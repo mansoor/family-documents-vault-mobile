@@ -1,0 +1,26 @@
+# Dependencies and build output
+node_modules/
+dist/
+coverage/
+.expo/
+web-build/
+
+# Generated native projects (expo prebuild) — never committed
+android/
+ios/
+
+# Signing keys and store credentials — never committed, anywhere
+*.jks
+*.keystore
+*.p12
+*.p8
+*.pem
+*.key
+google-services.json
+GoogleService-Info.plist
+.env
+.env.*
+
+# Design material lives only on the owner's machine
+docs-private/
+prototype/
