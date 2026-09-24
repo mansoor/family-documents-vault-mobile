@@ -67,8 +67,20 @@ Found before the session: Expo's `TextDecoder` decodes UTF-8 only.
 
 ## 5. CI
 
-_To fill in: minutes for the dev and preview builds, cold and warm, on the
-2-vCPU runner; the emulator probe; the monthly budget re-derived._
+First builds, 24 Sep 2026, commit 17c81ad, ubuntu-latest (2 vCPU), no
+Gradle or ccache cache yet (cold):
+
+| Build | Minutes | APK |
+|---|---|---|
+| dev (debug, arm64) | 17.9 | 143 MB |
+| preview (release, minified, arm64) | 20.7 | 53 MB |
+
+Both run in parallel when a tag or a native change triggers them, so a
+release costs about 39 runner minutes. Still to measure: the same builds
+warm (the Gradle cache from these runs), and the emulator boot probe.
+The monthly budget is re-derived once the warm figures are in. At cold
+figures, GitHub Free's 2,000 private-repo minutes a month would cover
+about 50 releases (both builds each), less what the check job uses.
 
 ## 6. ML Kit
 

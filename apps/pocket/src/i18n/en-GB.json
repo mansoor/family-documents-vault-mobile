@@ -1,0 +1,64 @@
+{
+  "common": {
+    "continue": "Continue",
+    "cancel": "Cancel",
+    "tryAgain": "Try again",
+    "openInBrowser": "Open in browser",
+    "working": "Working…"
+  },
+  "connect": {
+    "title": "Your vault",
+    "lead": "The address you open in your browser to use Family Document Vault.",
+    "address": "Vault address",
+    "addressHint": "vault.example.com, or 192.168.1.20:8080 at home",
+    "connect": "Connect",
+    "invalid": "That doesn't look like an address. It's the one you open in your browser, such as vault.example.com.",
+    "notAVault": "That address answered, but it isn't a Family Document Vault. Check the address — it's the one you open in your browser.",
+    "unreachable": "Can't reach {{host}}. Is this phone on the same Wi-Fi as the vault, or connected to your VPN?",
+    "setupRequired": "This vault hasn't been set up yet. Finish setting it up in a browser on a computer, then come back.",
+    "serverTooOld": "Your vault is on version {{server}}. This app needs {{needed}} or newer. Whoever looks after the vault can update it — it usually takes a few minutes.",
+    "showHow": "Show how",
+    "clientTooOld": "This version of the app is too old for your vault. It needs {{needed}} or newer; you have {{client}}. Update the app to carry on.",
+    "apiVersion": "This vault speaks a different version of the app's language ({{server}}). Update the app, or ask whoever looks after the vault.",
+    "askHttpTitle": "Not a secure connection",
+    "askHttp": "{{host}} doesn't use a secure connection. On your own Wi-Fi that's usually fine; anywhere else, other people on the network could see what you send. Use it on this Wi-Fi?",
+    "askHttpYes": "Use it on this Wi-Fi",
+    "refusePublicHttp": "The app only uses an unencrypted address inside your home network. Ask whoever runs the vault for its https:// address.",
+    "refuseMobileData": "This vault's address isn't secure, so the app only uses it on Wi-Fi.",
+    "stranger": "Something else is answering at {{host}} — not the vault you signed in to. Nothing was sent. If the vault was reinstalled, sign in again.",
+    "reinstalled": "This vault has been reinstalled since you last signed in. Sign in again."
+  },
+  "signIn": {
+    "title": "Sign in",
+    "to": "to {{name}}",
+    "email": "Email",
+    "password": "Password",
+    "signIn": "Sign in",
+    "codeStep": "One more step: the six-digit code from your authenticator app.",
+    "code": "Six-digit code",
+    "confirm": "Confirm",
+    "passkeyOnly": "You sign in with a passkey. The app can't use passkeys yet, so set a password in the browser (Settings → Password), then sign in here with it.",
+    "signedOutHere": "You've been signed out on this phone. Sign in again to carry on.",
+    "otherVault": "Use a different vault"
+  },
+  "home": {
+    "attentionTitle": "Needs attention",
+    "calm": "Nothing needs you right now.",
+    "recentTitle": "Recently added",
+    "none": "No documents yet. Add them from the browser for now — scanning with the phone comes next.",
+    "needsAName": "Needs a name",
+    "untitled": "Untitled document",
+    "offline": "No connection. What you see may be out of date.",
+    "settings": "Settings"
+  },
+  "settings": {
+    "title": "Settings",
+    "vault": "Vault",
+    "version": "Vault {{server}} · app {{app}}",
+    "signedInAs": "Signed in as {{email}}",
+    "largeText": "Large text",
+    "largeTextHint": "Makes all the app's text bigger, on top of your phone's own setting.",
+    "signOut": "Sign out",
+    "spike": "Scanner spike (test builds only)"
+  }
+}
