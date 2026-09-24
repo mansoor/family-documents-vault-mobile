@@ -1,0 +1,3 @@
+[submodule "vendor/fdv"]
+	path = vendor/fdv
+	url = https://github.com/mansoor/family-documents-vault.git

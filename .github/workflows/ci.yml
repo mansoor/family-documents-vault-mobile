@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [develop, main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  guard:
+    name: Guard
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+          fetch-depth: 0
+      - name: Nothing private, no signing keys, no store credentials
+        run: |
+          if git ls-files | grep -E '^(docs-private|prototype)/'; then
+            echo "::error::Private folders are tracked"; exit 1
+          fi
+          if git ls-files | grep -E '\.(jks|keystore|p12|p8)$|google-services\.json|GoogleService-Info\.plist|(^|/)\.env'; then
+            echo "::error::A key, a credential file or an .env is tracked"; exit 1
+          fi
+      - name: The pinned public commit is released or on develop
+        run: |
+          git -C vendor/fdv fetch --quiet origin develop --tags
+          if git -C vendor/fdv merge-base --is-ancestor HEAD origin/develop; then
+            echo "vendor/fdv is on public develop"
+          elif git -C vendor/fdv describe --exact-match --tags HEAD; then
+            echo "vendor/fdv is a public tag"
+          else
+            echo "::error::vendor/fdv points at a commit that is neither on public develop nor tagged"; exit 1
+          fi
+
+  check:
+    name: Lint, typecheck, test, bundle
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+      - name: Bundle for Android (Hermes compiles everything, @fdv/shared included)
+        working-directory: apps/pocket
+        run: APP_VARIANT=preview npx expo export --platform android --output-dir dist-android
+      - name: expo-doctor
+        working-directory: apps/pocket
+        run: npx expo-doctor
