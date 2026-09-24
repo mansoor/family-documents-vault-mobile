@@ -1,0 +1,3 @@
+packages:
+  - apps/*
+  - vendor/fdv/packages/shared

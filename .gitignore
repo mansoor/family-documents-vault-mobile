@@ -24,3 +24,6 @@ GoogleService-Info.plist
 # Design material lives only on the owner's machine
 docs-private/
 prototype/
+
+# Local export output
+dist-*/

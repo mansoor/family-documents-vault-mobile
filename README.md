@@ -9,4 +9,44 @@ This repository is private. It consumes the public repository's
 platform-neutral packages (`@fdv/shared`, `@fdv/client`) as a git submodule at
 `vendor/fdv`, and never the other way round.
 
-Build and sideload instructions arrive with iteration 4.0.
+## The builds
+
+| Build | Name on the phone | What it is for |
+| --- | --- | --- |
+| dev | FV dev | Development: the JavaScript comes from the laptop (Metro, port 8081). |
+| preview | FV test | A test build with everything inside it and a **TEST BUILD** banner. |
+| e2e | FV e2e | The emulator's build, with fake fixtures (from 4.5). |
+| release | Family Vault | The real app, signed with the owner's key (from the Phase 4 exit). |
+
+Each has its own id, so they can sit on one phone side by side.
+
+**Test builds talk to throwaway vaults only** — a stack started for the test,
+on port 8099, never the family's own vault on 8080.
+
+## Installing a test build on an Android phone
+
+1. On the phone, open the repository's **Releases** page and download the APK
+   from **preview-latest** (or **dev-latest**).
+2. Allow your browser to install apps when Android asks ("Install unknown
+   apps" for that browser), then open the APK.
+3. The phone reaches the throwaway vault at `http://<laptop's address>:8099`
+   on the same Wi-Fi. The laptop needs inbound firewall rules for TCP 8099
+   (the vault) and TCP 8081 (Metro, dev builds only), private networks only.
+
+APKs are built by GitHub Actions (`android.yml`), never on the laptop: run it
+by hand from the Actions tab, or push a `v*` tag for a preview build.
+
+## Working on it
+
+Node 22 and pnpm 9.15.9. Clone with `--recurse-submodules` into a path without
+spaces (Gradle, Metro and pnpm dislike them), then:
+
+```bash
+pnpm install
+pnpm lint && pnpm typecheck && pnpm test
+```
+
+`vendor/fdv` is the public repository, pinned. Its push URL is disabled on
+purpose: changes to the server or the shared packages go through the public
+repository and its pull requests, and are pinned here afterwards. CI refuses
+a pin that is neither on the public `develop` nor a release tag.

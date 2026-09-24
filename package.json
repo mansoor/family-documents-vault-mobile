@@ -1,0 +1,16 @@
+{
+  "name": "fdv-mobile",
+  "private": true,
+  "packageManager": "pnpm@9.15.9",
+  "engines": {
+    "node": ">=22.13 <23"
+  },
+  "scripts": {
+    "lint": "pnpm --filter @fdv/pocket lint",
+    "typecheck": "pnpm --filter @fdv/pocket typecheck",
+    "test": "pnpm --filter @fdv/pocket test"
+  },
+  "devDependencies": {
+    "tsx": "^4"
+  }
+}
