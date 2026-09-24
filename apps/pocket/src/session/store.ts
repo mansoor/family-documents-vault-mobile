@@ -47,13 +47,20 @@ let installation: string | null = null;
  */
 export async function installationId(): Promise<string> {
   if (installation) return installation;
-  const stored = await secureGet(INSTALLATION_KEY);
+  let stored: string | null = null;
+  try {
+    stored = await secureGet(INSTALLATION_KEY);
+  } catch {
+    // Unreadable (a keystore key lost with a restored backup): start again.
+    await secureDelete(INSTALLATION_KEY).catch(() => undefined);
+  }
   if (stored) {
     installation = stored;
     return stored;
   }
   const made = randomUUID();
-  await secureSet(INSTALLATION_KEY, made);
+  // A keystore that will not take it still leaves this run an id.
+  await secureSet(INSTALLATION_KEY, made).catch(() => undefined);
   installation = made;
   return made;
 }

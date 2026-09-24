@@ -37,6 +37,9 @@ jobs:
     timeout-minutes: 60
     env:
       VARIANT: ${{ inputs.variant || (startsWith(github.ref, 'refs/tags/') && 'preview') || 'dev' }}
+      # Every step, Gradle's included: its bundling step reads app.config.ts
+      # and babel.config.js again, and without this they would say dev.
+      APP_VARIANT: ${{ inputs.variant || (startsWith(github.ref, 'refs/tags/') && 'preview') || 'dev' }}
       NDK_VERSION: 27.1.12297006
     steps:
       - name: Start the clock
@@ -69,7 +72,7 @@ jobs:
           fi
       - name: Generate the native project
         working-directory: apps/pocket
-        run: APP_VARIANT=$VARIANT npx expo prebuild --platform android --no-install --clean
+        run: npx expo prebuild --platform android --no-install --clean
       - name: Gradle
         working-directory: apps/pocket/android
         run: |

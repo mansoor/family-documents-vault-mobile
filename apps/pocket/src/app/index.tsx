@@ -21,7 +21,7 @@ interface HomeData {
  */
 export default function Home() {
   const { t } = useTranslation();
-  const { caps, vault, offline, withToken, api } = useVault();
+  const { caps, vault, offline, notice, withToken, api } = useVault();
   const [data, setData] = useState<HomeData | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -80,7 +80,15 @@ export default function Home() {
                 </Pressable>
               </Link>
             </View>
-            {offline ? (
+            {notice === 'stranger' ? (
+              <Notice tone="danger" testID="home-stranger">
+                {t('connect.stranger', { host: vault?.origin.replace(/^https?:\/\//, '') ?? '' })}
+              </Notice>
+            ) : notice === 'wifi_only' ? (
+              <Notice tone="warn" testID="home-wifi-only">
+                {t('connect.refuseMobileData')}
+              </Notice>
+            ) : offline ? (
               <Notice tone="warn" testID="home-offline">
                 {t('home.offline')}
               </Notice>

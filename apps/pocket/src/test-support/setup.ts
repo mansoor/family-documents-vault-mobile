@@ -49,10 +49,20 @@ jest.mock('expo-file-system', () => {
   return { File, Paths: { document: { uri: 'doc:' }, cache: { uri: 'cache:' } } };
 });
 
-jest.mock('expo-network', () => ({
-  NetworkStateType: { WIFI: 'WIFI', CELLULAR: 'CELLULAR', ETHERNET: 'ETHERNET', NONE: 'NONE', UNKNOWN: 'UNKNOWN' },
-  getNetworkStateAsync: jest.fn(async () => ({ type: 'WIFI', isConnected: true, isInternetReachable: true })),
-}));
+const networkListeners = new Set<() => void>();
+(globalThis as Record<string, unknown>).__networkListeners = networkListeners;
+
+jest.mock('expo-network', () => {
+  const listeners = (globalThis as unknown as { __networkListeners: Set<() => void> }).__networkListeners;
+  return {
+    NetworkStateType: { WIFI: 'WIFI', CELLULAR: 'CELLULAR', ETHERNET: 'ETHERNET', NONE: 'NONE', UNKNOWN: 'UNKNOWN' },
+    getNetworkStateAsync: jest.fn(async () => ({ type: 'WIFI', isConnected: true, isInternetReachable: true })),
+    addNetworkStateListener: (listener: () => void) => {
+      listeners.add(listener);
+      return { remove: () => listeners.delete(listener) };
+    },
+  };
+});
 
 jest.mock('expo-device', () => ({ manufacturer: 'Test', modelName: 'Phone 1', osVersion: '15' }));
 
@@ -69,6 +79,7 @@ jest.mock('expo-crypto', () => {
 beforeEach(() => {
   secure.clear();
   files.clear();
+  networkListeners.clear();
 });
 
 // Under Jest there is no app.config to read, so the app would call itself

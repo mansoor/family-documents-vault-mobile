@@ -62,7 +62,13 @@ function proxy(req, res) {
 }
 
 function file(req, res) {
-  const wanted = decodeURIComponent(new URL(req.url, 'http://x').pathname);
+  let wanted;
+  try {
+    wanted = decodeURIComponent(new URL(req.url, 'http://x').pathname);
+  } catch {
+    res.writeHead(400).end();
+    return;
+  }
   let target = path.join(root, path.normalize(wanted));
   if (target !== root && !target.startsWith(root + path.sep)) {
     res.writeHead(400).end();

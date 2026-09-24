@@ -4,6 +4,7 @@ import {
   createHttp,
   isSessionOver,
   NetworkError,
+  serverOriginFrom,
   SessionCore,
   type Api,
   type FetchLike,
@@ -16,8 +17,8 @@ import { AppState } from 'react-native';
 import { log } from '../log';
 import { appHeaders } from '../net/app-headers';
 import type { ConnectOutcome } from '../net/connect';
-import { currentNetwork } from '../net/network';
-import { identityCheck, type NetworkKind } from '../net/policy';
+import { currentNetwork, onNetworkChange } from '../net/network';
+import { httpDecision, identityCheck, type NetworkKind } from '../net/policy';
 import { firstLaunch } from '../platform/prefs';
 import { forgetPreviousInstallation, installationId, SecureTokenStore } from '../session/store';
 import { leaveVault, readVaults, saveVault, updateVault, type VaultRecord } from './vaults';
@@ -32,24 +33,28 @@ import { leaveVault, readVaults, saveVault, updateVault, type VaultRecord } from
  *    session and shows the offline banner; only the vault saying so ends it.
  *  - **Nothing secret goes to a plain-http vault unless it is the one that
  *    was approved.** Before a token or a password is sent over http, the
- *    vault answering on this network must give the recorded instance_id —
- *    checked at most five minutes ago, and again whenever the network
- *    changes or the app comes back to the front.
+ *    phone must be on Wi-Fi or Ethernet, and the vault answering on this
+ *    network must give the recorded instance_id — checked at most five
+ *    minutes ago, and again after any network change (one Wi-Fi to another
+ *    included) or the app coming back to the front.
  */
 
 export type Phase = 'loading' | 'connect' | 'sign_in' | 'ready';
-export type Notice = 'signed_out_here' | 'reinstalled' | 'stranger' | null;
+export type Notice = 'signed_out_here' | 'reinstalled' | 'stranger' | 'wifi_only' | null;
 
 export type SignInResult =
   | { kind: 'ok' }
   | { kind: 'code' }
   | { kind: 'refused'; message: string; passkeyHint: boolean }
   | { kind: 'unreachable' }
-  | { kind: 'stranger' };
+  | { kind: 'stranger' }
+  | { kind: 'wifi_only' };
 
 export interface VaultDeps {
   fetch: FetchLike;
   network: () => Promise<NetworkKind>;
+  /** Calls back on any change of network; returns the unsubscribe. */
+  onNetworkChange: (callback: () => void) => () => void;
   store: TokenStore;
   now: () => number;
 }
@@ -88,9 +93,22 @@ export class StrangerError extends Error {
   }
 }
 
+/** An http vault, and the phone is not on Wi-Fi or Ethernet: nothing is sent. */
+export class WifiOnlyError extends Error {
+  constructor() {
+    super('This vault is only used on Wi-Fi.');
+    this.name = 'WifiOnlyError';
+  }
+}
+
+/** Anything that means "no usable answer from the vault here and now". */
+const unusable = (err: unknown) =>
+  err instanceof NetworkError || err instanceof StrangerError || err instanceof WifiOnlyError;
+
 const defaultDeps = (): VaultDeps => ({
   fetch: (url, init) => globalThis.fetch(url, init as RequestInit) as unknown as Promise<ResponseLike>,
   network: currentNetwork,
+  onNetworkChange,
   store: new SecureTokenStore(),
   now: () => Date.now(),
 });
@@ -103,54 +121,107 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
   const [offline, setOffline] = useState(false);
   const [notice, setNotice] = useState<Notice>(null);
   const [installation, setInstallation] = useState<string | null>(null);
-  const verified = useRef<{ at: number; network: NetworkKind } | null>(null);
+  const verified = useRef<{ at: number; network: NetworkKind; epoch: number } | null>(null);
+  // Bumped on every network change: an identity check that began on the
+  // previous network says nothing about this one.
+  const epoch = useRef(0);
   const mfaToken = useRef<string | null>(null);
 
+  // Keyed on the origin, not the record: saving the email after sign-in
+  // must not make a new client, and with it a new session core that has
+  // forgotten the access token it was just given.
+  const origin = vault?.origin ?? null;
   const api = useMemo(() => {
-    if (!vault || !installation) return null;
+    if (!origin || !installation) return null;
     return createApi(
       createHttp({
-        baseUrl: vault.origin,
+        baseUrl: origin,
         fetch: deps.fetch,
         headers: () => appHeaders(installation),
         timeoutMs: 20_000,
       }),
     );
-  }, [vault, installation, deps.fetch]);
+  }, [origin, installation, deps.fetch]);
 
-  /** For an http vault: is the one answering here the approved one? */
+  useEffect(
+    () =>
+      deps.onNetworkChange(() => {
+        epoch.current += 1;
+        verified.current = null;
+      }),
+    [deps],
+  );
+
+  /**
+   * For an http vault: may anything secret go to it, here and now? Only on
+   * Wi-Fi or Ethernet, and only if the vault answering on this network is
+   * the approved one. Throws WifiOnlyError, StrangerError or NetworkError.
+   */
   const gate = useCallback(async (): Promise<void> => {
     if (!vault || !api || vault.origin.startsWith('https://')) return;
-    const network = await deps.network();
-    const v = verified.current;
-    if (v && v.network === network && deps.now() - v.at < IDENTITY_TTL) return;
-    const answered = await api.capabilities(); // NetworkError propagates: offline
-    const identity = identityCheck(vault.origin, vault.instanceId, answered.instance_id);
-    if (identity.kind !== 'same') {
+    // A check that the network changed under is thrown away and made again.
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const started = epoch.current;
+      const network = await deps.network();
+      const decision = httpDecision(
+        { origin: vault.origin, host: serverOriginFrom(vault.origin)?.host ?? '' },
+        network,
+        vault,
+      );
+      if (decision.kind === 'refuse_mobile_data') {
+        verified.current = null;
+        setNotice('wifi_only');
+        throw new WifiOnlyError();
+      }
+      if (decision.kind !== 'allowed') {
+        // No longer approved, or no longer private: send it nothing.
+        verified.current = null;
+        setNotice('stranger');
+        throw new StrangerError();
+      }
+      const v = verified.current;
+      if (v && v.epoch === started && v.network === network && deps.now() - v.at < IDENTITY_TTL) return;
       verified.current = null;
-      setNotice('stranger');
-      log.warn('identity.mismatch', { secure: false });
-      throw new StrangerError();
+      const answered = await api.capabilities(); // NetworkError propagates: offline
+      if (epoch.current !== started) continue;
+      const identity = identityCheck(vault.origin, vault.instanceId, answered.instance_id);
+      if (identity.kind !== 'same') {
+        setNotice('stranger');
+        log.warn('identity.mismatch', { secure: false });
+        throw new StrangerError();
+      }
+      verified.current = { at: deps.now(), network, epoch: started };
+      setNotice((n) => (n === 'stranger' || n === 'wifi_only' ? null : n));
+      setCaps(answered);
+      return;
     }
-    verified.current = { at: deps.now(), network };
-    setCaps(answered);
+    throw new NetworkError('offline');
   }, [vault, api, deps]);
+
+  // The session core outlives changes to the vault record, so it reaches
+  // the gate through a ref. Until the first effect has run it refuses.
+  const gateRef = useRef<() => Promise<void>>(async () => {
+    throw new NetworkError('offline');
+  });
+  useEffect(() => {
+    gateRef.current = gate;
+  }, [gate]);
 
   const session = useMemo(
     () =>
       new SessionCore(
-        // The refresher reads the identity cache (a ref) when a refresh
-        // runs, not while rendering; the compiler cannot see that from here.
+        // The refresher reads the gate (a ref) when a refresh runs, not
+        // while rendering; the compiler cannot see that from here.
         // eslint-disable-next-line react-hooks/refs
         {
           refresh: async (refreshToken: string) => {
             if (!api) throw new NetworkError('offline');
             try {
-              await gate();
+              await gateRef.current();
             } catch (err) {
-              // Not the approved vault: say nothing to it, and treat it as
-              // no answer — the session stays for when the right one is back.
-              if (err instanceof StrangerError) throw new NetworkError('offline');
+              // Not the approved vault, or not on Wi-Fi: say nothing to it,
+              // and treat it as no answer — the session stays for later.
+              if (unusable(err)) throw new NetworkError('offline');
               throw err;
             }
             return api.refresh(refreshToken);
@@ -159,15 +230,22 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
         deps.store,
         { now: deps.now },
       ),
-    [api, gate, deps.store, deps.now],
+    [api, deps.store, deps.now],
   );
 
   // Each session core reads the store once. Anything that wants a token
   // waits for that read: a core that has not read it yet says "signed out",
-  // and believing it would clear a session that is really there.
+  // and believing it would clear a session that is really there. A store
+  // that cannot be read counts as empty: signed out, not stuck.
   const hydration = useRef<{ core: SessionCore; done: Promise<void> } | null>(null);
   const hydrated = useCallback((core: SessionCore): Promise<void> => {
-    if (hydration.current?.core !== core) hydration.current = { core, done: core.hydrate() };
+    if (hydration.current?.core !== core) {
+      const done = core.hydrate().catch(async () => {
+        log.error('session.unreadable', {});
+        await core.clear().catch(() => undefined);
+      });
+      hydration.current = { core, done };
+    }
     return hydration.current.done;
   }, []);
 
@@ -175,14 +253,20 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
   useEffect(() => {
     let cancelled = false;
     void (async () => {
-      if (firstLaunch()) await forgetPreviousInstallation();
-      const id = await installationId();
-      const v = readVaults();
-      const current = v.known.find((k) => k.origin === v.current) ?? null;
-      if (cancelled) return;
-      setInstallation(id);
-      setVault(current);
-      if (!current) setPhase('connect');
+      try {
+        if (firstLaunch()) await forgetPreviousInstallation();
+        const id = await installationId();
+        const v = readVaults();
+        const current = v.known.find((k) => k.origin === v.current) ?? null;
+        if (cancelled) return;
+        setInstallation(id);
+        setVault(current);
+        if (!current) setPhase('connect');
+      } catch {
+        // Never stuck on the loading screen: start from Connect.
+        log.error('launch.failed', {});
+        if (!cancelled) setPhase('connect');
+      }
     })();
     return () => {
       cancelled = true;
@@ -203,25 +287,39 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
   }, [vault, api, session, phase, hydrated]);
 
   const recheck = useCallback(async () => {
-    if (!api) return;
+    if (!api || !vault) return;
+    epoch.current += 1;
     verified.current = null;
+    if (vault.origin.startsWith('http://')) {
+      // Over http only the gate may believe what answers: a stranger's
+      // capability document is not shown, and does not clear the banner.
+      try {
+        await gate();
+        setOffline(false);
+      } catch (err) {
+        if (unusable(err)) setOffline(true);
+      }
+      return;
+    }
     try {
       const answered = await api.capabilities();
       setOffline(false);
-      if (vault && vault.origin.startsWith('https://')) {
-        const identity = identityCheck(vault.origin, vault.instanceId, answered.instance_id);
-        if (identity.kind === 'reinstalled') {
-          await session.clear();
-          setNotice('reinstalled');
-          setPhase('sign_in');
-          return;
-        }
+      const identity = identityCheck(vault.origin, vault.instanceId, answered.instance_id);
+      if (identity.kind === 'reinstalled' || identity.kind === 'first') {
+        // Record who is there now, so the next look does not say so again.
+        const next = updateVault(vault.origin, { instanceId: answered.instance_id ?? null });
+        setVault(next.known.find((k) => k.origin === vault.origin) ?? vault);
       }
       setCaps(answered);
+      if (identity.kind === 'reinstalled') {
+        await session.clear();
+        setNotice('reinstalled');
+        setPhase('sign_in');
+      }
     } catch (err) {
       if (err instanceof NetworkError) setOffline(true);
     }
-  }, [api, vault, session]);
+  }, [api, vault, session, gate]);
 
   // Coming back to the front: look again, as the network may have changed.
   useEffect(() => {
@@ -235,7 +333,12 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
     async <T,>(fn: (a: Api, token: string) => Promise<T>): Promise<T> => {
       if (!api) throw new NetworkError('offline');
       await hydrated(session);
-      await gate();
+      try {
+        await gate();
+      } catch (err) {
+        if (unusable(err)) setOffline(true);
+        throw err;
+      }
       const t = await session.token();
       if (t.kind === 'offline') {
         setOffline(true);
@@ -304,6 +407,7 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
 
   const signInFailed = (err: unknown): SignInResult => {
     if (err instanceof StrangerError) return { kind: 'stranger' };
+    if (err instanceof WifiOnlyError) return { kind: 'wifi_only' };
     if (err instanceof NetworkError) return { kind: 'unreachable' };
     if (err instanceof ApiRequestError) {
       return { kind: 'refused', message: err.message, passkeyHint: err.code === 'invalid_credentials' };

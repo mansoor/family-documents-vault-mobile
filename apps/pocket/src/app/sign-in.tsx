@@ -106,6 +106,11 @@ export default function SignIn() {
           {failure?.kind === 'stranger' ? (
             <Notice tone="danger">{t('connect.stranger', { host: vault?.origin.replace(/^https?:\/\//, '') ?? '' })}</Notice>
           ) : null}
+          {failure?.kind === 'wifi_only' ? (
+            <Notice tone="warn" testID="sign-in-wifi-only">
+              {t('connect.refuseMobileData')}
+            </Notice>
+          ) : null}
           <Button kind="quiet" label={t('signIn.otherVault')} onPress={() => void chooseAnotherVault()} />
         </ScrollView>
       </KeyboardAvoidingView>

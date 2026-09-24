@@ -11,7 +11,8 @@ import { isPrivateHost, type ServerAddress } from '@fdv/client';
  *  - only to a private address (the home network, a VPN such as Tailscale,
  *    this device), never to anything on the internet;
  *  - only on Wi-Fi or Ethernet, never on mobile data, where "private"
- *    addresses belong to the carrier, not the family;
+ *    addresses belong to the carrier, not the family — and not when the
+ *    phone cannot say which network it is on;
  *  - only after the person has been told, once per vault, what it means.
  *
  * And nothing secret is sent to an http address unless the vault answering
@@ -19,7 +20,12 @@ import { isPrivateHost, type ServerAddress } from '@fdv/client';
  * address on another network — a café's 192.168.1.20 — is somebody else.
  */
 
-export type NetworkKind = 'wifi' | 'ethernet' | 'cellular' | 'none' | 'unknown';
+/**
+ * 'unknown' is a phone that cannot say which network it is on, treated as
+ * mobile data. 'browser' is the web build (development and the browser
+ * tests), where no network can be named and the vault is on this machine.
+ */
+export type NetworkKind = 'wifi' | 'ethernet' | 'cellular' | 'none' | 'unknown' | 'browser';
 
 /** What the phone remembers about a vault it has connected to. */
 export interface KnownVault {
@@ -44,7 +50,7 @@ export function httpDecision(
 ): HttpDecision {
   if (address.origin.startsWith('https://')) return { kind: 'secure' };
   if (!isPrivateHost(address.host)) return { kind: 'refuse_public' };
-  if (network === 'cellular') return { kind: 'refuse_mobile_data' };
+  if (network === 'cellular' || network === 'unknown') return { kind: 'refuse_mobile_data' };
   if (!known?.httpApproved) return { kind: 'ask' };
   return { kind: 'allowed' };
 }

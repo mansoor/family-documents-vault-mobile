@@ -36,6 +36,17 @@ describe('plain http', () => {
     expect(httpDecision(at('http://100.101.102.103'), 'cellular', undefined)).toEqual({ kind: 'refuse_mobile_data' });
   });
 
+  it('a phone that cannot say which network it is on is treated as on mobile data', () => {
+    const address = at('http://192.168.1.20:8099');
+    expect(httpDecision(address, 'unknown', known(address.origin))).toEqual({ kind: 'refuse_mobile_data' });
+  });
+
+  it('the browser build asks, like Wi-Fi', () => {
+    const address = at('http://localhost:8098');
+    expect(httpDecision(address, 'browser', undefined)).toEqual({ kind: 'ask' });
+    expect(httpDecision(address, 'browser', known(address.origin))).toEqual({ kind: 'allowed' });
+  });
+
   it('https is always fine', () => {
     expect(httpDecision(at('vault.example.com'), 'cellular', undefined)).toEqual({ kind: 'secure' });
   });
