@@ -1,247 +1,172 @@
-import { scanDocument } from '@preeternal/react-native-document-scanner-plugin';
-import * as Crypto from 'expo-crypto';
-import { File, Paths } from 'expo-file-system';
-import * as ImagePicker from 'expo-image-picker';
+import { colours, radii, type DocumentView, type ReminderView } from '@fdv/shared';
+import { Image } from 'expo-image';
 import { Link } from 'expo-router';
-import * as Sharing from 'expo-sharing';
-import { useEffect, useRef, useState } from 'react';
-import { AppState, Image, ScrollView, StyleSheet, View } from 'react-native';
-import { buildPdf, type JpegPage } from '../pdf/build';
-import { jpegSize } from '../pdf/jpeg-size';
-import { captureFromBytes, captureFromFile, signIn, signInSecondStep } from '../spike/api';
-import { loadLastRun, saveLastRun, type LastRun } from '../spike/last-run';
-import { Timeline, type TimelineExport } from '../spike/timeline';
-import { Button, Card, Field, Line } from '../spike/ui';
+import { Settings as SettingsIcon } from 'lucide-react-native';
+import { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useVault } from '../state/vault';
+import { Card, Notice, StatusLine, Text } from '../ui';
+
+interface HomeData {
+  due: ReminderView[];
+  recent: DocumentView[];
+  token: string;
+}
 
 /**
- * The scanner spike (dev and preview builds only; never shipped).
- *
- * Sign in to a throwaway vault, scan with ML Kit's document scanner, build
- * the PDF on the phone, upload it both ways, and time every stage. The
- * numbers decide whether this scanner is the one (the kill criterion in
- * FINDINGS): tap → pages accepted, median ≤ 10 s, worst ≤ 12 s.
+ * Home: what needs attention, and what came in lately. It shows what it
+ * last had when the vault cannot be reached, under a plain banner.
  */
+export default function Home() {
+  const { t } = useTranslation();
+  const { caps, vault, offline, notice, withToken, api } = useVault();
+  const [data, setData] = useState<HomeData | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
-const hex = (buf: ArrayBuffer) => Array.from(new Uint8Array(buf), (b) => b.toString(16).padStart(2, '0')).join('');
-
-export default function Spike() {
-  const [base, setBase] = useState('http://192.168.1.10:8099');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [code, setCode] = useState('');
-  const [mfaToken, setMfaToken] = useState<string | null>(null);
-  const [token, setToken] = useState<string | null>(null);
-  const [status, setStatus] = useState<string | null>(null);
-  const [pages, setPages] = useState<string[]>([]);
-  const [run, setRun] = useState<LastRun | null>(() => loadLastRun());
-  const [busy, setBusy] = useState(false);
-  const timeline = useRef<Timeline | null>(null);
-
-  // The scanner is another app's activity: ours leaves the foreground when
-  // it opens, which is the closest thing to "the scanner is showing".
-  useEffect(() => {
-    const sub = AppState.addEventListener('change', (state) => {
-      const t = timeline.current;
-      if (t && state !== 'active' && t.between('tap', 'scannerShown') === null) t.mark('scannerShown');
-    });
-    return () => sub.remove();
-  }, []);
-
-  const origin = base.trim().replace(/\/+$/, '');
-
-  async function doSignIn() {
-    setBusy(true);
-    setStatus(null);
+  const load = useCallback(async () => {
     try {
-      const result = mfaToken
-        ? await signInSecondStep(origin, mfaToken, code.trim())
-        : await signIn(origin, email.trim(), password);
-      if (result.kind === 'signed_in') {
-        setToken(result.accessToken);
-        setMfaToken(null);
-        setStatus('Signed in.');
-      } else if (result.kind === 'second_step') {
-        setMfaToken(result.mfaToken);
-        setStatus('Enter the code from your authenticator.');
-      } else {
-        setStatus(`Refused (${result.status}): ${result.message}`);
-      }
-    } catch (err) {
-      setStatus(`Could not reach ${origin}: ${(err as Error).message}`);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function upload(uris: string[], t: Timeline) {
-    const read: JpegPage[] = [];
-    for (const [i, uri] of uris.entries()) {
-      const bytes = await new File(uri).bytes();
-      t.note(`page${i + 1}Bytes`, bytes.length);
-      read.push({ bytes, ...jpegSize(bytes) });
-    }
-    const started = Date.now();
-    const pdf = await buildPdf(read);
-    t.mark('pdfBuilt');
-    t.note('pdfMs', Date.now() - started);
-    t.note('pdfBytes', pdf.length);
-    const sha = hex(await Crypto.digest(Crypto.CryptoDigestAlgorithm.SHA256, pdf));
-
-    const file = new File(Paths.cache, 'spike-scan.pdf');
-    if (file.exists) file.delete();
-    file.create();
-    file.write(pdf);
-
-    const results: LastRun['results'] = [];
-    if (token) {
-      const a = await captureFromFile(origin, token, file.uri, Crypto.randomUUID());
-      if (a.status === 201) t.mark('created201');
-      results.push({ variant: 'file', status: a.status });
-      const b = await captureFromBytes(origin, token, pdf, Crypto.randomUUID());
-      results.push({ variant: 'bytes', status: b.status });
-    }
-    file.delete();
-    const next: LastRun = { at: new Date().toISOString(), timeline: t.export(), pdfSha256: sha, results };
-    saveLastRun(next);
-    setRun(next);
-  }
-
-  async function scan() {
-    const t = new Timeline();
-    timeline.current = t;
-    t.mark('tap');
-    setBusy(true);
-    try {
-      const result = await scanDocument({
-        maxNumDocuments: 10,
-        croppedImageQuality: 80,
-        responseType: 'imageFilePath' as never,
-        scannerMode: 'full',
+      const next = await withToken(async (a, token) => {
+        const [due, recent] = await Promise.all([
+          a.reminders(token, 'due'),
+          a.documents(token, { limit: 20 }),
+        ]);
+        return { due: due.items, recent: recent.items, token };
       });
-      if (result.status !== 'success' || result.scannedImages.length === 0) {
-        setStatus('Scan cancelled.');
-        return;
-      }
-      t.mark('pagesAccepted');
-      setPages(result.scannedImages);
-      await upload(result.scannedImages, t);
-      setStatus('Done.');
-    } catch (err) {
-      setStatus(`Scan failed: ${(err as Error).message}`);
-    } finally {
-      timeline.current = null;
-      setBusy(false);
+      setData(next);
+    } catch {
+      // Offline or signed out: the banner or the sign-in screen says so.
     }
-  }
+  }, [withToken]);
 
-  /** The baseline: an ordinary photo, no scanner. */
-  async function photo() {
-    const t = new Timeline();
-    t.mark('tap');
-    setBusy(true);
-    try {
-      const shot = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.8, exif: false });
-      if (shot.canceled || !shot.assets[0]) {
-        setStatus('Photo cancelled.');
-        return;
-      }
-      t.mark('pagesAccepted');
-      setPages([shot.assets[0].uri]);
-      await upload([shot.assets[0].uri], t);
-      setStatus('Done.');
-    } catch (err) {
-      setStatus(`Photo failed: ${(err as Error).message}`);
-    } finally {
-      setBusy(false);
-    }
-  }
+  useEffect(() => {
+    // Loading on arrival: the state is set after the requests answer, not
+    // synchronously, which is what the rule is about.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void load();
+  }, [load]);
 
-  async function share() {
-    if (!run) return;
-    const out = new File(Paths.cache, 'spike-timeline.json');
-    if (out.exists) out.delete();
-    out.create();
-    out.write(JSON.stringify(run, null, 2));
-    await Sharing.shareAsync(out.uri, { mimeType: 'application/json' });
-  }
+  const refresh = async () => {
+    setRefreshing(true);
+    await load();
+    setRefreshing(false);
+  };
+
+  const name = caps?.branding.display_name ?? vault?.displayName ?? '';
 
   return (
-    <ScrollView contentContainerStyle={styles.page} keyboardShouldPersistTaps="handled">
-      <Card title="1. Vault">
-        <Field label="Address" value={base} onChangeText={setBase} keyboardType="url" />
-        {mfaToken ? (
-          <Field label="Code" value={code} onChangeText={setCode} keyboardType="number-pad" />
-        ) : (
-          <>
-            <Field label="Email" value={email} onChangeText={setEmail} keyboardType="email-address" />
-            <Field label="Password" value={password} onChangeText={setPassword} secureTextEntry />
-          </>
-        )}
-        <Button label={token ? 'Signed in' : 'Sign in'} onPress={() => void doSignIn()} disabled={busy} />
-      </Card>
-
-      <Card title="2. Scan">
-        <Button label="Scan a document" onPress={() => void scan()} disabled={busy} />
-        <Button label="Photo instead" onPress={() => void photo()} disabled={busy} quiet />
-        {status ? <Line>{status}</Line> : null}
-        {pages.length ? (
-          <ScrollView horizontal contentContainerStyle={styles.strip}>
-            {pages.map((uri, i) => (
-              <Image
-                key={uri}
-                source={{ uri }}
-                style={styles.page1}
-                accessibilityLabel={`Page ${i + 1}`}
-                accessibilityIgnoresInvertColors
-              />
+    <SafeAreaView style={styles.safe} edges={['top']}>
+      <FlatList
+        testID="home-list"
+        data={data?.recent ?? []}
+        keyExtractor={(d) => d.id}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void refresh()} />}
+        contentContainerStyle={styles.page}
+        ListHeaderComponent={
+          <View style={styles.header}>
+            <View style={styles.titleRow}>
+              <Text variant="hero" style={styles.flex}>
+                {name}
+              </Text>
+              <Link href="/settings" asChild>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={t('home.settings')}
+                  hitSlop={12}
+                  style={styles.iconButton}
+                >
+                  <SettingsIcon color={colours.inkSoft} size={24} />
+                </Pressable>
+              </Link>
+            </View>
+            {notice === 'stranger' ? (
+              <Notice tone="danger" testID="home-stranger">
+                {t('connect.stranger', { host: vault?.origin.replace(/^https?:\/\//, '') ?? '' })}
+              </Notice>
+            ) : notice === 'wifi_only' ? (
+              <Notice tone="warn" testID="home-wifi-only">
+                {t('connect.refuseMobileData')}
+              </Notice>
+            ) : offline ? (
+              <Notice tone="warn" testID="home-offline">
+                {t('home.offline')}
+              </Notice>
+            ) : null}
+            <Text variant="screen">{t('home.attentionTitle')}</Text>
+            {data && data.due.length === 0 ? (
+              <Text tone="soft" testID="home-calm">
+                {t('home.calm')}
+              </Text>
+            ) : null}
+            {data?.due.map((r) => (
+              <Card key={r.id} style={styles.dueCard}>
+                <Text weight="600">{r.document_title ?? t('home.untitled')}</Text>
+                <Text variant="secondary" tone="warn" weight="600">
+                  {r.label}
+                </Text>
+              </Card>
             ))}
-          </ScrollView>
-        ) : null}
-      </Card>
-
-      {run ? <Timing run={run} onShare={() => void share()} /> : null}
-
-      <Link href="/probes" asChild>
-        <Button label="Probes" onPress={() => undefined} quiet />
-      </Link>
-      <View style={styles.bottom} />
-    </ScrollView>
+            <Text variant="screen" style={styles.recentTitle}>
+              {t('home.recentTitle')}
+            </Text>
+            {data && data.recent.length === 0 ? <Text tone="soft">{t('home.none')}</Text> : null}
+          </View>
+        }
+        renderItem={({ item }) => (
+          <DocumentRow doc={item} token={data?.token ?? null} thumb={api && item.latest_version_id ? api.thumbnailUrl(item.latest_version_id) : null} />
+        )}
+      />
+    </SafeAreaView>
   );
 }
 
-function Timing(props: { run: LastRun; onShare: () => void }) {
-  const { timeline, results, pdfSha256 } = props.run;
-  const at = (m: TimelineExport['marks'][number]['mark']) => timeline.marks.find((x) => x.mark === m)?.ms;
-  const accepted = at('pagesAccepted');
+function DocumentRow(props: { doc: DocumentView; token: string | null; thumb: string | null }) {
+  const { t } = useTranslation();
+  const { doc } = props;
   return (
-    <Card title="Last run">
-      {timeline.marks.map((m) => (
-        <Line key={m.mark}>
-          {m.mark}: {(m.ms / 1000).toFixed(2)} s
-        </Line>
-      ))}
-      {accepted !== undefined ? (
-        <Line tone={accepted <= 10_000 ? 'ok' : 'danger'}>tap → pages accepted: {(accepted / 1000).toFixed(2)} s</Line>
-      ) : null}
-      {Object.entries(timeline.numbers).map(([k, v]) => (
-        <Line key={k} tone="muted">
-          {k}: {v}
-        </Line>
-      ))}
-      {results.map((r) => (
-        <Line key={r.variant} tone={r.status === 201 ? 'ok' : 'danger'}>
-          upload ({r.variant}): {r.status}
-        </Line>
-      ))}
-      {pdfSha256 ? <Line tone="muted">sha256 {pdfSha256}</Line> : null}
-      <Button label="Share the timing" onPress={props.onShare} quiet />
-    </Card>
+    <View style={styles.row} accessible accessibilityLabel={doc.title ?? t('home.needsAName')}>
+      <View style={styles.thumb}>
+        {props.thumb && props.token ? (
+          <Image
+            source={{ uri: props.thumb, headers: { authorization: `Bearer ${props.token}` } }}
+            // Held in memory only: a document's picture never lands in the
+            // phone's disk cache.
+            cachePolicy="memory"
+            style={styles.thumbImage}
+            contentFit="cover"
+            accessibilityIgnoresInvertColors
+          />
+        ) : null}
+      </View>
+      <View style={styles.flex}>
+        <Text weight="600">{doc.title ?? t('home.needsAName')}</Text>
+        <StatusLine status={doc.status} />
+      </View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  page: { padding: 16, gap: 16 },
-  strip: { gap: 8 },
-  page1: { width: 90, height: 127, borderRadius: 6, backgroundColor: '#FFFFFF' },
-  bottom: { height: 40 },
+  safe: { flex: 1, backgroundColor: colours.bg },
+  page: { padding: 20, gap: 10 },
+  header: { gap: 12, marginBottom: 4 },
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  flex: { flex: 1 },
+  iconButton: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
+  dueCard: { gap: 4, borderColor: colours.warn },
+  recentTitle: { marginTop: 12 },
+  row: {
+    flexDirection: 'row',
+    gap: 12,
+    alignItems: 'center',
+    backgroundColor: colours.surface,
+    borderRadius: radii.l,
+    borderWidth: 1,
+    borderColor: colours.border,
+    padding: 10,
+    minHeight: 72,
+  },
+  thumb: { width: 48, height: 64, borderRadius: radii.s, backgroundColor: colours.accentSoft, overflow: 'hidden' },
+  thumbImage: { width: 48, height: 64 },
 });

@@ -50,3 +50,25 @@ pnpm lint && pnpm typecheck && pnpm test
 purpose: changes to the server or the shared packages go through the public
 repository and its pull requests, and are pinned here afterwards. CI refuses
 a pin that is neither on the public `develop` nor a release tag.
+
+## Trying it in a browser
+
+The web build runs the same screens against a real vault, which is how
+the sign-in flow is tested in CI. It is for development only: the phone
+app is the product.
+
+```bash
+cd apps/pocket
+pnpm web:export
+FDV_DEV_API=http://localhost:8099 node scripts/serve-web.mjs
+```
+
+Open http://localhost:8098 and give the app that same address,
+`localhost:8098`: the server passes `/api/` through to the vault, so the
+browser talks to one origin and the vault needs no CORS rules. It listens
+on loopback only unless `HOST` says otherwise.
+
+`pnpm web:e2e` builds the export and runs the Playwright test in
+`e2e-web/` against `FDV_DEV_API` (default `http://localhost:8099`). On a
+fresh vault it sets one up first; for a vault that is already set up, set
+`FDV_E2E_EMAIL` and `FDV_E2E_PASSWORD`.

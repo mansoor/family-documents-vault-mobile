@@ -3,8 +3,8 @@ import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { useState } from 'react';
 import { ScrollView, StyleSheet } from 'react-native';
-import { PROBES, type ProbeResult } from '../probes/probes';
-import { Button, Card, Field, Line } from '../spike/ui';
+import { PROBES, type ProbeResult } from '../../probes/probes';
+import { Button, Card, Field, Line } from '../../spike/ui';
 
 /** Run the probes one at a time, see the answers, export them for FINDINGS. */
 export default function Probes() {

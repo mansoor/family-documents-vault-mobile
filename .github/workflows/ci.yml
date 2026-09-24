@@ -61,3 +61,44 @@ jobs:
       - name: expo-doctor
         working-directory: apps/pocket
         run: npx expo-doctor
+
+  web-e2e:
+    name: Connect and sign in on a real vault (web build)
+    runs-on: ubuntu-latest
+    needs: check
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - name: A vault from the pinned public commit, the way a self-hoster starts one
+        working-directory: vendor/fdv
+        run: |
+          node scripts/gen-env.mjs
+          sed -i 's/^FDV_PORT=.*/FDV_PORT=8099/; s#^FDV_BASE_URL=.*#FDV_BASE_URL=http://localhost:8099#' .env
+          docker compose -p fdvtest up -d --build
+          for i in $(seq 1 60); do
+            curl -sf http://localhost:8099/readyz && break
+            sleep 5
+          done
+          curl -sf http://localhost:8099/api/v1/capabilities
+      - name: Web build, served with /api/ passed through to the vault
+        working-directory: apps/pocket
+        run: pnpm web:e2e
+      - name: Vault logs on failure
+        if: failure()
+        working-directory: vendor/fdv
+        run: docker compose -p fdvtest logs --no-color | tail -200
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: web-e2e-results
+          path: apps/pocket/test-results
+          retention-days: 2

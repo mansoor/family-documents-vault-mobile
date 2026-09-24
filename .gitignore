@@ -27,3 +27,5 @@ prototype/
 
 # Local export output
 dist-*/
+test-results/
+playwright-report/

@@ -25,4 +25,13 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
   return context.resolveRequest(context, moduleName, platform);
 };
 
+// expo-sqlite's web build loads SQLite as WebAssembly. Only the spike's
+// probes screen uses it, but every route is bundled for the web build.
+config.resolver.assetExts.push('wasm');
+
+// The Babel config depends on APP_VARIANT (preview and release drop console
+// calls), which Metro's transform cache does not know about. Keep one cache
+// per variant so a preview build never reuses a dev build's output.
+config.cacheVersion = `${config.cacheVersion ?? ''}:${process.env.APP_VARIANT || 'dev'}`;
+
 module.exports = config;
