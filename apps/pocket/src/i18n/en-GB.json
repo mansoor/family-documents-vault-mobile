@@ -432,5 +432,22 @@
     "failedOther": "the notification app said no.",
     "tryAgain": "Try again",
     "unreachable": "Couldn't reach your vault. Try again when you're online."
+  },
+  "errors": {
+    "general": "That didn't work. Try again in a moment.",
+    "offline": "Can't reach your vault right now. Check this phone's connection, then try again.",
+    "timeout": "Your vault took too long to answer. Try again in a moment.",
+    "sessionEnded": "You were signed out. Sign in again to carry on.",
+    "stepUp": "Confirm it's you to carry on.",
+    "setupRequired": "This vault hasn't been set up yet. Open it in the browser first.",
+    "unexpected": "Something answered that doesn't sound like your vault. Try again; if it keeps happening, whoever looks after the vault can have a look.",
+    "rateLimited_one": "Too many tries. Wait a minute, then try again.",
+    "rateLimited_other": "Too many tries. Wait {{count}} minutes, then try again.",
+    "invalidCredentials": "That email and password don't match. Check them and try again.",
+    "notFound": "That isn't there any more, or it isn't yours to see.",
+    "previewPending": "The vault is still drawing the pages. Try again in a minute.",
+    "noPreview": "The vault can't draw pages for this file. Save a copy to open it.",
+    "scanInProgress": "This scan is still being filed. It will be ready in a moment.",
+    "uploadInProgress": "This is still on its way to the vault. Try again in a moment."
   }
 }
