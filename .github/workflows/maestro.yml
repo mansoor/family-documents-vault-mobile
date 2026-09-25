@@ -114,6 +114,11 @@ jobs:
           disable-animations: true
           script: |
             adb shell dumpsys connectivity | grep -m3 -iE 'NetworkAgentInfo|type: ' || true
+            # A busy runner makes System UI slow to answer, and Android puts a
+            # "System UI isn't responding" dialog over whatever the flow is
+            # looking for (run 36132900051). Nobody is there to answer it.
+            adb shell settings put global hide_error_dialogs 1
+            adb shell am broadcast -a android.intent.action.CLOSE_SYSTEM_DIALOGS || true
             adb install -r fv-e2e.apk
             $HOME/.maestro/bin/maestro test -e EMAIL="$EMAIL" -e PASSWORD="$PASSWORD" --format junit --output maestro-report.xml apps/pocket/.maestro/capture-offline-queue.yaml
 
