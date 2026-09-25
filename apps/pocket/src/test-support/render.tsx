@@ -6,8 +6,9 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { fixtureScanner } from '../capture/scanner';
 import { writePrefs } from '../platform/prefs';
 import { MemoryQueueStore } from '../queue/store';
-import { SecureTokenStore } from '../session/store';
+import { installationId, SecureTokenStore } from '../session/store';
 import { CaptureProvider, type CaptureDeps } from '../state/capture';
+import { EssentialsProvider, type EssentialsDeps } from '../state/essentials';
 import { LockProvider, type LockDeps } from '../state/lock';
 import { VaultProvider, type VaultDeps } from '../state/vault';
 import type { Vaults } from '../state/vaults';
@@ -70,7 +71,8 @@ export async function signedIn(t: TestVault, origin = 'https://vault.test'): Pro
   const { email, password } = t.vault.state;
   if (!email || !password) throw new Error('the test vault has no one to sign in as');
   knownVault(origin, { email });
-  const api = createApi(createHttp({ baseUrl: origin, fetch: t.fetch }));
+  // As the app signs in: saying which installation it is (the vault keeps it on the session).
+  const api = createApi(createHttp({ baseUrl: origin, fetch: t.fetch, installationId: await installationId() }));
   const tokens = await api.signIn(email, password);
   if ('mfa_required' in tokens) throw new Error('no second step here');
   await new SessionCore({ refresh: (r) => api.refresh(r) }, new SecureTokenStore()).accept(tokens);
@@ -119,6 +121,8 @@ export async function renderApp(
     capture?: Partial<CaptureDeps>;
     /** With the app's lock (4.8), on these parts; without, a phone with no lock. */
     lock?: Partial<LockDeps>;
+    /** With the kept Essentials (4.10), inside the lock; on these parts. */
+    essentials?: Partial<EssentialsDeps>;
   } = {},
 ) {
   const t = testVault();
@@ -134,7 +138,13 @@ export async function renderApp(
         <VaultProvider deps={deps}>
           {opts.lock ? (
             <LockProvider deps={opts.lock}>
-              <CaptureProvider deps={capture}>{ui}</CaptureProvider>
+              {opts.essentials ? (
+                <EssentialsProvider deps={opts.essentials}>
+                  <CaptureProvider deps={capture}>{ui}</CaptureProvider>
+                </EssentialsProvider>
+              ) : (
+                <CaptureProvider deps={capture}>{ui}</CaptureProvider>
+              )}
             </LockProvider>
           ) : (
             <CaptureProvider deps={capture}>{ui}</CaptureProvider>

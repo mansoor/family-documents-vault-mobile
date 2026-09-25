@@ -69,7 +69,11 @@ export function OnThisPhone() {
       {offer ? (
         <Card>
           <Text>{t('essentials.offer')}</Text>
-          <Button testID="essentials-keep" label={t('essentials.keep')} onPress={() => setAsking({ includePrivate: false })} />
+          <Button
+            testID="essentials-keep"
+            label={t('essentials.keep')}
+            onPress={() => setAsking({ includePrivate: false })}
+          />
           <Button testID="essentials-not-now" kind="quiet" label={t('essentials.notNow')} onPress={e.offered} />
         </Card>
       ) : null}
@@ -124,7 +128,11 @@ export function OnThisPhone() {
               <Text tone="soft" style={styles.rowText}>
                 {t('essentials.privateNotKept', { count: privateMissing })}
               </Text>
-              <Button kind="quiet" label={t('essentials.keepThemToo')} onPress={() => setAsking({ includePrivate: true })} />
+              <Button
+                kind="quiet"
+                label={t('essentials.keepThemToo')}
+                onPress={() => setAsking({ includePrivate: true })}
+              />
             </View>
           ) : null}
         </>
@@ -138,7 +146,12 @@ export function OnThisPhone() {
           return outcome;
         }}
       />
-      <Modal visible={privateChoice !== null} transparent animationType="fade" onRequestClose={() => setPrivateChoice(null)}>
+      <Modal
+        visible={privateChoice !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setPrivateChoice(null)}
+      >
         <View style={styles.scrim}>
           <View style={styles.sheet} accessibilityViewIsModal testID="essentials-private-choice">
             <Text>{t('essentials.alsoPrivate', { count: privateChoice?.count ?? 0 })}</Text>
@@ -206,7 +219,11 @@ function PasswordSheet(props: {
   return (
     <Modal visible={props.visible} transparent animationType="fade" onRequestClose={close}>
       <View style={styles.scrim}>
-        <View style={[styles.sheet, { paddingBottom: 20 + insets.bottom }]} accessibilityViewIsModal testID="essentials-password">
+        <View
+          style={[styles.sheet, { paddingBottom: 20 + insets.bottom }]}
+          accessibilityViewIsModal
+          testID="essentials-password"
+        >
           <Text>{t('essentials.password')}</Text>
           <Field
             label={t('essentials.passwordLabel')}
@@ -235,5 +252,11 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 56 },
   rowText: { flex: 1, gap: 2, minHeight: 44, justifyContent: 'center' },
   scrim: { flex: 1, backgroundColor: 'rgba(28,26,23,0.45)', justifyContent: 'flex-end' },
-  sheet: { backgroundColor: colours.bg, padding: 20, gap: 12, borderTopLeftRadius: radii.l, borderTopRightRadius: radii.l },
+  sheet: {
+    backgroundColor: colours.bg,
+    padding: 20,
+    gap: 12,
+    borderTopLeftRadius: radii.l,
+    borderTopRightRadius: radii.l,
+  },
 });

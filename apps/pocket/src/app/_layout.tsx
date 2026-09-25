@@ -8,10 +8,10 @@ import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { extra, SPIKE } from '../config';
 import { LockGate } from '../lock/gate';
 import { CaptureProvider } from '../state/capture';
+import { EssentialsProvider } from '../state/essentials';
 import { LockProvider, useLock } from '../state/lock';
 import { useVault, VaultProvider } from '../state/vault';
 import { TextScaleProvider } from '../ui/text-scale';
-
 
 /** Preview builds say so on every screen: they point at throwaway vaults only. */
 function TestBanner() {
@@ -54,6 +54,7 @@ function Gates() {
         <Stack.Screen name="capture" options={{ title: '', gestureEnabled: false }} />
         <Stack.Screen name="settings" options={{ title: t('settings.title') }} />
         <Stack.Screen name="timings" options={{ title: t('timings.title') }} />
+        <Stack.Screen name="essential/[id]" options={{ title: '' }} />
       </Stack.Protected>
       <Stack.Protected guard={phase === 'sign_in'}>
         <Stack.Screen name="sign-in" options={{ headerShown: false }} />
@@ -76,14 +77,16 @@ export default function RootLayout() {
       <TextScaleProvider>
         <VaultProvider>
           <LockProvider>
-            <CaptureProvider>
-              <View style={styles.root}>
-                {extra.testBanner ? <TestBanner /> : null}
-                <LockGate>
-                  <Gates />
-                </LockGate>
-              </View>
-            </CaptureProvider>
+            <EssentialsProvider>
+              <CaptureProvider>
+                <View style={styles.root}>
+                  {extra.testBanner ? <TestBanner /> : null}
+                  <LockGate>
+                    <Gates />
+                  </LockGate>
+                </View>
+              </CaptureProvider>
+            </EssentialsProvider>
           </LockProvider>
         </VaultProvider>
       </TextScaleProvider>

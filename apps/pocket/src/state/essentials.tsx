@@ -9,7 +9,15 @@ import { openPrivateCopies, type CopiesIo } from '../essentials/copies';
 import { deleteEssentials, openEssentials, type Tier } from '../essentials/open';
 import { sendOpens } from '../essentials/opens';
 import type { EssentialsStore } from '../essentials/store';
-import { ageOf, lastChecked, PRIVATE_COUNT_KEY, syncEssentials, type Age, type Checked, type PageFetch } from '../essentials/sync';
+import {
+  ageOf,
+  lastChecked,
+  PRIVATE_COUNT_KEY,
+  syncEssentials,
+  type Age,
+  type Checked,
+  type PageFetch,
+} from '../essentials/sync';
 import { endWipes, OWNER_KEY, ownerKey } from '../essentials/wipe';
 import { log } from '../log';
 import { readPrefs, writePrefs } from '../platform/prefs';
@@ -126,7 +134,10 @@ export function EssentialsProvider(props: { children: ReactNode; deps?: Partial<
   const busy = useRef<Promise<void> | null>(null);
 
   const available =
-    caps?.features.offline_essentials === true && lock.status !== 'none' && lock.level !== null && who?.role !== 'viewer';
+    caps?.features.offline_essentials === true &&
+    lock.status !== 'none' &&
+    lock.level !== null &&
+    who?.role !== 'viewer';
 
   const setPrefs = useCallback((next: Partial<Prefs>) => {
     setPrefsState((p) => {
@@ -188,15 +199,12 @@ export function EssentialsProvider(props: { children: ReactNode; deps?: Partial<
 
   // Open while the lock is open (its key is in memory then); closed when it closes.
   useEffect(() => {
-    let cancelled = false;
     const hex = lock.everydayKey;
-    if (lock.status !== 'unlocked' || !hex || !prefs.enrolled) {
-      const s = storeRef.current;
-      storeRef.current = null;
-      setStore(null);
-      void s?.close().catch(() => undefined);
-      return;
-    }
+    // Nobody signed in (a session just ended, and may have taken the copies
+    // with it): nothing is opened — not even an empty store.
+    if (lock.status !== 'unlocked' || !hex || !prefs.enrolled || !who) return;
+    let cancelled = false;
+    let opened: EssentialsStore | null = null;
     void (async () => {
       try {
         const s = await d.io.open('everyday', hex);
@@ -220,6 +228,11 @@ export function EssentialsProvider(props: { children: ReactNode; deps?: Partial<
           await wipe('removed_age');
           return;
         }
+        if (cancelled) {
+          await s.close();
+          return;
+        }
+        opened = s;
         storeRef.current = s;
         setStore(s);
         await refresh(s);
@@ -227,8 +240,15 @@ export function EssentialsProvider(props: { children: ReactNode; deps?: Partial<
         log.error('essentials.open_failed', { err: String(err) });
       }
     })();
+    // Closed when the lock closes, or when what it was opened with changes.
     return () => {
       cancelled = true;
+      if (!opened) return;
+      if (storeRef.current === opened) {
+        storeRef.current = null;
+        setStore(null);
+      }
+      void opened.close().catch(() => undefined);
     };
     // The key appears a moment after the status: both are watched.
   }, [lock.status, lock.everydayKey, prefs.enrolled, who, d, refresh, wipe]);
@@ -366,7 +386,23 @@ export function EssentialsProvider(props: { children: ReactNode; deps?: Partial<
       offered: () => setPrefs({ offered: true }),
       dismissNotice: () => setNotice(null),
     }),
-    [available, prefs, items, privateInSet, privateKept, checked, age, grant, renewDue, syncing, notice, enrol, run, open, setPrefs],
+    [
+      available,
+      prefs,
+      items,
+      privateInSet,
+      privateKept,
+      checked,
+      age,
+      grant,
+      renewDue,
+      syncing,
+      notice,
+      enrol,
+      run,
+      open,
+      setPrefs,
+    ],
   );
   return <Ctx.Provider value={value}>{props.children}</Ctx.Provider>;
 }

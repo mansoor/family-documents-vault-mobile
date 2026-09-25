@@ -58,9 +58,14 @@ export function EssentialPages(props: { id: string; mode?: string }) {
 
   // A swipe turns the page (at its own size); a pinch makes it larger or smaller.
   const gesture = useRef({ n, pages, zoom, spread: 0 });
-  gesture.current = { ...gesture.current, n, pages, zoom };
+  useEffect(() => {
+    gesture.current = { ...gesture.current, n, pages, zoom };
+  }, [n, pages, zoom]);
   const responder = useMemo(
     () =>
+      // The handlers read the ref on a touch, not while rendering; the
+      // compiler cannot see that from here.
+      // eslint-disable-next-line react-hooks/refs
       PanResponder.create({
         onMoveShouldSetPanResponder: (_evt, g) => Math.abs(g.dx) > 20 || g.numberActiveTouches > 1,
         onPanResponderMove: (evt) => {
@@ -107,12 +112,40 @@ export function EssentialPages(props: { id: string; mode?: string }) {
         <>
           <Text variant="title">{title}</Text>
           <View style={styles.tools}>
-            <Button kind="quiet" label="‹" accessibilityLabel={t('essentials.previous')} disabled={n <= 1} onPress={() => go(n - 1)} testID="essential-previous" />
+            <Button
+              kind="quiet"
+              label="‹"
+              accessibilityLabel={t('essentials.previous')}
+              disabled={n <= 1}
+              onPress={() => go(n - 1)}
+              testID="essential-previous"
+            />
             <Text testID="essential-page">{t('essentials.page', { n, total: pages })}</Text>
-            <Button kind="quiet" label="›" accessibilityLabel={t('essentials.next')} disabled={n >= pages} onPress={() => go(n + 1)} testID="essential-next" />
+            <Button
+              kind="quiet"
+              label="›"
+              accessibilityLabel={t('essentials.next')}
+              disabled={n >= pages}
+              onPress={() => go(n + 1)}
+              testID="essential-next"
+            />
             <View style={styles.gap} />
-            <Button kind="quiet" label="−" accessibilityLabel={t('essentials.smaller')} disabled={zoom === 0} onPress={() => setZoom((z) => Math.max(0, z - 1))} testID="essential-smaller" />
-            <Button kind="quiet" label="+" accessibilityLabel={t('essentials.larger')} disabled={zoom === ZOOMS.length - 1} onPress={() => setZoom((z) => Math.min(ZOOMS.length - 1, z + 1))} testID="essential-larger" />
+            <Button
+              kind="quiet"
+              label="−"
+              accessibilityLabel={t('essentials.smaller')}
+              disabled={zoom === 0}
+              onPress={() => setZoom((z) => Math.max(0, z - 1))}
+              testID="essential-smaller"
+            />
+            <Button
+              kind="quiet"
+              label="+"
+              accessibilityLabel={t('essentials.larger')}
+              disabled={zoom === ZOOMS.length - 1}
+              onPress={() => setZoom((z) => Math.min(ZOOMS.length - 1, z + 1))}
+              testID="essential-larger"
+            />
           </View>
           <View style={styles.frame} {...responder.panHandlers}>
             <ScrollView horizontal={zoom > 0} scrollEnabled={zoom > 0} contentContainerStyle={styles.center}>
@@ -123,6 +156,7 @@ export function EssentialPages(props: { id: string; mode?: string }) {
                     // From memory only: never written to the image cache.
                     cachePolicy="none"
                     contentFit="contain"
+                    accessibilityIgnoresInvertColors
                     accessibilityLabel={t('essentials.pageAlt', { n, title })}
                     testID="essential-image"
                     style={{ width: pageWidth, height: zoom > 0 ? pageWidth * 1.3 : height * 0.62 }}

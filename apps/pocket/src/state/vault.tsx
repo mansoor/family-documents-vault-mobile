@@ -163,7 +163,11 @@ const defaultDeps = (): VaultDeps => ({
 export function VaultProvider(props: { children: ReactNode; deps?: Partial<VaultDeps> }) {
   const deps = useMemo<VaultDeps>(
     // A test's fetch is the vault for uploads too, unless it says otherwise.
-    () => ({ ...defaultDeps(), ...props.deps, uploadFetch: props.deps?.uploadFetch ?? props.deps?.fetch ?? expoUploadFetch }),
+    () => ({
+      ...defaultDeps(),
+      ...props.deps,
+      uploadFetch: props.deps?.uploadFetch ?? props.deps?.fetch ?? expoUploadFetch,
+    }),
     [props.deps],
   );
   const [phase, setPhase] = useState<Phase>('loading');
@@ -335,19 +339,6 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
     };
   }, []);
 
-  // Once the vault and its session core exist: signed in or not.
-  useEffect(() => {
-    if (!vault || !api || phase !== 'loading') return;
-    let cancelled = false;
-    void (async () => {
-      await hydrated(session);
-      if (!cancelled) setPhase(session.signedIn ? 'ready' : 'sign_in');
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [vault, api, session, phase, hydrated]);
-
   const recheck = useCallback(async () => {
     if (!api || !vault) return;
     epoch.current += 1;
@@ -382,6 +373,25 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
       if (err instanceof NetworkError) setOffline(true);
     }
   }, [api, vault, session, gate]);
+
+  // Once the vault and its session core exist: signed in or not.
+  useEffect(() => {
+    if (!vault || !api || phase !== 'loading') return;
+    let cancelled = false;
+    void (async () => {
+      await hydrated(session);
+      if (cancelled) return;
+      setPhase(session.signedIn ? 'ready' : 'sign_in');
+      // Signed in from the start (a session kept from before): what the
+      // vault can do is learned now, not only the next time the app comes
+      // to the front — keeping Essentials depends on it (4.10). Over http
+      // the gate learns it before the first thing is sent.
+      if (session.signedIn && vault.origin.startsWith('https://')) void recheck();
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [vault, api, session, phase, hydrated, recheck]);
 
   // Coming back to the front: look again, as the network may have changed.
   useEffect(() => {
@@ -458,7 +468,8 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
   const accepted = useCallback(
     async (tokens: Parameters<SessionCore['accept']>[0], email: string | null) => {
       await session.accept(tokens);
-      if (vault && email) setVault(updateVault(vault.origin, { email }).known.find((k) => k.origin === vault.origin) ?? vault);
+      if (vault && email)
+        setVault(updateVault(vault.origin, { email }).known.find((k) => k.origin === vault.origin) ?? vault);
       mfaToken.current = null;
       setNotice(null);
       setOffline(false);
@@ -503,7 +514,8 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
 
   const signInCode = useCallback(
     async (code: string): Promise<SignInResult> => {
-      if (!api || !mfaToken.current) return { kind: 'refused', message: 'Start again from your password.', passkeyHint: false };
+      if (!api || !mfaToken.current)
+        return { kind: 'refused', message: 'Start again from your password.', passkeyHint: false };
       try {
         await gate();
         const tokens = await api.signInMfa(mfaToken.current, code.replace(/\s/g, ''));
@@ -547,7 +559,9 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
   // The session core is not React state; what it says changes only as the phase does.
   const who = useMemo<VaultValue['who']>(() => {
     const info = phase === 'ready' ? session.info : null;
-    return info && vault ? { origin: vault.origin, member_id: info.member_id, role: info.role, household_id: info.household_id } : null;
+    return info && vault
+      ? { origin: vault.origin, member_id: info.member_id, role: info.role, household_id: info.household_id }
+      : null;
   }, [phase, vault, session]);
 
   const value = useMemo<VaultValue>(
@@ -569,7 +583,24 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
       withToken,
       recheck,
     }),
-    [phase, vault, caps, offline, notice, api, uploadApi, who, sessionOwner, chooseVault, signIn, signInCode, signOut, chooseAnotherVault, withToken, recheck],
+    [
+      phase,
+      vault,
+      caps,
+      offline,
+      notice,
+      api,
+      uploadApi,
+      who,
+      sessionOwner,
+      chooseVault,
+      signIn,
+      signInCode,
+      signOut,
+      chooseAnotherVault,
+      withToken,
+      recheck,
+    ],
   );
   return <VaultContext.Provider value={value}>{props.children}</VaultContext.Provider>;
 }
