@@ -76,6 +76,8 @@ interface CaptureValue {
   cardData: () => Promise<CardData | null>;
   /** This start's card is kept on the phone: a scan made offline from now on can be filed. */
   cardKept: boolean;
+  /** queue.db is open (the e2e build shows it, for a flow that fails). */
+  storeOpen: boolean;
   /** "Scan the new one": a new version of a document, straight into the queue. */
   renew: (documentId: string) => Promise<StartOutcome | 'saved' | SaveProblem>;
   /** A Needs-you item, put right (another person, no person) and sent again. */
@@ -557,6 +559,7 @@ export function CaptureProvider(props: { children: ReactNode; deps?: Partial<Cap
       scanner: deps.scanner,
       cardData: loadCard,
       cardKept: cardKept !== null && cardKept === cardKey,
+      storeOpen: store !== null,
       renew,
       retry,
       others,
@@ -581,6 +584,7 @@ export function CaptureProvider(props: { children: ReactNode; deps?: Partial<Cap
       loadCard,
       cardKept,
       cardKey,
+      store,
       renew,
       retry,
       others,
