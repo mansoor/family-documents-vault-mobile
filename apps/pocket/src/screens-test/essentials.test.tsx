@@ -12,7 +12,7 @@ import { CHECKED_KEY } from '../essentials/sync';
 import { OWNER_KEY } from '../essentials/wipe';
 import { LockGate } from '../lock/gate';
 import { KeyRing } from '../lock/keys';
-import { writePrefs } from '../platform/prefs';
+import { readPrefs, writePrefs } from '../platform/prefs';
 import { useEssentials, type EssentialsDeps } from '../state/essentials';
 import { useLock, type LockDeps } from '../state/lock';
 import { useVault } from '../state/vault';
@@ -467,6 +467,21 @@ describe('Essentials in airplane mode', () => {
     await act(async () => release());
     await waitFor(() => expect(removed).toEqual(expect.arrayContaining(['everyday', 'private'])));
     expect(open).toBe(0);
+  });
+
+  it('the removal notice is still there after a restart, until it is dismissed', async () => {
+    // The app learned of the revoke in one run; the person looks in the next.
+    const t = testVault([ORIGIN]);
+    const parts = phoneParts();
+    writePrefs('essentials', { notice: 'signed_out' });
+    knownVault(ORIGIN, { email: 'owner@example.test' });
+    await renderApp(<App />, { fetch: t.fetch, lock: parts.lock, essentials: parts.essentials });
+    expect(
+      await screen.findByText('This phone was signed out of the vault, so the documents kept on it have been removed.'),
+    ).toBeTruthy();
+    await fireEvent.press(screen.getByTestId('essentials-notice-dismiss'));
+    await waitFor(() => expect(screen.queryByTestId('essentials-notice')).toBeNull());
+    expect(readPrefs<{ notice: unknown }>('essentials', { notice: 'x' }).notice).toBeNull();
   });
 
   it('somebody else’s copies are gone before anything is shown', async () => {

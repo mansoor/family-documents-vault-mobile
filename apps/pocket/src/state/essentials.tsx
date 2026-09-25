@@ -109,6 +109,11 @@ interface Prefs {
   owner: string | null;
   /** A removal that failed (a file left behind): tried again at the next start. */
   leftover: boolean;
+  /**
+   * Why copies went, kept until it is dismissed or somebody signs in: the
+   * app may learn of it in one run and be looked at in the next.
+   */
+  notice: EssentialsNotice;
 }
 
 const NO_PREFS: Prefs = {
@@ -120,6 +125,7 @@ const NO_PREFS: Prefs = {
   regrant: false,
   owner: null,
   leftover: false,
+  notice: null,
 };
 
 /** Nobody's choice any more: offered afresh to whoever signs in next. */
@@ -238,7 +244,6 @@ export function EssentialsProvider(props: { children: ReactNode; deps?: Partial<
   const [grant, setGrant] = useState<OfflineGrant | null>(null);
   const [synced, setSynced] = useState(false);
   const [syncing, setSyncing] = useState(false);
-  const [notice, setNotice] = useState<EssentialsNotice>(null);
   const [ready, setReady] = useState(false);
   const [reopen, setReopen] = useState(0);
   const storeRef = useRef<EssentialsStore | null>(null);
@@ -329,7 +334,7 @@ export function EssentialsProvider(props: { children: ReactNode; deps?: Partial<
       clearLists();
       setGrant(null);
       setPrefs({ kept: false, expired: false, regrant: false, leftover: !gone });
-      if (why) setNotice(why);
+      if (why) setPrefs({ notice: why });
       log.info('essentials.wiped', { why: why ?? 'signed_out_quietly' });
     },
     [removeFiles, clearLists, setPrefs],
@@ -357,7 +362,7 @@ export function EssentialsProvider(props: { children: ReactNode; deps?: Partial<
       else setPrefs({ expired: true });
     });
     const offIn = on('signedIn', () => {
-      setPrefs({ expired: false });
+      setPrefs({ expired: false, notice: null });
       const p = prefsRef.current;
       if (!p.enrolled) return;
       const me = sessionOwner();
@@ -568,7 +573,7 @@ export function EssentialsProvider(props: { children: ReactNode; deps?: Partial<
           );
         }
         // No connection changes nothing; a full phone says so.
-        if (problem && failureKind(problem) === 'full') setNotice('short_of_space');
+        if (problem && failureKind(problem) === 'full') setPrefs({ notice: 'short_of_space' });
         else if (problem && !(problem instanceof NetworkError))
           log.warn('essentials.sync_failed', { kind: failureKind(problem) });
       })();
@@ -722,7 +727,7 @@ export function EssentialsProvider(props: { children: ReactNode; deps?: Partial<
       grant,
       renewDue,
       syncing,
-      notice,
+      notice: prefs.notice,
       enrol,
       regrant,
       signedInWith,
@@ -731,7 +736,7 @@ export function EssentialsProvider(props: { children: ReactNode; deps?: Partial<
       sync: () => run(),
       open,
       offered: () => setPrefs({ offered: true }),
-      dismissNotice: () => setNotice(null),
+      dismissNotice: () => setPrefs({ notice: null }),
     }),
     [
       available,
@@ -746,7 +751,6 @@ export function EssentialsProvider(props: { children: ReactNode; deps?: Partial<
       grant,
       renewDue,
       syncing,
-      notice,
       enrol,
       regrant,
       signedInWith,
