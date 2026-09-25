@@ -29,7 +29,7 @@
     "reinstalled": "This vault has been reinstalled since you last signed in. Sign in again.",
     "certificateUntrusted": "This phone doesn't trust your vault's certificate yet. If your vault makes its own certificate, install it on this phone once — here's how.",
     "certificateWrongName": "Your vault's certificate is for a different name. Use the address the certificate was made for — the one your browser shows when you open the vault.",
-    "certificateExpired": "Your vault's certificate has run out. Whoever looks after the vault can renew it; then try again.",
+    "certificateExpired": "Your vault's certificate has run out — or this phone's date is wrong. Check the date in the phone's settings; if it is right, whoever looks after the vault can renew the certificate.",
     "guideTitle": "Install your vault's certificate",
     "guideAndroid1": "1. Get the certificate file from whoever looks after your vault. For a vault that makes its own, it is vault-ca.crt (the vault's README says how to copy it out).",
     "guideAndroid2": "2. Put the file on this phone, then open Settings and search for \"CA certificate\" (it is under Security, then Encryption & credentials, then Install a certificate).",

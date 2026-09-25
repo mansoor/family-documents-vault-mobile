@@ -1,6 +1,7 @@
 import type { DocumentView } from '@fdv/shared';
-import { fireEvent, screen, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react-native';
 import * as Linking from 'expo-linking';
+import { AppState } from 'react-native';
 import Settings from '../app/settings';
 import { MemoryEssentialsStore } from '../essentials/store';
 import { CHECKED_KEY } from '../essentials/sync';
@@ -125,6 +126,57 @@ describe('Settings, in full (4.15)', () => {
     expect(t.calls).toContain('POST https://vault.test/api/v1/auth/logout');
     expect(await queue.list()).toEqual([]);
     await waitFor(() => expect(parts.stores.size).toBe(0));
+  });
+
+  it("Use another vault removes everybody's waiting scans for it, and says which are already on their way", async () => {
+    const t = testVault();
+    const queue = new MemoryQueueStore();
+    await queue.add(waiting(), new Uint8Array([1]));
+    await queue.add({ ...waiting(), id: 'q2', account: 'someone-else' }, new Uint8Array([2]));
+    await queue.add({ ...waiting(), id: 'q3', state: 'sending' }, new Uint8Array([3]));
+    await queue.add({ ...waiting(), id: 'q4', origin: 'https://other.test' }, new Uint8Array([4]));
+    await queue.cache('card|https://vault.test|fake-member', { types: [] });
+    await unlocked(t, <Settings />, { capture: testCapture({ openStore: async () => queue }) });
+    await fireEvent.press(await screen.findByTestId('settings-change-vault'));
+    const question = await screen.findByTestId('change-vault-question');
+    expect(question).toHaveTextContent("2 scans haven't reached this vault yet. They will be removed too.", {
+      exact: false,
+    });
+    expect(question).toHaveTextContent('One is already on its way and will reach the vault.', { exact: false });
+    await fireEvent.press(screen.getByTestId('change-vault-yes'));
+    await waitFor(() => expect(readVaults().known).toEqual([]));
+    // The one on its way is left to arrive; another vault's scan is not this one's to remove.
+    expect((await queue.list()).map((i) => i.id).sort()).toEqual(['q3', 'q4']);
+    expect(await queue.cached('card|https://vault.test|fake-member')).toBeNull();
+  });
+
+  it('Remove offline copies without a connection keeps what was opened, and tells the vault later', async () => {
+    const t = testVault();
+    const parts = phoneParts();
+    await keepOne(parts);
+    await parts.stores.get('everyday')?.recordOpen({
+      id: 'open-1',
+      document_id: 'passport',
+      version_id: 'passport-v1',
+      at: Date.now(),
+      mode: 'view',
+      online: false,
+    });
+    await unlocked(t, <Settings />, { parts, before: () => void t.reachable.delete('https://vault.test') });
+    await fireEvent.press(await screen.findByTestId('settings-offline-remove'));
+    await fireEvent.press(await screen.findByTestId('settings-offline-remove-yes'));
+    await waitFor(() => expect(parts.stores.size).toBe(0));
+    expect(readPrefs<{ id: string }[]>('essentials-unsent-opens', []).map((o) => o.id)).toEqual(['open-1']);
+    expect(t.calls.filter((c) => c.includes('/offline/opens'))).toEqual([]);
+    // The connection comes back: they are told, and forgotten here.
+    Object.defineProperty(AppState, 'currentState', { value: 'active', configurable: true });
+    t.reachable.add('https://vault.test');
+    const listeners = (globalThis as unknown as { __networkListeners: Set<() => void> }).__networkListeners;
+    await act(async () => {
+      for (const l of [...listeners]) l();
+    });
+    await waitFor(() => expect(t.calls.some((c) => c.includes('/offline/opens'))).toBe(true));
+    await waitFor(() => expect(readPrefs('essentials-unsent-opens', null)).toEqual([]));
   });
 
   it('About lists the licences, and the rest is in the browser', async () => {

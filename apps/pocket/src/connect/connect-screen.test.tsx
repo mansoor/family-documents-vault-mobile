@@ -1,5 +1,6 @@
 import { fireEvent, screen } from '@testing-library/react-native';
 import * as Linking from 'expo-linking';
+import { Platform } from 'react-native';
 import Connect from '../app/connect';
 import { audit } from '../test-support/a11y';
 import { installed, renderApp } from '../test-support/render';
@@ -51,6 +52,7 @@ describe('Connect: links, certificates, Wi-Fi sign-in pages (4.15)', () => {
   });
 
   it('a trust failure shows the certificate copy, and how to install it', async () => {
+    const os = jest.replaceProperty(Platform, 'OS', 'android');
     const t = testVault([]);
     const trust = new Error(
       'javax.net.ssl.SSLHandshakeException: java.security.cert.CertPathValidatorException: Trust anchor for certification path not found.',
@@ -72,8 +74,12 @@ describe('Connect: links, certificates, Wi-Fi sign-in pages (4.15)', () => {
       { exact: false },
     );
     await fireEvent.press(screen.getByTestId('connect-certificate-how'));
+    // The Android steps, as they ship (the tests run as an iPhone otherwise).
     expect(screen.getByTestId('connect-certificate-guide')).toHaveTextContent(/vault-ca\.crt/);
     expect(audit()).toEqual([]);
+    expect(screen.getByTestId('connect-certificate-guide')).toHaveTextContent(/Install anyway/);
+    expect(screen.getByTestId('connect-certificate-guide')).toHaveTextContent(/User credentials/);
+    os.restore();
   });
 
   it('a Wi-Fi sign-in page says to finish signing in to the Wi-Fi', async () => {

@@ -216,6 +216,12 @@ export class SqliteQueueStore implements QueueStore {
     });
   }
 
+  forgetCached(prefix: string): Promise<void> {
+    return this.serial(async () => {
+      await this.db.runAsync('delete from card_cache where substr(key, 1, ?) = ?', [prefix.length, prefix]);
+    });
+  }
+
   remove(id: string): Promise<void> {
     return this.serial(() =>
       this.db.withTransactionAsync(async () => {

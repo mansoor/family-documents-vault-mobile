@@ -4,6 +4,7 @@ import {
   localToday,
   type DocumentView,
   type OfflineGrant,
+  type OfflineOpen,
   type Status,
   type StatusInput,
 } from '@fdv/shared';
@@ -186,6 +187,8 @@ const DAY = 86_400_000;
 const RENEW_WITHIN = 3 * DAY;
 /** The document types, as much as today's status needs: kept with the copies. */
 const TYPES_KEY = 'types';
+/** Openings not yet told when the copies were removed: told when the vault next answers. */
+const UNSENT_OPENS = 'essentials-unsent-opens';
 type StatusType = NonNullable<StatusInput['type']>;
 
 function defaultDeps(): EssentialsDeps {
@@ -680,8 +683,9 @@ export function EssentialsProvider(props: { children: ReactNode; deps?: Partial<
         owner: who ? ownerKey(who.origin, who.member_id) : null,
       });
       // The Only me copies: their own store, opened with the person's biometrics.
+      // Otherwise a fresh sync, after any running one: it took the old scope.
       if (includePrivate) await openPrivate();
-      else void runRef.current();
+      else void (busy.current?.promise ?? Promise.resolve()).then(() => runRef.current());
       return 'ok';
     },
     [granted, setPrefs, who, openPrivate],
@@ -750,7 +754,38 @@ export function EssentialsProvider(props: { children: ReactNode; deps?: Partial<
     return n;
   }, [whenOpen]);
 
+  // Openings kept aside when the copies were removed without a connection.
+  useEffect(() => {
+    if (offline || !who) return;
+    const unsent = readPrefs<OfflineOpen[]>(UNSENT_OPENS, []);
+    if (!unsent.length) return;
+    withToken((a, token) => a.offlineOpens(token, unsent))
+      .then(() => writePrefs(UNSENT_OPENS, []))
+      .catch(() => undefined);
+  }, [offline, who, withToken]);
+
   const removeCopies = useCallback(async () => {
+    // What was opened here is the vault's to record: told first, and what
+    // cannot be told now is kept aside and told the next time it answers.
+    const send = (events: OfflineOpen[]) => withToken((a, token) => a.offlineOpens(token, events));
+    const unsent: OfflineOpen[] = [];
+    for (const s of [storeRef.current, privateRef.current]) {
+      if (!s) continue;
+      try {
+        await sendOpens(s, send);
+      } catch {
+        for (const o of await s.opens().catch(() => [])) {
+          unsent.push({
+            id: o.id,
+            version_id: o.version_id,
+            opened_at: new Date(o.at).toISOString(),
+            mode: o.mode,
+            online: o.online,
+          });
+        }
+      }
+    }
+    if (unsent.length) writePrefs(UNSENT_OPENS, [...readPrefs<OfflineOpen[]>(UNSENT_OPENS, []), ...unsent]);
     try {
       await withToken((a, token) => a.endOfflineGrant(token));
     } catch {

@@ -143,6 +143,12 @@ describe('connect: certificates and Wi-Fi sign-in pages (4.15)', () => {
     expect(out).toMatchObject({ kind: 'ask_http', origin: 'http://192.168.1.20:8080' });
   });
 
+  it('on mobile data, a certificate problem says more than "only on Wi-Fi"', async () => {
+    const t = testVault([]);
+    const out = await connect('vault.local', { ...deps(t, { network: 'cellular' }), whyFailed: async () => trust });
+    expect(out).toEqual({ kind: 'certificate', host: 'vault.local', trouble: 'untrusted' });
+  });
+
   it('a Wi-Fi sign-in page gets its own words', async () => {
     const t = testVault(['https://vault.test']);
     t.impostor.set('https://vault.test', '<html>Welcome to Café Wi-Fi</html>');

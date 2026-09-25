@@ -16,6 +16,8 @@ const target = join(app, 'src', 'about', 'licences.json');
 
 /** Native code the app's own modules bring in (modules/unifiedpush). */
 const NATIVE = [
+  // Compiled into the app by expo-sqlite (useSQLCipher: true): the offline stores' encryption.
+  { name: 'SQLCipher (Zetetic, community edition)', versions: ['4.7.0'], licence: 'BSD-3-Clause' },
   { name: 'org.unifiedpush.android:connector', versions: ['3.3.5'], licence: 'Apache-2.0' },
   { name: 'com.google.crypto.tink:tink', versions: ['1.23.0'], licence: 'Apache-2.0' },
 ];

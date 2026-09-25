@@ -19,7 +19,7 @@ export default function Licences() {
   return (
     <FlatList
       data={list}
-      keyExtractor={(l) => l.name}
+      keyExtractor={(l, i) => `${l.name}|${l.versions.join(',')}|${i}`}
       contentContainerStyle={styles.page}
       ListHeaderComponent={<Text tone="soft">{t('settings.licencesLead', { count: list.length })}</Text>}
       renderItem={({ item }) => (

@@ -9,8 +9,12 @@
 export type CertificateTrouble = 'untrusted' | 'wrong_name' | 'expired';
 
 const RULES: [RegExp, CertificateTrouble][] = [
-  // Android (Conscrypt / OkHttp).
-  [/CertificateExpiredException|CertificateNotYetValidException|certificate (has )?expired/i, 'expired'],
+  // Android (Conscrypt / OkHttp). An expired certificate — or a phone whose
+  // date is wrong — reaches the app as "Chain validation failed".
+  [
+    /CertificateExpiredException|CertificateNotYetValidException|certificate (has )?expired|Chain validation failed/i,
+    'expired',
+  ],
   [
     /SSLPeerUnverifiedException|Hostname .* not verified|doesn't match any of the subject alternative names/i,
     'wrong_name',
@@ -20,9 +24,9 @@ const RULES: [RegExp, CertificateTrouble][] = [
     'untrusted',
   ],
   // iOS (NSURLErrorDomain): -1202 untrusted, -1201 expired, -1203/-1204 no or bad root.
-  [/NSURLErrorServerCertificateHasBadDate|-1201\b/i, 'expired'],
+  [/NSURLErrorServerCertificateHasBadDate|(?:NSURLErrorDomain[^\n]{0,40}?|Code=)-1201\b/i, 'expired'],
   [
-    /NSURLErrorServerCertificateUntrusted|NSURLErrorServerCertificateHasUnknownRoot|NSURLErrorServerCertificateNotYetValid|-120[234]\b|certificate for this server is invalid/i,
+    /NSURLErrorServerCertificateUntrusted|NSURLErrorServerCertificateHasUnknownRoot|NSURLErrorServerCertificateNotYetValid|(?:NSURLErrorDomain[^\n]{0,40}?|Code=)-120[234]\b|certificate for this server is invalid/i,
     'untrusted',
   ],
 ];

@@ -622,6 +622,7 @@
 {"name":"source-map-support","versions":["0.5.13","0.5.21"],"licence":"MIT"},
 {"name":"split-on-first","versions":["1.1.0"],"licence":"MIT"},
 {"name":"sprintf-js","versions":["1.0.3"],"licence":"BSD-3-Clause"},
+{"name":"SQLCipher (Zetetic, community edition)","versions":["4.7.0"],"licence":"BSD-3-Clause"},
 {"name":"stack-utils","versions":["2.0.6"],"licence":"MIT"},
 {"name":"stackframe","versions":["1.3.4"],"licence":"MIT"},
 {"name":"stacktrace-parser","versions":["0.1.11"],"licence":"MIT"},

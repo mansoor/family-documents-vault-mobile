@@ -110,7 +110,7 @@ export async function connect(
     } catch (err) {
       if (err instanceof NetworkError) {
         // Nothing there on this scheme — or a certificate the phone refused.
-        if (secure && deps.whyFailed && !certificate) {
+        if (secure && deps.whyFailed && !certificate && err.kind !== 'timeout') {
           const why = await deps.whyFailed(`${origin}/api/v1/capabilities`).catch((e: unknown) => e);
           const trouble = certificateTrouble(why);
           if (trouble) certificate = { kind: 'certificate', host: address.host, trouble };
@@ -144,12 +144,14 @@ export async function connect(
     }
     return { kind: 'ok', origin, caps: n.caps, firstTime: identity.kind === 'first' };
   }
-  if (refusal) return refusal;
-  if (reachedAny) return (await captive()) ? { kind: 'captive_portal' } : { kind: 'not_a_vault' };
-  if (certificate) {
+  // Only https records a certificate problem, and it says more than the
+  // refusal of the http tried after it (mobile data, say).
+  if (certificate && !reachedAny) {
     // A sign-in page answering for https shows its own name; a vault that
     // makes its own certificate is simply not trusted yet, internet or not.
     return certificate.trouble === 'wrong_name' && (await captive()) ? { kind: 'captive_portal' } : certificate;
   }
+  if (refusal) return refusal;
+  if (reachedAny) return (await captive()) ? { kind: 'captive_portal' } : { kind: 'not_a_vault' };
   return { kind: 'unreachable', host: address.host };
 }

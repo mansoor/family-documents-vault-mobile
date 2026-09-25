@@ -56,7 +56,7 @@ export default function Settings() {
     const origin = vault?.origin;
     setBusy(true);
     try {
-      await capture.removeMany(capture.queue.filter((i) => i.state !== 'sending').map((i) => i.id));
+      if (origin) await capture.forgetVault(origin);
       await signOut();
       await chooseAnotherVault();
       if (origin) forgetVault(origin);
@@ -66,6 +66,9 @@ export default function Settings() {
     }
   };
   const plain = vault?.origin.startsWith('http://') ?? false;
+  // Everybody's scans for this vault go with it, not only this person's.
+  const here = [...capture.queue, ...capture.others];
+  const hereOnItsWay = here.filter((i) => i.state === 'sending').length;
   // Seven taps on the version, a second or less apart, open Timings.
   const taps = useRef<{ n: number; at: number }>({ n: 0, at: 0 });
   const tapVersion = () => {
@@ -198,9 +201,10 @@ export default function Settings() {
           >
             <Text variant="screen">{t('settings.changeVaultTitle')}</Text>
             <Text>{t('settings.changeVaultWords')}</Text>
-            {capture.queue.length > 0 ? (
-              <Text tone="warn">{t('settings.changeVaultWaiting', { count: capture.queue.length })}</Text>
+            {here.length - hereOnItsWay > 0 ? (
+              <Text tone="warn">{t('settings.changeVaultWaiting', { count: here.length - hereOnItsWay })}</Text>
             ) : null}
+            {hereOnItsWay > 0 ? <Text tone="soft">{t('settings.onItsWay', { count: hereOnItsWay })}</Text> : null}
             <Button
               testID="change-vault-yes"
               kind="danger"

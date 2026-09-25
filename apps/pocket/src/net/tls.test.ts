@@ -28,6 +28,19 @@ describe('a certificate the phone will not accept', () => {
     ).toBe('expired');
   });
 
+  it("Android's own words for an expired certificate (or a wrong date) say so", () => {
+    expect(certificateTrouble(new Error('javax.net.ssl.SSLHandshakeException: Chain validation failed'))).toBe(
+      'expired',
+    );
+  });
+
+  it('an address that happens to hold an iPhone error number is not one', () => {
+    expect(certificateTrouble(new Error('Could not connect to vault-1202.local'))).toBeNull();
+    expect(certificateTrouble(new Error('The operation couldn’t be completed. (NSURLErrorDomain error -1202.)'))).toBe(
+      'untrusted',
+    );
+  });
+
   it('anything else is not a certificate problem', () => {
     for (const err of [
       new TypeError('Network request failed'),
