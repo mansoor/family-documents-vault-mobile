@@ -1,7 +1,8 @@
 name: Maestro
 
 # The phone on an emulator, against a real vault (4.5; the lock, 4.8; kept
-# Essentials in airplane mode, and wiped by a revoked session, 4.10): the e2e build
+# Essentials in airplane mode, and wiped by a revoked session, 4.10; Show
+# mode, 4.11): the e2e build
 # (x86_64, fixture scanner) runs .maestro/ flows while a vault from the
 # published images runs on the host, reached as 10.0.2.2. A run costs
 # about 40 runner minutes, so it runs on demand, and on a pull request that
@@ -126,11 +127,12 @@ jobs:
             $HOME/.maestro/bin/maestro test -e EMAIL="$EMAIL" -e PASSWORD="$PASSWORD" --format junit --output maestro-lock.xml apps/pocket/.maestro/lock.yaml || sh .github/scripts/on-flow-failure.sh lock
             sh .github/scripts/essentials-seed.sh || touch essentials-seed-failed
             $HOME/.maestro/bin/maestro test -e EMAIL="$EMAIL" -e PASSWORD="$PASSWORD" --format junit --output maestro-essentials.xml apps/pocket/.maestro/offline-essential.yaml || sh .github/scripts/on-flow-failure.sh essentials
+            $HOME/.maestro/bin/maestro test --format junit --output maestro-show.xml apps/pocket/.maestro/show-mode.yaml || sh .github/scripts/on-flow-failure.sh show
             sh .github/scripts/essentials-files.sh present || touch essentials-kept-failed
             sh .github/scripts/essentials-revoke.sh || touch essentials-revoke-failed
             $HOME/.maestro/bin/maestro test --format junit --output maestro-revoked.xml apps/pocket/.maestro/essentials-revoked.yaml || sh .github/scripts/on-flow-failure.sh revoked
             sh .github/scripts/essentials-files.sh absent || touch essentials-gone-failed
-            sh -c 'for f in capture-failed lock-failed cache-check-failed essentials-seed-failed essentials-failed essentials-kept-failed essentials-revoke-failed revoked-failed essentials-gone-failed; do if [ -f "$f" ]; then echo "failed: $f"; exit 1; fi; done'
+            sh -c 'for f in capture-failed lock-failed cache-check-failed essentials-seed-failed essentials-failed show-failed essentials-kept-failed essentials-revoke-failed revoked-failed essentials-gone-failed; do if [ -f "$f" ]; then echo "failed: $f"; exit 1; fi; done'
 
       - name: Exactly one document, carrying the card's fields
         run: |
@@ -155,6 +157,7 @@ jobs:
             maestro-report.xml
             maestro-lock.xml
             maestro-essentials.xml
+            maestro-show.xml
             maestro-revoked.xml
             app-files.txt
             essentials-files.txt

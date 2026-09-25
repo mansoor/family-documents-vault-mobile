@@ -14,7 +14,10 @@ import { Button, Notice, Text } from '../ui';
 export function LockScreen() {
   const { t } = useTranslation();
   const lock = useLock();
-  const { exitApp, autoPrompt, unlock } = lock;
+  const { exitApp, unlock, lockedFor } = lock;
+  // After Show mode the phone may still be in a clerk's hand: no prompt of
+  // its own; the person it belongs to taps Unlock.
+  const autoPrompt = lock.autoPrompt && lockedFor !== 'show';
   const asked = useRef(false);
 
   useEffect(() => {
@@ -50,6 +53,7 @@ export function LockScreen() {
       <View style={styles.body}>
         <Lock size={40} color={colours.accent} accessibilityElementsHidden importantForAccessibility="no" />
         <Text variant="screen">{t('lock.title')}</Text>
+        {lockedFor === 'show' ? <Text testID="lock-after-show">{t('show.carryOn')}</Text> : null}
         {lock.tooManyTries ? (
           <Notice tone="warn" testID="lock-too-many" announce={t('lock.tooMany')}>
             {t('lock.tooMany')}

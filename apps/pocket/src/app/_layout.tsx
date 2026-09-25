@@ -2,12 +2,15 @@ import '../i18n';
 import { colours } from '@fdv/shared';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { extra, SPIKE } from '../config';
 import { LockGate } from '../lock/gate';
 import { CaptureProvider } from '../state/capture';
+import { recoverBrightness } from '../show/brightness';
+import { defaultShowPlatform } from '../show/platform';
 import { EssentialsProvider, useEssentials } from '../state/essentials';
 import { LockProvider, useLock } from '../state/lock';
 import { useVault, VaultProvider } from '../state/vault';
@@ -61,6 +64,7 @@ function Gates() {
       </Stack.Protected>
       <Stack.Protected guard={reading}>
         <Stack.Screen name="essential/[id]" options={{ title: '' }} />
+        <Stack.Screen name="show/[id]" options={{ headerShown: false, animation: 'fade', gestureEnabled: false }} />
       </Stack.Protected>
       <Stack.Protected guard={phase === 'sign_in'}>
         <Stack.Screen name="sign-in" options={{ headerShown: false }} />
@@ -76,6 +80,14 @@ function Gates() {
   );
 }
 
+/** A brightness Show mode left behind (the app stopped while showing) goes back at launch. */
+function ShowRecovery() {
+  useEffect(() => {
+    void recoverBrightness(defaultShowPlatform());
+  }, []);
+  return null;
+}
+
 export default function RootLayout() {
   return (
     <SafeAreaProvider>
@@ -86,6 +98,7 @@ export default function RootLayout() {
             <EssentialsProvider>
               <CaptureProvider>
                 <View style={styles.root}>
+                  <ShowRecovery />
                   {extra.testBanner ? <TestBanner /> : null}
                   <LockGate>
                     <Gates />

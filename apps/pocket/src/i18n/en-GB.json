@@ -248,5 +248,21 @@
     "privateUnavailable": "This phone's fingerprint or face unlock can't open your Only me copies.",
     "dismiss": "Dismiss",
     "pending": "The vault is still preparing this document's pages. They'll be kept here the next time the phone is online."
+  },
+  "show": {
+    "hint": "Tap Done, or press back, to finish.",
+    "done": "Done",
+    "notKept": "This one isn't kept on this phone, so it can't be shown without a connection.",
+    "pending": "The vault is still preparing this document's pages. Try again in a minute.",
+    "noPreview": "This document can't be shown on the phone.",
+    "carryOn": "Unlock to carry on.",
+    "rotate": "Turn",
+    "rotateHint": "Turns the page sideways, or back.",
+    "previous": "Previous page",
+    "next": "Next page",
+    "larger": "Larger",
+    "smaller": "Smaller",
+    "page": "Page {{n}} of {{total}}",
+    "pageAlt": "Page {{n}} of {{title}}"
   }
 }
