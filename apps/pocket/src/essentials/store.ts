@@ -19,6 +19,19 @@ export interface OfflineDocument {
   kept_at: number;
 }
 
+/**
+ * One opening of a kept copy, as the vault is told it (POST /offline/opens):
+ * its own id, so sending it twice records it once.
+ */
+export interface OfflineOpenRecord {
+  id: string;
+  document_id: string;
+  version_id: string;
+  at: number;
+  mode: 'view' | 'show';
+  online: boolean;
+}
+
 export interface EssentialsStore {
   documents(): Promise<OfflineDocument[]>;
   document(id: string): Promise<OfflineDocument | null>;
@@ -27,10 +40,11 @@ export interface EssentialsStore {
   removeDocument(id: string): Promise<void>;
   page(versionId: string, n: number): Promise<Uint8Array | null>;
   putPage(versionId: string, n: number, jpeg: Uint8Array): Promise<void>;
-  /** Opened here, with no connection: told to the vault next time there is one. */
-  recordOpen(documentId: string, at: number): Promise<void>;
-  opens(): Promise<{ document_id: string; at: number }[]>;
-  clearOpens(upTo: number): Promise<void>;
+  /** Opened here: told to the vault next time there is a connection. */
+  recordOpen(open: OfflineOpenRecord): Promise<void>;
+  opens(): Promise<OfflineOpenRecord[]>;
+  /** Told, and the vault has them: forgotten here. */
+  clearOpens(ids: string[]): Promise<void>;
   state(key: string): Promise<string | null>;
   setState(key: string, value: string): Promise<void>;
   close(): Promise<void>;
@@ -40,7 +54,7 @@ export interface EssentialsStore {
 export class MemoryEssentialsStore implements EssentialsStore {
   private docs = new Map<string, OfflineDocument>();
   private pageMap = new Map<string, Uint8Array>();
-  private openLog: { document_id: string; at: number }[] = [];
+  private openLog: OfflineOpenRecord[] = [];
   private kv = new Map<string, string>();
 
   async documents() {
@@ -67,14 +81,14 @@ export class MemoryEssentialsStore implements EssentialsStore {
   async putPage(versionId: string, n: number, jpeg: Uint8Array) {
     this.pageMap.set(`${versionId}|${n}`, new Uint8Array(jpeg));
   }
-  async recordOpen(documentId: string, at: number) {
-    this.openLog.push({ document_id: documentId, at });
+  async recordOpen(open: OfflineOpenRecord) {
+    if (!this.openLog.some((o) => o.id === open.id)) this.openLog.push({ ...open });
   }
   async opens() {
     return [...this.openLog].sort((a, b) => a.at - b.at);
   }
-  async clearOpens(upTo: number) {
-    this.openLog = this.openLog.filter((o) => o.at > upTo);
+  async clearOpens(ids: string[]) {
+    this.openLog = this.openLog.filter((o) => !ids.includes(o.id));
   }
   async state(key: string) {
     return this.kv.get(key) ?? null;

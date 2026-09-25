@@ -29,6 +29,8 @@ export function capabilities(over: Partial<Capabilities> = {}): Capabilities {
       idempotent_capture: true,
       capture_metadata: true,
       issued_by: true,
+      page_previews: true,
+      offline_essentials: true,
     },
     limits: { max_upload_bytes: 104_857_600, max_members: null, max_storage_bytes: null },
     deprecations: [],

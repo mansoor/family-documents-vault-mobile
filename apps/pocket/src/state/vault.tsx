@@ -22,7 +22,7 @@ import { currentNetwork, onNetworkChange } from '../net/network';
 import { httpDecision, identityCheck, type NetworkKind } from '../net/policy';
 import { firstLaunch } from '../platform/prefs';
 import { forgetPreviousInstallation, installationId, SecureTokenStore } from '../session/store';
-import { signedIn } from '../lock/bridge';
+import { emit } from './events';
 import { leaveVault, readVaults, saveVault, updateVault, type VaultRecord } from './vaults';
 
 /**
@@ -408,6 +408,7 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
       }
       if (t.kind === 'ended' || t.kind === 'signed_out') {
         await session.clear();
+        if (t.kind === 'ended') emit('sessionEnded', t.reason);
         setNotice(t.kind === 'ended' ? 'signed_out_here' : null);
         setPhase('sign_in');
         throw new ApiRequestError(401, 'session_ended', 'Sign in again to carry on.');
@@ -420,6 +421,7 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
         if (err instanceof NetworkError) setOffline(true);
         if (isSessionOver(err)) {
           await session.clear();
+          emit('sessionEnded', (err as ApiRequestError).reason ?? 'revoked');
           setNotice('signed_out_here');
           setPhase('sign_in');
         }
@@ -461,7 +463,7 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
       setNotice(null);
       setOffline(false);
       // The password was just given: the app's lock opens with it.
-      signedIn();
+      emit('signedIn');
       setPhase('ready');
     },
     [session, vault],
@@ -521,12 +523,14 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
       // Signed out here regardless; the vault ends the session when it can.
     }
     await session.clear();
+    emit('signedOut');
     setNotice(null);
     setPhase('sign_in');
   }, [withToken, session]);
 
   const chooseAnotherVault = useCallback(async () => {
     await session.clear();
+    emit('signedOut');
     leaveVault();
     verified.current = null;
     setVault(null);

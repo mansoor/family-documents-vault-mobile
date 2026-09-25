@@ -54,18 +54,23 @@ describe.each(makers)('the offline Essentials store, %s', (_name, make) => {
     expect((await s.documents()).map((d) => d.id)).toEqual(['b']);
   });
 
-  it('remembers what was opened offline until it has been told', async () => {
+  it('remembers what was opened until the vault has been told, each once', async () => {
     const s = await make();
-    await s.recordOpen('a', 5);
-    await s.recordOpen('b', 7);
-    await s.recordOpen('a', 9);
-    expect(await s.opens()).toEqual([
-      { document_id: 'a', at: 5 },
-      { document_id: 'b', at: 7 },
-      { document_id: 'a', at: 9 },
-    ]);
-    await s.clearOpens(7);
-    expect(await s.opens()).toEqual([{ document_id: 'a', at: 9 }]);
+    const open = (id: string, document_id: string, at: number, mode: 'view' | 'show' = 'view') => ({
+      id,
+      document_id,
+      version_id: `${document_id}-v1`,
+      at,
+      mode,
+      online: false,
+    });
+    await s.recordOpen(open('o1', 'a', 5));
+    await s.recordOpen(open('o2', 'b', 7, 'show'));
+    await s.recordOpen(open('o3', 'a', 9));
+    await s.recordOpen(open('o1', 'a', 5));
+    expect(await s.opens()).toEqual([open('o1', 'a', 5), open('o2', 'b', 7, 'show'), open('o3', 'a', 9)]);
+    await s.clearOpens(['o1', 'o2']);
+    expect(await s.opens()).toEqual([open('o3', 'a', 9)]);
   });
 
   it('keeps where syncing got to', async () => {
@@ -82,6 +87,6 @@ describe('the store’s schema', () => {
     const db = nodeSqlDb();
     await SqliteEssentialsStore.over(db);
     await SqliteEssentialsStore.over(db);
-    expect(await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version', [])).toEqual({ user_version: 1 });
+    expect(await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version', [])).toEqual({ user_version: 2 });
   });
 });

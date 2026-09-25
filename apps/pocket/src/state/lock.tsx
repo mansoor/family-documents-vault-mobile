@@ -3,12 +3,12 @@ import { useTranslation } from 'react-i18next';
 import { AppState, BackHandler } from 'react-native';
 import { extra } from '../config';
 import { defaultAuth } from '../lock/auth';
-import { onSignedIn } from '../lock/bridge';
 import { KeyRing } from '../lock/keys';
 import { defaultScreenGuard } from '../lock/screen-guard';
 import type { AuthOutcome, AuthPort, LockLevel, ScreenGuardPort } from '../lock/types';
 import { log } from '../log';
 import { readPrefs, writePrefs } from '../platform/prefs';
+import { on } from './events';
 import { useVault } from './vault';
 
 /**
@@ -153,7 +153,7 @@ export function LockProvider(props: { children: ReactNode; deps?: Partial<LockDe
   // lock screen never appears, and nothing asks for a fingerprint on top.
   useEffect(
     () =>
-      onSignedIn(() => {
+      on('signedIn', () => {
         signedInHere.current = true;
         if (statusRef.current === 'locked' || statusRef.current === 'checking') open();
       }),
