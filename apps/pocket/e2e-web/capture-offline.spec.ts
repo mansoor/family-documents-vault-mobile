@@ -42,7 +42,7 @@ test('saved with no connection, sent once when it is back', async ({ page, conte
   await page.getByLabel('Email').fill(EMAIL);
   await page.getByLabel('Password').fill(PASSWORD);
   await page.getByRole('button', { name: 'Sign in' }).click();
-  await expect(page.getByText('Needs attention')).toBeVisible();
+  await expect(page.getByText('Needs attention').first()).toBeVisible();
 
   // The connection goes, after the app has seen the vault's choices.
   await page.waitForTimeout(1000);
@@ -54,7 +54,9 @@ test('saved with no connection, sent once when it is back', async ({ page, conte
   await page.getByRole('button', { name: 'More details' }).click();
   await page.getByLabel('Name', { exact: true }).fill(title);
   await page.getByRole('button', { name: 'Save' }).click();
-  await expect(page.getByText("Saved on this phone. It'll go to the vault as soon as there's a connection.")).toBeVisible();
+  await expect(
+    page.getByText("Saved on this phone. It'll go to the vault as soon as there's a connection."),
+  ).toBeVisible();
   await expect(page.getByText('Waiting to send')).toBeVisible();
 
   // Back online: it goes by itself.

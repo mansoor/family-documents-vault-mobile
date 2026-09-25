@@ -2,7 +2,7 @@ import { act, fireEvent, screen, waitFor, within } from '@testing-library/react-
 import { PDFDocument } from 'pdf-lib';
 import { useEffect, useRef, useState } from 'react';
 import CaptureScreen from '../app/capture';
-import Home from '../app/index';
+import Home from '../test-support/home';
 import { fixtureScanner, type ScanOutcome } from '../capture/scanner';
 import { MemoryQueueStore } from '../queue/store';
 import type { QueueItem } from '../queue/item';
@@ -115,7 +115,9 @@ describe('the confirm card', () => {
     await fireEvent.press(chip('Fake Owner (Yours)'));
     expect(onlyMe().props.accessibilityState).toMatchObject({ disabled: false });
     await fireEvent.press(onlyMe());
-    expect(screen.getByText('Only you can open this. Nobody can open it after you, unless you leave a key.')).toBeTruthy();
+    expect(
+      screen.getByText('Only you can open this. Nobody can open it after you, unless you leave a key.'),
+    ).toBeTruthy();
     // Given to someone else, it stops being Only me.
     await fireEvent.press(chip('Aisha Khan'));
     expect(onlyMe().props.accessibilityState).toMatchObject({ disabled: true, selected: false });
@@ -135,7 +137,9 @@ describe('the confirm card', () => {
     await fireEvent.press(screen.getByTestId('more-details'));
     expect(screen.getByTestId('field-name').props.placeholder).toBe("Aisha's passport");
     // The reminder it will get.
-    expect(screen.getByTestId('capture-reminder')).toHaveTextContent("We'll remind you 9 months and 6 months before it expires.");
+    expect(screen.getByTestId('capture-reminder')).toHaveTextContent(
+      "We'll remind you 9 months and 6 months before it expires.",
+    );
   });
 
   it('Expires is hidden when the type has no expiry', async () => {
@@ -161,7 +165,11 @@ describe('the confirm card', () => {
       await fireEvent.changeText(screen.getByTestId('field-expires'), typed);
       await fireEvent.press(screen.getByTestId('capture-save'));
       await waitFor(() => expect(t.vault.state.documents).toHaveLength(1));
-      expect(rec.metadata()[0]).toMatchObject({ type_key: 'passport', owner_member_id: 'fake-member', expires: expected });
+      expect(rec.metadata()[0]).toMatchObject({
+        type_key: 'passport',
+        owner_member_id: 'fake-member',
+        expires: expected,
+      });
       unmount();
     }
   });
@@ -231,7 +239,12 @@ describe('the confirm card', () => {
     const t = testVault();
     await withMembers(t);
     const phone = testCapture({
-      scanner: fixtureScanner([{ kind: 'file', file: { uri: 'cache:/picked/lease.pdf', name: 'Lease.pdf', mime: 'application/pdf', size: 2048 } }]),
+      scanner: fixtureScanner([
+        {
+          kind: 'file',
+          file: { uri: 'cache:/picked/lease.pdf', name: 'Lease.pdf', mime: 'application/pdf', size: 2048 },
+        },
+      ]),
     });
     phone.files.set('cache:/picked/lease.pdf', new TextEncoder().encode('%PDF-1.4\n%%EOF\n'));
     await renderApp(<Scanned how="file" />, { fetch: t.fetch, capture: phone });
@@ -319,7 +332,9 @@ describe('the page strip', () => {
     expect(await screen.findByText('1 page')).toBeTruthy();
     expect(phone.files.has('cache:/scan/2.jpg')).toBe(false);
     // The last page cannot be removed; the scan can only be thrown away.
-    expect(screen.getByRole('button', { name: 'Remove page 1' }).props.accessibilityState).toMatchObject({ disabled: true });
+    expect(screen.getByRole('button', { name: 'Remove page 1' }).props.accessibilityState).toMatchObject({
+      disabled: true,
+    });
   });
 });
 

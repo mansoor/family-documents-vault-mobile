@@ -13,8 +13,11 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { openOnline } from '../documents/online';
 import { useEssentials, type OpenCopy } from '../state/essentials';
 import { useLock, useScreenGuard } from '../state/lock';
+import { useStepUp } from '../state/step-up';
+import { useVault } from '../state/vault';
 import { Text } from '../ui';
 import { brighten, restoreBrightness } from './brightness';
 import { defaultShowPlatform, type ShowPlatform } from './platform';
@@ -39,6 +42,8 @@ const DIM = 'rgba(255,255,255,0.72)';
 export function ShowMode(props: {
   id: string;
   onLeave: () => void;
+  /** Not kept on the phone: from the vault, confirming it is you first if it asks (4.12). */
+  online?: boolean;
   platform?: ShowPlatform;
   /** Tests only: shorter than ten minutes and three seconds. */
   showForMs?: number;
@@ -47,6 +52,9 @@ export function ShowMode(props: {
   const { id, onLeave } = props;
   const { t } = useTranslation();
   const { open } = useEssentials();
+  const { withToken } = useVault();
+  const { guarded } = useStepUp();
+  const { online } = props;
   const { lockNow } = useLock();
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
@@ -68,8 +76,9 @@ export function ShowMode(props: {
   useEffect(() => {
     if (opened.current || !id) return;
     opened.current = true;
-    void open(id, 'show').then((c) => setCopy(c ?? 'missing'));
-  }, [id, open]);
+    const load = online ? openOnline(withToken, guarded, id) : open(id, 'show');
+    void load.then((c) => setCopy(c ?? 'missing')).catch(() => setCopy('missing'));
+  }, [id, open, online, withToken, guarded]);
 
   useEffect(() => {
     if (!copy || copy === 'missing' || copy.pages === 0) return;

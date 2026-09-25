@@ -1,19 +1,20 @@
 import { can, colours, radii, TAP_MIN, type DocumentView, type Member, type ReminderView } from '@fdv/shared';
 import { Image } from 'expo-image';
 import { Link, useRouter } from 'expo-router';
-import { Camera, FileUp, ImagePlus, Settings as SettingsIcon } from 'lucide-react-native';
+import { FileUp, ImagePlus, Settings as SettingsIcon, type LucideIcon } from 'lucide-react-native';
 import { useCallback, useEffect, useState } from 'react';
 import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
 import { FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { QueueRow } from '../capture/queue-row';
-import { OnThisPhone } from '../essentials/ui';
-import { useEssentials } from '../state/essentials';
-import { extra } from '../config';
-import { useCapture, type SavedNote } from '../state/capture';
-import { useVault } from '../state/vault';
-import { Button, Card, Notice, StatusLine, Text } from '../ui';
+import { QueueRow } from '../../capture/queue-row';
+import { useBeginCapture } from '../../capture/scan-button';
+import { OnThisPhone } from '../../essentials/ui';
+import { useEssentials } from '../../state/essentials';
+import { extra } from '../../config';
+import { useCapture, type SavedNote } from '../../state/capture';
+import { useVault } from '../../state/vault';
+import { Button, Card, Notice, StatusLine, Text } from '../../ui';
 
 interface HomeData {
   due: ReminderView[];
@@ -31,11 +32,11 @@ export default function Home() {
   const { t } = useTranslation();
   const { caps, vault, offline, notice, withToken, api, who } = useVault();
   const capture = useCapture();
-  const router = useRouter();
   const insets = useSafeAreaInsets();
   const [data, setData] = useState<HomeData | null>(null);
   const [refreshing, setRefreshing] = useState(false);
-  const [scannerFailed, setScannerFailed] = useState(false);
+  // The camera is in the tab bar (4.12); a file or a photo starts here.
+  const { begin, scannerFailed, setScannerFailed } = useBeginCapture();
   const [dockHeight, setDockHeight] = useState(84);
   const [othersKept, setOthersKept] = useState(false);
   const [members, setMembers] = useState<Member[] | null>(null);
@@ -110,16 +111,6 @@ export default function Home() {
     who?.role !== 'teen' &&
     !renewing.has(documentId) &&
     due.findIndex((r) => r.document_id === documentId) === index;
-
-  const begin = async (how: 'scan' | 'file' | 'photo') => {
-    const outcome = await capture.start(how);
-    if (outcome === 'card') {
-      setScannerFailed(false);
-      router.push('/capture');
-    } else if (outcome === 'failed' && how === 'scan') {
-      setScannerFailed(true);
-    }
-  };
 
   const essentials = useEssentials();
   const refresh = async () => {
@@ -252,10 +243,7 @@ export default function Home() {
         )}
       />
       {canAdd ? (
-        <View
-          style={[styles.dock, { bottom: 16 + insets.bottom }]}
-          onLayout={(e) => setDockHeight(e.nativeEvent.layout.height)}
-        >
+        <View style={[styles.dock, { bottom: 12 }]} onLayout={(e) => setDockHeight(e.nativeEvent.layout.height)}>
           {scannerFailed ? (
             <View style={styles.dockNotice}>
               <Notice tone="warn" testID="home-scanner-failed">
@@ -283,18 +271,6 @@ export default function Home() {
               style={styles.e2eMarker}
             />
           ) : null}
-          {capture.scanner.scans ? (
-            <Pressable
-              testID="home-scan"
-              accessibilityRole="button"
-              accessibilityLabel={t('home.scan')}
-              accessibilityHint={t('home.scanHint')}
-              onPress={() => void begin('scan')}
-              style={({ pressed }) => [styles.camera, pressed ? styles.pressed : null]}
-            >
-              <Camera color={colours.onAccent} size={30} accessibilityElementsHidden importantForAccessibility="no" />
-            </Pressable>
-          ) : null}
           <DockButton
             icon={ImagePlus}
             label={t('home.addPhoto')}
@@ -307,7 +283,7 @@ export default function Home() {
   );
 }
 
-function DockButton(props: { icon: typeof Camera; label: string; onPress: () => void; testID: string }) {
+function DockButton(props: { icon: LucideIcon; label: string; onPress: () => void; testID: string }) {
   const Icon = props.icon;
   return (
     <Pressable
@@ -347,9 +323,16 @@ function SavedLine(props: { text: string; onDismiss: () => void }) {
 
 function DocumentRow(props: { doc: DocumentView; token: string | null; thumb: string | null }) {
   const { t } = useTranslation();
+  const router = useRouter();
   const { doc } = props;
   return (
-    <View style={styles.row} accessible accessibilityLabel={doc.title ?? t('home.needsAName')}>
+    <Pressable
+      style={({ pressed }) => [styles.row, pressed ? styles.pressed : null]}
+      accessibilityRole="button"
+      accessibilityLabel={doc.title ?? t('home.needsAName')}
+      testID={`doc-row-${doc.id}`}
+      onPress={() => router.push({ pathname: '/document/[id]', params: { id: doc.id } })}
+    >
       <View style={styles.thumb}>
         {props.thumb && props.token ? (
           <Image
@@ -367,7 +350,7 @@ function DocumentRow(props: { doc: DocumentView; token: string | null; thumb: st
         <Text weight="600">{doc.title ?? t('home.needsAName')}</Text>
         <StatusLine status={doc.status} />
       </View>
-    </View>
+    </Pressable>
   );
 }
 
@@ -391,15 +374,6 @@ const styles = StyleSheet.create({
     rowGap: 8,
   },
   dockNotice: { width: '100%' },
-  camera: {
-    width: 68,
-    height: 68,
-    borderRadius: 34,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colours.accent,
-    elevation: 3,
-  },
   dockButton: {
     minHeight: TAP_MIN,
     minWidth: 96,

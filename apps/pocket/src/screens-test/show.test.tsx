@@ -2,7 +2,7 @@ import type { DocumentView } from '@fdv/shared';
 import { act, fireEvent, screen, waitFor } from '@testing-library/react-native';
 import { useEffect, useState } from 'react';
 import { AppState, BackHandler, StyleSheet, type AppStateStatus } from 'react-native';
-import Home from '../app/index';
+import Home from '../app/(tabs)/index';
 import type { Tier } from '../essentials/open';
 import { MemoryEssentialsStore } from '../essentials/store';
 import { CHECKED_KEY } from '../essentials/sync';

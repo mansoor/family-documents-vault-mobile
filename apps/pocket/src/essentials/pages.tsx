@@ -3,8 +3,10 @@ import { Image } from 'expo-image';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PanResponder, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { openOnline } from '../documents/online';
 import { useEssentials, type OpenCopy } from '../state/essentials';
 import { useScreenGuard } from '../state/lock';
+import { useStepUp } from '../state/step-up';
 import { useVault } from '../state/vault';
 import { Button, Notice, StatusLine, Text } from '../ui';
 
@@ -16,11 +18,12 @@ const ZOOMS = [1, 1.5, 2, 3];
  * written out as a file, and nothing is cached. Buttons move between pages
  * and zoom; so do a swipe and a pinch. Never captured.
  */
-export function EssentialPages(props: { id: string; mode?: string }) {
-  const { id, mode } = props;
+export function EssentialPages(props: { id: string; mode?: string; online?: boolean }) {
+  const { id, mode, online } = props;
   const { t } = useTranslation();
   const e = useEssentials();
-  const { offline } = useVault();
+  const { offline, withToken } = useVault();
+  const { guarded } = useStepUp();
   const { width, height } = useWindowDimensions();
   useScreenGuard('viewer');
 
@@ -35,8 +38,10 @@ export function EssentialPages(props: { id: string; mode?: string }) {
   useEffect(() => {
     if (opened.current || !id) return;
     opened.current = true;
-    void open(id, mode === 'show' ? 'show' : 'view').then((c) => setCopy(c ?? 'missing'));
-  }, [id, mode, open]);
+    // Not kept on the phone (4.12): from the vault, confirming it is you if it asks.
+    const load = online ? openOnline(withToken, guarded, id) : open(id, mode === 'show' ? 'show' : 'view');
+    void load.then((c) => setCopy(c ?? 'missing')).catch(() => setCopy('missing'));
+  }, [id, mode, open, online, withToken, guarded]);
 
   useEffect(() => {
     if (!copy || copy === 'missing' || copy.pages === 0) return;
@@ -109,7 +114,15 @@ export function EssentialPages(props: { id: string; mode?: string }) {
       {copy === 'missing' ? <Notice tone="warn">{t('essentials.notKept')}</Notice> : null}
       {copy && copy !== 'missing' && pages === 0 ? (
         <Notice tone="info" testID={copy.pending ? 'essential-pending' : 'essential-no-preview'}>
-          {t(copy.pending ? 'essentials.pending' : 'essentials.noPreview')}
+          {t(
+            copy.pending
+              ? online
+                ? 'document.pending'
+                : 'essentials.pending'
+              : online
+                ? 'document.noPreview'
+                : 'essentials.noPreview',
+          )}
         </Notice>
       ) : null}
       {pages > 0 ? (

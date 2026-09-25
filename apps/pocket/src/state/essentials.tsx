@@ -165,6 +165,8 @@ interface EssentialsValue {
   /** The Only me copies, with the person's fingerprint or face; brought up to date when online. */
   openPrivate(): Promise<PrivateOutcome>;
   sync(): Promise<void>;
+  /** Kept on this phone — asked of the store itself, once it is open (4.12). */
+  isKept(id: string): Promise<boolean>;
   open(id: string, mode: 'view' | 'show'): Promise<OpenCopy | null>;
   offered(): void;
   dismissNotice(): void;
@@ -706,6 +708,16 @@ export function EssentialsProvider(props: { children: ReactNode; deps?: Partial<
     [d, offline],
   );
 
+  const isKept = useCallback(
+    async (id: string): Promise<boolean> => {
+      if (!prefsRef.current.enrolled || !prefsRef.current.kept) return false;
+      await whenOpen();
+      for (const s of [storeRef.current, privateRef.current]) if (s && (await s.document(id))) return true;
+      return false;
+    },
+    [whenOpen],
+  );
+
   const items = useMemo(() => [...everyday, ...privateItems], [everyday, privateItems]);
   const age = useMemo(() => (checked ? ageOf(checked, d.now()) : null), [checked, d]);
   // Lapsed (or ended by the vault): the set came back with no grant.
@@ -734,6 +746,7 @@ export function EssentialsProvider(props: { children: ReactNode; deps?: Partial<
       countOwnPrivate,
       openPrivate,
       sync: () => run(),
+      isKept,
       open,
       offered: () => setPrefs({ offered: true }),
       dismissNotice: () => setPrefs({ notice: null }),
@@ -757,6 +770,7 @@ export function EssentialsProvider(props: { children: ReactNode; deps?: Partial<
       countOwnPrivate,
       openPrivate,
       run,
+      isKept,
       open,
       setPrefs,
     ],
@@ -784,6 +798,7 @@ const NONE: EssentialsValue = {
   countOwnPrivate: async () => 0,
   openPrivate: async () => 'unavailable',
   sync: async () => undefined,
+  isKept: async () => false,
   open: async () => null,
   offered: () => undefined,
   dismissNotice: () => undefined,

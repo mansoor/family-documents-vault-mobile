@@ -3,6 +3,11 @@
  * under jest-expo, as on a device): it loads and answers. 4.11's review
  * found it importing itself, which threw here and at every launch.
  */
+import * as Brightness from 'expo-brightness';
+import * as ScreenOrientation from 'expo-screen-orientation';
+import { defaultShowPlatform } from './platform';
+
+// Hoisted above the imports by jest.
 jest.mock('expo-brightness', () => ({
   getBrightnessAsync: jest.fn(async () => 0.5),
   setBrightnessAsync: jest.fn(async () => undefined),
@@ -18,10 +23,6 @@ jest.mock('expo-screen-orientation', () => ({
   lockAsync: jest.fn(async () => undefined),
   OrientationLock: { LANDSCAPE: 5, PORTRAIT_UP: 3 },
 }));
-
-import * as Brightness from 'expo-brightness';
-import * as ScreenOrientation from 'expo-screen-orientation';
-import { defaultShowPlatform } from './platform';
 
 describe('the phone’s Show platform', () => {
   it('loads, and does what it says', async () => {

@@ -44,8 +44,11 @@ async function token(request: APIRequestContext, email: string, password: string
 }
 
 const titlesFor = async (request: APIRequestContext, bearer: string) => {
-  const r = await request.get(`${VAULT}/api/v1/documents?limit=200`, { headers: { authorization: `Bearer ${bearer}` } });
-  return ((await r.json()) as { items: { title: string | null; visibility: string; owner_member_id: string | null }[] }).items;
+  const r = await request.get(`${VAULT}/api/v1/documents?limit=200`, {
+    headers: { authorization: `Bearer ${bearer}` },
+  });
+  return ((await r.json()) as { items: { title: string | null; visibility: string; owner_member_id: string | null }[] })
+    .items;
 };
 
 let second = { email: '', password: 'another correct horse battery' };
@@ -81,7 +84,7 @@ async function signIn(page: Page, address: string) {
   await page.getByLabel('Email').fill(EMAIL);
   await page.getByLabel('Password').fill(PASSWORD);
   await page.getByRole('button', { name: 'Sign in' }).click();
-  await expect(page.getByText('Needs attention')).toBeVisible();
+  await expect(page.getByText('Needs attention').first()).toBeVisible();
 }
 
 test('a PDF saved as Only me is invisible to the second adult', async ({ page, baseURL, request }) => {
@@ -91,13 +94,17 @@ test('a PDF saved as Only me is invisible to the second adult', async ({ page, b
   // Add a file: the browser's own file chooser.
   const chooser = page.waitForEvent('filechooser');
   await page.getByRole('button', { name: 'Add a file' }).click();
-  await (await chooser).setFiles({ name: 'counselling-letter.pdf', mimeType: 'application/pdf', buffer: pdf('A private letter') });
+  await (
+    await chooser
+  ).setFiles({ name: 'counselling-letter.pdf', mimeType: 'application/pdf', buffer: pdf('A private letter') });
 
   // The card: whose it is, Only me, a name; then Save.
   await expect(page.getByText('counselling-letter.pdf', { exact: false })).toBeVisible();
   await page.getByRole('button', { name: /\(Yours\)$/ }).click();
   await page.getByRole('button', { name: 'Only me' }).click();
-  await expect(page.getByText('Only you can open this. Nobody can open it after you, unless you leave a key.')).toBeVisible();
+  await expect(
+    page.getByText('Only you can open this. Nobody can open it after you, unless you leave a key.'),
+  ).toBeVisible();
   await page.getByRole('button', { name: 'More details' }).click();
   await page.getByLabel('Name', { exact: true }).fill(title);
   await page.getByRole('button', { name: 'Save' }).click();
