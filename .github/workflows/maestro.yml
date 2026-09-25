@@ -120,6 +120,8 @@ jobs:
             # "System UI isn't responding" dialog over whatever the flow is
             # looking for (run 36132900051). Nobody is there to answer it.
             adb shell settings put global hide_error_dialogs 1
+            # Android's "Viewing full screen" notice, shown the first time an app hides the bars (Show mode, 4.11), takes the next Back: seen already here.
+            adb shell settings put secure immersive_mode_confirmations confirmed
             adb shell am broadcast -a android.intent.action.CLOSE_SYSTEM_DIALOGS || true
             adb install -r fv-e2e.apk
             $HOME/.maestro/bin/maestro test -e EMAIL="$EMAIL" -e PASSWORD="$PASSWORD" --format junit --output maestro-report.xml apps/pocket/.maestro/capture-offline-queue.yaml || sh .github/scripts/on-flow-failure.sh capture

@@ -21,6 +21,14 @@ appId: io.github.mansoor.familyvault.e2e
     visible:
       id: show-image
     timeout: 15000
+# Android's own "Viewing full screen" notice, if it is up, would take the Back.
+- runFlow:
+    when:
+      visible:
+        text: Got it
+    commands:
+      - tapOn:
+          text: Got it
 # The controls fade after three seconds: a tap brings them back.
 - tapOn:
     id: show-screen
