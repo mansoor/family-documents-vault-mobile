@@ -73,6 +73,8 @@ interface CaptureValue {
   scanner: ScannerPort;
   /** The card's choices from the last time the vault was reached; null if never. */
   cardData: () => Promise<CardData | null>;
+  /** This start's card is kept on the phone: a scan made offline from now on can be filed. */
+  cardKept: boolean;
   /** "Scan the new one": a new version of a document, straight into the queue. */
   renew: (documentId: string) => Promise<StartOutcome | 'saved' | SaveProblem>;
   /** A Needs-you item, put right (another person, no person) and sent again. */
@@ -278,27 +280,59 @@ export function CaptureProvider(props: { children: ReactNode; deps?: Partial<Cap
 
   // The card's choices, fetched on every start that reaches the vault and
   // kept, so a scan made with no connection can still be filed properly.
+  // One fetch at a time: a card opened while the start's fetch is still on
+  // its way waits for it rather than racing it (and, offline, finding the
+  // cache not yet written). What came back is held in memory too, and
+  // written to the queue store as soon as the store is open.
   const cardKey = whoKey ? `card|${whoKey}` : null;
-  const loadCard = useCallback(async (): Promise<CardData | null> => {
-    if (!cardKey) return null;
-    try {
-      const fresh = await current.current.withToken(async (a, token) => {
-        const [types, members, docs] = await Promise.all([
-          a.documentTypes(token),
-          a.members(token),
-          a.documents(token, { limit: 100 }),
-        ]);
-        return { types: types.items, members: members.items, filed: docs.items.map((d) => d.type_key) };
-      });
-      await storeRef.current?.cache(cardKey, fresh);
-      return fresh;
-    } catch {
-      return (await storeRef.current?.cached<CardData>(cardKey)) ?? null;
-    }
-  }, [cardKey]);
+  const cardFetch = useRef<{ key: string; promise: Promise<CardData | null> } | null>(null);
+  const cardFresh = useRef<{ key: string; data: CardData } | null>(null);
+  const [cardKept, setCardKept] = useState<string | null>(null);
+  const keepCard = useCallback(async (key: string, data: CardData) => {
+    const s = storeRef.current;
+    if (!s) return;
+    await s.cache(key, data);
+    setCardKept(key);
+  }, []);
+  const loadCard = useCallback((): Promise<CardData | null> => {
+    if (!cardKey) return Promise.resolve(null);
+    const running = cardFetch.current;
+    if (running && running.key === cardKey) return running.promise;
+    const key = cardKey;
+    const entry = { key, promise: Promise.resolve<CardData | null>(null) };
+    entry.promise = (async (): Promise<CardData | null> => {
+      try {
+        const fresh = await current.current.withToken(async (a, token) => {
+          const [types, members, docs] = await Promise.all([
+            a.documentTypes(token),
+            a.members(token),
+            a.documents(token, { limit: 100 }),
+          ]);
+          return { types: types.items, members: members.items, filed: docs.items.map((d) => d.type_key) };
+        });
+        cardFresh.current = { key, data: fresh };
+        await keepCard(key, fresh).catch(() => undefined);
+        return fresh;
+      } catch {
+        const held = cardFresh.current;
+        if (held && held.key === key) return held.data;
+        return (await storeRef.current?.cached<CardData>(key)) ?? null;
+      } finally {
+        if (cardFetch.current === entry) cardFetch.current = null;
+      }
+    })();
+    cardFetch.current = entry;
+    return entry.promise;
+  }, [cardKey, keepCard]);
+  // Fetched as soon as somebody is signed in, whether or not the store is open yet…
   useEffect(() => {
-    if (store && cardKey) void loadCard();
-  }, [store, cardKey, loadCard]);
+    if (cardKey) void loadCard();
+  }, [cardKey, loadCard]);
+  // …and kept once it is.
+  useEffect(() => {
+    const held = cardFresh.current;
+    if (store && held && held.key === cardKey && cardKept !== cardKey) void keepCard(held.key, held.data).catch(() => undefined);
+  }, [store, cardKey, cardKept, keepCard]);
 
   // Foreground only: sending stops in the background and starts again in
   // front; a network change is worth a look only while in front.
@@ -519,6 +553,7 @@ export function CaptureProvider(props: { children: ReactNode; deps?: Partial<Cap
     () => ({
       scanner: deps.scanner,
       cardData: loadCard,
+      cardKept: cardKept !== null && cardKept === cardKey,
       renew,
       retry,
       others,
@@ -541,6 +576,8 @@ export function CaptureProvider(props: { children: ReactNode; deps?: Partial<Cap
     [
       deps,
       loadCard,
+      cardKept,
+      cardKey,
       renew,
       retry,
       others,

@@ -129,6 +129,30 @@ describe('the card with no connection', () => {
     );
   });
 
+  it('opened while the start’s fetch is still on its way, the card waits for it rather than finding nothing', async () => {
+    const t = testVault([ORIGIN]);
+    await signedIn(t);
+    const phone = testCapture({ scanner: fixtureScanner([TWO_PAGES]) });
+    phone.files.set('cache:/scan/1.jpg', jpeg('letter-with-exif.jpg'));
+    phone.files.set('cache:/scan/2.jpg', jpeg('card.jpg'));
+    // The start's list of people is answered, and slow to arrive…
+    let release = () => undefined as void;
+    const held = new Promise<void>((r) => (release = r));
+    const slow: TestVault['fetch'] = async (url, init) => {
+      const res = await withStatus(t)(url, init);
+      if (url.includes('/api/v1/members')) await held;
+      return res;
+    };
+    await renderApp(<App />, { fetch: slow, capture: phone });
+    await screen.findByTestId('home-calm');
+    // …and the connection goes while it is on its way; then the card opens.
+    t.reachable.delete(ORIGIN);
+    await fireEvent.press(screen.getByTestId('home-scan'));
+    await act(async () => release());
+    expect(await screen.findByRole('button', { name: 'Passport' })).toBeTruthy();
+    expect(screen.queryByText(/hasn't seen the vault's choices/)).toBeNull();
+  });
+
   it('never having seen the choices, offers Skip only', async () => {
     const t = testVault([]);
     await (async () => {

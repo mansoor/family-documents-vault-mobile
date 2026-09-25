@@ -8,6 +8,7 @@ import { useTranslation } from 'react-i18next';
 import { FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { QueueRow } from '../capture/queue-row';
+import { extra } from '../config';
 import { useCapture, type SavedNote } from '../state/capture';
 import { useVault } from '../state/vault';
 import { Button, Card, Notice, StatusLine, Text } from '../ui';
@@ -250,6 +251,10 @@ export default function Home() {
           </View>
         ) : null}
         <DockButton icon={FileUp} label={t('home.addFile')} onPress={() => void begin('file')} testID="home-add-file" />
+        {/* The e2e build only: tells a flow the card is kept, before it goes offline. */}
+        {extra.fixtures && capture.cardKept ? (
+          <View testID="e2e-card-kept" collapsable={false} style={styles.e2eMarker} />
+        ) : null}
         {capture.scanner.scans ? (
           <Pressable
             testID="home-scan"
@@ -334,6 +339,7 @@ function DocumentRow(props: { doc: DocumentView; token: string | null; thumb: st
 }
 
 const styles = StyleSheet.create({
+  e2eMarker: { width: 1, height: 1 },
   safe: { flex: 1, backgroundColor: colours.bg },
   page: { padding: 20, gap: 10 },
   queue: { gap: 8 },

@@ -26,10 +26,15 @@ env:
 - hideKeyboard
 - tapOn:
     id: sign-in-go
-# Home has what it needs from the vault (the card's choices load with it).
+# Home has what it needs from the vault, and the card's choices are kept
+# on the phone (a marker only the e2e build draws).
 - extendedWaitUntil:
     visible:
       id: home-calm
+    timeout: 30000
+- extendedWaitUntil:
+    visible:
+      id: e2e-card-kept
     timeout: 30000
 - waitForAnimationToEnd
 
