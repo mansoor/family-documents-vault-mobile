@@ -158,7 +158,7 @@ describe('notifications on this phone (4.14)', () => {
     const t = pushVault('off');
     const fake = new FakePushNative();
     await settingsOn(t, fake);
-    await screen.findByText(/Vault 0\.4\.14/);
+    await waitFor(() => expect(screen.getByTestId('settings-version')).toHaveTextContent(/Vault 0\.4\.14/));
     expect(screen.queryByTestId('push-title')).toBeNull();
   });
 

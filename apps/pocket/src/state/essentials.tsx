@@ -170,6 +170,14 @@ interface EssentialsValue {
   /** Which version is kept on this phone, if any. */
   keptVersion(id: string): Promise<string | null>;
   open(id: string, mode: 'view' | 'show'): Promise<OpenCopy | null>;
+  /** How much the kept pages take on this phone, in bytes (4.15). */
+  copiesSize(): Promise<number>;
+  /**
+   * Settings → Remove offline copies (4.15): the vault is told this phone
+   * keeps nothing any more (the grant ends), and every copy goes. Without
+   * a connection the copies still go; the grant lapses by itself.
+   */
+  removeCopies(): Promise<void>;
   offered(): void;
   dismissNotice(): void;
 }
@@ -734,6 +742,25 @@ export function EssentialsProvider(props: { children: ReactNode; deps?: Partial<
   );
   const isKept = useCallback(async (id: string) => (await keptVersion(id)) !== null, [keptVersion]);
 
+  const copiesSize = useCallback(async (): Promise<number> => {
+    if (!storeRef.current && !openableRef.current) return 0;
+    await whenOpen();
+    let n = 0;
+    for (const s of [storeRef.current, privateRef.current]) n += s ? await s.bytes() : 0;
+    return n;
+  }, [whenOpen]);
+
+  const removeCopies = useCallback(async () => {
+    try {
+      await withToken((a, token) => a.endOfflineGrant(token));
+    } catch {
+      // No connection, or the grant already over: it ends by itself.
+    }
+    await wipe(null);
+    setPrefs(NOT_ENROLLED);
+    log.info('essentials.removed_by_person', {});
+  }, [withToken, wipe, setPrefs]);
+
   const items = useMemo(() => [...everyday, ...privateItems], [everyday, privateItems]);
   const age = useMemo(() => (checked ? ageOf(checked, d.now()) : null), [checked, d]);
   // Lapsed (or ended by the vault): the set came back with no grant.
@@ -765,6 +792,8 @@ export function EssentialsProvider(props: { children: ReactNode; deps?: Partial<
       isKept,
       keptVersion,
       open,
+      copiesSize,
+      removeCopies,
       offered: () => setPrefs({ offered: true }),
       dismissNotice: () => setPrefs({ notice: null }),
     }),
@@ -790,6 +819,8 @@ export function EssentialsProvider(props: { children: ReactNode; deps?: Partial<
       isKept,
       keptVersion,
       open,
+      copiesSize,
+      removeCopies,
       setPrefs,
     ],
   );
@@ -819,6 +850,8 @@ const NONE: EssentialsValue = {
   isKept: async () => false,
   keptVersion: async () => null,
   open: async () => null,
+  copiesSize: async () => 0,
+  removeCopies: async () => undefined,
   offered: () => undefined,
   dismissNotice: () => undefined,
 };

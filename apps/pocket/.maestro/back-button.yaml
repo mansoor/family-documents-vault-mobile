@@ -1,0 +1,83 @@
+# Iteration 4.15's Back rules, on an emulator (the e2e build), against the
+# same vault as the other flows (10.0.2.2:8099):
+#  - Settings: Back on "Use another vault?" keeps this vault; Back again
+#    goes Home.
+#  - The capture card with a scan: Back asks; Keep editing stays on the
+#    card; Throw away leaves it — nothing reaches the vault (the document
+#    count after the flows stays at one).
+# Back in Show mode and on the lock screen: show-mode.yaml and lock.yaml.
+appId: io.github.mansoor.familyvault.e2e
+env:
+  VAULT: 10.0.2.2:8099
+---
+- launchApp:
+    clearState: true
+- tapOn:
+    id: connect-address
+- inputText: ${VAULT}
+- hideKeyboard
+- tapOn:
+    id: connect-go
+- tapOn:
+    id: connect-approve-http
+- tapOn:
+    id: sign-in-email
+- inputText: ${EMAIL}
+- tapOn:
+    id: sign-in-password
+- inputText: ${PASSWORD}
+- hideKeyboard
+- tapOn:
+    id: sign-in-go
+- extendedWaitUntil:
+    visible:
+      id: home-calm
+    timeout: 30000
+- waitForAnimationToEnd
+
+# Settings: a question, then Back.
+- tapOn: Settings
+- extendedWaitUntil:
+    visible:
+      id: settings-change-vault
+    timeout: 15000
+- tapOn:
+    id: settings-change-vault
+- assertVisible:
+    id: change-vault-question
+- back
+- assertNotVisible:
+    id: change-vault-question
+- assertVisible:
+    id: settings-change-vault
+- back
+- extendedWaitUntil:
+    visible:
+      id: home-calm
+    timeout: 15000
+
+# The capture card with a scan on it.
+- tapOn:
+    id: home-scan
+- extendedWaitUntil:
+    visible:
+      id: capture-card
+    timeout: 30000
+- back
+- assertVisible:
+    id: leave-question
+- tapOn:
+    id: leave-keep
+- assertNotVisible:
+    id: leave-question
+- assertVisible:
+    id: capture-card
+- back
+- tapOn:
+    id: leave-throw
+- extendedWaitUntil:
+    visible:
+      id: home-calm
+    timeout: 15000
+- assertNotVisible:
+    id: capture-card

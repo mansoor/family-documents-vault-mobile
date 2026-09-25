@@ -40,6 +40,21 @@ export function updateVault(origin: string, patch: Partial<VaultRecord>): Vaults
   return next;
 }
 
+/**
+ * Everything the phone knew of a vault — its instance id, the approval
+ * for plain http, the email last used — gone (4.15, Change server): the
+ * next time is a first time.
+ */
+export function forgetVault(origin: string): Vaults {
+  const now = readVaults();
+  const next = {
+    current: now.current === origin ? null : now.current,
+    known: now.known.filter((k) => k.origin !== origin),
+  };
+  writePrefs(NAME, next);
+  return next;
+}
+
 export function leaveVault(): Vaults {
   const next = { ...readVaults(), current: null };
   writePrefs(NAME, next);

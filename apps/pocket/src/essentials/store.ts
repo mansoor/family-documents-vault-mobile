@@ -40,6 +40,8 @@ export interface EssentialsStore {
   removeDocument(id: string): Promise<void>;
   page(versionId: string, n: number): Promise<Uint8Array | null>;
   putPage(versionId: string, n: number, jpeg: Uint8Array): Promise<void>;
+  /** How much the kept pages take, in bytes (Settings, 4.15). */
+  bytes(): Promise<number>;
   /** Opened here: told to the vault next time there is a connection. */
   recordOpen(open: OfflineOpenRecord): Promise<void>;
   opens(): Promise<OfflineOpenRecord[]>;
@@ -80,6 +82,11 @@ export class MemoryEssentialsStore implements EssentialsStore {
   }
   async putPage(versionId: string, n: number, jpeg: Uint8Array) {
     this.pageMap.set(`${versionId}|${n}`, new Uint8Array(jpeg));
+  }
+  async bytes() {
+    let n = 0;
+    for (const page of this.pageMap.values()) n += page.byteLength;
+    return n;
   }
   async recordOpen(open: OfflineOpenRecord) {
     if (!this.openLog.some((o) => o.id === open.id)) this.openLog.push({ ...open });

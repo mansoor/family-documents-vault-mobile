@@ -6,6 +6,37 @@ app's own, tagged `vX.Y.Z` in this repository.
 
 ## [Unreleased]
 
+## [0.1.9] — iteration 4.15: address, certificates, Settings and Back
+
+### Added
+- **Settings, in full.**
+  - The vault: its address, "Not secure" when it is reached without
+    encryption, and "Use another vault", which signs out and removes
+    everything kept on this phone for this one (scans still waiting
+    included, after saying how many).
+  - Signed-in devices, named as the vault names them: this phone marked,
+    the ones keeping Essentials said, any other signed out from here.
+  - Offline copies: how many, how much room, when last checked, whether
+    your own Only me documents are among them (switched with your
+    password), and Remove offline copies — the vault is told this phone
+    keeps nothing now.
+  - About: the versions, the licences of everything the app is made of
+    (listed from the build itself), and "More settings are in the browser".
+- **A link pasted as the address.** An invitation or a password reset
+  link becomes the vault's address, with the browser to finish it; a share
+  link is for the browser only. The secret in the link is never kept.
+- **Certificates in words.** A vault whose certificate this phone doesn't
+  trust yet says so, with how to install it once (Android's steps; the
+  iPhone's too); a certificate for another name, or one that has run out,
+  says that instead of "can't reach".
+- **A Wi-Fi sign-in page** answering instead of the vault is named as one.
+
+### Changed
+- Back closes every sheet without doing what it asked (Use another vault,
+  Sign out, Confirm it's you), as it already leaves Show mode for the lock
+  screen, leaves the app from the lock screen, and asks before a scan on
+  the card is thrown away.
+
 ## [0.1.8] — iteration 4.14: push on Android
 
 Needs a vault of 0.4.14 or later for notifications; with an older one,

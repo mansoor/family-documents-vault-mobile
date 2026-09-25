@@ -1,6 +1,6 @@
 import type { FetchLike } from '@fdv/client';
 import { createFakeVault } from '@fdv/client/testing';
-import type { Capabilities, DocumentView, ReminderView, SearchHit, VersionView } from '@fdv/shared';
+import type { Capabilities, DocumentView, ReminderView, SearchHit, SessionRow, VersionView } from '@fdv/shared';
 
 /**
  * The client's fake vault, with the capability document the app needs to
@@ -57,6 +57,8 @@ export interface TestVault {
   library: Library;
   /** Push (4.14): the vault's side of this phone's notifications. */
   push: PushSide;
+  /** Signed-in devices (4.15): this phone, and a laptop. */
+  sessions: SessionRow[];
 }
 
 export interface PushSide {
@@ -114,6 +116,30 @@ export function testVault(origins: string[] = ['https://vault.test']): TestVault
     calls: [],
     reminders: [],
     upcoming: [],
+    sessions: [
+      {
+        id: 'this-phone',
+        current: true,
+        user_agent: 'FamilyVault/0.1.9',
+        ip: null,
+        created_at: '2026-09-01T00:00:00Z',
+        last_used_at: '2026-09-25T00:00:00Z',
+        client: 'app',
+        label: 'the app on a Test Phone 1',
+        offline: true,
+      },
+      {
+        id: 'laptop',
+        current: false,
+        user_agent: 'Mozilla/5.0',
+        ip: null,
+        created_at: '2026-08-01T00:00:00Z',
+        last_used_at: '2026-09-20T00:00:00Z',
+        client: 'browser',
+        label: 'Firefox on a Mac',
+        offline: false,
+      },
+    ],
     push: {
       key: { public_key: VAPID, enabled: true },
       devices: [],
@@ -232,6 +258,13 @@ async function library(t: TestVault, path: string, init: Parameters<FetchLike>[1
 
   const pushed = await pushRoutes(t, q, init.method, body);
   if (pushed) return pushed;
+  if (q === '/api/v1/auth/sessions' && init.method === 'GET') return json({ items: t.sessions });
+  const s = /^\/api\/v1\/auth\/sessions\/([^/]+)$/.exec(q);
+  if (s?.[1] && init.method === 'DELETE') {
+    if (!t.sessions.some((x) => x.id === s[1])) return failure(404, 'not_found', 'There is no such session.');
+    t.sessions = t.sessions.filter((x) => x.id !== s[1]);
+    return { ...json(null), status: 204, text: async () => '' } as Reply;
+  }
   if (q === '/api/v1/auth/step-up' && init.method === 'POST') {
     const ok = body.password === t.vault.state.password || body.code === '123456';
     if (!ok) return failure(401, 'invalid_credentials', "That password isn't right.");

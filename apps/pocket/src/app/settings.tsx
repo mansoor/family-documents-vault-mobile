@@ -1,4 +1,5 @@
 import { colours, radii } from '@fdv/shared';
+import * as Linking from 'expo-linking';
 import { useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -6,17 +7,25 @@ import { Modal, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-na
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { APP_VERSION, SPIKE } from '../config';
 import { NotificationsCard } from '../push/card';
+import { SignedInDevices } from '../settings/devices';
+import { OfflineCopies } from '../settings/offline';
 import { useCapture } from '../state/capture';
 import { useLock, type LockTimeout } from '../state/lock';
 import { useVault } from '../state/vault';
+import { forgetVault } from '../state/vaults';
 import { Button, Card, Notice, Text } from '../ui';
 import { useTextScale } from '../ui/text-scale';
 
-/** Settings: which vault, who is signed in, Large text, the lock, notifications, sign out. */
+/**
+ * Settings, in full (4.15): which vault (and whether it is reached without
+ * encryption), changing it, who is signed in and on which devices, the
+ * lock, the offline copies, notifications, Large text, About — and the
+ * browser for everything else.
+ */
 export default function Settings() {
   const { t } = useTranslation();
   const router = useRouter();
-  const { vault, caps, signOut } = useVault();
+  const { vault, caps, signOut, chooseAnotherVault } = useVault();
   const { large, setLarge } = useTextScale();
   const lock = useLock();
   const timeouts: [LockTimeout, string][] = [
@@ -27,6 +36,8 @@ export default function Settings() {
   const capture = useCapture();
   const insets = useSafeAreaInsets();
   const [asking, setAsking] = useState(false);
+  const [changing, setChanging] = useState(false);
+  const [busy, setBusy] = useState(false);
   // Signing out with scans still on their way: keep them for next time, or not.
   const leave = () => {
     if (capture.queue.length > 0) setAsking(true);
@@ -39,6 +50,22 @@ export default function Settings() {
     if (remove) await capture.removeMany(capture.queue.filter((i) => i.state !== 'sending').map((i) => i.id));
     await signOut();
   };
+  // Changing the vault: signed out, and everything of this one's goes —
+  // the offline copies, the scans still waiting, the vault's own record.
+  const changeVault = async () => {
+    const origin = vault?.origin;
+    setBusy(true);
+    try {
+      await capture.removeMany(capture.queue.filter((i) => i.state !== 'sending').map((i) => i.id));
+      await signOut();
+      await chooseAnotherVault();
+      if (origin) forgetVault(origin);
+    } finally {
+      setBusy(false);
+      setChanging(false);
+    }
+  };
+  const plain = vault?.origin.startsWith('http://') ?? false;
   // Seven taps on the version, a second or less apart, open Timings.
   const taps = useRef<{ n: number; at: number }>({ n: 0, at: 0 });
   const tapVersion = () => {
@@ -56,6 +83,11 @@ export default function Settings() {
       <Card>
         <Text variant="title">{t('settings.vault')}</Text>
         <Text>{vault?.origin.replace(/^https?:\/\//, '') ?? ''}</Text>
+        {plain ? (
+          <Text tone="warn" variant="secondary" testID="settings-not-secure">
+            {t('settings.notSecure')}
+          </Text>
+        ) : null}
         <Pressable
           testID="settings-version"
           accessibilityRole="text"
@@ -68,7 +100,14 @@ export default function Settings() {
           </Text>
         </Pressable>
         {vault?.email ? <Text tone="soft">{t('settings.signedInAs', { email: vault.email })}</Text> : null}
+        <Button
+          testID="settings-change-vault"
+          kind="quiet"
+          label={t('settings.changeVault')}
+          onPress={() => setChanging(true)}
+        />
       </Card>
+      <SignedInDevices />
       <Card>
         <View style={styles.row}>
           <View style={styles.flex}>
@@ -128,9 +167,51 @@ export default function Settings() {
           />
         </View>
       </Card>
+      <OfflineCopies />
       <NotificationsCard />
+      <Card>
+        <Text variant="title">{t('settings.about')}</Text>
+        <Text tone="soft">{version}</Text>
+        <Button
+          testID="settings-licences"
+          kind="quiet"
+          label={t('settings.licences')}
+          onPress={() => router.push('/licences')}
+        />
+        {vault ? (
+          <Button
+            testID="settings-in-browser"
+            kind="quiet"
+            label={t('settings.moreInBrowser')}
+            onPress={() => void Linking.openURL(vault.origin)}
+          />
+        ) : null}
+      </Card>
       <Button testID="settings-sign-out" kind="quiet" label={t('settings.signOut')} onPress={leave} />
       {SPIKE ? <Button kind="quiet" label={t('settings.spike')} onPress={() => router.push('/spike')} /> : null}
+      <Modal visible={changing} transparent animationType="fade" onRequestClose={() => setChanging(false)}>
+        <View style={styles.scrim}>
+          <View
+            style={[styles.sheet, { paddingBottom: 20 + insets.bottom }]}
+            accessibilityViewIsModal
+            testID="change-vault-question"
+          >
+            <Text variant="screen">{t('settings.changeVaultTitle')}</Text>
+            <Text>{t('settings.changeVaultWords')}</Text>
+            {capture.queue.length > 0 ? (
+              <Text tone="warn">{t('settings.changeVaultWaiting', { count: capture.queue.length })}</Text>
+            ) : null}
+            <Button
+              testID="change-vault-yes"
+              kind="danger"
+              label={t('settings.changeVaultYes')}
+              busy={busy}
+              onPress={() => void changeVault()}
+            />
+            <Button kind="quiet" label={t('common.cancel')} onPress={() => setChanging(false)} />
+          </View>
+        </View>
+      </Modal>
       <Modal visible={asking} transparent animationType="fade" onRequestClose={() => setAsking(false)}>
         <View style={styles.scrim}>
           <View
