@@ -1,0 +1,66 @@
+# Iteration 4.5's proof on an emulator (the e2e build: fixture scanner,
+# x86_64), against a vault from the published images on the host
+# (10.0.2.2:8099). A scan saved in airplane mode survives the app being
+# stopped, and reaches the vault once, with the card's details. The
+# workflow then asks the vault's API that exactly one such document exists.
+appId: io.github.mansoor.familyvault.e2e
+env:
+  VAULT: 10.0.2.2:8099
+---
+- launchApp:
+    clearState: true
+- tapOn:
+    id: connect-address
+- inputText: ${VAULT}
+- hideKeyboard
+- tapOn:
+    id: connect-go
+- tapOn:
+    id: connect-approve-http
+- tapOn:
+    id: sign-in-email
+- inputText: ${EMAIL}
+- tapOn:
+    id: sign-in-password
+- inputText: ${PASSWORD}
+- hideKeyboard
+- tapOn:
+    id: sign-in-go
+# Home has what it needs from the vault (the card's choices load with it).
+- extendedWaitUntil:
+    visible:
+      id: home-calm
+    timeout: 30000
+- waitForAnimationToEnd
+
+# Airplane mode on: the card works from what the phone last saw.
+- setAirplaneMode: enabled
+- tapOn:
+    id: home-scan
+- scrollUntilVisible:
+    element: Passport
+- tapOn: Passport
+- scrollUntilVisible:
+    element: .*\(Yours\)
+- tapOn: .*\(Yours\)
+- scrollUntilVisible:
+    element:
+      id: capture-save
+- tapOn:
+    id: capture-save
+- assertVisible: Saved on this phone.*
+- assertVisible: Waiting to send
+
+# Stopped for real, then the connection comes back, then opened again.
+- stopApp
+- setAirplaneMode: disabled
+- launchApp
+# The scan is on Home — on its way, or already in Recently added — and
+# then gone from the queue: it has reached the vault.
+- extendedWaitUntil:
+    visible: Pocket's passport
+    timeout: 30000
+- extendedWaitUntil:
+    notVisible: On its way
+    timeout: 120000
+- assertVisible: Pocket's passport

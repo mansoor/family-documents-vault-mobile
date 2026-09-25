@@ -22,8 +22,18 @@ export interface QueueProblem {
   message: string | null;
 }
 
+/**
+ * What an item makes: a new document (POST /capture), or a new version of
+ * one already in the vault — a renewed passport, a new policy year (POST
+ * /documents/{target}/versions), which also resolves its reminders.
+ */
+export type QueueKind = 'capture' | 'version';
+
 export interface QueueItem {
   id: string;
+  kind: QueueKind;
+  /** For a version: the document it renews. */
+  target: string | null;
   /**
    * The upload's idempotency key: made once, at Save, and sent with every
    * try, so a retry can never make a second document.
@@ -48,4 +58,10 @@ export interface QueueItem {
    */
   askFirst: boolean;
   problem: QueueProblem | null;
+  /**
+   * Why the last try did not go, while it waits to try again: 'offline',
+   * or the vault's code ('storage_unreachable', 'rate_limited'…). Null
+   * before the first try.
+   */
+  lastCode: string | null;
 }

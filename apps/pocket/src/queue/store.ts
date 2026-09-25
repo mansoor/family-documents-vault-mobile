@@ -14,6 +14,12 @@ export interface QueueStore {
   update(id: string, patch: Partial<Omit<QueueItem, 'id'>>): Promise<void>;
   /** The item, its bytes and its key, gone. */
   remove(id: string): Promise<void>;
+  /**
+   * What the card needs to work offline — the kinds of document, the
+   * household's people — as last seen from each vault and account.
+   */
+  cached<T>(key: string): Promise<T | null>;
+  cache(key: string, value: unknown): Promise<void>;
 }
 
 export class MemoryQueueStore implements QueueStore {
@@ -40,5 +46,16 @@ export class MemoryQueueStore implements QueueStore {
 
   async remove(id: string): Promise<void> {
     this.items.delete(id);
+  }
+
+  private readonly kept = new Map<string, string>();
+
+  async cached<T>(key: string): Promise<T | null> {
+    const v = this.kept.get(key);
+    return v === undefined ? null : (JSON.parse(v) as T);
+  }
+
+  async cache(key: string, value: unknown): Promise<void> {
+    this.kept.set(key, JSON.stringify(value));
   }
 }

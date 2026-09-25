@@ -1,4 +1,5 @@
-import { can, type CaptureMetadata } from '@fdv/shared';
+import { multipartBody } from '@fdv/client';
+import { can, type CaptureMetadata, type DocumentTypeView, type Member } from '@fdv/shared';
 import { randomUUID } from 'expo-crypto';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { AppState } from 'react-native';
@@ -50,14 +51,37 @@ export type SaveOutcome = { kind: 'saved' } | { kind: 'refused'; problem: SavePr
 export interface SavedNote {
   /** Skipped, or saved without saying what it is: it needs a name. */
   unnamed: boolean;
+  /** Saved with no connection to the vault: it goes when there is one. */
+  offline?: boolean;
+  /** A new version of a document already in the vault. */
+  renewal?: boolean;
   /** The reminders it will get, when it has the date they come from. */
   reminder: string | null;
   /** A kind that expires, saved without its expiry date: no reminders yet. */
   noExpiry: boolean;
 }
 
+/** What the card offers, as last seen from the vault: kept so it works offline. */
+export interface CardData {
+  types: DocumentTypeView[];
+  members: Member[];
+  /** The type of each document the phone could see, for ranking the chips. */
+  filed: (string | null)[];
+}
+
 interface CaptureValue {
   scanner: ScannerPort;
+  /** The card's choices from the last time the vault was reached; null if never. */
+  cardData: () => Promise<CardData | null>;
+  /** "Scan the new one": a new version of a document, straight into the queue. */
+  renew: (documentId: string) => Promise<StartOutcome | 'saved' | SaveProblem>;
+  /** A Needs-you item, put right (another person, no person) and sent again. */
+  retry: (id: string, metadata: CaptureMetadata) => Promise<void>;
+  /** This vault's captures made by someone else who used this phone. */
+  others: QueueItem[];
+  /** Captures waiting on this phone for this vault: this account's, or anyone's when signed out. */
+  waitingHere: number;
+  removeMany: (ids: string[]) => Promise<void>;
   pending: CaptureSource | null;
   start: (how: 'scan' | 'file' | 'photo') => Promise<StartOutcome>;
   /** Add page, or Retake: more pages from the scanner, at most `max`. */
@@ -103,11 +127,14 @@ const inFront = () => AppState.currentState !== 'background' && AppState.current
 
 export function CaptureProvider(props: { children: ReactNode; deps?: Partial<CaptureDeps> }) {
   const deps = useMemo<CaptureDeps>(() => ({ ...defaultDeps(), ...props.deps }), [props.deps]);
-  const { who, withToken, uploadApi, api, sessionOwner } = useVault();
+  const { who, withToken, uploadApi, api, sessionOwner, vault, offline } = useVault();
+  const origin = vault?.origin ?? null;
   const [store, setStore] = useState<QueueStore | null>(null);
   const [openTry, setOpenTry] = useState(0);
   const [pending, setPending] = useState<CaptureSource | null>(null);
   const [queue, setQueue] = useState<QueueItem[]>([]);
+  const [others, setOthers] = useState<QueueItem[]>([]);
+  const [waitingHere, setWaitingHere] = useState(0);
   const [delivered, setDelivered] = useState(0);
   const [saved, setSaved] = useState<SavedNote | null>(null);
   const timings = useMemo(() => new TimingRecorder(deps.now), [deps.now]);
@@ -138,16 +165,21 @@ export function CaptureProvider(props: { children: ReactNode; deps?: Partial<Cap
 
   // The uploader reads who is signed in, and how to reach the vault, when
   // it runs — through a ref, so one uploader lives as long as the store.
-  const current = useRef({ who, withToken, uploadApi, api, sessionOwner });
+  const current = useRef({ who, withToken, uploadApi, api, sessionOwner, origin, offline });
   useEffect(() => {
-    current.current = { who, withToken, uploadApi, api, sessionOwner };
-  }, [who, withToken, uploadApi, api, sessionOwner]);
+    current.current = { who, withToken, uploadApi, api, sessionOwner, origin, offline };
+  }, [who, withToken, uploadApi, api, sessionOwner, origin, offline]);
 
   const refresh = useCallback(async () => {
     if (!store) return;
     const w = current.current.who;
-    const all = await store.list();
-    setQueue(w ? all.filter((i) => i.origin === w.origin && i.account === w.member_id) : []);
+    const here = current.current.origin;
+    const all = (await store.list()).filter((i) => i.origin === here);
+    const mine = w ? all.filter((i) => i.account === w.member_id) : [];
+    setQueue(mine);
+    setOthers(w ? all.filter((i) => i.account !== w.member_id) : []);
+    // Signed out, every scan waiting for this vault counts: they go when their person signs in.
+    setWaitingHere(w ? mine.length : all.length);
   }, [store]);
 
   const uploader = useMemo(() => {
@@ -166,9 +198,15 @@ export function CaptureProvider(props: { children: ReactNode; deps?: Partial<Cap
     const u = new Uploader({
       store,
       send: (item, bytes) =>
-        asOwner(item, (token) => {
+        asOwner(item, async (token) => {
           const up = current.current.uploadApi;
           if (!up) throw new NotThisAccountError();
+          if (item.kind === 'version' && item.target) {
+            // A renewal: the new version of a document already there.
+            const body = multipartBody([{ name: 'file', filename: item.filename, contentType: item.mime, bytes }]);
+            const v = await up.upload(token, item.target, { kind: 'bytes', ...body }, item.key);
+            return { document_id: v.document_id, version_id: v.id, job_id: null, state: 'stored' };
+          }
           return up.capture(
             token,
             {
@@ -228,7 +266,31 @@ export function CaptureProvider(props: { children: ReactNode; deps?: Partial<Cap
     // Loading the queue for whoever is signed in: set after the store answers.
     void refresh();
     if (whoKey && inFront()) void uploader?.kick({ fresh: true });
-  }, [whoKey, uploader, refresh]);
+  }, [whoKey, origin, uploader, refresh]);
+
+  // The card's choices, fetched on every start that reaches the vault and
+  // kept, so a scan made with no connection can still be filed properly.
+  const cardKey = whoKey ? `card|${whoKey}` : null;
+  const loadCard = useCallback(async (): Promise<CardData | null> => {
+    if (!cardKey) return null;
+    try {
+      const fresh = await current.current.withToken(async (a, token) => {
+        const [types, members, docs] = await Promise.all([
+          a.documentTypes(token),
+          a.members(token),
+          a.documents(token, { limit: 100 }),
+        ]);
+        return { types: types.items, members: members.items, filed: docs.items.map((d) => d.type_key) };
+      });
+      await storeRef.current?.cache(cardKey, fresh);
+      return fresh;
+    } catch {
+      return (await storeRef.current?.cached<CardData>(cardKey)) ?? null;
+    }
+  }, [cardKey]);
+  useEffect(() => {
+    if (store && cardKey) void loadCard();
+  }, [store, cardKey, loadCard]);
 
   // Foreground only: sending stops in the background and starts again in
   // front; a network change is worth a look only while in front.
@@ -353,6 +415,7 @@ export function CaptureProvider(props: { children: ReactNode; deps?: Partial<Cap
           unnamed,
           reminder: unnamed ? null : note.reminder,
           noExpiry: unnamed ? false : note.noExpiry,
+          offline: current.current.offline,
         });
         await refresh();
         void uploader?.kick();
@@ -386,9 +449,71 @@ export function CaptureProvider(props: { children: ReactNode; deps?: Partial<Cap
     [store, refresh],
   );
 
+  const removeMany = useCallback(
+    async (ids: string[]) => {
+      for (const id of ids) await store?.remove(id);
+      await refresh();
+    },
+    [store, refresh],
+  );
+
+  // Put right and sent again, under the same key: the vault kept nothing of
+  // a refused try. The visibility is the card's, never less private.
+  const retry = useCallback(
+    async (id: string, metadata: CaptureMetadata) => {
+      await store?.update(id, { metadata, state: 'waiting', problem: null, attempts: 0, nextAt: 0, lastCode: null });
+      await refresh();
+      if (inFront()) void uploader?.kick();
+    },
+    [store, refresh, uploader],
+  );
+
+  // "Scan the new one": a renewal needs no card — it is the same document,
+  // newer — so the pages go straight into the queue as its next version.
+  const renew = useCallback(
+    async (documentId: string): Promise<StartOutcome | 'saved' | SaveProblem> => {
+      if (!allowed() || busyScanning.current || !who) return 'cancelled';
+      const scanner = deps.scanner;
+      const outcome = await run(() => (scanner.scans ? scanner.scan(MAX_PAGES) : scanner.pickFile()));
+      if (outcome.kind !== 'pages' && outcome.kind !== 'file') return outcome.kind;
+      const source: CaptureSource =
+        outcome.kind === 'pages' ? { kind: 'pages', pages: outcome.pages } : { kind: 'file', file: outcome.file };
+      // There is no card to go back to: a scan that cannot be kept is
+      // deleted here, with the reason, never left in the cache.
+      const drop = async () => {
+        await Promise.all(sourceFiles(source).map((uri) => deps.discard(uri)));
+      };
+      const s = storeRef.current;
+      if (!s) {
+        await drop();
+        return 'queue_unavailable';
+      }
+      try {
+        await commitCapture(
+          { source, metadata: null, origin: who.origin, account: who.member_id, renews: documentId },
+          { store: s, read: deps.read, discard: deps.discard, uuid: deps.uuid, now: deps.now },
+        );
+      } catch (err) {
+        await drop();
+        return err instanceof CommitError ? err.problem : 'unreadable';
+      }
+      setSaved({ unnamed: false, reminder: null, noExpiry: false, renewal: true, offline: current.current.offline });
+      await refresh();
+      if (inFront()) void uploader?.kick();
+      return 'saved';
+    },
+    [allowed, who, deps, run, refresh, uploader],
+  );
+
   const value = useMemo<CaptureValue>(
     () => ({
       scanner: deps.scanner,
+      cardData: loadCard,
+      renew,
+      retry,
+      others,
+      waitingHere,
+      removeMany,
       pending,
       start,
       morePages,
@@ -403,7 +528,25 @@ export function CaptureProvider(props: { children: ReactNode; deps?: Partial<Cap
       remove,
       timings,
     }),
-    [deps, pending, start, morePages, save, throwAway, queue, delivered, saved, remove, timings],
+    [
+      deps,
+      loadCard,
+      renew,
+      retry,
+      others,
+      waitingHere,
+      removeMany,
+      pending,
+      start,
+      morePages,
+      save,
+      throwAway,
+      queue,
+      delivered,
+      saved,
+      remove,
+      timings,
+    ],
   );
   return <CaptureContext.Provider value={value}>{props.children}</CaptureContext.Provider>;
 }

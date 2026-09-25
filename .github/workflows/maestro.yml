@@ -1,0 +1,136 @@
+name: Maestro
+
+# The phone on an emulator, against a real vault (4.5): the e2e build
+# (x86_64, fixture scanner) runs .maestro/ flows while a vault from the
+# published images runs on the host, reached as 10.0.2.2. A run costs
+# about 40 runner minutes, so it runs on demand, and on a pull request that
+# changes the flows or this workflow — not on every push.
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - apps/pocket/.maestro/**
+      - .github/workflows/maestro.yml
+
+concurrency:
+  group: maestro-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  flows:
+    name: Capture in airplane mode, sent once
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      APP_VARIANT: e2e
+      NDK_VERSION: 27.1.12297006
+      EMAIL: pocket-e2e@example.test
+      PASSWORD: correct horse battery staple
+    steps:
+      - name: Start the clock
+        run: echo "STARTED=$(date +%s)" >> "$GITHUB_ENV"
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: NDK (cached)
+        id: ndk
+        uses: actions/cache@v4
+        with:
+          path: /usr/local/lib/android/sdk/ndk/${{ env.NDK_VERSION }}
+          key: ndk-${{ env.NDK_VERSION }}
+      - name: Install the NDK
+        if: steps.ndk.outputs.cache-hit != 'true'
+        run: |
+          if [ ! -d "$ANDROID_HOME/ndk/$NDK_VERSION" ]; then
+            yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "ndk;$NDK_VERSION" > /dev/null
+          fi
+      - name: The e2e build
+        working-directory: apps/pocket
+        run: |
+          npx expo prebuild --platform android --no-install --clean
+          cd android && ./gradlew assembleRelease -PreactNativeArchitectures=x86_64 --no-daemon
+          cp "$(find app/build/outputs/apk -name '*.apk' | head -1)" "$GITHUB_WORKSPACE/fv-e2e.apk"
+
+      - name: A vault from the published images, the version the app is pinned to
+        working-directory: vendor/fdv
+        run: |
+          git fetch --quiet --tags origin
+          # The app is tested against the vault it is pinned to, or not at all.
+          TAG=$(git describe --tags --exact-match) || { echo '::error::vendor/fdv is not on a release tag'; exit 1; }
+          VERSION=${TAG#v}
+          echo "Vault $VERSION" >> "$GITHUB_STEP_SUMMARY"
+          node scripts/gen-env.mjs
+          sed -i "s/^FDV_PORT=.*/FDV_PORT=8099/; s#^FDV_BASE_URL=.*#FDV_BASE_URL=http://localhost:8099#" .env
+          echo "FDV_VERSION=$VERSION" >> .env
+          docker compose -p fdvtest pull
+          docker compose -p fdvtest up -d --no-build
+          for i in $(seq 1 60); do
+            curl -sf http://localhost:8099/readyz && break
+            sleep 5
+          done
+          curl -sf http://localhost:8099/api/v1/setup -H 'content-type: application/json' \
+            -d "{\"household_name\":\"The Pocket family\",\"display_name\":\"Pocket Owner\",\"email\":\"$EMAIL\",\"password\":\"$PASSWORD\"}" > /dev/null
+
+      - name: Maestro
+        run: |
+          curl -Ls "https://get.maestro.mobile.dev" | bash
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: The flows, on an emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          target: google_apis
+          # A phone-sized screen: the default is 320 × 640 at mdpi.
+          profile: pixel_6
+          disable-animations: true
+          script: |
+            adb shell dumpsys connectivity | grep -m3 -iE 'NetworkAgentInfo|type: ' || true
+            adb install -r fv-e2e.apk
+            $HOME/.maestro/bin/maestro test -e EMAIL="$EMAIL" -e PASSWORD="$PASSWORD" --format junit --output maestro-report.xml apps/pocket/.maestro/capture-offline-queue.yaml
+
+      - name: Exactly one document, carrying the card's fields
+        run: |
+          TOKEN=$(curl -sf http://localhost:8099/api/v1/auth/password -H 'content-type: application/json' \
+            -d "{\"email\":\"$EMAIL\",\"password\":\"$PASSWORD\"}" | jq -r .access_token)
+          curl -sf "http://localhost:8099/api/v1/documents?limit=200" -H "authorization: Bearer $TOKEN" > docs.json
+          jq '.items | map({title, type_key, owner_member_id})' docs.json
+          test "$(jq '.items | length' docs.json)" = "1"
+          test "$(jq -r '.items[0].type_key' docs.json)" = "passport"
+          test "$(jq -r '.items[0].owner_member_id' docs.json)" != "null"
+          echo "One document, a passport with its person: the scan saved offline arrived once." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Vault logs on failure
+        if: failure()
+        working-directory: vendor/fdv
+        run: docker compose -p fdvtest logs --no-color | tail -200
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: maestro-results
+          path: |
+            maestro-report.xml
+            ~/.maestro/tests/
+          retention-days: 3
+      - name: Minutes
+        if: always()
+        run: echo "Took $(( ($(date +%s) - STARTED) / 60 )) minutes" >> "$GITHUB_STEP_SUMMARY"

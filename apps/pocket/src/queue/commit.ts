@@ -73,6 +73,8 @@ export async function commitCapture(
     metadata: CaptureMetadata | null;
     origin: string;
     account: string;
+    /** A new version of this document (a renewal), rather than a new document. */
+    renews?: string | null;
   },
   deps: CommitDeps,
 ): Promise<QueueItem> {
@@ -110,6 +112,8 @@ export async function commitCapture(
 
   const item: QueueItem = {
     id: deps.uuid(),
+    kind: input.renews ? 'version' : 'capture',
+    target: input.renews ?? null,
     key: deps.uuid(),
     origin: input.origin,
     account: input.account,
@@ -123,6 +127,7 @@ export async function commitCapture(
     nextAt: 0,
     askFirst: false,
     problem: null,
+    lastCode: null,
   };
   try {
     await deps.store.add(item, bytes);

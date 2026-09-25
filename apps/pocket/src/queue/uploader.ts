@@ -230,7 +230,7 @@ export class Uploader {
       if (isSessionOver(err) || err.status === 401) {
         // Signed out: the item waits for whoever signs in next as this account.
         this.phoneSide.add(item.id);
-        return this.wait(item, { attempts, nextAt: later(err) });
+        return this.wait(item, { attempts, nextAt: later(err), lastCode: 'signed_out' });
       }
       this.phoneSide.delete(item.id);
       if (err.status === 409 && err.code === 'upload_in_progress') {
@@ -239,6 +239,7 @@ export class Uploader {
           attempts,
           askFirst: true,
           nextAt: this.deps.now() + ms,
+          lastCode: err.code,
         });
       }
       if (FINAL.has(err.status) || (err.status === 409 && !err.retriable)) {
@@ -255,12 +256,12 @@ export class Uploader {
         return;
       }
       // 408, 429, 5xx and the like: the vault is there and will take it later.
-      return this.wait(item, { attempts, nextAt: later(err) });
+      return this.wait(item, { attempts, nextAt: later(err), lastCode: err.code });
     }
     // No answer at all, or nothing sent (not the approved vault, not on
     // Wi-Fi): try again later, asking first — or as soon as that changes.
     this.phoneSide.add(item.id);
-    return this.wait(item, { attempts, nextAt: later(err) });
+    return this.wait(item, { attempts, nextAt: later(err), lastCode: 'offline' });
   }
 }
 

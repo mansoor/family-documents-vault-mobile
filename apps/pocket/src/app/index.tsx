@@ -1,4 +1,4 @@
-import { can, colours, radii, TAP_MIN, type DocumentView, type ReminderView } from '@fdv/shared';
+import { can, colours, radii, TAP_MIN, type DocumentView, type Member, type ReminderView } from '@fdv/shared';
 import { Image } from 'expo-image';
 import { Link, useRouter } from 'expo-router';
 import { Camera, FileUp, ImagePlus, Settings as SettingsIcon } from 'lucide-react-native';
@@ -7,8 +7,7 @@ import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
 import { FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { sizeWords } from '../capture/ui';
-import type { QueueItem } from '../queue/item';
+import { QueueRow } from '../capture/queue-row';
 import { useCapture, type SavedNote } from '../state/capture';
 import { useVault } from '../state/vault';
 import { Button, Card, Notice, StatusLine, Text } from '../ui';
@@ -35,7 +34,22 @@ export default function Home() {
   const [refreshing, setRefreshing] = useState(false);
   const [scannerFailed, setScannerFailed] = useState(false);
   const [dockHeight, setDockHeight] = useState(84);
+  const [othersKept, setOthersKept] = useState(false);
+  const [members, setMembers] = useState<Member[] | null>(null);
   const canAdd = who ? can(who.role, 'document.add') : false;
+  const needsYou = capture.queue.some((i) => i.state === 'needs_you');
+
+  // The family as last seen, for putting a refused scan right.
+  useEffect(() => {
+    if (!needsYou) return;
+    let cancelled = false;
+    void capture.cardData().then((d) => {
+      if (!cancelled) setMembers(d?.members ?? null);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [needsYou, capture]);
 
   const load = useCallback(async () => {
     try {
@@ -73,6 +87,26 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void load();
   }, [load, capture.delivered]);
+
+  const [renewProblem, setRenewProblem] = useState<string | null>(null);
+  const renew = async (documentId: string) => {
+    setRenewProblem(null);
+    const outcome = await capture.renew(documentId);
+    if (outcome === 'failed') setScannerFailed(true);
+    else if (outcome === 'too_big') setRenewProblem(t('capture.tooBig'));
+    else if (outcome === 'no_space') setRenewProblem(t('capture.noSpace'));
+    else if (outcome === 'queue_unavailable') setRenewProblem(t('capture.queueUnavailable'));
+    else if (outcome === 'unreadable' || outcome === 'too_many_pages') setRenewProblem(t('capture.unreadable'));
+  };
+  // "Scan the new one": once per document, not for a teen (who can renew
+  // only their own, which Home cannot tell), and not while a new version of
+  // it is already waiting to go.
+  const renewing = new Set(capture.queue.filter((i) => i.kind === 'version').map((i) => i.target));
+  const canRenew = (documentId: string, index: number, due: ReminderView[]) =>
+    canAdd &&
+    who?.role !== 'teen' &&
+    !renewing.has(documentId) &&
+    due.findIndex((r) => r.document_id === documentId) === index;
 
   const begin = async (how: 'scan' | 'file' | 'photo') => {
     const outcome = await capture.start(how);
@@ -131,6 +165,23 @@ export default function Home() {
               </Notice>
             ) : null}
             {capture.saved ? <SavedLine text={savedWords(capture.saved, t)} onDismiss={capture.dismissSaved} /> : null}
+            {renewProblem ? (
+              <Notice tone="danger" testID="home-renew-problem">
+                {renewProblem}
+              </Notice>
+            ) : null}
+            {capture.others.length > 0 && !othersKept ? (
+              <Notice tone="warn" testID="home-others" announce={t('home.others', { count: capture.others.length })}>
+                <Text>{t('home.others', { count: capture.others.length })}</Text>
+                <Button
+                  label={t('home.removeThem', { count: capture.others.length })}
+                  kind="danger"
+                  onPress={() => void capture.removeMany(capture.others.map((i) => i.id))}
+                  testID="home-others-remove"
+                />
+                <Button label={t('home.keepThem', { count: capture.others.length })} kind="quiet" onPress={() => setOthersKept(true)} />
+              </Notice>
+            ) : null}
             {capture.queue.length > 0 ? (
               <View style={styles.queue}>
                 <Text variant="screen">{t('home.queueTitle')}</Text>
@@ -140,7 +191,10 @@ export default function Home() {
                     item={item}
                     offline={offline}
                     limit={caps?.limits.max_upload_bytes ?? null}
+                    members={members}
+                    me={who?.member_id ?? null}
                     onRemove={() => void capture.remove(item.id)}
+                    onRetry={(metadata) => void capture.retry(item.id, metadata)}
                   />
                 ))}
               </View>
@@ -156,12 +210,21 @@ export default function Home() {
                 {t('home.calm')}
               </Text>
             ) : null}
-            {data?.due.map((r) => (
+            {data?.due.map((r, i, due) => (
               <Card key={r.id} style={styles.dueCard}>
                 <Text weight="600">{r.document_title ?? t('home.untitled')}</Text>
                 <Text variant="secondary" tone="warn" weight="600">
                   {r.label}
                 </Text>
+                {canRenew(r.document_id, i, due) ? (
+                  <Button
+                    label={t('home.renew')}
+                    kind="quiet"
+                    hint={t('home.renewHint')}
+                    onPress={() => void renew(r.document_id)}
+                    testID={`renew-${r.document_id}`}
+                  />
+                ) : null}
               </Card>
             ))}
             <Text variant="screen" style={styles.recentTitle}>
@@ -226,6 +289,8 @@ function DockButton(props: { icon: typeof Camera; label: string; onPress: () => 
 
 /** What Home says once a capture is safe on the phone. */
 function savedWords(note: SavedNote, t: TFunction): string {
+  if (note.offline) return t('home.savedOffline');
+  if (note.renewal) return t('home.savedRenewal');
   if (note.unnamed) return t('home.savedSkipped');
   if (note.reminder) return t('home.savedReminder', { reminder: note.reminder });
   if (note.noExpiry) return t('home.savedNoExpiry');
@@ -239,34 +304,6 @@ function SavedLine(props: { text: string; onDismiss: () => void }) {
       <Text>{props.text}</Text>
       <Button label={t('home.dismiss')} kind="quiet" onPress={props.onDismiss} testID="home-saved-dismiss" />
     </Notice>
-  );
-}
-
-/** A capture on its way: what it is, and where it stands — never "upload failed". */
-function QueueRow(props: { item: QueueItem; offline: boolean; limit: number | null; onRemove: () => void }) {
-  const { t } = useTranslation();
-  const { item } = props;
-  const p = item.problem;
-  const words =
-    item.state === 'needs_you'
-      ? p?.status === 413
-        ? t('queue.tooBigForVault', { limit: sizeWords(props.limit) })
-        : p?.status === 415
-          ? t('queue.wrongKind')
-          : t('queue.refused', { reason: p?.message ?? p?.code ?? '' })
-      : props.offline
-        ? t('queue.notYet')
-        : item.state === 'waiting' && item.attempts > 0
-          ? t('queue.busy')
-          : t('queue.sending');
-  return (
-    <Card style={item.state === 'needs_you' ? styles.needsYou : null}>
-      <Text weight="600">{item.metadata?.title ?? t('queue.untitled')}</Text>
-      <Text variant="secondary" tone={item.state === 'needs_you' ? 'danger' : 'soft'} testID="queue-state">
-        {words}
-      </Text>
-      {item.state === 'needs_you' ? <Button label={t('queue.remove')} kind="quiet" onPress={props.onRemove} /> : null}
-    </Card>
   );
 }
 

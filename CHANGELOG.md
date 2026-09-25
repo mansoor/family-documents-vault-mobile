@@ -6,6 +6,32 @@ app's own, tagged `vX.Y.Z` in this repository.
 
 ## [Unreleased]
 
+## [0.1.3] — iteration 4.5: the queue in airplane mode
+
+### Added
+- The card works with no connection. The kinds of document and the
+  family's people are kept on the phone (in the encrypted queue) each time
+  the vault is reached, so a scan made in airplane mode is filed with its
+  details and goes as it is once the connection is back: "Saved on this
+  phone. It'll go to the vault as soon as there's a connection." A phone
+  that has never seen them offers Skip.
+- Home says where each capture stands: Waiting to send, Sending…, or Needs
+  you — and why: no connection yet, a busy vault, a vault that can't reach
+  where it keeps files. The queue sends the moment the connection comes
+  back, on the phone and in the browser alike.
+- Needs you comes with choices, none of which makes a scan less private:
+  Remove it; for a scan whose person has left the family, give it to
+  someone else or to nobody (an Only me scan can only stay yours).
+- Scans belong to whoever made them. Signed out, they wait, and the
+  sign-in screen says how many; signed in as someone else, Home asks
+  whether to remove the other person's scans from this phone. Signing out
+  with scans still waiting asks whether to keep them for next time.
+- Scan the new one: from a reminder on Home, a renewed document goes in
+  as the next version of the same one, and its reminder is done.
+- An e2e build (x86_64, a fixture scanner) and a Maestro flow on an
+  emulator: a scan saved in airplane mode, the app killed, the connection
+  back — exactly one document in the vault, with the card's fields.
+
 ## [0.1.2] — iteration 4.4: scan, confirm, saved
 
 ### Added

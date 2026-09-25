@@ -18,7 +18,13 @@ export interface SqlDb {
   withTransactionAsync(task: () => Promise<void>): Promise<void>;
 }
 
-const SCHEMA = `
+/**
+ * queue.db's schema, one step per app version that changed it, applied in
+ * order and counted in PRAGMA user_version. Step 1 is 0.1.2's (it did not
+ * count, so it is written to be safe to run again).
+ */
+const STEPS = [
+  `
 create table if not exists queue_item (
   id text primary key,
   key text not null,
@@ -39,7 +45,19 @@ create table if not exists queue_bytes (
   id text primary key,
   bytes blob not null
 );
-`;
+`,
+  // 0.1.3: renewals (new versions), the last try's reason, the card's cache.
+  `
+alter table queue_item add column kind text not null default 'capture';
+alter table queue_item add column target text;
+alter table queue_item add column last_code text;
+create table card_cache (
+  key text primary key,
+  value text not null,
+  saved_at integer not null
+);
+`,
+];
 
 interface Row {
   id: string;
@@ -56,9 +74,15 @@ interface Row {
   next_at: number;
   ask_first: number;
   problem: string | null;
+  kind: QueueItem['kind'];
+  target: string | null;
+  last_code: string | null;
 }
 
 const COLUMNS: Record<Exclude<keyof QueueItem, 'id'>, keyof Row> = {
+  kind: 'kind',
+  target: 'target',
+  lastCode: 'last_code',
   key: 'key',
   origin: 'origin',
   account: 'account',
@@ -83,6 +107,9 @@ function toParam(field: Exclude<keyof QueueItem, 'id'>, value: unknown): SqlPara
 function fromRow(r: Row): QueueItem {
   return {
     id: r.id,
+    kind: r.kind,
+    target: r.target,
+    lastCode: r.last_code,
     key: r.key,
     origin: r.origin,
     account: r.account,
@@ -113,7 +140,15 @@ export class SqliteQueueStore implements QueueStore {
 
   /** A store over a database already opened and keyed. */
   static async over(db: SqlDb): Promise<SqliteQueueStore> {
-    await db.execAsync(SCHEMA);
+    const at = (await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version', []))?.user_version ?? 0;
+    for (let step = at; step < STEPS.length; step += 1) {
+      // A step and its count together, or neither: an upgrade stopped
+      // halfway (a full phone, the app killed) is simply run again.
+      await db.withTransactionAsync(async () => {
+        await db.execAsync(STEPS[step] as string);
+        await db.execAsync(`PRAGMA user_version = ${step + 1}`);
+      });
+    }
     // Bytes whose item is gone: never sent, never shown, only taking room.
     await db.runAsync('delete from queue_bytes where id not in (select id from queue_item)', []);
     return new SqliteQueueStore(db);
@@ -160,6 +195,23 @@ export class SqliteQueueStore implements QueueStore {
       await this.db.runAsync(
         `update queue_item set ${fields.map((f) => `${COLUMNS[f]} = ?`).join(', ')} where id = ?`,
         [...fields.map((f) => toParam(f, patch[f])), id],
+      );
+    });
+  }
+
+  cached<T>(key: string): Promise<T | null> {
+    return this.serial(async () => {
+      const row = await this.db.getFirstAsync<{ value: string }>('select value from card_cache where key = ?', [key]);
+      return row ? (JSON.parse(row.value) as T) : null;
+    });
+  }
+
+  cache(key: string, value: unknown): Promise<void> {
+    return this.serial(async () => {
+      await this.db.runAsync(
+        `insert into card_cache (key, value, saved_at) values (?, ?, ?)
+         on conflict (key) do update set value = excluded.value, saved_at = excluded.saved_at`,
+        [key, JSON.stringify(value), Date.now()],
       );
     });
   }

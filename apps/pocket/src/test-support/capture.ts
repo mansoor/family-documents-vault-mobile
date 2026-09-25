@@ -1,4 +1,4 @@
-import { createApi, createHttp, type Api, type FetchLike, type ResponseLike } from '@fdv/client';
+import { createApi, createHttp, multipartBody, type Api, type FetchLike, type ResponseLike } from '@fdv/client';
 import { createFakeVault } from '@fdv/client/testing';
 import type { Tokens } from '@fdv/shared';
 import { readFileSync } from 'fs';
@@ -84,8 +84,13 @@ export async function captureVault(origin = 'https://vault.test'): Promise<Captu
   cv.token = t.access_token;
   cv.deps = (store, over = {}) => ({
     store,
-    send: (item: QueueItem, bytes: Uint8Array) =>
-      cv.api.capture(
+    send: async (item: QueueItem, bytes: Uint8Array) => {
+      if (item.kind === 'version' && item.target) {
+        const body = multipartBody([{ name: 'file', filename: item.filename, contentType: item.mime, bytes }]);
+        const v = await cv.api.upload(cv.token, item.target, { kind: 'bytes', ...body }, item.key);
+        return { document_id: v.document_id, version_id: v.id, job_id: null, state: 'stored' };
+      }
+      return cv.api.capture(
         cv.token,
         {
           file: {
@@ -97,7 +102,8 @@ export async function captureVault(origin = 'https://vault.test'): Promise<Captu
           ...(item.metadata ? { metadata: item.metadata } : {}),
         },
         item.key,
-      ),
+      );
+    },
     status: (item: QueueItem) => cv.api.uploadStatus(cv.token, item.key),
     who: () => ({ origin, account: 'fake-member' }),
     now: () => 0,
