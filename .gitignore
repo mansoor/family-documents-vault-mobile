@@ -8,6 +8,11 @@ web-build/
 # Generated native projects (expo prebuild) — never committed
 android/
 ios/
+# ...except the app's own native modules (4.14), which are source.
+!apps/pocket/modules/*/android/
+!apps/pocket/modules/*/ios/
+apps/pocket/modules/*/android/build/
+apps/pocket/modules/*/android/.gradle/
 
 # Signing keys and store credentials — never committed, anywhere
 *.jks

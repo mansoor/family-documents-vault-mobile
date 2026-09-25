@@ -1,0 +1,33 @@
+// UnifiedPush for the phone app (4.14): a local Expo module around the
+// UnifiedPush connector. The connector registers with the person's own
+// distributor (ntfy and the like) and decrypts each message (RFC 8291);
+// this module decides what, if anything, a message may show.
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'io.github.mansoor.familyvault'
+version = '0.1.0'
+
+android {
+  namespace "io.github.mansoor.familyvault.push"
+  defaultConfig {
+    versionCode 1
+    versionName "0.1.0"
+  }
+  testOptions {
+    unitTests.all {
+      // The JVM tests read the words from strings.xml itself.
+      systemProperty 'fdv.res', file('src/main/res').absolutePath
+    }
+  }
+}
+
+dependencies {
+  implementation 'org.unifiedpush.android:connector:3.3.5'
+  implementation 'androidx.core:core:1.13.1'
+  testImplementation 'junit:junit:4.13.2'
+  // The real org.json ahead of android.jar's stubs, for the JVM tests.
+  testImplementation 'org.json:json:20240303'
+}
