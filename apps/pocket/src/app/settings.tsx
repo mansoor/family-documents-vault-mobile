@@ -6,16 +6,23 @@ import { Modal, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-na
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { APP_VERSION, SPIKE } from '../config';
 import { useCapture } from '../state/capture';
+import { useLock, type LockTimeout } from '../state/lock';
 import { useVault } from '../state/vault';
-import { Button, Card, Text } from '../ui';
+import { Button, Card, Notice, Text } from '../ui';
 import { useTextScale } from '../ui/text-scale';
 
-/** Settings, for now: which vault, who is signed in, Large text, sign out. */
+/** Settings: which vault, who is signed in, Large text, the lock, sign out. */
 export default function Settings() {
   const { t } = useTranslation();
   const router = useRouter();
   const { vault, caps, signOut } = useVault();
   const { large, setLarge } = useTextScale();
+  const lock = useLock();
+  const timeouts: [LockTimeout, string][] = [
+    ['immediately', t('settings.lockImmediately')],
+    ['1m', t('settings.lockOneMinute')],
+    ['5m', t('settings.lockFiveMinutes')],
+  ];
   const capture = useCapture();
   const insets = useSafeAreaInsets();
   const [asking, setAsking] = useState(false);
@@ -77,6 +84,48 @@ export default function Settings() {
           />
         </View>
       </Card>
+      <Card>
+        <Text variant="title">{t('settings.lock')}</Text>
+        {lock.status === 'none' ? (
+          <Notice testID="settings-no-screen-lock">{t('lock.noScreenLock')}</Notice>
+        ) : (
+          <View accessibilityRole="radiogroup" accessibilityLabel={t('settings.lockAfter')} style={styles.choices}>
+            <Text weight="600">{t('settings.lockAfter')}</Text>
+            {timeouts.map(([value, label]) => (
+              <Pressable
+                key={value}
+                testID={`settings-lock-${value}`}
+                accessibilityRole="radio"
+                accessibilityState={{ checked: lock.timeout === value }}
+                onPress={() => lock.setTimeout(value)}
+                style={styles.choice}
+              >
+                <View style={[styles.dot, lock.timeout === value ? styles.dotOn : null]} />
+                <Text>{label}</Text>
+              </Pressable>
+            ))}
+          </View>
+        )}
+        {lock.level === 'secret' || lock.level === 'weak' ? (
+          <Text tone="soft" variant="secondary" testID="settings-weak-biometrics">
+            {t('lock.weakBiometrics')}
+          </Text>
+        ) : null}
+        <View style={styles.row}>
+          <View style={styles.flex}>
+            <Text weight="600">{t('settings.screenshots')}</Text>
+            <Text tone="soft" variant="secondary">
+              {t('settings.screenshotsHint')}
+            </Text>
+          </View>
+          <Switch
+            testID="settings-screenshots"
+            accessibilityLabel={t('settings.screenshots')}
+            value={lock.screenshots}
+            onValueChange={lock.setScreenshots}
+          />
+        </View>
+      </Card>
       <Button testID="settings-sign-out" kind="quiet" label={t('settings.signOut')} onPress={leave} />
       {SPIKE ? <Button kind="quiet" label={t('settings.spike')} onPress={() => router.push('/spike')} /> : null}
       <Modal visible={asking} transparent animationType="fade" onRequestClose={() => setAsking(false)}>
@@ -101,4 +150,8 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   version: { minHeight: 44, justifyContent: 'center' },
   flex: { flex: 1 },
+  choices: { gap: 4 },
+  choice: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 12 },
+  dot: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: colours.borderInput },
+  dotOn: { borderWidth: 6, borderColor: colours.accent },
 });

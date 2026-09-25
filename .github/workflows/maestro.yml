@@ -120,7 +120,10 @@ jobs:
             adb shell settings put global hide_error_dialogs 1
             adb shell am broadcast -a android.intent.action.CLOSE_SYSTEM_DIALOGS || true
             adb install -r fv-e2e.apk
-            $HOME/.maestro/bin/maestro test -e EMAIL="$EMAIL" -e PASSWORD="$PASSWORD" --format junit --output maestro-report.xml apps/pocket/.maestro/capture-offline-queue.yaml
+            $HOME/.maestro/bin/maestro test -e EMAIL="$EMAIL" -e PASSWORD="$PASSWORD" --format junit --output maestro-report.xml apps/pocket/.maestro/capture-offline-queue.yaml || sh .github/scripts/on-flow-failure.sh capture
+            sh .github/scripts/cache-check.sh || touch cache-check-failed
+            $HOME/.maestro/bin/maestro test -e EMAIL="$EMAIL" -e PASSWORD="$PASSWORD" --format junit --output maestro-lock.xml apps/pocket/.maestro/lock.yaml || sh .github/scripts/on-flow-failure.sh lock
+            sh -c 'for f in capture-failed lock-failed cache-check-failed; do if [ -f "$f" ]; then echo "failed: $f"; exit 1; fi; done'
 
       - name: Exactly one document, carrying the card's fields
         run: |
@@ -143,6 +146,10 @@ jobs:
           name: maestro-results
           path: |
             maestro-report.xml
+            maestro-lock.xml
+            app-files.txt
+            ui-*.xml
+            rn-*.log
             ~/.maestro/tests/
           retention-days: 3
       - name: Minutes

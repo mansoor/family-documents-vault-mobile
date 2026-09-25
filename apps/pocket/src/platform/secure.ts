@@ -35,3 +35,34 @@ export async function secureDelete(key: string): Promise<void> {
   }
   await SecureStore.deleteItemAsync(key, OPTIONS);
 }
+
+/**
+ * A secret behind the phone's strong biometrics (4.8): no PIN instead, and
+ * gone for good when a fingerprint or face is added or changed — reading it
+ * then gives null. Reading or writing asks; declining throws. Only on the
+ * phone: the web build has none, and says so with canUseStrongBiometrics.
+ */
+const guarded = (prompt: string): SecureStore.SecureStoreOptions => ({
+  ...OPTIONS,
+  requireAuthentication: true,
+  authenticationPrompt: prompt,
+});
+
+export function canUseStrongBiometrics(): boolean {
+  if (web) return false;
+  try {
+    return SecureStore.canUseBiometricAuthentication();
+  } catch {
+    return false;
+  }
+}
+
+export async function secureGetGuarded(key: string, prompt: string): Promise<string | null> {
+  if (web) return null;
+  return SecureStore.getItemAsync(key, guarded(prompt));
+}
+
+export async function secureSetGuarded(key: string, value: string, prompt: string): Promise<void> {
+  if (web) throw new Error('no strong biometrics on the web build');
+  await SecureStore.setItemAsync(key, value, guarded(prompt));
+}

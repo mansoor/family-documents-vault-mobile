@@ -22,6 +22,7 @@ import { currentNetwork, onNetworkChange } from '../net/network';
 import { httpDecision, identityCheck, type NetworkKind } from '../net/policy';
 import { firstLaunch } from '../platform/prefs';
 import { forgetPreviousInstallation, installationId, SecureTokenStore } from '../session/store';
+import { signedIn } from '../lock/bridge';
 import { leaveVault, readVaults, saveVault, updateVault, type VaultRecord } from './vaults';
 
 /**
@@ -459,6 +460,8 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
       mfaToken.current = null;
       setNotice(null);
       setOffline(false);
+      // The password was just given: the app's lock opens with it.
+      signedIn();
       setPhase('ready');
     },
     [session, vault],

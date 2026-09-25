@@ -255,6 +255,16 @@ export default function Home() {
         {extra.fixtures && capture.cardKept ? (
           <View testID="e2e-card-kept" collapsable={false} style={styles.e2eMarker} />
         ) : null}
+        {/* The e2e build only: what a failed flow's view dump should say. */}
+        {extra.fixtures ? (
+          <View
+            testID="e2e-state"
+            accessible
+            accessibilityLabel={`queue ${capture.storeOpen ? 'open' : 'closed'}, card ${capture.cardKept ? 'kept' : 'not kept'}`}
+            collapsable={false}
+            style={styles.e2eMarker}
+          />
+        ) : null}
         {capture.scanner.scans ? (
           <Pressable
             testID="home-scan"

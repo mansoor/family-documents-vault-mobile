@@ -10,6 +10,10 @@ import * as ScreenCapture from 'expo-screen-capture';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import * as SecureStore from 'expo-secure-store';
 import * as SQLite from 'expo-sqlite';
+import { openPrivateCopies } from '../essentials/copies';
+import { openEssentials } from '../essentials/open';
+import i18n from '../i18n';
+import { KeyRing } from '../lock/keys';
 import snapshots from './node-snapshots.json';
 import { sharedCases } from './shared-cases';
 
@@ -303,6 +307,56 @@ export const PROBES: Probe[] = [
       return result('P12', null, [
         'By hand: on the Probes screen, swipe back from the edge. Does it animate a preview, or go straight back?',
       ]);
+    },
+  },
+  {
+    id: 'L1',
+    title: 'Offline Essentials store under SQLCipher (4.8)',
+    async run() {
+      const hex = await new KeyRing().openEveryday();
+      const started = Date.now();
+      const store = await openEssentials('everyday', hex);
+      const opened = Date.now() - started;
+      const page = Crypto.getRandomValues(new Uint8Array(200_000));
+      await store.putDocument({ id: 'probe-l1', version_id: 'probe-l1-v1', view: '{}', pages: 1, kept_at: Date.now() });
+      const wrote = Date.now();
+      await store.putPage('probe-l1-v1', 1, page);
+      const back = await store.page('probe-l1-v1', 1);
+      const read = Date.now() - wrote;
+      const same = back !== null && back.length === page.length && back.every((b, i) => b === page[i]);
+      await store.removeDocument('probe-l1');
+      await store.close();
+      // A plain SQLite file starts "SQLite format 3"; an encrypted one does not.
+      const file = new File(SQLite.defaultDatabaseDirectory as string, 'essentials.db');
+      const head = Array.from((await file.bytes()).slice(0, 15), (b) => String.fromCharCode(b)).join('');
+      const encrypted = head !== 'SQLite format 3';
+      return result(
+        'L1',
+        same && encrypted,
+        [same ? 'A 200 KB page came back as written.' : 'The page did not come back as written.', encrypted ? 'The file is not readable without its key.' : 'The file is plain SQLite!'],
+        { open_ms: opened, write_read_ms: read },
+      );
+    },
+  },
+  {
+    id: 'L2',
+    title: 'Only me key and a fingerprint change (4.8)',
+    async run() {
+      const copies = await openPrivateCopies(new KeyRing(), i18n.t('lock.privatePrompt'));
+      switch (copies.kind) {
+        case 'ok':
+          await copies.store.close();
+          return result('L2', null, [
+            'The Only me key opened (made on the first run).',
+            "Now add a fingerprint (or change the face) in the phone's settings, and run this again: it should say the copies were removed.",
+          ]);
+        case 'changed':
+          return result('L2', true, [i18n.t('lock.enrolmentChanged'), 'Only the Only me copies were removed.']);
+        case 'unavailable':
+          return result('L2', null, [i18n.t('lock.weakBiometrics')]);
+        default:
+          return result('L2', null, ['Not confirmed: run it again, and confirm with a fingerprint or face.']);
+      }
     },
   },
 ];

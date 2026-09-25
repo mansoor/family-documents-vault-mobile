@@ -6,6 +6,52 @@ app's own, tagged `vX.Y.Z` in this repository.
 
 ## [Unreleased]
 
+## [0.1.4] — iteration 4.8: the lock and the encrypted stores
+
+### Added
+- The app locks. It asks for the phone's fingerprint or face — or its PIN
+  or pattern, always allowed instead — when it starts with somebody signed
+  in, and when it comes back after longer away than you chose in Settings:
+  immediately, after a minute (the default) or after five. Signing in with
+  your password counts as unlocking. Back on the lock screen leaves the
+  app, and nothing of the app is behind it. The scanner, the file and photo
+  pickers, and the phone's own prompt are not "away".
+- "Too many tries. Unlock with your phone's PIN or pattern instead."
+- A phone with no screen lock has no app lock and will keep nothing
+  offline; Settings says so, and everything else works as it did.
+- The app is kept out of screenshots, screen recordings and the recent apps
+  view while it is open. Settings → Allow screenshots lets the lists and
+  Settings be captured; the card, and later documents' pages, never are.
+- The encrypted stores the offline Essentials will live in (4.10):
+  essentials.db for household and adults-only Essentials, under a key read
+  when the app unlocks and dropped when it locks; and essentials-private.db
+  for your own Only me Essentials, if you choose to keep them, under a key
+  behind strong biometrics only, which the phone throws away when a
+  fingerprint or face is added or changed — then only those copies are
+  removed, to be fetched again online. A phone whose face or fingerprint
+  unlock isn't strong enough cannot keep Only me copies, and Settings says
+  so. SQLCipher with the raw key, temporary tables in memory, deleted rows
+  overwritten; nothing is encrypted by hand.
+- A new installation keeps none of the previous one's keys (the queue's and
+  the stores' included), on phones that keep the keystore across a
+  reinstall.
+- Probes L1 (the store under SQLCipher, read back, and not plain SQLite on
+  disk) and L2 (the Only me key, and what a new fingerprint does to it).
+
+### Fixed
+- A scan saved while the app was still opening its queue at start (most
+  likely just after install or a restart) was kept but never listed as
+  waiting: the queue could be opened twice when the app came to the front
+  at start. It now opens once, and is tried again on coming back only
+  after it failed.
+
+### Tests
+- The e2e build has a fake phone lock, opened by a tap. Maestro's lock
+  flow: not asked again after signing in, locked at a cold start, locked
+  after 70 s away, and Back leaves. The capture flow unlocks after its cold
+  restart. After the flows, CI reads the app's folders as root and fails if
+  any HTTP or image cache holds document or picture bytes.
+
 ## [0.1.3] — iteration 4.5: the queue in airplane mode
 
 ### Added

@@ -35,6 +35,7 @@ import { matchTypes, rankTypes } from '../capture/types';
 import { Chip, ChipRow, FileRow, LeaveQuestion, PageStrip } from '../capture/ui';
 import type { CaptureSource } from '../queue/commit';
 import { useCapture, type CardData, type SaveProblem } from '../state/capture';
+import { useScreenGuard } from '../state/lock';
 import { useVault } from '../state/vault';
 import { Button, Field, Notice, Text } from '../ui';
 
@@ -47,6 +48,8 @@ type Loaded = CardData;
  * vault until Save or Skip.
  */
 export default function CaptureScreen() {
+  // The card shows the pages: never captured, whatever Settings allows.
+  useScreenGuard('card');
   const { pending } = useCapture();
   const router = useRouter();
   // Opened with nothing to show (a reload on the web, an old link): Home.
