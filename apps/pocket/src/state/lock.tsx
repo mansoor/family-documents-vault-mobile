@@ -70,6 +70,8 @@ interface LockValue {
   screenshots: boolean;
   setScreenshots(allowed: boolean): void;
   keys: KeyRing;
+  /** The everyday copies' key while the lock is open (a moment after it opens); null otherwise. */
+  everydayKey: string | null;
   /**
    * Something of the app's own that takes it out of the front — the
    * scanner, a picker, the phone's own prompt — is not leaving it.
@@ -102,6 +104,7 @@ export function LockProvider(props: { children: ReactNode; deps?: Partial<LockDe
   const [level, setLevel] = useState<LockLevel | null>(null);
   const [covered, setCovered] = useState(false);
   const [tooManyTries, setTooManyTries] = useState(false);
+  const [everydayKey, setEverydayKey] = useState<string | null>(null);
   const [prefs, setPrefsState] = useState<LockPrefs>(() => readPrefs('lock', { timeout: '1m', screenshots: false }));
 
   // Read by the AppState listener and the prompt, which outlive a render.
@@ -121,6 +124,7 @@ export function LockProvider(props: { children: ReactNode; deps?: Partial<LockDe
 
   const lock = useCallback(() => {
     d.keys.drop();
+    setEverydayKey(null);
     setStatus('locked');
   }, [d, setStatus]);
 
@@ -128,7 +132,12 @@ export function LockProvider(props: { children: ReactNode; deps?: Partial<LockDe
   const open = useCallback(() => {
     setTooManyTries(false);
     setStatus('unlocked');
-    void d.keys.openEveryday().catch(() => log.error('essentials.key_unreadable', {}));
+    void d.keys
+      .openEveryday()
+      .then((hex) => {
+        if (statusRef.current === 'unlocked') setEverydayKey(hex);
+      })
+      .catch(() => log.error('essentials.key_unreadable', {}));
   }, [d, setStatus]);
 
   // Starting: locked, if the phone has a lock at all.
@@ -205,6 +214,7 @@ export function LockProvider(props: { children: ReactNode; deps?: Partial<LockDe
           setLevel(l);
           if (l === 'none' && statusRef.current !== 'none') {
             d.keys.drop();
+            setEverydayKey(null);
             setStatus('none');
           } else if (l !== 'none' && statusRef.current === 'none') {
             open();
@@ -278,12 +288,13 @@ export function LockProvider(props: { children: ReactNode; deps?: Partial<LockDe
       screenshots: prefs.screenshots,
       setScreenshots: (screenshots) => setPrefs({ ...prefs, screenshots }),
       keys: d.keys,
+      everydayKey,
       away,
       guard,
       exitApp: d.exitApp,
       autoPrompt: d.autoPrompt,
     }),
-    [status, level, covered, tooManyTries, unlock, prefs, setPrefs, d, away, guard],
+    [status, level, covered, tooManyTries, unlock, prefs, setPrefs, d, everydayKey, away, guard],
   );
   return <Ctx.Provider value={value}>{props.children}</Ctx.Provider>;
 }
@@ -300,6 +311,7 @@ const NO_LOCK: LockValue = {
   screenshots: false,
   setScreenshots: () => undefined,
   keys: new KeyRing(),
+  everydayKey: null,
   away: (task) => task(),
   guard: () => () => undefined,
   exitApp: () => undefined,

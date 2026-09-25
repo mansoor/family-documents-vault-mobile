@@ -1,0 +1,239 @@
+import { colours, radii } from '@fdv/shared';
+import { useRouter } from 'expo-router';
+import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { Modal, Pressable, StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useEssentials, type EnrolOutcome } from '../state/essentials';
+import { useLock } from '../state/lock';
+import { useVault } from '../state/vault';
+import { Button, Card, Field, Notice, Text } from '../ui';
+
+const day = (ms: number) =>
+  new Date(ms).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+
+/**
+ * "On this phone" (4.10): a section of Home. Offered once; then what is
+ * kept, each with Open and Show, how long it is kept for, and — when the
+ * person has Only me Essentials not kept here — the way to keep them too.
+ */
+export function OnThisPhone() {
+  const { t } = useTranslation();
+  const router = useRouter();
+  const e = useEssentials();
+  const lock = useLock();
+  const { withToken, who } = useVault();
+  const [asking, setAsking] = useState<null | { includePrivate: boolean }>(null);
+  const [privateChoice, setPrivateChoice] = useState<null | { password: string; count: number }>(null);
+
+  if (!e.available) return null;
+
+  /** How many of the person's own Essentials are Only me: offered as a separate choice. */
+  const ownPrivateCount = async () => {
+    try {
+      const page = await withToken((a, token) => a.documents(token, { essential: 'true', limit: 200 }));
+      return page.items.filter((d) => d.visibility === 'private' && d.owner_member_id === who?.member_id).length;
+    } catch {
+      return 0;
+    }
+  };
+
+  const afterPassword = async (password: string): Promise<EnrolOutcome> => {
+    if (asking?.includePrivate) return e.enrol(password, true);
+    // The Only me ones are a separate, explicit choice — and need strong biometrics.
+    const count = lock.level === 'strong' ? await ownPrivateCount() : 0;
+    if (count > 0) {
+      setAsking(null);
+      setPrivateChoice({ password, count });
+      return 'ok';
+    }
+    return e.enrol(password, false);
+  };
+
+  const offer = !e.prefs.enrolled && !e.prefs.offered;
+  const privateMissing = Math.max(0, e.privateInSet - e.privateKept);
+
+  return (
+    <View style={styles.section} testID="essentials">
+      {e.notice ? (
+        <Notice tone={e.notice === 'short_of_space' ? 'warn' : 'info'} testID="essentials-notice">
+          {t(
+            e.notice === 'removed_age'
+              ? 'essentials.removedAge'
+              : e.notice === 'signed_out'
+                ? 'essentials.removedSignedOut'
+                : 'essentials.shortOfSpace',
+          )}
+        </Notice>
+      ) : null}
+      {offer ? (
+        <Card>
+          <Text>{t('essentials.offer')}</Text>
+          <Button testID="essentials-keep" label={t('essentials.keep')} onPress={() => setAsking({ includePrivate: false })} />
+          <Button testID="essentials-not-now" kind="quiet" label={t('essentials.notNow')} onPress={e.offered} />
+        </Card>
+      ) : null}
+      {e.prefs.enrolled ? (
+        <>
+          <Text variant="screen">{t('essentials.title')}</Text>
+          {e.age?.warn ? (
+            <Notice tone="warn" testID="essentials-connect-by">
+              {t('essentials.connectBy', { date: day(e.age.removeAt) })}
+            </Notice>
+          ) : null}
+          {e.renewDue ? (
+            <Card>
+              <Text>{t('essentials.renew')}</Text>
+              <Button label={t('essentials.renewButton')} onPress={() => setAsking({ includePrivate: false })} />
+            </Card>
+          ) : null}
+          {e.items.length === 0 ? (
+            <Text tone="soft" testID="essentials-none">
+              {e.syncing ? t('essentials.syncing') : t('essentials.none')}
+            </Text>
+          ) : (
+            <Text tone="soft" testID="essentials-count">
+              {t('essentials.count', { count: e.items.length })}
+            </Text>
+          )}
+          {e.items.map((item) => (
+            <View key={item.id} style={styles.row} testID={`essential-${item.id}`}>
+              <Pressable
+                style={styles.rowText}
+                accessibilityRole="button"
+                accessibilityLabel={`${t('essentials.open')}: ${item.document.title ?? t('essentials.untitled')}`}
+                onPress={() => router.push({ pathname: '/essential/[id]', params: { id: item.id } })}
+              >
+                <Text weight="600">{item.document.title ?? t('essentials.untitled')}</Text>
+                {e.age ? (
+                  <Text tone="soft" variant="secondary">
+                    {t('essentials.keptUntil', { date: day(e.age.removeAt) })}
+                  </Text>
+                ) : null}
+              </Pressable>
+              <Button
+                kind="quiet"
+                label={t('essentials.show')}
+                testID={`essential-show-${item.id}`}
+                onPress={() => router.push({ pathname: '/essential/[id]', params: { id: item.id, mode: 'show' } })}
+              />
+            </View>
+          ))}
+          {privateMissing > 0 && lock.level === 'strong' ? (
+            <View style={styles.row}>
+              <Text tone="soft" style={styles.rowText}>
+                {t('essentials.privateNotKept', { count: privateMissing })}
+              </Text>
+              <Button kind="quiet" label={t('essentials.keepThemToo')} onPress={() => setAsking({ includePrivate: true })} />
+            </View>
+          ) : null}
+        </>
+      ) : null}
+      <PasswordSheet
+        visible={asking !== null}
+        onCancel={() => setAsking(null)}
+        onPassword={async (password) => {
+          const outcome = await afterPassword(password);
+          if (outcome === 'ok') setAsking(null);
+          return outcome;
+        }}
+      />
+      <Modal visible={privateChoice !== null} transparent animationType="fade" onRequestClose={() => setPrivateChoice(null)}>
+        <View style={styles.scrim}>
+          <View style={styles.sheet} accessibilityViewIsModal testID="essentials-private-choice">
+            <Text>{t('essentials.alsoPrivate', { count: privateChoice?.count ?? 0 })}</Text>
+            <Button
+              testID="essentials-private-yes"
+              label={t('essentials.alsoPrivateYes')}
+              onPress={() => {
+                const c = privateChoice;
+                setPrivateChoice(null);
+                if (c) void e.enrol(c.password, true);
+              }}
+            />
+            <Button
+              testID="essentials-private-no"
+              kind="quiet"
+              label={t('essentials.alsoPrivateNo')}
+              onPress={() => {
+                const c = privateChoice;
+                setPrivateChoice(null);
+                if (c) void e.enrol(c.password, false);
+              }}
+            />
+          </View>
+        </View>
+      </Modal>
+    </View>
+  );
+}
+
+/** The password, once, for keeping Essentials (the vault's offline grant). */
+function PasswordSheet(props: {
+  visible: boolean;
+  onCancel: () => void;
+  onPassword: (password: string) => Promise<EnrolOutcome>;
+}) {
+  const { t } = useTranslation();
+  const insets = useSafeAreaInsets();
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const close = () => {
+    setPassword('');
+    setError(null);
+    props.onCancel();
+  };
+  const go = async () => {
+    setBusy(true);
+    setError(null);
+    const outcome = await props.onPassword(password);
+    setBusy(false);
+    if (outcome === 'ok') {
+      setPassword('');
+      return;
+    }
+    setError(
+      t(
+        outcome === 'wrong_password'
+          ? 'essentials.wrongPassword'
+          : outcome === 'offline'
+            ? 'essentials.noConnection'
+            : 'essentials.failed',
+      ),
+    );
+  };
+  return (
+    <Modal visible={props.visible} transparent animationType="fade" onRequestClose={close}>
+      <View style={styles.scrim}>
+        <View style={[styles.sheet, { paddingBottom: 20 + insets.bottom }]} accessibilityViewIsModal testID="essentials-password">
+          <Text>{t('essentials.password')}</Text>
+          <Field
+            label={t('essentials.passwordLabel')}
+            testID="essentials-password-field"
+            secureTextEntry
+            value={password}
+            onChangeText={setPassword}
+            error={error}
+            onSubmitEditing={() => void go()}
+          />
+          <Button
+            testID="essentials-password-go"
+            label={t('essentials.keep')}
+            onPress={() => void go()}
+            disabled={busy || password.length === 0}
+          />
+          <Button kind="quiet" label={t('common.cancel')} onPress={close} />
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+const styles = StyleSheet.create({
+  section: { gap: 12 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 56 },
+  rowText: { flex: 1, gap: 2, minHeight: 44, justifyContent: 'center' },
+  scrim: { flex: 1, backgroundColor: 'rgba(28,26,23,0.45)', justifyContent: 'flex-end' },
+  sheet: { backgroundColor: colours.bg, padding: 20, gap: 12, borderTopLeftRadius: radii.l, borderTopRightRadius: radii.l },
+});
