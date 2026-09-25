@@ -107,6 +107,28 @@ describe('the card with no connection', () => {
     expect(t.vault.state.documents[0]).toMatchObject({ type_key: 'passport', owner_member_id: 'fake-member' });
   });
 
+  it('saved while the vault seemed there, but the first try found no connection: the Saved line says so', async () => {
+    const t = testVault([ORIGIN]);
+    await signedIn(t);
+    const phone = testCapture({ scanner: fixtureScanner([TWO_PAGES]) });
+    phone.files.set('cache:/scan/1.jpg', jpeg('letter-with-exif.jpg'));
+    phone.files.set('cache:/scan/2.jpg', jpeg('card.jpg'));
+    // Everything answers except the upload itself.
+    const noUpload: TestVault['fetch'] = async (url, init) => {
+      if (url.endsWith('/api/v1/capture')) throw new TypeError('Network request failed');
+      return withStatus(t)(url, init);
+    };
+    await renderApp(<App />, { fetch: noUpload, capture: phone });
+    await fireEvent.press(await screen.findByTestId('home-scan'));
+    await fireEvent.press(await screen.findByRole('button', { name: 'Passport' }));
+    await fireEvent.press(screen.getByTestId('capture-save'));
+    await waitFor(() =>
+      expect(screen.getByTestId('home-saved')).toHaveTextContent(
+        /^Saved on this phone\. It'll go to the vault as soon as there's a connection\./,
+      ),
+    );
+  });
+
   it('never having seen the choices, offers Skip only', async () => {
     const t = testVault([]);
     await (async () => {

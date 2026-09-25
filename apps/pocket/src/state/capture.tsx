@@ -170,6 +170,9 @@ export function CaptureProvider(props: { children: ReactNode; deps?: Partial<Cap
     current.current = { who, withToken, uploadApi, api, sessionOwner, origin, offline };
   }, [who, withToken, uploadApi, api, sessionOwner, origin, offline]);
 
+  /** The capture the Saved line is about. */
+  const savedItem = useRef<string | null>(null);
+
   const refresh = useCallback(async () => {
     if (!store) return;
     const w = current.current.who;
@@ -177,6 +180,11 @@ export function CaptureProvider(props: { children: ReactNode; deps?: Partial<Cap
     const all = (await store.list()).filter((i) => i.origin === here);
     const mine = w ? all.filter((i) => i.account === w.member_id) : [];
     setQueue(mine);
+    // The Saved line goes by what happened, not by a guess made before
+    // anything was sent: once the capture's first try found no connection,
+    // it says it is saved on this phone.
+    const just = mine.find((i) => i.id === savedItem.current);
+    if (just?.lastCode === 'offline') setSaved((n) => (n && !n.offline ? { ...n, offline: true } : n));
     setOthers(w ? all.filter((i) => i.account !== w.member_id) : []);
     // Signed out, every scan waiting for this vault counts: they go when their person signs in.
     setWaitingHere(w ? mine.length : all.length);
@@ -405,6 +413,7 @@ export function CaptureProvider(props: { children: ReactNode; deps?: Partial<Cap
             },
           );
           timings.queued(item.id);
+          savedItem.current = item.id;
         } catch (err) {
           if (err instanceof CommitError) return { kind: 'refused', problem: err.problem };
           throw err;
@@ -489,10 +498,11 @@ export function CaptureProvider(props: { children: ReactNode; deps?: Partial<Cap
         return 'queue_unavailable';
       }
       try {
-        await commitCapture(
+        const item = await commitCapture(
           { source, metadata: null, origin: who.origin, account: who.member_id, renews: documentId },
           { store: s, read: deps.read, discard: deps.discard, uuid: deps.uuid, now: deps.now },
         );
+        savedItem.current = item.id;
       } catch (err) {
         await drop();
         return err instanceof CommitError ? err.problem : 'unreadable';
