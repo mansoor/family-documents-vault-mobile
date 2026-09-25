@@ -32,6 +32,12 @@ jobs:
     steps:
       - name: Start the clock
         run: echo "STARTED=$(date +%s)" >> "$GITHUB_ENV"
+      - name: Room on the runner
+        # The Android build, the vault's images and the emulator do not all
+        # fit on a hosted runner's disk alongside toolchains this job never uses.
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/.ghcup /usr/local/share/boost /usr/share/swift             /opt/hostedtoolcache/CodeQL /usr/local/share/powershell /usr/local/share/chromium
+          df -h /
       - uses: actions/checkout@v4
         with:
           submodules: true
@@ -64,6 +70,9 @@ jobs:
           npx expo prebuild --platform android --no-install --clean
           cd android && ./gradlew assembleRelease -PreactNativeArchitectures=x86_64 --no-daemon
           cp "$(find app/build/outputs/apk -name '*.apk' | head -1)" "$GITHUB_WORKSPACE/fv-e2e.apk"
+          # The APK is out; the build's intermediates are gigabytes the vault needs.
+          rm -rf app/build build .gradle
+          df -h /
 
       - name: A vault from the published images, the version the app is pinned to
         working-directory: vendor/fdv
