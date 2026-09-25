@@ -1,5 +1,5 @@
 import { NetworkError } from '@fdv/client';
-import { colours, radii, type DocumentView, type Member, type SearchHit } from '@fdv/shared';
+import { categoryLabel, colours, radii, type DocumentView, type Member, type SearchHit } from '@fdv/shared';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FlatList, Pressable, ScrollView, StyleSheet, View } from 'react-native';
@@ -34,20 +34,27 @@ export default function SearchScreen() {
   const [sealed, setSealed] = useState<Sealed>({ state: 'idle', items: [], searched: 0 });
   const [unreachable, setUnreachable] = useState(false);
 
-  // The chips: the family, and the kinds of document there are.
+  // The chips: the family, and the kinds of document there are — asked
+  // again when the connection returns, until they have come.
+  const chipsLoaded = members.length > 0;
   useEffect(() => {
+    if (chipsLoaded || offline) return;
     let cancelled = false;
     void withToken((a, token) => Promise.all([a.members(token), a.documentTypes(token)]))
       .then(([m, types]) => {
         if (cancelled) return;
         setMembers(m.items);
-        setCategories([...new Set(types.items.map((x) => x.category))].sort());
+        setCategories(
+          [...new Set(types.items.map((x) => x.category))].sort((x, y) =>
+            categoryLabel(x).localeCompare(categoryLabel(y)),
+          ),
+        );
       })
       .catch(() => undefined);
     return () => {
       cancelled = true;
     };
-  }, [withToken]);
+  }, [withToken, offline, chipsLoaded]);
 
   useEffect(() => {
     let cancelled = false;
@@ -77,7 +84,10 @@ export default function SearchScreen() {
           setSealed({ state: 'idle', items: [], searched: 0 });
         }
       } catch (err) {
-        if (!cancelled && err instanceof NetworkError) setUnreachable(true);
+        if (cancelled) return;
+        if (err instanceof NetworkError) setUnreachable(true);
+        // The second pass never stays "looking" once it has failed.
+        setSealed((was) => (was.state === 'searching' ? { state: 'done', items: [], searched: 0 } : was));
       }
     };
     const timer = setTimeout(() => void run(), q ? SEARCH_DEBOUNCE_MS : 0);
@@ -85,7 +95,8 @@ export default function SearchScreen() {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [q, category, memberId, withToken]);
+    // The connection coming back asks again.
+  }, [q, category, memberId, withToken, offline]);
 
   const noConnection = offline || unreachable;
   const found = hits ? hits.length + sealed.items.length : null;
@@ -132,7 +143,7 @@ export default function SearchScreen() {
               {categories.map((c) => (
                 <Chip
                   key={c}
-                  label={c}
+                  label={categoryLabel(c)}
                   on={category === c}
                   onPress={() => setCategory(category === c ? null : c)}
                   testID={`chip-category-${c}`}
@@ -146,13 +157,17 @@ export default function SearchScreen() {
             ) : null}
             {!noConnection && found !== null ? (
               found === 0 && sealed.state !== 'searching' ? (
-                <Text tone="soft" testID="search-nothing">
-                  {t('search.nothing')}
-                </Text>
+                <View accessibilityLiveRegion="polite">
+                  <Text tone="soft" testID="search-nothing">
+                    {t('search.nothing')}
+                  </Text>
+                </View>
               ) : (
-                <Text tone="soft" testID="search-count">
-                  {t('search.results', { count: found })}
-                </Text>
+                <View accessibilityLiveRegion="polite">
+                  <Text tone="soft" testID="search-count">
+                    {t('search.results', { count: found })}
+                  </Text>
+                </View>
               )
             ) : null}
           </View>

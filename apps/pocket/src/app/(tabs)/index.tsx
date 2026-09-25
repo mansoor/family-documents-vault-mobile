@@ -13,6 +13,7 @@ import { OnThisPhone } from '../../essentials/ui';
 import { useEssentials } from '../../state/essentials';
 import { extra } from '../../config';
 import { useCapture, type SavedNote } from '../../state/capture';
+import { on } from '../../state/events';
 import { useVault } from '../../state/vault';
 import { Button, Card, Notice, StatusLine, Text } from '../../ui';
 
@@ -91,6 +92,8 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void load();
   }, [load, capture.delivered]);
+  // Put off or done on Needs attention: Home's list looks again.
+  useEffect(() => on('remindersChanged', () => void load()), [load]);
 
   const [renewProblem, setRenewProblem] = useState<string | null>(null);
   const renew = async (documentId: string) => {

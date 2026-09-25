@@ -93,6 +93,21 @@ describe('Search', () => {
     );
   });
 
+  it('when the connection comes back, it searches again by itself', async () => {
+    const t = testVault([ORIGIN]);
+    t.library.search = () => ({ items: [hit({ document_id: 'passport' })], sealed: 0 });
+    await unlocked(t, <SearchScreen />);
+    t.reachable.delete(ORIGIN);
+    await fireEvent.changeText(await screen.findByTestId('search-field'), 'passport');
+    expect(await screen.findByTestId('search-offline')).toBeTruthy();
+    t.reachable.add(ORIGIN);
+    await act(async () => {
+      for (const l of (globalThis as unknown as { __networkListeners: Set<() => void> }).__networkListeners) l();
+    });
+    expect(await screen.findByTestId('doc-row-passport')).toBeTruthy();
+    expect(screen.queryByTestId('search-offline')).toBeNull();
+  });
+
   it('can be used with a screen reader and a thumb', async () => {
     const t = testVault([ORIGIN]);
     t.library.search = () => ({ items: [hit({ document_id: 'passport', snippet: '<em>pass</em>port' })], sealed: 0 });

@@ -1,10 +1,11 @@
 import { ApiRequestError, StepUpCoordinator, type Api } from '@fdv/client';
 import { colours, radii } from '@fdv/shared';
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { KeyboardAvoidingView, Modal, Platform, StyleSheet, View } from 'react-native';
+import { AccessibilityInfo, KeyboardAvoidingView, Modal, Platform, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button, Field, Text } from '../ui';
+import { useLock } from './lock';
 import { useVault } from './vault';
 
 /**
@@ -24,26 +25,44 @@ interface StepUpValue {
 
 const Ctx = createContext<StepUpValue | null>(null);
 
+/** One prompt: settled once, and it clears only itself. */
+interface Asking {
+  message: string;
+  settle: (ok: boolean) => void;
+}
+
 export function StepUpProvider(props: { children: ReactNode }) {
   const { withToken } = useVault();
-  const [asking, setAsking] = useState<{ message: string; settle: (ok: boolean) => void } | null>(null);
+  const { status } = useLock();
+  const [asking, setAsking] = useState<Asking | null>(null);
 
   const coordinator = useMemo(
     () =>
       new StepUpCoordinator(
         (req) =>
-          new Promise<boolean>((settle) =>
-            setAsking({
+          new Promise<boolean>((settle) => {
+            let done = false;
+            const self: Asking = {
               message: req.message,
               settle: (ok) => {
-                setAsking(null);
+                if (done) return;
+                done = true;
+                setAsking((cur) => (cur === self ? null : cur));
                 settle(ok);
               },
-            }),
-          ),
+            };
+            setAsking(self);
+          }),
       ),
     [],
   );
+
+  // Locked (away too long, or Show mode ended): whatever was asked is not
+  // confirmed, and nothing goes on behind the lock screen.
+  const open = status === 'unlocked' || status === 'none';
+  useEffect(() => {
+    if (!open) asking?.settle(false);
+  }, [open, asking]);
 
   const guarded = useCallback(
     async <T,>(fn: (a: Api, token: string) => Promise<T>): Promise<T | null> => {
@@ -63,7 +82,7 @@ export function StepUpProvider(props: { children: ReactNode }) {
   return (
     <Ctx.Provider value={value}>
       {props.children}
-      <StepUpSheet asking={asking} />
+      <StepUpSheet asking={open ? asking : null} />
     </Ctx.Provider>
   );
 }
@@ -74,7 +93,7 @@ export function useStepUp(): StepUpValue {
 }
 
 /** The sheet: the password, or a code from the authenticator app. */
-function StepUpSheet(props: { asking: { message: string; settle: (ok: boolean) => void } | null }) {
+function StepUpSheet(props: { asking: Asking | null }) {
   const { t } = useTranslation();
   const { withToken } = useVault();
   const insets = useSafeAreaInsets();
@@ -91,15 +110,21 @@ function StepUpSheet(props: { asking: { message: string; settle: (ok: boolean) =
     asking?.settle(ok);
   };
   const confirm = async () => {
+    // The prompt this answer is for: a later one is never answered by it.
+    const answering = asking;
     setBusy(true);
     setError(null);
     try {
       const body = how === 'password' ? { password: value } : { code: value.replace(/\s/g, '') };
       await withToken((a, token) => a.stepUp(token, body));
-      done(true);
+      setValue('');
+      setHow('password');
+      answering?.settle(true);
     } catch (err) {
-      // The vault's own words when it has them.
-      setError(err instanceof ApiRequestError && err.message ? err.message : t('stepUp.failed'));
+      // The vault's own words when it has them, said aloud too.
+      const words = err instanceof ApiRequestError && err.message ? err.message : t('stepUp.failed');
+      setError(words);
+      AccessibilityInfo.announceForAccessibility(words);
     } finally {
       setBusy(false);
     }

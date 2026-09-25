@@ -74,7 +74,8 @@
     "removeThem_one": "Remove it",
     "removeThem_other": "Remove them",
     "keepThem_one": "Keep it",
-    "keepThem_other": "Keep them"
+    "keepThem_other": "Keep them",
+    "dismissNotice": "Dismiss"
   },
   "settings": {
     "title": "Settings",
@@ -315,7 +316,12 @@
     "issuedBy": "Issued by",
     "issued": "Issued",
     "expires": "Expires",
-    "owner": "Whose"
+    "owner": "Whose",
+    "notConfirmed": "It wasn't confirmed that it's you, so the pages aren't shown.",
+    "tryAgain": "Try again",
+    "pageFailed": "The pages couldn't be fetched. Check the connection and try again.",
+    "preparingShow": "Getting the pages ready…",
+    "failed": "That didn't work. Try again."
   },
   "search": {
     "title": "Search",
@@ -341,7 +347,8 @@
     "done": "Done",
     "snoozeHint": "Reminds you again later.",
     "scanNew": "Scan the new one",
-    "needsConnection": "Changes need a connection."
+    "needsConnection": "Changes need a connection.",
+    "failed": "That didn't work. Try again."
   },
   "people": {
     "title": "People",

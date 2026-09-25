@@ -1,11 +1,13 @@
-import { NetworkError } from '@fdv/client';
+import { ApiRequestError, NetworkError } from '@fdv/client';
 import { addDays, can, colours, localToday, type ReminderView } from '@fdv/shared';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { renewWords } from '../../capture/renew-words';
 import { useCapture } from '../../state/capture';
+import { emit } from '../../state/events';
 import { useVault } from '../../state/vault';
 import { Button, Card, Notice, Text } from '../../ui';
 
@@ -27,8 +29,10 @@ export default function AttentionScreen() {
   const [due, setDue] = useState<ReminderView[] | null>(null);
   const [upcoming, setUpcoming] = useState<ReminderView[]>([]);
   const [refreshing, setRefreshing] = useState(false);
-  const [problem, setProblem] = useState<string | null>(null);
+  const [problem, setProblem] = useState<{ tone: 'ok' | 'warn'; text: string } | null>(null);
   const canAdd = who ? can(who.role, 'document.add') : false;
+  // Viewers see reminders; putting them off or marking them done is not theirs.
+  const canManage = who ? can(who.role, 'reminder.manage') : false;
 
   const load = useCallback(async () => {
     try {
@@ -43,26 +47,35 @@ export default function AttentionScreen() {
   }, [withToken]);
 
   useEffect(() => {
-    // Loaded on arrival; the state is set after the requests answer.
+    // Loaded on arrival, and again when the connection returns or the vault
+    // takes a capture; the state is set after the requests answer.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void load();
-  }, [load, capture.delivered]);
+  }, [load, capture.delivered, offline]);
 
   const act = async (fn: Parameters<typeof withToken>[0]) => {
     setProblem(null);
     try {
       await withToken(fn);
       await load();
+      emit('remindersChanged');
     } catch (err) {
-      if (err instanceof NetworkError) setProblem(t('attention.needsConnection'));
+      if (err instanceof NetworkError) setProblem({ tone: 'warn', text: t('attention.needsConnection') });
+      else
+        setProblem({
+          tone: 'warn',
+          text: err instanceof ApiRequestError && err.message ? err.message : t('attention.failed'),
+        });
     }
   };
   const snooze = (r: ReminderView, days: number) =>
     act((a, token) => a.snoozeReminder(token, r.id, addDays(today(), days)));
   const done = (r: ReminderView) => act((a, token) => a.acknowledgeReminder(token, r.id));
   const scanNew = async (r: ReminderView) => {
+    setProblem(null);
     const outcome = await capture.renew(r.document_id);
     if (outcome === 'card') router.push('/capture');
+    else setProblem(renewWords(outcome, t));
   };
   // Not while its new version is already waiting to go; not for a teen or a viewer.
   const renewing = new Set(capture.queue.filter((i) => i.kind === 'version').map((i) => i.target));
@@ -74,31 +87,33 @@ export default function AttentionScreen() {
       <Text variant="secondary" tone={isDue ? 'warn' : 'soft'} weight="600">
         {r.label}
       </Text>
-      <View style={styles.actions}>
-        <Button
-          kind="quiet"
-          label={t('attention.week')}
-          hint={t('attention.snoozeHint')}
-          disabled={offline}
-          onPress={() => void snooze(r, 7)}
-          testID={`snooze-week-${r.id}`}
-        />
-        <Button
-          kind="quiet"
-          label={t('attention.month')}
-          hint={t('attention.snoozeHint')}
-          disabled={offline}
-          onPress={() => void snooze(r, 30)}
-          testID={`snooze-month-${r.id}`}
-        />
-        <Button
-          kind="quiet"
-          label={t('attention.done')}
-          disabled={offline}
-          onPress={() => void done(r)}
-          testID={`done-${r.id}`}
-        />
-      </View>
+      {canManage ? (
+        <View style={styles.actions}>
+          <Button
+            kind="quiet"
+            label={t('attention.week')}
+            hint={t('attention.snoozeHint')}
+            disabled={offline}
+            onPress={() => void snooze(r, 7)}
+            testID={`snooze-week-${r.id}`}
+          />
+          <Button
+            kind="quiet"
+            label={t('attention.month')}
+            hint={t('attention.snoozeHint')}
+            disabled={offline}
+            onPress={() => void snooze(r, 30)}
+            testID={`snooze-month-${r.id}`}
+          />
+          <Button
+            kind="quiet"
+            label={t('attention.done')}
+            disabled={offline}
+            onPress={() => void done(r)}
+            testID={`done-${r.id}`}
+          />
+        </View>
+      ) : null}
       {isDue && canRenew(r) ? (
         <Button
           kind="quiet"
@@ -137,7 +152,11 @@ export default function AttentionScreen() {
             {t('home.offline')}
           </Notice>
         ) : null}
-        {problem ? <Notice tone="warn">{problem}</Notice> : null}
+        {problem ? (
+          <Notice tone={problem.tone} testID="attention-notice">
+            {problem.text}
+          </Notice>
+        ) : null}
         {due && due.length === 0 && upcoming.length === 0 ? (
           <Text tone="soft" testID="attention-calm">
             {t('attention.calm')}

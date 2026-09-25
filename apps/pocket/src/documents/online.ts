@@ -18,7 +18,11 @@ export function latestOf(versions: VersionView[]): VersionView | null {
  * to confirm it is you, once for a while); a page never touches the disk.
  * Pages the vault has not drawn yet are asked for, which starts them.
  */
-export async function openOnline(withToken: WithToken, guarded: Guarded, id: string): Promise<OpenCopy | null> {
+export async function openOnline(
+  withToken: WithToken,
+  guarded: Guarded,
+  id: string,
+): Promise<OpenCopy | 'unconfirmed' | null> {
   const [document, versions] = await withToken((a, token) =>
     Promise.all([a.document(token, id), a.versions(token, id)]),
   );
@@ -33,7 +37,8 @@ export async function openOnline(withToken: WithToken, guarded: Guarded, id: str
   if (latest && pending) {
     // Not drawn yet: asking for the first page starts it, or finds it done.
     try {
-      await guarded((a, token) => a.page(token, latest.id, 1));
+      // Not confirmed: that is the answer, not asked again straight away.
+      if ((await guarded((a, token) => a.page(token, latest.id, 1))) === null) return 'unconfirmed';
       const again = latestOf((await withToken((a, token) => a.versions(token, id))).items);
       pages = again?.preview_pages ?? 1;
       pending = false;

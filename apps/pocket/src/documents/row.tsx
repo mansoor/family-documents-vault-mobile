@@ -1,4 +1,4 @@
-import { colours, radii, type Status } from '@fdv/shared';
+import { colours, radii, statusTone, type Status } from '@fdv/shared';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, Text as RNText } from 'react-native';
@@ -13,11 +13,19 @@ export function DocumentRow(props: { id: string; title: string | null; status: S
   const { t } = useTranslation();
   const router = useRouter();
   const title = props.title ?? t('document.untitled');
+  // Read out as it is shown: its name, its status, and where it matched.
+  const said = [
+    title,
+    statusTone(props.status)?.words,
+    props.snippet ? snippetParts(props.snippet).map((p) => p.text).join('') : null,
+  ]
+    .filter(Boolean)
+    .join('. ');
   return (
     <Pressable
       testID={`doc-row-${props.id}`}
       accessibilityRole="button"
-      accessibilityLabel={title}
+      accessibilityLabel={said}
       onPress={() => router.push({ pathname: '/document/[id]', params: { id: props.id } })}
       style={({ pressed }) => [styles.row, pressed ? styles.pressed : null]}
     >

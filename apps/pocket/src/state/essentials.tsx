@@ -167,6 +167,8 @@ interface EssentialsValue {
   sync(): Promise<void>;
   /** Kept on this phone — asked of the store itself, once it is open (4.12). */
   isKept(id: string): Promise<boolean>;
+  /** Which version is kept on this phone, if any. */
+  keptVersion(id: string): Promise<string | null>;
   open(id: string, mode: 'view' | 'show'): Promise<OpenCopy | null>;
   offered(): void;
   dismissNotice(): void;
@@ -447,6 +449,8 @@ export function EssentialsProvider(props: { children: ReactNode; deps?: Partial<
       } catch (err) {
         if (s && !opened) await s.close().catch(() => undefined);
         log.error('essentials.open_failed', { kind: failureKind(err) });
+        // Nobody waits for a store that will not open.
+        for (const go of waiting.current.splice(0)) go();
       }
     })();
     // Closed when the lock closes, or when what it was opened with changes.
@@ -708,15 +712,27 @@ export function EssentialsProvider(props: { children: ReactNode; deps?: Partial<
     [d, offline],
   );
 
-  const isKept = useCallback(
-    async (id: string): Promise<boolean> => {
-      if (!prefsRef.current.enrolled || !prefsRef.current.kept) return false;
+  // Whether the store is open or about to be: otherwise nothing is waited for.
+  const openable = ready && lock.status === 'unlocked' && prefs.enrolled && prefs.kept && readable;
+  const openableRef = useRef(openable);
+  useEffect(() => {
+    openableRef.current = openable;
+  }, [openable]);
+
+  /** The version kept on this phone, asked of the store itself (it may still be opening). */
+  const keptVersion = useCallback(
+    async (id: string): Promise<string | null> => {
+      if (!storeRef.current && !openableRef.current) return null;
       await whenOpen();
-      for (const s of [storeRef.current, privateRef.current]) if (s && (await s.document(id))) return true;
-      return false;
+      for (const s of [storeRef.current, privateRef.current]) {
+        const doc = s ? await s.document(id) : null;
+        if (doc) return doc.version_id;
+      }
+      return null;
     },
     [whenOpen],
   );
+  const isKept = useCallback(async (id: string) => (await keptVersion(id)) !== null, [keptVersion]);
 
   const items = useMemo(() => [...everyday, ...privateItems], [everyday, privateItems]);
   const age = useMemo(() => (checked ? ageOf(checked, d.now()) : null), [checked, d]);
@@ -747,6 +763,7 @@ export function EssentialsProvider(props: { children: ReactNode; deps?: Partial<
       openPrivate,
       sync: () => run(),
       isKept,
+      keptVersion,
       open,
       offered: () => setPrefs({ offered: true }),
       dismissNotice: () => setPrefs({ notice: null }),
@@ -771,6 +788,7 @@ export function EssentialsProvider(props: { children: ReactNode; deps?: Partial<
       openPrivate,
       run,
       isKept,
+      keptVersion,
       open,
       setPrefs,
     ],
@@ -799,6 +817,7 @@ const NONE: EssentialsValue = {
   openPrivate: async () => 'unavailable',
   sync: async () => undefined,
   isKept: async () => false,
+  keptVersion: async () => null,
   open: async () => null,
   offered: () => undefined,
   dismissNotice: () => undefined,

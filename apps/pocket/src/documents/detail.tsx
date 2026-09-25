@@ -13,12 +13,15 @@ import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { RefreshControl, ScrollView, StyleSheet, Switch, View } from 'react-native';
+import { renewWords } from '../capture/renew-words';
+import { holdForShow } from '../show/handoff';
 import { useCapture } from '../state/capture';
 import { useEssentials } from '../state/essentials';
+import { useLock } from '../state/lock';
 import { useStepUp } from '../state/step-up';
 import { useVault } from '../state/vault';
-import { Button, Card, Notice, StatusLine, Text } from '../ui';
-import { latestOf } from './online';
+import { Button, Notice, StatusLine, Text } from '../ui';
+import { latestOf, openOnline } from './online';
 import { markWarnedAboutCopies, saveCopy, warnedAboutCopies } from './save-copy';
 
 type Problem = 'offline' | 'not_found' | null;
@@ -40,19 +43,26 @@ export function DocumentDetail(props: { id: string }) {
   const { guarded } = useStepUp();
   const essentials = useEssentials();
   const capture = useCapture();
+  const lock = useLock();
   const [doc, setDoc] = useState<DocumentView | null>(null);
   const [versions, setVersions] = useState<VersionView[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
   const [problem, setProblem] = useState<Problem>(null);
-  const [notice, setNotice] = useState<string | null>(null);
+  const [notice, setNotice] = useState<{ tone: 'ok' | 'warn'; text: string } | null>(null);
   const [warning, setWarning] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [preparing, setPreparing] = useState(false);
+  const [toggling, setToggling] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const warn = useCallback((text: string) => setNotice({ tone: 'warn', text }), []);
 
   const kept = essentials.items.find((i) => i.id === id) ?? null;
   const shown = doc ?? kept?.document ?? null;
-  const canEdit = who ? can(who.role, 'document.edit') : false;
-  const canAdd = who ? can(who.role, 'document.add') : false;
+  // A teen changes only their own; the vault refuses the rest.
+  const mine = !!who && shown?.owner_member_id === who.member_id;
+  const mayChange = !!who && can(who.role, 'document.edit') && (who.role !== 'teen' || mine);
+  const renewing = capture.queue.some((i) => i.kind === 'version' && i.target === id);
+  const mayAddVersion = !!who && can(who.role, 'document.add') && (who.role !== 'teen' || mine) && !renewing;
 
   const load = useCallback(async () => {
     try {
@@ -70,36 +80,73 @@ export function DocumentDetail(props: { id: string }) {
   }, [withToken, id]);
 
   useEffect(() => {
-    // Loaded on arrival; the state is set after the requests answer.
+    // Loaded on arrival, again when the connection returns and when the
+    // vault takes a capture; the state is set after the requests answer.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void load();
-  }, [load]);
+  }, [load, offline, capture.delivered]);
 
-  // Kept on the phone: from there, asking nothing — the store is asked
-  // (it may still be opening). Otherwise from the vault.
-  const where = async () => ((await essentials.isKept(id)) ? { id } : { id, online: '1' });
-  const showIt = async () => router.push({ pathname: '/show/[id]', params: await where() });
-  const pages = async () => router.push({ pathname: '/essential/[id]', params: await where() });
+  const latest = latestOf(versions);
+  /**
+   * The copy kept on the phone, when it is the current one (or there is no
+   * way to know better, offline): from there, asking nothing. The store
+   * itself is asked, as it may still be opening.
+   */
+  const keptIsCurrent = async () => {
+    const kept = await essentials.keptVersion(id);
+    return !!kept && (offline || !latest || latest.id === kept);
+  };
 
-  const setEssential = async (value: boolean) => {
-    if (!doc) return;
+  // Show mode never asks anybody to confirm it is them: for a copy not kept
+  // here, the pages are confirmed and fetched first, and handed over.
+  const showIt = async () => {
     setNotice(null);
-    if (offline) {
-      setNotice(t('document.needsConnection'));
+    if (await keptIsCurrent()) {
+      router.push({ pathname: '/show/[id]', params: { id } });
       return;
     }
+    if (offline) return warn(t('document.needsConnection'));
+    setPreparing(true);
+    try {
+      const copy = await openOnline(withToken, guarded, id);
+      if (copy === null) return warn(t('document.pageFailed'));
+      if (copy === 'unconfirmed') return warn(t('document.notConfirmed'));
+      const uris: string[] = [];
+      for (let n = 1; n <= copy.pages; n += 1) {
+        const uri = await copy.page(n);
+        if (uri === null) return warn(t('document.notConfirmed'));
+        uris.push(uri);
+      }
+      holdForShow(id, { ...copy, page: async (n) => uris[n - 1] ?? null });
+      router.push({ pathname: '/show/[id]', params: { id, online: '1' } });
+    } catch (err) {
+      warn(err instanceof NetworkError ? t('document.needsConnection') : t('document.pageFailed'));
+    } finally {
+      setPreparing(false);
+    }
+  };
+  const pages = async () =>
+    router.push({ pathname: '/essential/[id]', params: (await keptIsCurrent()) ? { id } : { id, online: '1' } });
+
+  const setEssential = async (value: boolean) => {
+    if (!doc || toggling) return;
+    setNotice(null);
+    if (offline) return warn(t('document.needsConnection'));
+    setToggling(true);
     try {
       setDoc(await withToken((a, token) => a.updateDocument(token, id, { is_essential: value }, doc.etag)));
     } catch (err) {
       if (err instanceof ApiRequestError && err.status === 409) {
         // Changed meanwhile by somebody else: theirs is shown, not overwritten.
-        setNotice(t('document.conflict'));
+        warn(t('document.conflict'));
         await load();
-      } else if (err instanceof NetworkError) setNotice(t('document.needsConnection'));
+      } else if (err instanceof NetworkError) warn(t('document.needsConnection'));
+      else warn(err instanceof ApiRequestError && err.message ? err.message : t('document.failed'));
+    } finally {
+      setToggling(false);
     }
   };
 
-  const latest = latestOf(versions);
   const doSave = async () => {
     if (!latest) return;
     setWarning(false);
@@ -108,29 +155,40 @@ export function DocumentDetail(props: { id: string }) {
     try {
       const res = await guarded((a, token) => a.content(token, latest.id));
       if (!res) return; // not confirmed: nothing done
-      await saveCopy(new Uint8Array(await res.arrayBuffer()), latest.filename, latest.mime);
+      await saveCopy(new Uint8Array(await res.arrayBuffer()), latest.filename, latest.mime, { away: lock.away });
+      // Warned once a copy has really gone out, not before.
+      markWarnedAboutCopies();
     } catch (err) {
-      setNotice(err instanceof NetworkError ? t('document.needsConnection') : t('document.saveFailed'));
+      warn(err instanceof NetworkError ? t('document.needsConnection') : t('document.saveFailed'));
     } finally {
       setSaving(false);
     }
   };
   const save = () => {
-    // Said once: the copy is outside the vault.
+    setNotice(null);
+    // Nothing to save from here without the vault: said, and the warning kept for when there is.
+    if (offline || !latest) return warn(t('document.needsConnection'));
     if (!warnedAboutCopies()) setWarning(true);
     else void doSave();
   };
 
   const addVersion = async () => {
+    setNotice(null);
     const outcome = await capture.renew(id);
     if (outcome === 'card') router.push('/capture');
+    else setNotice(renewWords(outcome, t));
   };
 
   if (!shown) {
     return (
       <View style={styles.page} testID="document">
         {problem === 'not_found' ? <Notice tone="warn">{t('document.notFound')}</Notice> : null}
-        {problem === 'offline' ? <Notice tone="warn">{t('document.offline')}</Notice> : null}
+        {problem === 'offline' ? (
+          <Notice tone="warn">
+            <Text>{t('document.offline')}</Text>
+            <Button kind="quiet" label={t('document.tryAgain')} onPress={() => void load()} testID="document-retry" />
+          </Notice>
+        ) : null}
       </View>
     );
   }
@@ -163,13 +221,13 @@ export function DocumentDetail(props: { id: string }) {
         </Notice>
       ) : null}
       {notice ? (
-        <Notice tone="warn" testID="document-notice">
-          {notice}
+        <Notice tone={notice.tone} testID="document-notice">
+          {notice.text}
         </Notice>
       ) : null}
 
       {primaryIsShow ? (
-        <Button testID="document-show" label={t('document.show')} onPress={() => void showIt()} />
+        <Button testID="document-show" label={t('document.show')} busy={preparing} onPress={() => void showIt()} />
       ) : (
         <Button testID="document-save" label={t('document.saveCopy')} busy={saving} onPress={save} />
       )}
@@ -178,18 +236,11 @@ export function DocumentDetail(props: { id: string }) {
         <Button testID="document-save" kind="quiet" label={t('document.saveCopy')} busy={saving} onPress={save} />
       ) : null}
       {warning ? (
-        <Card>
+        <Notice tone="warn" announce={t('document.saveWarning')}>
           <Text testID="document-save-warning">{t('document.saveWarning')}</Text>
-          <Button
-            testID="document-save-anyway"
-            label={t('document.saveAnyway')}
-            onPress={() => {
-              markWarnedAboutCopies();
-              void doSave();
-            }}
-          />
+          <Button testID="document-save-anyway" label={t('document.saveAnyway')} onPress={() => void doSave()} />
           <Button kind="quiet" label={t('document.saveCancel')} onPress={() => setWarning(false)} />
-        </Card>
+        </Notice>
       ) : null}
 
       <Text variant="screen">{t('document.facts')}</Text>
@@ -204,7 +255,7 @@ export function DocumentDetail(props: { id: string }) {
           </View>
         ))}
 
-      {canEdit && doc ? (
+      {mayChange && doc ? (
         <View style={styles.switchRow}>
           <View style={styles.flex}>
             <Text weight="600">{t('document.essential')}</Text>
@@ -216,7 +267,7 @@ export function DocumentDetail(props: { id: string }) {
             testID="document-essential"
             accessibilityLabel={t('document.essential')}
             value={doc.is_essential}
-            disabled={offline}
+            disabled={offline || toggling}
             onValueChange={(v) => void setEssential(v)}
             trackColor={{ true: colours.accent, false: colours.border }}
           />
@@ -237,7 +288,7 @@ export function DocumentDetail(props: { id: string }) {
             </Text>
           </View>
         ))}
-      {canAdd && doc ? (
+      {mayAddVersion && doc ? (
         <Button
           testID="document-add-version"
           kind="quiet"

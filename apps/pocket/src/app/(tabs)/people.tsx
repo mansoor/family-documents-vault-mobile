@@ -27,7 +27,8 @@ export default function PeopleScreen() {
     // Loaded on arrival; the state is set after the request answers.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void load();
-  }, [load]);
+    // Again when the connection returns.
+  }, [load, offline]);
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>

@@ -28,8 +28,11 @@ app's own, tagged `vX.Y.Z` in this repository.
   deleted, whatever happened. A copy left by the app stopping is swept at
   the next launch. The first time, it says "The copy you save is outside
   the vault, where the vault can't protect it."
-- Show and the pages work for an Essential that is not kept on the phone,
-  from the vault.
+- Show and the pages work for an Essential that is not kept on the phone
+  (or kept in an older version), from the vault. For Show, the pages are
+  confirmed and fetched on the Document screen first, so Show mode itself
+  never asks anybody to confirm it is them. "Confirm it's you" is withdrawn
+  whenever the app locks.
 - Search: results a quarter of a second after you stop typing, narrowed
   by person and by kind. Matches inside the pages are shown in bold, never
   as markup. Your own sealed documents are searched in a second pass.

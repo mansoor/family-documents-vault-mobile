@@ -7,6 +7,7 @@ import { audit } from '../test-support/a11y';
 import { jpeg } from '../test-support/capture';
 import { libraryDoc, unlocked } from '../test-support/lookup';
 import { installed, testCapture } from '../test-support/render';
+import { SecureTokenStore } from '../session/store';
 import { resetRoutes } from '../test-support/router';
 import { testVault } from '../test-support/vault';
 
@@ -72,6 +73,22 @@ describe('Needs attention', () => {
     );
     // Queued: not offered again while it waits to go.
     await waitFor(() => expect(screen.queryByTestId('scan-new-passport')).toBeNull());
+  });
+
+  it('a viewer sees what needs attention, and is not offered to put it off', async () => {
+    const t = testVault([ORIGIN]);
+    t.reminders = [reminder({ id: 'r1', document_id: 'passport' })];
+    await unlocked(t, <AttentionScreen />, {
+      before: async () => {
+        const store = new SecureTokenStore();
+        const kept = await store.load();
+        await store.save({ ...(kept as NonNullable<typeof kept>), role: 'viewer' as never });
+      },
+    });
+    expect(await screen.findByText('Expires in 12 days')).toBeTruthy();
+    expect(screen.queryByTestId('snooze-week-r1')).toBeNull();
+    expect(screen.queryByTestId('done-r1')).toBeNull();
+    expect(screen.queryByTestId('scan-new-passport')).toBeNull();
   });
 
   it('can be used with a screen reader and a thumb', async () => {

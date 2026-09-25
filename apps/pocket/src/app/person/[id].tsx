@@ -2,7 +2,7 @@ import { colours, type DocumentView } from '@fdv/shared';
 import { useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FlatList, StyleSheet } from 'react-native';
+import { FlatList, RefreshControl, StyleSheet } from 'react-native';
 import { DocumentRow } from '../../documents/row';
 import { useVault } from '../../state/vault';
 import { Notice, Text } from '../../ui';
@@ -13,6 +13,7 @@ export default function PersonScreen() {
   const { t } = useTranslation();
   const { withToken, offline } = useVault();
   const [docs, setDocs] = useState<DocumentView[] | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -26,7 +27,8 @@ export default function PersonScreen() {
     // Loaded on arrival; the state is set after the request answers.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void load();
-  }, [load]);
+    // Again when the connection returns.
+  }, [load, offline]);
 
   return (
     <FlatList
@@ -34,6 +36,15 @@ export default function PersonScreen() {
       style={styles.safe}
       contentContainerStyle={styles.page}
       data={docs ?? []}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={() => {
+            setRefreshing(true);
+            void load().finally(() => setRefreshing(false));
+          }}
+        />
+      }
       keyExtractor={(d) => d.id}
       ListHeaderComponent={
         <>

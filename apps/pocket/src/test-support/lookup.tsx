@@ -134,12 +134,16 @@ export function phoneParts(stores = new Map<Tier, MemoryEssentialsStore>()) {
 export async function unlocked(
   t: TestVault,
   start: ReactElement,
-  opts: { parts?: ReturnType<typeof phoneParts>; capture?: Partial<CaptureDeps>; before?: () => void } = {},
+  opts: {
+    parts?: ReturnType<typeof phoneParts>;
+    capture?: Partial<CaptureDeps>;
+    before?: () => void | Promise<void>;
+  } = {},
 ) {
   const parts = opts.parts ?? phoneParts();
   await signedIn(t);
   // Signed in, before the app starts: the vault's side of things set up.
-  opts.before?.();
+  await opts.before?.();
   const app = await renderApp(<LookupApp start={start} />, {
     fetch: t.fetch,
     lock: parts.lock,

@@ -1,11 +1,11 @@
 import { colours } from '@fdv/shared';
 import { useRouter } from 'expo-router';
 import { Camera } from 'lucide-react-native';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { useCapture } from '../state/capture';
-import { Notice } from '../ui';
+import { Button, Notice, Text } from '../ui';
 
 /**
  * Starting a capture — the scanner, a file or a photo — and, when it
@@ -18,6 +18,7 @@ export function useBeginCapture() {
   const [scannerFailed, setScannerFailed] = useState(false);
   const begin = useCallback(
     async (how: 'scan' | 'file' | 'photo') => {
+      setScannerFailed(false);
       const outcome = await capture.start(how);
       if (outcome === 'card') {
         setScannerFailed(false);
@@ -28,6 +29,12 @@ export function useBeginCapture() {
     },
     [capture, router],
   );
+  // Said for a while, not for ever.
+  useEffect(() => {
+    if (!scannerFailed) return;
+    const timer = setTimeout(() => setScannerFailed(false), 10_000);
+    return () => clearTimeout(timer);
+  }, [scannerFailed]);
   return { begin, scannerFailed, setScannerFailed };
 }
 
@@ -38,14 +45,15 @@ export function useBeginCapture() {
 export function ScanButton() {
   const { t } = useTranslation();
   const capture = useCapture();
-  const { begin, scannerFailed } = useBeginCapture();
+  const { begin, scannerFailed, setScannerFailed } = useBeginCapture();
   if (!capture.scanner.scans) return null;
   return (
     <View style={styles.wrap}>
       {scannerFailed ? (
         <View style={styles.notice}>
           <Notice tone="warn" testID="home-scanner-failed">
-            {t('home.scannerFailed')}
+            <Text>{t('home.scannerFailed')}</Text>
+            <Button kind="quiet" label={t('home.dismissNotice')} onPress={() => setScannerFailed(false)} />
           </Notice>
         </View>
       ) : null}

@@ -1,11 +1,11 @@
-import { screen } from '@testing-library/react-native';
+import { fireEvent, screen } from '@testing-library/react-native';
 import PeopleScreen from '../app/(tabs)/people';
 import { SecureTokenStore } from '../session/store';
 import { audit } from '../test-support/a11y';
 import { unlocked } from '../test-support/lookup';
 import { fixtureScanner } from '../capture/scanner';
 import { installed, renderApp, signedIn, testCapture } from '../test-support/render';
-import { resetRoutes } from '../test-support/router';
+import { resetRoutes, routes } from '../test-support/router';
 import { testVault } from '../test-support/vault';
 import { TabBar } from '../ui/tab-bar';
 
@@ -53,11 +53,17 @@ describe('the tab bar', () => {
     }
   });
 
-  it('Home, Search, the camera, Needs attention, People — each a named tab', async () => {
-    await as('owner');
+  it('Home, Search, the camera, Needs attention, People — each a named tab, in that order', async () => {
+    const navigated = await as('owner');
     const order = ['tab-home', 'tab-search', 'home-scan', 'tab-attention', 'tab-people'];
-    for (const id of order) expect(await screen.findByTestId(id)).toBeTruthy();
+    await screen.findByTestId('tab-people');
+    const shown = screen.root
+      ?.queryAll((n) => order.includes(String(n.props.testID)) && typeof n.type === 'string')
+      .map((n) => String(n.props.testID));
+    expect([...new Set(shown)]).toEqual(order);
     expect(screen.getByTestId('tab-home').props.accessibilityState).toEqual({ selected: true });
+    await fireEvent.press(screen.getByTestId('tab-attention'));
+    expect(navigated).toEqual(['attention']);
     expect(audit()).toEqual([]);
   });
 
@@ -67,5 +73,7 @@ describe('the tab bar', () => {
     await unlocked(t, <PeopleScreen />);
     expect(await screen.findByTestId('person-fake-member')).toHaveTextContent(/Fake Owner \(you\)/);
     expect(audit()).toEqual([]);
+    await fireEvent.press(screen.getByTestId('person-fake-member'));
+    expect(routes().at(-1)).toEqual({ pathname: '/person/[id]', params: { id: 'fake-member', name: 'Fake Owner' } });
   });
 });
