@@ -1,4 +1,4 @@
-import { ApiRequestError } from '@fdv/client';
+import { wordsFor } from '../errors/words';
 import type { SessionRow } from '@fdv/shared';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -47,7 +47,7 @@ export function SignedInDevices() {
       setConfirming(null);
       setAsked((n) => n + 1);
     } catch (err) {
-      setProblem(err instanceof ApiRequestError ? err.message : t('settings.devicesUnreachable'));
+      setProblem(wordsFor(err, t, 'settings.devicesUnreachable'));
     } finally {
       setBusy(null);
     }

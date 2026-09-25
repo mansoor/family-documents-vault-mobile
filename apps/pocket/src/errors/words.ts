@@ -34,6 +34,13 @@ export const CATALOGUE: Readonly<Record<string, string>> = {
   upload_in_progress: 'errors.uploadInProgress',
 };
 
+/**
+ * Codes whose exact words only the vault has — which password, which thing
+ * was not found — so its message is shown when it gives one, and the
+ * catalogue's only when it does not.
+ */
+const VAULT_SAYS: ReadonlySet<string> = new Set(['invalid_credentials', 'not_found']);
+
 /** The words for a failure, as the person should read them. */
 export function wordsFor(err: unknown, t: TFunction, general = 'errors.general'): string {
   if (err instanceof NetworkError) return t(CATALOGUE[err.kind] ?? CATALOGUE.offline ?? general);
@@ -44,6 +51,7 @@ export function wordsFor(err: unknown, t: TFunction, general = 'errors.general')
       return t('errors.rateLimited', { count: minutes });
     }
     const key = CATALOGUE[err.code];
+    if (key && VAULT_SAYS.has(err.code) && err.message) return err.message;
     if (key) return t(key);
     return err.message || t(general);
   }

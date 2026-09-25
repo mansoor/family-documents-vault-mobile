@@ -1,4 +1,5 @@
-import { ApiRequestError, NetworkError } from '@fdv/client';
+import { NetworkError } from '@fdv/client';
+import { wordsFor } from '../../errors/words';
 import { addDays, can, colours, localToday, type ReminderView } from '@fdv/shared';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
@@ -64,7 +65,7 @@ export default function AttentionScreen() {
       else
         setProblem({
           tone: 'warn',
-          text: err instanceof ApiRequestError && err.message ? err.message : t('attention.failed'),
+          text: wordsFor(err, t, 'attention.failed'),
         });
     }
   };

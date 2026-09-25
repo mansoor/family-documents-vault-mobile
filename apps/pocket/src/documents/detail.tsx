@@ -1,4 +1,5 @@
 import { ApiRequestError, NetworkError } from '@fdv/client';
+import { wordsFor } from '../errors/words';
 import {
   can,
   colours,
@@ -141,7 +142,7 @@ export function DocumentDetail(props: { id: string }) {
         warn(t('document.conflict'));
         await load();
       } else if (err instanceof NetworkError) warn(t('document.needsConnection'));
-      else warn(err instanceof ApiRequestError && err.message ? err.message : t('document.failed'));
+      else warn(wordsFor(err, t, 'document.failed'));
     } finally {
       setToggling(false);
     }
