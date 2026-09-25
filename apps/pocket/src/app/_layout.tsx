@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { extra, SPIKE } from '../config';
+import { CaptureProvider } from '../state/capture';
 import { useVault, VaultProvider } from '../state/vault';
 import { TextScaleProvider } from '../ui/text-scale';
 
@@ -47,7 +48,9 @@ function Gates() {
     >
       <Stack.Protected guard={phase === 'ready'}>
         <Stack.Screen name="index" options={{ headerShown: false }} />
+        <Stack.Screen name="capture" options={{ title: '', gestureEnabled: false }} />
         <Stack.Screen name="settings" options={{ title: t('settings.title') }} />
+        <Stack.Screen name="timings" options={{ title: t('timings.title') }} />
       </Stack.Protected>
       <Stack.Protected guard={phase === 'sign_in'}>
         <Stack.Screen name="sign-in" options={{ headerShown: false }} />
@@ -69,10 +72,12 @@ export default function RootLayout() {
       <StatusBar style="dark" />
       <TextScaleProvider>
         <VaultProvider>
-          <View style={styles.root}>
-            {extra.testBanner ? <TestBanner /> : null}
-            <Gates />
-          </View>
+          <CaptureProvider>
+            <View style={styles.root}>
+              {extra.testBanner ? <TestBanner /> : null}
+              <Gates />
+            </View>
+          </CaptureProvider>
         </VaultProvider>
       </TextScaleProvider>
     </SafeAreaProvider>

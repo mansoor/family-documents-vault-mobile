@@ -6,6 +6,60 @@ app's own, tagged `vX.Y.Z` in this repository.
 
 ## [Unreleased]
 
+## [0.1.2] — iteration 4.4: scan, confirm, saved
+
+### Added
+- Scan a document with the camera button at the bottom of Home: ML Kit's
+  document scanner finds the edges and flattens the pages, several in one
+  go. Or add a file (a PDF, a photo, a Word or Excel file, up to 25 MB) or
+  a photo from the phone; on the web build, and on a phone whose scanner
+  cannot start, those are the ways in.
+- The confirm card comes straight after the scanner's Done — no second
+  review screen. The pages are in a strip, each with Move earlier, Move
+  later, Remove and Retake, and Add page (20 at most); nothing needs
+  dragging. What it is: the kinds of document the family files most, as
+  chips, and More… with a search. Whose it is: the family's people (a
+  teen's scans are always their own). Who can see this: Everyone, Adults
+  only, or Only me — only for your own documents, with the sentence that
+  says what Only me means. Essential, from the kind of document. More
+  details: the name (made from what you chose unless you type one), who
+  issued it (with the family's own issuers to pick from), the number, the
+  dates ("14 Mar 2031", "March 2031", "2031"), the expiry date for the
+  kinds that expire, and where the original is kept. The reminder it will
+  get, in a sentence. Save, or Skip to name it later; Back asks whether to
+  save it without details, throw it away, or keep editing.
+- Nothing goes to the vault while the card is open. At Save or Skip the
+  pages become one PDF (the photos' location and camera details
+  removed), and it goes into the phone's own queue, encrypted
+  (SQLCipher, under a key in the phone's keystore for this device only);
+  the scanner's files are deleted.
+- The queue sends one capture at a time while the app is open, with the
+  card's details ahead of the file, so a document arrives complete and
+  private from its first byte. Each capture has one key, made at Save:
+  however often it is tried — a dropped connection, a busy vault, the app
+  closed halfway — one scan makes one document. A lost answer is asked
+  about before anything is sent again. A busy vault is tried again when
+  it says; one that cannot take the file (too big, a kind it does not
+  keep, details it refuses) says why in plain words, never "upload
+  failed". A capture is only ever sent as the person who made it, to the
+  vault it was made for: someone else signing in on the same phone
+  leaves it waiting. Nothing is sent while the app is in the background,
+  and a large file on a slow connection is given the time it needs.
+- Home: "Saved. We'll remind you 9 months and 6 months before it
+  expires." (or "It's under Needs a name" after Skip), the captures on
+  their way and where each stands, and how many documents need a name.
+- Timings: tap the version in Settings seven times. The last twenty
+  captures, stage by stage — tap, scanner, pages, card, Save, queued, in
+  the vault — shared only through the share sheet, times only.
+
+### Changed
+- The app now needs vault 0.4.10 or newer: uploads that can be retried
+  safely, the card's details sent with the file, and who issued it.
+
+### Fixed
+- The web build failed to start once expo-router's web dialog was in it
+  (tslib 2's module wrapper under Metro).
+
 ## [0.1.1] — iteration 4.2: connect and sign in
 
 ### Added

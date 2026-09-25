@@ -9,11 +9,12 @@ import {
   type Api,
   type FetchLike,
   type ResponseLike,
+  type StoredSession,
   type TokenStore,
 } from '@fdv/client';
 import type { Capabilities } from '@fdv/shared';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { AppState } from 'react-native';
+import { AppState, Platform } from 'react-native';
 import { log } from '../log';
 import { appHeaders } from '../net/app-headers';
 import type { ConnectOutcome } from '../net/connect';
@@ -52,6 +53,8 @@ export type SignInResult =
 
 export interface VaultDeps {
   fetch: FetchLike;
+  /** For uploads: expo/fetch on the phone, which sends a body of bytes as it is. */
+  uploadFetch: FetchLike;
   network: () => Promise<NetworkKind>;
   /** Calls back on any change of network; returns the unsubscribe. */
   onNetworkChange: (callback: () => void) => () => void;
@@ -66,6 +69,16 @@ interface VaultValue {
   offline: boolean;
   notice: Notice;
   api: Api | null;
+  /** The same vault, for uploads (longer timeout, bytes-safe fetch). */
+  uploadApi: Api | null;
+  /** Who is signed in, to which vault; null until the phase is ready. */
+  who: (Pick<StoredSession, 'member_id' | 'role' | 'household_id'> & { origin: string }) | null;
+  /**
+   * Whose session this is at this instant — read from the session itself,
+   * not from the last render — for work that must only ever be done as one
+   * person (the queue's uploads).
+   */
+  sessionOwner: () => { origin: string; member_id: string } | null;
   chooseVault: (outcome: Extract<ConnectOutcome, { kind: 'ok' | 'reinstalled' }>) => Promise<void>;
   signIn: (email: string, password: string) => Promise<SignInResult>;
   signInCode: (code: string) => Promise<SignInResult>;
@@ -105,8 +118,41 @@ export class WifiOnlyError extends Error {
 const unusable = (err: unknown) =>
   err instanceof NetworkError || err instanceof StrangerError || err instanceof WifiOnlyError;
 
+const platformFetch: FetchLike = (url, init) =>
+  globalThis.fetch(url, init as RequestInit) as unknown as Promise<ResponseLike>;
+
+const expoUploadFetch: FetchLike = (url, init) => {
+  if (Platform.OS === 'web') return platformFetch(url, init);
+  // Loaded when first used: it is native code, and the tests never send through it.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { fetch } = require('expo/fetch') as typeof import('expo/fetch');
+  return fetch(url, init as never) as unknown as Promise<ResponseLike>;
+};
+
+/** The slowest uplink an upload is waited for: about 128 kbit/s. */
+const MIN_UPLOAD_RATE = 16 * 1024;
+
+/**
+ * An upload waits a minute, plus as long as its body takes at the slowest
+ * uplink worth waiting for: a 25 MB file on poor mobile data still gets
+ * there, and a stalled one is still given up on.
+ */
+function withSizedTimeout(send: FetchLike): FetchLike {
+  return async (url, init) => {
+    const size = init.body instanceof Uint8Array ? init.body.byteLength : 0;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 60_000 + Math.ceil((size / MIN_UPLOAD_RATE) * 1000));
+    try {
+      return await send(url, { ...init, signal: controller.signal });
+    } finally {
+      clearTimeout(timer);
+    }
+  };
+}
+
 const defaultDeps = (): VaultDeps => ({
-  fetch: (url, init) => globalThis.fetch(url, init as RequestInit) as unknown as Promise<ResponseLike>,
+  fetch: platformFetch,
+  uploadFetch: expoUploadFetch,
   network: currentNetwork,
   onNetworkChange,
   store: new SecureTokenStore(),
@@ -114,7 +160,11 @@ const defaultDeps = (): VaultDeps => ({
 });
 
 export function VaultProvider(props: { children: ReactNode; deps?: Partial<VaultDeps> }) {
-  const deps = useMemo<VaultDeps>(() => ({ ...defaultDeps(), ...props.deps }), [props.deps]);
+  const deps = useMemo<VaultDeps>(
+    // A test's fetch is the vault for uploads too, unless it says otherwise.
+    () => ({ ...defaultDeps(), ...props.deps, uploadFetch: props.deps?.uploadFetch ?? props.deps?.fetch ?? expoUploadFetch }),
+    [props.deps],
+  );
   const [phase, setPhase] = useState<Phase>('loading');
   const [vault, setVault] = useState<VaultRecord | null>(null);
   const [caps, setCaps] = useState<Capabilities | null>(null);
@@ -142,6 +192,17 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
       }),
     );
   }, [origin, installation, deps.fetch]);
+
+  const uploadApi = useMemo(() => {
+    if (!origin || !installation) return null;
+    return createApi(
+      createHttp({
+        baseUrl: origin,
+        fetch: withSizedTimeout(deps.uploadFetch),
+        headers: () => appHeaders(installation),
+      }),
+    );
+  }, [origin, installation, deps.uploadFetch]);
 
   useEffect(
     () =>
@@ -471,6 +532,17 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
     setPhase('connect');
   }, [session]);
 
+  const sessionOwner = useCallback(() => {
+    const info = session.info;
+    return info && origin ? { origin, member_id: info.member_id } : null;
+  }, [session, origin]);
+
+  // The session core is not React state; what it says changes only as the phase does.
+  const who = useMemo<VaultValue['who']>(() => {
+    const info = phase === 'ready' ? session.info : null;
+    return info && vault ? { origin: vault.origin, member_id: info.member_id, role: info.role, household_id: info.household_id } : null;
+  }, [phase, vault, session]);
+
   const value = useMemo<VaultValue>(
     () => ({
       phase,
@@ -479,6 +551,9 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
       offline,
       notice,
       api,
+      uploadApi,
+      who,
+      sessionOwner,
       chooseVault,
       signIn,
       signInCode,
@@ -487,7 +562,7 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
       withToken,
       recheck,
     }),
-    [phase, vault, caps, offline, notice, api, chooseVault, signIn, signInCode, signOut, chooseAnotherVault, withToken, recheck],
+    [phase, vault, caps, offline, notice, api, uploadApi, who, sessionOwner, chooseVault, signIn, signInCode, signOut, chooseAnotherVault, withToken, recheck],
   );
   return <VaultContext.Provider value={value}>{props.children}</VaultContext.Provider>;
 }

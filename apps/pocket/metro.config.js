@@ -11,6 +11,13 @@ const config = getDefaultConfig(__dirname);
 const vendor = path.resolve(__dirname, '../../vendor/fdv/packages') + path.sep;
 
 config.resolver.resolveRequest = (context, moduleName, platform) => {
+  // tslib 2's ES entry (modules/index.js) imports its CommonJS build as a
+  // default export, which Metro's web bundle hands over as undefined — the
+  // app then fails to start ("Cannot destructure property '__extends'").
+  // Its plain ES build has no such step. (expo-router's web dialog pulls it in.)
+  if (moduleName === 'tslib' && platform === 'web') {
+    return context.resolveRequest(context, 'tslib/tslib.es6.js', platform);
+  }
   if (
     moduleName.startsWith('.') &&
     moduleName.endsWith('.js') &&

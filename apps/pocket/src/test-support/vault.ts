@@ -12,7 +12,7 @@ export const INSTANCE = '0f5a1c2e-9b7d-4e61-8a33-5c2d7e9f1a40';
 export function capabilities(over: Partial<Capabilities> = {}): Capabilities {
   return {
     product: 'family-document-vault',
-    server_version: '0.4.7',
+    server_version: '0.4.10',
     api_version: 1,
     min_client_version: '0.0.1',
     edition: 'self_hosted',
@@ -26,6 +26,9 @@ export function capabilities(over: Partial<Capabilities> = {}): Capabilities {
       share_links: true,
       bulk_import: false,
       multi_household: false,
+      idempotent_capture: true,
+      capture_metadata: true,
+      issued_by: true,
     },
     limits: { max_upload_bytes: 104_857_600, max_members: null, max_storage_bytes: null },
     deprecations: [],
