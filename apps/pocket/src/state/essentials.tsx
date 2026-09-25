@@ -75,13 +75,37 @@ interface Prefs {
   enrolled: boolean;
   /** Home has offered it once. */
   offered: boolean;
-  /** Copies are kept (the lock covers sign-in too while they are). */
+  /** Copies are kept. */
   kept: boolean;
+  /**
+   * The session simply expired with copies kept: they stay readable from
+   * the sign-in screen (behind the lock) until their maximum age.
+   */
+  expired: boolean;
+  /** The person also chose to keep their Only me Essentials. */
+  private: boolean;
+  /**
+   * Signed in again, and the new session has no grant yet: the vault keeps
+   * nothing for such a session, so nothing syncs (and nothing kept is
+   * removed) until there is one — across restarts too.
+   */
+  regrant: boolean;
 }
+
+const NO_PREFS: Prefs = {
+  enrolled: false,
+  offered: false,
+  kept: false,
+  expired: false,
+  private: false,
+  regrant: false,
+};
 
 interface EssentialsValue {
   /** This phone and this vault can keep Essentials at all. */
   available: boolean;
+  /** Signed out by expiry, with copies kept: they can be read, not synced. */
+  keptWhileSignedOut: boolean;
   prefs: Prefs;
   items: KeptDocument[];
   /** Only me Essentials in the vault's set, and how many are kept here. */
@@ -90,11 +114,18 @@ interface EssentialsValue {
   checked: Checked | null;
   age: Age | null;
   grant: OfflineGrant | null;
-  /** The grant lapses within three days: one password keeps it going. */
+  /**
+   * One password keeps them up to date: the grant lapses within three
+   * days, or this is a new session (signed in again) with none yet.
+   */
   renewDue: boolean;
   syncing: boolean;
   notice: EssentialsNotice;
   enrol(password: string, includePrivate: boolean): Promise<EnrolOutcome>;
+  /** The grant again, as first chosen: after signing in again, or before it lapses. */
+  regrant(password: string): Promise<EnrolOutcome>;
+  /** Signed in with this password: a grant still awaited is renewed with it. */
+  signedInWith(password: string): Promise<void>;
   sync(): Promise<void>;
   open(id: string, mode: 'view' | 'show'): Promise<OpenCopy | null>;
   offered(): void;
@@ -119,9 +150,7 @@ export function EssentialsProvider(props: { children: ReactNode; deps?: Partial<
   const { t } = useTranslation();
   const { who, withToken, caps, offline } = useVault();
   const lock = useLock();
-  const [prefs, setPrefsState] = useState<Prefs>(() =>
-    readPrefs('essentials', { enrolled: false, offered: false, kept: false }),
-  );
+  const [prefs, setPrefsState] = useState<Prefs>(() => ({ ...NO_PREFS, ...readPrefs('essentials', NO_PREFS) }));
   const [store, setStore] = useState<EssentialsStore | null>(null);
   const [items, setItems] = useState<KeptDocument[]>([]);
   const [privateInSet, setPrivateInSet] = useState(0);
@@ -132,19 +161,23 @@ export function EssentialsProvider(props: { children: ReactNode; deps?: Partial<
   const [notice, setNotice] = useState<EssentialsNotice>(null);
   const storeRef = useRef<EssentialsStore | null>(null);
   const busy = useRef<Promise<void> | null>(null);
+  const prefsRef = useRef(prefs);
 
   const available =
     caps?.features.offline_essentials === true &&
     lock.status !== 'none' &&
     lock.level !== null &&
     who?.role !== 'viewer';
+  const keptWhileSignedOut = who === null && prefs.enrolled && prefs.kept && prefs.expired;
+  // Whose copies may be opened: the person signed in, or — after expiry — the last one.
+  const readable = who !== null || keptWhileSignedOut;
 
   const setPrefs = useCallback((next: Partial<Prefs>) => {
-    setPrefsState((p) => {
-      const merged = { ...p, ...next };
-      writePrefs('essentials', merged);
-      return merged;
-    });
+    // The ref first: listeners and callbacks read it before the next render.
+    const merged = { ...prefsRef.current, ...next };
+    prefsRef.current = merged;
+    writePrefs('essentials', merged);
+    setPrefsState(merged);
   }, []);
 
   /** What the everyday store holds, as the list shows it. */
@@ -175,7 +208,7 @@ export function EssentialsProvider(props: { children: ReactNode; deps?: Partial<
       setItems([]);
       setChecked(null);
       setPrivateKept(0);
-      setPrefs({ kept: false });
+      setPrefs({ kept: false, expired: false, regrant: false });
       if (why) setNotice(why);
       log.info('essentials.wiped', { why: why ?? 'signed_out_quietly' });
     },
@@ -186,6 +219,11 @@ export function EssentialsProvider(props: { children: ReactNode; deps?: Partial<
   useEffect(() => {
     const offEnded = on('sessionEnded', (reason) => {
       if (endWipes(reason)) void wipe('signed_out');
+      else setPrefs({ expired: true });
+    });
+    const offIn = on('signedIn', () => {
+      setPrefs({ expired: false });
+      if (prefsRef.current.enrolled) setPrefs({ regrant: true });
     });
     const offOut = on('signedOut', () => {
       void wipe(null);
@@ -193,6 +231,7 @@ export function EssentialsProvider(props: { children: ReactNode; deps?: Partial<
     });
     return () => {
       offEnded();
+      offIn();
       offOut();
     };
   }, [wipe, setPrefs]);
@@ -201,8 +240,9 @@ export function EssentialsProvider(props: { children: ReactNode; deps?: Partial<
   useEffect(() => {
     const hex = lock.everydayKey;
     // Nobody signed in (a session just ended, and may have taken the copies
-    // with it): nothing is opened — not even an empty store.
-    if (lock.status !== 'unlocked' || !hex || !prefs.enrolled || !who) return;
+    // with it): nothing is opened — not even an empty store. After expiry,
+    // what is kept is opened as it is: nobody new has signed in to check.
+    if (lock.status !== 'unlocked' || !hex || !prefs.enrolled || !readable) return;
     let cancelled = false;
     let opened: EssentialsStore | null = null;
     void (async () => {
@@ -251,7 +291,7 @@ export function EssentialsProvider(props: { children: ReactNode; deps?: Partial<
       void opened.close().catch(() => undefined);
     };
     // The key appears a moment after the status: both are watched.
-  }, [lock.status, lock.everydayKey, prefs.enrolled, who, d, refresh, wipe]);
+  }, [lock.status, lock.everydayKey, prefs.enrolled, readable, who, d, refresh, wipe]);
 
   const fetchPage = useCallback(
     async (versionId: string, n: number): Promise<PageFetch> => {
@@ -271,7 +311,9 @@ export function EssentialsProvider(props: { children: ReactNode; deps?: Partial<
   const run = useCallback(
     (privateStore: EssentialsStore | null = null): Promise<void> => {
       const s = storeRef.current;
-      if (!s || offline) return Promise.resolve();
+      // Signed out: read, never synced — the vault would not answer. Signed
+      // in again: not before the grant, or the vault's answer is "keep nothing".
+      if (!s || offline || !who || prefsRef.current.regrant) return Promise.resolve();
       if (busy.current) return busy.current;
       setSyncing(true);
       busy.current = (async () => {
@@ -299,14 +341,14 @@ export function EssentialsProvider(props: { children: ReactNode; deps?: Partial<
       })();
       return busy.current;
     },
-    [offline, withToken, fetchPage, d, refresh, setPrefs],
+    [offline, who, withToken, fetchPage, d, refresh, setPrefs],
   );
 
   // In front only: when the store opens (after unlocking), when the app
   // comes back, and when the connection does.
   useEffect(() => {
-    if (store) void run();
-  }, [store, run]);
+    if (store && !prefs.regrant) void run();
+  }, [store, prefs.regrant, run]);
   useEffect(() => {
     const sub = AppState.addEventListener('change', (next) => {
       if (next === 'active') void run();
@@ -314,17 +356,40 @@ export function EssentialsProvider(props: { children: ReactNode; deps?: Partial<
     return () => sub.remove();
   }, [run]);
 
-  const enrol = useCallback(
+  /** The vault's offline grant, for this session. */
+  const granted = useCallback(
     async (password: string, includePrivate: boolean): Promise<EnrolOutcome> => {
       try {
         const g = await withToken((a, token) => a.offlineGrant(token, password, includePrivate));
         setGrant(g);
-        setPrefs({ enrolled: true, offered: true });
       } catch (err) {
         if (err instanceof ApiRequestError && err.code === 'invalid_credentials') return 'wrong_password';
         if (err instanceof NetworkError) return 'offline';
         return 'failed';
       }
+      setPrefs({ regrant: false });
+      return 'ok';
+    },
+    [withToken, setPrefs],
+  );
+
+  // As first chosen; the sync that was held follows (see below).
+  const regrant = useCallback(
+    (password: string): Promise<EnrolOutcome> => granted(password, prefsRef.current.private),
+    [granted],
+  );
+  const signedInWith = useCallback(
+    async (password: string): Promise<void> => {
+      if (prefsRef.current.regrant) await regrant(password);
+    },
+    [regrant],
+  );
+
+  const enrol = useCallback(
+    async (password: string, includePrivate: boolean): Promise<EnrolOutcome> => {
+      const outcome = await granted(password, includePrivate);
+      if (outcome !== 'ok') return outcome;
+      setPrefs({ enrolled: true, offered: true, ...(includePrivate ? { private: true } : {}) });
       if (!includePrivate) return 'ok';
       // The Only me copies: their own store, opened with the person's biometrics.
       const copies = await lock.away(() => openPrivateCopies(lock.keys, t('lock.privatePrompt'), d.io));
@@ -334,7 +399,7 @@ export function EssentialsProvider(props: { children: ReactNode; deps?: Partial<
       }
       return 'ok';
     },
-    [withToken, setPrefs, lock, t, d, run],
+    [granted, setPrefs, lock, t, d, run],
   );
 
   const open = useCallback(
@@ -365,11 +430,12 @@ export function EssentialsProvider(props: { children: ReactNode; deps?: Partial<
   );
 
   const age = useMemo(() => (checked ? ageOf(checked, d.now()) : null), [checked, d]);
-  const renewDue = grant !== null && Date.parse(grant.expires_at) - d.now() <= RENEW_WITHIN;
+  const renewDue = prefs.regrant || (grant !== null && Date.parse(grant.expires_at) - d.now() <= RENEW_WITHIN);
 
   const value = useMemo<EssentialsValue>(
     () => ({
       available,
+      keptWhileSignedOut,
       prefs,
       items,
       privateInSet,
@@ -381,6 +447,8 @@ export function EssentialsProvider(props: { children: ReactNode; deps?: Partial<
       syncing,
       notice,
       enrol,
+      regrant,
+      signedInWith,
       sync: () => run(),
       open,
       offered: () => setPrefs({ offered: true }),
@@ -388,6 +456,7 @@ export function EssentialsProvider(props: { children: ReactNode; deps?: Partial<
     }),
     [
       available,
+      keptWhileSignedOut,
       prefs,
       items,
       privateInSet,
@@ -399,6 +468,8 @@ export function EssentialsProvider(props: { children: ReactNode; deps?: Partial<
       syncing,
       notice,
       enrol,
+      regrant,
+      signedInWith,
       run,
       open,
       setPrefs,
@@ -409,7 +480,8 @@ export function EssentialsProvider(props: { children: ReactNode; deps?: Partial<
 
 const NONE: EssentialsValue = {
   available: false,
-  prefs: { enrolled: false, offered: true, kept: false },
+  keptWhileSignedOut: false,
+  prefs: { ...NO_PREFS, offered: true },
   items: [],
   privateInSet: 0,
   privateKept: 0,
@@ -420,6 +492,8 @@ const NONE: EssentialsValue = {
   syncing: false,
   notice: null,
   enrol: async () => 'failed',
+  regrant: async () => 'failed',
+  signedInWith: async () => undefined,
   sync: async () => undefined,
   open: async () => null,
   offered: () => undefined,

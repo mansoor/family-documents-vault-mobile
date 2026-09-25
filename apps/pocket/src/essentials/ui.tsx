@@ -19,11 +19,10 @@ const day = (ms: number) =>
  */
 export function OnThisPhone() {
   const { t } = useTranslation();
-  const router = useRouter();
   const e = useEssentials();
   const lock = useLock();
   const { withToken, who } = useVault();
-  const [asking, setAsking] = useState<null | { includePrivate: boolean }>(null);
+  const [asking, setAsking] = useState<null | { includePrivate: boolean; renew?: boolean }>(null);
   const [privateChoice, setPrivateChoice] = useState<null | { password: string; count: number }>(null);
 
   if (!e.available) return null;
@@ -88,7 +87,11 @@ export function OnThisPhone() {
           {e.renewDue ? (
             <Card>
               <Text>{t('essentials.renew')}</Text>
-              <Button label={t('essentials.renewButton')} onPress={() => setAsking({ includePrivate: false })} />
+              <Button
+                testID="essentials-renew"
+                label={t('essentials.renewButton')}
+                onPress={() => setAsking({ includePrivate: false, renew: true })}
+              />
             </Card>
           ) : null}
           {e.items.length === 0 ? (
@@ -100,29 +103,7 @@ export function OnThisPhone() {
               {t('essentials.count', { count: e.items.length })}
             </Text>
           )}
-          {e.items.map((item) => (
-            <View key={item.id} style={styles.row} testID={`essential-${item.id}`}>
-              <Pressable
-                style={styles.rowText}
-                accessibilityRole="button"
-                accessibilityLabel={`${t('essentials.open')}: ${item.document.title ?? t('essentials.untitled')}`}
-                onPress={() => router.push({ pathname: '/essential/[id]', params: { id: item.id } })}
-              >
-                <Text weight="600">{item.document.title ?? t('essentials.untitled')}</Text>
-                {e.age ? (
-                  <Text tone="soft" variant="secondary">
-                    {t('essentials.keptUntil', { date: day(e.age.removeAt) })}
-                  </Text>
-                ) : null}
-              </Pressable>
-              <Button
-                kind="quiet"
-                label={t('essentials.show')}
-                testID={`essential-show-${item.id}`}
-                onPress={() => router.push({ pathname: '/essential/[id]', params: { id: item.id, mode: 'show' } })}
-              />
-            </View>
-          ))}
+          <KeptRows />
           {privateMissing > 0 && lock.level === 'strong' ? (
             <View style={styles.row}>
               <Text tone="soft" style={styles.rowText}>
@@ -141,7 +122,7 @@ export function OnThisPhone() {
         visible={asking !== null}
         onCancel={() => setAsking(null)}
         onPassword={async (password) => {
-          const outcome = await afterPassword(password);
+          const outcome = asking?.renew ? await e.regrant(password) : await afterPassword(password);
           if (outcome === 'ok') setAsking(null);
           return outcome;
         }}
@@ -177,6 +158,68 @@ export function OnThisPhone() {
           </View>
         </View>
       </Modal>
+    </View>
+  );
+}
+
+/** What is kept: each with Open and Show, and how long it is kept for. */
+function KeptRows() {
+  const { t } = useTranslation();
+  const router = useRouter();
+  const e = useEssentials();
+  return e.items.map((item) => (
+    <View key={item.id} style={styles.row} testID={`essential-${item.id}`}>
+      <Pressable
+        style={styles.rowText}
+        accessibilityRole="button"
+        accessibilityLabel={`${t('essentials.open')}: ${item.document.title ?? t('essentials.untitled')}`}
+        onPress={() => router.push({ pathname: '/essential/[id]', params: { id: item.id } })}
+      >
+        <Text weight="600">{item.document.title ?? t('essentials.untitled')}</Text>
+        {e.age ? (
+          <Text tone="soft" variant="secondary">
+            {t('essentials.keptUntil', { date: day(e.age.removeAt) })}
+          </Text>
+        ) : null}
+      </Pressable>
+      <Button
+        kind="quiet"
+        label={t('essentials.show')}
+        testID={`essential-show-${item.id}`}
+        onPress={() => router.push({ pathname: '/essential/[id]', params: { id: item.id, mode: 'show' } })}
+      />
+    </View>
+  ));
+}
+
+/**
+ * On the sign-in screen, after the session simply expired: what is kept
+ * can still be opened — behind the lock — though not brought up to date.
+ */
+export function KeptWhileSignedOut() {
+  const { t } = useTranslation();
+  const e = useEssentials();
+  const lock = useLock();
+  if (!e.keptWhileSignedOut) return null;
+  return (
+    <View style={styles.section} testID="essentials-signed-out">
+      <Text variant="screen">{t('essentials.title')}</Text>
+      <Notice tone="info">{t('essentials.signInToSync')}</Notice>
+      {e.age?.warn ? (
+        <Notice tone="warn" testID="essentials-connect-by">
+          {t('essentials.connectBy', { date: day(e.age.removeAt) })}
+        </Notice>
+      ) : null}
+      {lock.status === 'unlocked' ? (
+        <KeptRows />
+      ) : (
+        <Button
+          kind="quiet"
+          testID="essentials-open-kept"
+          label={t('essentials.openKept')}
+          onPress={() => void lock.unlock()}
+        />
+      )}
     </View>
   );
 }

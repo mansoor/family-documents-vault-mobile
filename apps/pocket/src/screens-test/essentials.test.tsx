@@ -1,7 +1,9 @@
+import type { FetchLike } from '@fdv/client';
 import type { DocumentView, OfflineItem } from '@fdv/shared';
 import { act, fireEvent, screen, waitFor } from '@testing-library/react-native';
 import { useEffect, useState } from 'react';
 import Home from '../app/index';
+import SignIn from '../app/sign-in';
 import type { Tier } from '../essentials/open';
 import { EssentialPages } from '../essentials/pages';
 import { MemoryEssentialsStore } from '../essentials/store';
@@ -33,20 +35,25 @@ jest.mock('expo-router', () => ({
 const ORIGIN = 'https://vault.test';
 const PASSWORD = 'correct horse battery staple';
 
+/** The app's own gates (see _layout), with the test's navigation. */
 function App() {
   const { phase } = useVault();
   const { status } = useLock();
+  const { keptWhileSignedOut } = useEssentials();
   const [viewing, setViewing] = useState<{ id: string; mode?: string } | null>(null);
   useEffect(() => {
     mockNav.go = (p) => setViewing(p.params);
   }, []);
+  const reading = phase === 'ready' || (phase === 'sign_in' && keptWhileSignedOut && status === 'unlocked');
   const content =
-    phase !== 'ready' || status === 'checking' ? null : viewing ? (
+    viewing && reading ? (
       <>
         <Button label="Back" testID="viewer-back" onPress={() => setViewing(null)} />
         <EssentialPages id={viewing.id} {...(viewing.mode ? { mode: viewing.mode } : {})} />
       </>
-    ) : (
+    ) : phase === 'sign_in' ? (
+      <SignIn />
+    ) : phase !== 'ready' || status === 'checking' ? null : (
       <Home />
     );
   return (
@@ -117,9 +124,9 @@ function phoneParts() {
   return { lock, essentials, mem };
 }
 
-async function start(t: TestVault, parts = phoneParts()) {
+async function start(t: TestVault, parts = phoneParts(), fetch: FetchLike = t.fetch) {
   await signedIn(t);
-  await renderApp(<App />, { fetch: t.fetch, lock: parts.lock, essentials: parts.essentials });
+  await renderApp(<App />, { fetch, lock: parts.lock, essentials: parts.essentials });
   await fireEvent.press(await screen.findByTestId('lock-unlock'));
   await screen.findByTestId('home-calm');
   return parts;
@@ -196,7 +203,7 @@ describe('Essentials in airplane mode', () => {
     expect(parts.mem.stores.size).toBe(0);
   });
 
-  it('an expired session keeps them readable', async () => {
+  it('an expired session keeps them readable, from sign-in and behind the lock', async () => {
     const t = testVault([ORIGIN]);
     t.vault.state.offlineEssentials.items = [passport()];
     const parts = await start(t);
@@ -208,9 +215,73 @@ describe('Essentials in airplane mode', () => {
     }
     await pullToRefresh();
     // Signed out, by the vault's clock — and the copies are still here.
-    await waitFor(() => expect(screen.queryByTestId('home-calm')).toBeNull());
+    expect(await screen.findByTestId('essentials-signed-out')).toBeTruthy();
+    expect(screen.getByText('Sign in again to keep these up to date. You can still open them.')).toBeTruthy();
     expect(parts.mem.removed).toEqual([]);
-    expect(await parts.mem.stores.get('everyday')!.document('passport')).not.toBeNull();
+    // Locked with the sign-out: nothing kept is listed until it opens.
+    expect(screen.queryByTestId('essential-passport')).toBeNull();
+    await fireEvent.press(screen.getByTestId('essentials-open-kept'));
+    await fireEvent.press(await screen.findByLabelText('Open: Passport'));
+    expect(await screen.findByTestId('essential-image')).toBeTruthy();
+    // Read, not synced: nothing asked of the vault while signed out.
+    expect(t.vault.state.offlineEssentials.received.size).toBe(0);
+  });
+
+  /** Kept, then the session expires, then signed in again on the sign-in screen. */
+  async function expireAndSignInAgain(t: TestVault) {
+    for (const s of t.vault.state.sessions) {
+      s.revoked = true;
+      s.endedBecause = 'expired' as never;
+    }
+    await pullToRefresh();
+    await screen.findByTestId('essentials-signed-out');
+    await fireEvent.changeText(screen.getByTestId('sign-in-email'), 'owner@example.test');
+    await fireEvent.changeText(screen.getByTestId('sign-in-password'), PASSWORD);
+    await fireEvent.press(screen.getByTestId('sign-in-go'));
+  }
+
+  it('signing in again after expiry renews the grant with that password, and keeps them up to date', async () => {
+    const t = testVault([ORIGIN]);
+    t.vault.state.offlineEssentials.items = [passport()];
+    const parts = await start(t);
+    await keep();
+    await screen.findByTestId('essential-passport');
+    await expireAndSignInAgain(t);
+    // The new session has its grant — so the vault's set is not "keep nothing".
+    expect(await screen.findByTestId('essential-passport')).toBeTruthy();
+    expect(screen.queryByTestId('essentials-signed-out')).toBeNull();
+    expect(screen.queryByTestId('essentials-renew')).toBeNull();
+    const current = t.vault.state.sessions.find((s) => !s.revoked);
+    expect(current?.offlineGrant).toBeTruthy();
+    expect(parts.mem.removed).toEqual([]);
+  });
+
+  it('signed in again with no grant yet, nothing kept is removed; one password brings them up to date', async () => {
+    const t = testVault([ORIGIN]);
+    t.vault.state.offlineEssentials.items = [passport()];
+    let grants = 0;
+    // The first grant goes through; the one at the next sign-in finds no connection.
+    const fetch: FetchLike = async (url, init) => {
+      if (String(url).endsWith('/api/v1/offline/grant') && ++grants === 2)
+        throw new TypeError('Network request failed');
+      return t.fetch(url, init);
+    };
+    const parts = await start(t, phoneParts(), fetch);
+    await keep();
+    await screen.findByTestId('essential-passport');
+    await expireAndSignInAgain(t);
+    // Held: the vault would say "keep nothing" to a session with no grant.
+    expect(await screen.findByTestId('essentials-renew')).toBeTruthy();
+    await pullToRefresh();
+    expect(screen.getByTestId('essential-passport')).toBeTruthy();
+    expect(parts.mem.removed).toEqual([]);
+    // One password, and they are kept up to date again.
+    await fireEvent.press(screen.getByTestId('essentials-renew'));
+    await fireEvent.changeText(await screen.findByTestId('essentials-password-field'), PASSWORD);
+    await fireEvent.press(screen.getByTestId('essentials-password-go'));
+    await waitFor(() => expect(screen.queryByTestId('essentials-renew')).toBeNull());
+    expect(t.vault.state.sessions.find((s) => !s.revoked)?.offlineGrant).toBeTruthy();
+    expect(screen.getByTestId('essential-passport')).toBeTruthy();
   });
 
   it('somebody else’s copies are gone before anything is shown', async () => {

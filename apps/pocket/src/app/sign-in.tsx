@@ -1,8 +1,10 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { KeptWhileSignedOut } from '../essentials/ui';
 import { useCapture } from '../state/capture';
+import { useEssentials } from '../state/essentials';
 import { useVault, type SignInResult } from '../state/vault';
 import { Button, Card, Field, Notice, Text } from '../ui';
 
@@ -14,6 +16,10 @@ export default function SignIn() {
   const { t } = useTranslation();
   const { vault, caps, notice, signIn, signInCode, chooseAnotherVault } = useVault();
   const { waitingHere } = useCapture();
+  const essentials = useEssentials();
+  // Kept until the sign-in completes (past the code step): it renews the
+  // grant for Essentials kept here, so they are not asked for it again.
+  const typed = useRef('');
   const [email, setEmail] = useState(vault?.email ?? '');
   const [password, setPassword] = useState('');
   const [code, setCode] = useState('');
@@ -27,11 +33,15 @@ export default function SignIn() {
     setBusy(true);
     setFailure(null);
     try {
+      if (step === 'password') typed.current = password;
       const r = step === 'password' ? await signIn(email, password) : await signInCode(code);
       if (r.kind === 'code') {
         setStep('code');
         setPassword('');
-      } else if (r.kind !== 'ok') {
+      } else if (r.kind === 'ok') {
+        void essentials.signedInWith(typed.current);
+        typed.current = '';
+      } else {
         setFailure(r);
       }
     } finally {
@@ -104,20 +114,29 @@ export default function SignIn() {
           {failure?.kind === 'refused' ? (
             <Notice tone="danger" testID="sign-in-refused">
               <Text>{failure.message}</Text>
-              {failure.passkeyHint ? <Text tone="soft" variant="secondary">{t('signIn.passkeyOnly')}</Text> : null}
+              {failure.passkeyHint ? (
+                <Text tone="soft" variant="secondary">
+                  {t('signIn.passkeyOnly')}
+                </Text>
+              ) : null}
             </Notice>
           ) : null}
           {failure?.kind === 'unreachable' ? (
-            <Notice tone="danger">{t('connect.unreachable', { host: vault?.origin.replace(/^https?:\/\//, '') ?? '' })}</Notice>
+            <Notice tone="danger">
+              {t('connect.unreachable', { host: vault?.origin.replace(/^https?:\/\//, '') ?? '' })}
+            </Notice>
           ) : null}
           {failure?.kind === 'stranger' ? (
-            <Notice tone="danger">{t('connect.stranger', { host: vault?.origin.replace(/^https?:\/\//, '') ?? '' })}</Notice>
+            <Notice tone="danger">
+              {t('connect.stranger', { host: vault?.origin.replace(/^https?:\/\//, '') ?? '' })}
+            </Notice>
           ) : null}
           {failure?.kind === 'wifi_only' ? (
             <Notice tone="warn" testID="sign-in-wifi-only">
               {t('connect.refuseMobileData')}
             </Notice>
           ) : null}
+          <KeptWhileSignedOut />
           <Button kind="quiet" label={t('signIn.otherVault')} onPress={() => void chooseAnotherVault()} />
         </ScrollView>
       </KeyboardAvoidingView>

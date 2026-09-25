@@ -256,8 +256,10 @@ export function LockProvider(props: { children: ReactNode; deps?: Partial<LockDe
     }
   }, [d, t, away, open, setStatus]);
 
-  // Kept out of screenshots while open, unless the person allows them.
-  const shielded = phase === 'ready' && status !== 'locked' && status !== 'checking' && !prefs.screenshots;
+  // Kept out of screenshots while open, unless the person allows them. Open
+  // while signed out means kept Essentials are being read: the same.
+  const showing = phase === 'ready' ? status !== 'locked' && status !== 'checking' : status === 'unlocked';
+  const shielded = showing && !prefs.screenshots;
   useEffect(() => {
     void (shielded ? d.screen.prevent('app') : d.screen.allow('app'));
   }, [d, shielded]);

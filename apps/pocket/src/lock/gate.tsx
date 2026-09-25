@@ -19,7 +19,8 @@ export function LockGate(props: { children: ReactNode }) {
   return (
     <View style={styles.root}>
       {props.children}
-      {phase === 'ready' && covered ? <View testID="lock-cover" style={styles.cover} /> : null}
+      {/* Covered only ever while open: signed in, or reading what is kept. */}
+      {covered ? <View testID="lock-cover" style={styles.cover} /> : null}
     </View>
   );
 }
