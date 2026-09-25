@@ -1,0 +1,123 @@
+name: Release
+
+# The owner's build (4.18): io.github.mansoor.familyvault, the JavaScript
+# embedded, minified, arm64, signed with the owner's own key — never a
+# debug key — and checked with apksigner before it is attached to a
+# private GitHub Release. v0.2.0-rc first; v0.2.0 after the demonstration.
+#
+# The key comes from four repository secrets, set by the owner:
+#   FV_RELEASE_KEYSTORE        the keystore, base64 (base64 -w0 release.jks)
+#   FV_RELEASE_STORE_PASSWORD  its password
+#   FV_RELEASE_KEY_ALIAS       the key's alias
+#   FV_RELEASE_KEY_PASSWORD    the key's password
+# The keystore is written to the runner's temporary folder for the build
+# and removed after it, whatever happens.
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: The release tag to build and attach to (v0.2.0-rc, v0.2.0)
+        required: true
+  push:
+    tags: ['v0.2.*']
+
+concurrency:
+  group: release-${{ inputs.tag || github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: The signed release
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      APP_VARIANT: release
+      NDK_VERSION: 27.1.12297006
+      TAG: ${{ inputs.tag || github.ref_name }}
+    steps:
+      - name: The owner's key is there
+        env:
+          KEYSTORE: ${{ secrets.FV_RELEASE_KEYSTORE }}
+          STORE_PASSWORD: ${{ secrets.FV_RELEASE_STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.FV_RELEASE_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.FV_RELEASE_KEY_PASSWORD }}
+        run: |
+          for v in KEYSTORE STORE_PASSWORD KEY_ALIAS KEY_PASSWORD; do
+            if [ -z "$(printenv "$v")" ]; then
+              echo "::error::The release is signed with the owner's key: set FV_RELEASE_$v in the repository's secrets"
+              exit 1
+            fi
+          done
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+          submodules: true
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: NDK (cached)
+        id: ndk
+        uses: actions/cache@v4
+        with:
+          path: /usr/local/lib/android/sdk/ndk/${{ env.NDK_VERSION }}
+          key: ndk-${{ env.NDK_VERSION }}
+      - name: Install the NDK
+        if: steps.ndk.outputs.cache-hit != 'true'
+        run: |
+          if [ ! -d "$ANDROID_HOME/ndk/$NDK_VERSION" ]; then
+            yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "ndk;$NDK_VERSION" > /dev/null
+          fi
+      - name: Generate the native project
+        working-directory: apps/pocket
+        run: npx expo prebuild --platform android --no-install --clean
+      - name: Build, signed with the owner's key
+        working-directory: apps/pocket/android
+        env:
+          KEYSTORE: ${{ secrets.FV_RELEASE_KEYSTORE }}
+          STORE_PASSWORD: ${{ secrets.FV_RELEASE_STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.FV_RELEASE_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.FV_RELEASE_KEY_PASSWORD }}
+        run: |
+          KS="$RUNNER_TEMP/release.jks"
+          trap 'rm -f "$KS"' EXIT
+          printf '%s' "$KEYSTORE" | base64 -d > "$KS"
+          ./gradlew assembleRelease :unifiedpush:testDebugUnitTest --no-daemon \
+            -PreactNativeArchitectures=arm64-v8a \
+            -Pandroid.injected.signing.store.file="$KS" \
+            -Pandroid.injected.signing.store.password="$STORE_PASSWORD" \
+            -Pandroid.injected.signing.key.alias="$KEY_ALIAS" \
+            -Pandroid.injected.signing.key.password="$KEY_PASSWORD"
+      - name: Signed by the owner's key, not a debug key
+        working-directory: apps/pocket/android/app/build/outputs/apk/release
+        run: |
+          APK=$(find . -name '*.apk' | head -1)
+          SIGNER="$ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)/apksigner"
+          "$SIGNER" verify --verbose --print-certs "$APK" | tee "$RUNNER_TEMP/signature.txt"
+          if grep -qi 'CN=Android Debug' "$RUNNER_TEMP/signature.txt"; then
+            echo "::error::signed with a debug key"
+            exit 1
+          fi
+          cp "$APK" "$GITHUB_WORKSPACE/family-vault-$TAG.apk"
+          echo "APK=family-vault-$TAG.apk" >> "$GITHUB_ENV"
+          grep -m1 'SHA-256 digest' "$RUNNER_TEMP/signature.txt" >> "$GITHUB_STEP_SUMMARY" || true
+      - name: Attached to the private release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          case "$TAG" in *-rc*) PRE=--prerelease ;; *) PRE= ;; esac
+          if ! gh release view "$TAG" > /dev/null 2>&1; then
+            gh release create "$TAG" $PRE --verify-tag --title "Family Vault $TAG" \
+              --notes "The owner's signed build of $TAG. See CHANGELOG.md."
+          fi
+          gh release upload "$TAG" "$APK" --clobber

@@ -10,6 +10,9 @@ name: Maestro
 # the flows, the app's own native code or this workflow — not on every push.
 on:
   workflow_dispatch:
+  # The exit flows run on the release tags too (4.18).
+  push:
+    tags: ['v0.2.*']
   pull_request:
     paths:
       - apps/pocket/.maestro/**
