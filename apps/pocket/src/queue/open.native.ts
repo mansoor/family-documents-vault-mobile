@@ -58,5 +58,11 @@ export async function openQueue(): Promise<QueueStore> {
     await deleteDatabaseAsync(NAME).catch(() => undefined);
     db = await keyed(hex);
   }
-  return SqliteQueueStore.over(db);
+  try {
+    return await SqliteQueueStore.over(db);
+  } catch (err) {
+    // Not left open behind us: the next try opens it afresh.
+    await (db as unknown as { closeAsync(): Promise<void> }).closeAsync().catch(() => undefined);
+    throw err;
+  }
 }

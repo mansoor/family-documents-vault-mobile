@@ -4,6 +4,8 @@ import Constants from 'expo-constants';
 export const extra = (Constants.expoConfig?.extra ?? {}) as {
   testBanner?: boolean;
   variant?: 'dev' | 'preview' | 'e2e' | 'release';
+  /** The e2e build: the fixture scanner instead of the camera. */
+  fixtures?: boolean;
 };
 
 /** The scanner spike's screens exist in dev and preview builds only. */

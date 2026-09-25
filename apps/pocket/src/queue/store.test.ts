@@ -22,6 +22,9 @@ const item = (id: string, over: Partial<QueueItem> = {}): QueueItem => ({
   nextAt: 0,
   askFirst: false,
   problem: null,
+  kind: 'capture',
+  target: null,
+  lastCode: null,
   ...over,
 });
 

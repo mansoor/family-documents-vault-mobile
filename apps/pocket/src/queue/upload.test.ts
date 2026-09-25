@@ -27,6 +27,9 @@ async function queued(over: Partial<QueueItem> = {}) {
     nextAt: 0,
     askFirst: false,
     problem: null,
+    kind: 'capture',
+    target: null,
+    lastCode: null,
     ...over,
   };
   await store.add(item, PDF);

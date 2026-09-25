@@ -5,8 +5,6 @@ import {
   rankKnownIssuers,
   reminderSentence,
   shortTypeLabel,
-  type DocumentTypeView,
-  type Member,
 } from '@fdv/shared';
 import { useNavigation, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -36,16 +34,11 @@ import {
 import { matchTypes, rankTypes } from '../capture/types';
 import { Chip, ChipRow, FileRow, LeaveQuestion, PageStrip } from '../capture/ui';
 import type { CaptureSource } from '../queue/commit';
-import { useCapture, type SaveProblem } from '../state/capture';
+import { useCapture, type CardData, type SaveProblem } from '../state/capture';
 import { useVault } from '../state/vault';
 import { Button, Field, Notice, Text } from '../ui';
 
-interface Loaded {
-  types: DocumentTypeView[];
-  members: Member[];
-  /** The type of each document the phone could see, for ranking the chips. */
-  filed: (string | null)[];
-}
+type Loaded = CardData;
 
 /**
  * The confirm card: straight after the scanner's Done, no second review.
@@ -120,30 +113,20 @@ function Card(props: { initial: CaptureSource }) {
   const blocked = useRef<unknown>(null);
   const issuedByOn = caps?.features.issued_by === true;
 
+  // The vault's choices — or, with no connection, the ones this phone last saw.
   useEffect(() => {
     let cancelled = false;
-    withToken(async (a, token) => {
-      const [types, members, docs] = await Promise.all([
-        a.documentTypes(token),
-        a.members(token),
-        a.documents(token, { limit: 100 }),
-      ]);
-      return {
-        types: types.items,
-        members: members.items,
-        filed: docs.items.map((d) => d.type_key),
-      };
-    })
-      .then((d) => {
-        if (!cancelled) setData(d);
-      })
-      .catch(() => {
-        if (!cancelled) setOffline(true);
-      });
+    void capture.cardData().then((d) => {
+      if (cancelled) return;
+      if (d) setData(d);
+      else setOffline(true);
+    });
     return () => {
       cancelled = true;
     };
-  }, [withToken]);
+    // Once, when the card opens.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // The household's issuers, those used for this kind of document first.
   useEffect(() => {

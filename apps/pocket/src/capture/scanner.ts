@@ -1,3 +1,6 @@
+import { File, Paths } from 'expo-file-system';
+import { extra } from '../config';
+import { FIXTURE_PAGE_BASE64 } from './fixture-page';
 import { mlkitScanner } from './mlkit';
 import type { PageRef, PickedFile } from '../queue/commit';
 
@@ -38,7 +41,30 @@ export function fixtureScanner(outcomes: ScanOutcome[], scans = true): ScannerPo
   };
 }
 
-/** ML Kit on the phone (mlkit.native.ts); the pickers alone on the web (mlkit.ts). */
+/**
+ * The e2e build's scanner (4.5): two pages of the fixture card, written
+ * where a real scanner leaves its pages, so everything after the scan — the
+ * card, the PDF, the queue, the deletion — is the real thing.
+ */
+export function e2eScanner(): ScannerPort {
+  let n = 0;
+  const bytes = Uint8Array.from(atob(FIXTURE_PAGE_BASE64), (c) => c.charCodeAt(0));
+  const page = (): PageRef => {
+    n += 1;
+    const f = new File(Paths.cache, `fixture-page-${Date.now()}-${n}.jpg`);
+    f.create();
+    f.write(bytes);
+    return { uri: f.uri };
+  };
+  return {
+    scans: true,
+    scan: async (max) => ({ kind: 'pages', pages: Array.from({ length: Math.min(2, max) }, page) }),
+    pickFile: async () => ({ kind: 'cancelled' }),
+    pickPhoto: async () => ({ kind: 'cancelled' }),
+  };
+}
+
+/** ML Kit on the phone (mlkit.native.ts); the pickers alone on the web (mlkit.ts); fixtures in the e2e build. */
 export function defaultScanner(): ScannerPort {
-  return mlkitScanner;
+  return extra.fixtures ? e2eScanner() : mlkitScanner;
 }

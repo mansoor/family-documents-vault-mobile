@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useCapture } from '../state/capture';
 import { useVault, type SignInResult } from '../state/vault';
 import { Button, Card, Field, Notice, Text } from '../ui';
 
@@ -12,6 +13,7 @@ import { Button, Card, Field, Notice, Text } from '../ui';
 export default function SignIn() {
   const { t } = useTranslation();
   const { vault, caps, notice, signIn, signInCode, chooseAnotherVault } = useVault();
+  const { waitingHere } = useCapture();
   const [email, setEmail] = useState(vault?.email ?? '');
   const [password, setPassword] = useState('');
   const [code, setCode] = useState('');
@@ -44,6 +46,11 @@ export default function SignIn() {
           <Text variant="hero">{t('signIn.title')}</Text>
           {name ? <Text tone="soft">{t('signIn.to', { name })}</Text> : null}
           {notice === 'signed_out_here' ? <Notice tone="warn">{t('signIn.signedOutHere')}</Notice> : null}
+          {waitingHere > 0 ? (
+            <Notice tone="info" testID="sign-in-waiting">
+              {t('signIn.waiting', { count: waitingHere })}
+            </Notice>
+          ) : null}
           {notice === 'reinstalled' ? <Notice tone="warn">{t('connect.reinstalled')}</Notice> : null}
           <Card>
             {step === 'password' ? (

@@ -30,7 +30,19 @@ export async function currentNetwork(): Promise<NetworkKind> {
 
 /** Calls back whenever the phone's network changes; returns the unsubscribe. */
 export function onNetworkChange(callback: () => void): () => void {
-  if (Platform.OS === 'web') return () => undefined;
+  if (Platform.OS === 'web') {
+    const w = globalThis as unknown as {
+      addEventListener?: (type: string, fn: () => void) => void;
+      removeEventListener?: (type: string, fn: () => void) => void;
+    };
+    const fn = () => callback();
+    w.addEventListener?.('online', fn);
+    w.addEventListener?.('offline', fn);
+    return () => {
+      w.removeEventListener?.('online', fn);
+      w.removeEventListener?.('offline', fn);
+    };
+  }
   const subscription = Network.addNetworkStateListener(() => callback());
   return () => subscription.remove();
 }

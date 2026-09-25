@@ -39,7 +39,9 @@
     "confirm": "Confirm",
     "passkeyOnly": "You sign in with a passkey. The app can't use passkeys yet, so set a password in the browser (Settings → Password), then sign in here with it.",
     "signedOutHere": "You've been signed out on this phone. Sign in again to carry on.",
-    "otherVault": "Use a different vault"
+    "otherVault": "Use a different vault",
+    "waiting_one": "A scan is waiting on this phone. It goes to the vault when the person who made it signs in.",
+    "waiting_other": "{{count}} scans are waiting on this phone. Each goes to the vault when the person who made it signs in."
   },
   "home": {
     "attentionTitle": "Needs attention",
@@ -62,7 +64,17 @@
     "savedSkipped": "Saved. It's under Needs a name whenever you want to finish it.",
     "dismiss": "Dismiss",
     "queueTitle": "On its way",
-    "savedNoExpiry": "Saved. Add the expiry date whenever you want reminders."
+    "savedNoExpiry": "Saved. Add the expiry date whenever you want reminders.",
+    "savedOffline": "Saved on this phone. It'll go to the vault as soon as there's a connection.",
+    "savedRenewal": "Saved as the new version. Its reminder is done once it reaches the vault.",
+    "renew": "Scan the new one",
+    "renewHint": "Adds the renewed document as the new version of this one.",
+    "others_one": "This scan was made by someone else who used this phone. Remove it from this phone?",
+    "others_other": "These {{count}} scans were made by someone else who used this phone. Remove them from this phone?",
+    "removeThem_one": "Remove it",
+    "removeThem_other": "Remove them",
+    "keepThem_one": "Keep it",
+    "keepThem_other": "Keep them"
   },
   "settings": {
     "title": "Settings",
@@ -73,7 +85,13 @@
     "largeTextHint": "Makes all the app's text bigger, on top of your phone's own setting.",
     "signOut": "Sign out",
     "spike": "Scanner spike (test builds only)",
-    "timings": "Timings"
+    "timings": "Timings",
+    "waiting_one": "A scan hasn't reached the vault yet.",
+    "waiting_other": "{{count}} scans haven't reached the vault yet.",
+    "keepThem": "Keep them for next time",
+    "removeThem": "Remove them",
+    "onItsWay_one": "One is already on its way and will reach the vault.",
+    "onItsWay_other": "{{count}} are already on their way and will reach the vault."
   },
   "queue": {
     "sending": "Sending to the vault…",
@@ -83,7 +101,18 @@
     "wrongKind": "The vault can't keep this kind of file. It takes PDFs, photos (JPEG, PNG, HEIC, TIFF), Word and Excel files.",
     "refused": "The vault didn't take it: {{reason}}",
     "remove": "Remove it",
-    "untitled": "A scan"
+    "untitled": "A scan",
+    "waiting": "Waiting to send",
+    "sendingShort": "Sending…",
+    "needsYou": "Needs you",
+    "storage": "The vault can't reach where it keeps files right now. Your scan is safe here and will try again.",
+    "noLongerAdd": "You can no longer add documents to this vault. Ask an owner.",
+    "ownerGone": "The person it was for is no longer in the family. Choose someone else, or save it without a person — it keeps who can see it.",
+    "chooseSomeone": "Who it is for now",
+    "forPerson": "For {{name}}",
+    "withoutPerson": "Without a person",
+    "newVersion": "A new version",
+    "versionRefused": "The vault didn't let you add a new version of this document. Whoever it belongs to can."
   },
   "capture": {
     "title": "New document",
@@ -133,7 +162,7 @@
     "noSpace": "Your phone is out of space, so this scan couldn't be kept. Free some space and scan again.",
     "unreadable": "This scan couldn't be read. Try scanning it again.",
     "signedOut": "Sign in again to save this scan.",
-    "offlineSkip": "No connection, so the card can't be filled in now. Skip keeps the scan on this phone; you can name it when you're back online.",
+    "offlineSkip": "No connection, and this phone hasn't seen the vault's choices yet. Skip keeps the scan: you can name it when you're back online.",
     "queueUnavailable": "Couldn't keep it on this phone just now. Try Save again in a moment.",
     "notAllowed": "Your account can open documents but not add them. Ask whoever runs the vault."
   },

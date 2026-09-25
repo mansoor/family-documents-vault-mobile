@@ -1,6 +1,6 @@
 {
   "name": "@fdv/pocket",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "main": "expo-router/entry",
   "dependencies": {
     "@expo-google-fonts/figtree": "^0.4.1",
