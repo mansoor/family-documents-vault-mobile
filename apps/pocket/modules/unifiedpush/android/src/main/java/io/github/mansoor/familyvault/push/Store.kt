@@ -40,6 +40,13 @@ internal class Store(context: Context) {
       prefs.edit().putString(OPEN, value).commit()
     }
 
+  /** The last tap followed: the same one handed over again is not followed again. */
+  var lastOpenId: String?
+    get() = prefs.getString(OPEN_ID, null)
+    set(value) {
+      prefs.edit().putString(OPEN_ID, value).commit()
+    }
+
   /** A session_ended arrived: the app finishes the sign-out before its first screen. */
   var sessionEnded: Boolean
     get() = prefs.getBoolean(SESSION_ENDED, false)
@@ -63,6 +70,7 @@ internal class Store(context: Context) {
     const val TEMPORARY = "temporary"
     const val FAILURE = "failure"
     const val OPEN = "open"
+    const val OPEN_ID = "open_id"
     const val SESSION_ENDED = "session_ended"
   }
 }

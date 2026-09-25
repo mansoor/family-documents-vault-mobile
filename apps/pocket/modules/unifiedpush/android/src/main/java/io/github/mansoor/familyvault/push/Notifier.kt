@@ -7,6 +7,7 @@ import android.content.Intent
 import androidx.core.app.NotificationChannelCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import java.util.UUID
 
 /**
  * Shows what a push rendered to, in the app's own words, on the Reminders
@@ -16,6 +17,8 @@ import androidx.core.app.NotificationManagerCompat
  */
 internal object Notifier {
   const val EXTRA_OPEN = "io.github.mansoor.familyvault.push.OPEN"
+  /** Which tap this was: followed once, even if Android hands the intent over again. */
+  const val EXTRA_OPEN_ID = "io.github.mansoor.familyvault.push.OPEN_ID"
 
   fun text(context: Context, r: Rendered): String =
     when (r.type) {
@@ -57,7 +60,10 @@ internal object Notifier {
     channels(context)
     val launch = context.packageManager.getLaunchIntentForPackage(context.packageName) ?: return
     launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-    r.type.opens.word?.let { launch.putExtra(EXTRA_OPEN, it) }
+    r.type.opens.word?.let {
+      launch.putExtra(EXTRA_OPEN, it)
+      launch.putExtra(EXTRA_OPEN_ID, UUID.randomUUID().toString())
+    }
     // One request code per type: each notification keeps its own word.
     val tap =
       PendingIntent.getActivity(

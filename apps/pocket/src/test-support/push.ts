@@ -48,6 +48,8 @@ export class FakePushNative implements PushNative {
   unregister() {
     this.unregistered += 1;
     this.s = { ...this.s, endpoint: null, p256dh: null, auth: null };
+    // As the connector: with its last registration gone, it forgets the distributor too.
+    this.saved = null;
   }
   state() {
     return this.s;

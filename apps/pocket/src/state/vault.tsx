@@ -401,16 +401,21 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
    * databases when the message came.
    */
   const endedByPush = useCallback(async () => {
-    const signedIn = session.signedIn;
-    if (signedIn) {
+    // Not the vault's session core yet: the launch looks at the flag itself.
+    if (!api) return;
+    // Until the core has read the store, "signed out" means nothing.
+    await hydrated(session);
+    if (session.signedIn) {
       await session.clear();
-      emit('sessionEnded', 'revoked');
       setNotice('signed_out_here');
       setPhase('sign_in');
       log.info('session.ended_by_push', {});
     }
+    // The copies go whether or not anybody is signed in here (kept after an
+    // expiry, say): a failure to remove them is retried at the next start.
+    emit('sessionEnded', 'revoked');
     deps.push?.clearSessionEnded();
-  }, [session, deps.push]);
+  }, [api, session, hydrated, deps.push]);
 
   // Once the vault and its session core exist: signed in or not.
   useEffect(() => {

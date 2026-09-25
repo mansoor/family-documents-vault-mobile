@@ -1,6 +1,7 @@
 package io.github.mansoor.familyvault.push
 
 import android.content.Context
+import android.content.Intent
 import androidx.core.app.NotificationManagerCompat
 import expo.modules.kotlin.exception.Exceptions
 import expo.modules.kotlin.modules.Module
@@ -28,6 +29,23 @@ class UnifiedPushModule : Module() {
       pkg
     }
 
+  /**
+   * A tap's word, taken off the intent: once only — not again when the app
+   * is reopened from Recents (Android hands over the first intent again),
+   * and not for a tap already followed.
+   */
+  private fun wordOf(intent: Intent): String? {
+    val word = intent.getStringExtra(Notifier.EXTRA_OPEN) ?: return null
+    val id = intent.getStringExtra(Notifier.EXTRA_OPEN_ID)
+    intent.removeExtra(Notifier.EXTRA_OPEN)
+    intent.removeExtra(Notifier.EXTRA_OPEN_ID)
+    if ((intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY) != 0) return null
+    val store = Store(context)
+    if (id == null || id == store.lastOpenId) return null
+    store.lastOpenId = id
+    return word
+  }
+
   override fun definition() = ModuleDefinition {
     Name("FdvUnifiedPush")
     Events("onPush")
@@ -37,9 +55,8 @@ class UnifiedPushModule : Module() {
 
     // A notification tapped while the app is open.
     OnNewIntent { intent ->
-      val word = intent.getStringExtra(Notifier.EXTRA_OPEN)
+      val word = wordOf(intent)
       if (word != null) {
-        intent.removeExtra(Notifier.EXTRA_OPEN)
         Store(context).pendingOpen = word
         sendEvent("onPush", mapOf("kind" to "open"))
       }
@@ -79,10 +96,7 @@ class UnifiedPushModule : Module() {
     // Where a tapped notification asked to go: the one that started the app, or a later one.
     Function("takeOpen") {
       val store = Store(context)
-      val started =
-        appContext.currentActivity?.intent?.let { i ->
-          i.getStringExtra(Notifier.EXTRA_OPEN)?.also { i.removeExtra(Notifier.EXTRA_OPEN) }
-        }
+      val started = appContext.currentActivity?.intent?.let { wordOf(it) }
       val word = started ?: store.pendingOpen
       store.pendingOpen = null
       word

@@ -105,9 +105,20 @@ export function NotificationsCard() {
       {s.kind === 'waiting' ? <Text testID="push-waiting">{t('push.waiting')}</Text> : null}
       {s.kind === 'failed' ? (
         <>
-          <Text testID="push-failed">{t('push.failed', { why: reason(s.reason) })}</Text>
+          <Text testID="push-failed">
+            {t('push.failed', { why: s.reason === 'VAULT' && s.message ? s.message : reason(s.reason) })}
+          </Text>
           <Button kind="quiet" label={t('push.tryAgain')} busy={busy} onPress={() => void turnOn()} />
         </>
+      ) : null}
+      {s.kind === 'waiting' || s.kind === 'failed' ? (
+        <Button
+          testID="push-turn-off"
+          kind="quiet"
+          label={t('push.turnOff')}
+          busy={busy}
+          onPress={() => void run(push.turnOff)}
+        />
       ) : null}
       {s.kind === 'on' ? (
         <>

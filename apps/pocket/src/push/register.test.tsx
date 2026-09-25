@@ -1,11 +1,13 @@
 import { act, fireEvent, screen, waitFor } from '@testing-library/react-native';
 import Settings from '../app/settings';
 import { MemoryEssentialsStore } from '../essentials/store';
+import { ownerKey } from '../essentials/wipe';
+import { readPrefs, writePrefs } from '../platform/prefs';
 import { useVault } from '../state/vault';
 import { audit } from '../test-support/a11y';
 import { phoneParts, unlocked } from '../test-support/lookup';
 import { FakePushNative } from '../test-support/push';
-import { installed, renderApp, signedIn } from '../test-support/render';
+import { installed, knownVault, renderApp, respond, signedIn } from '../test-support/render';
 import { resetRoutes } from '../test-support/router';
 import { capabilities, testVault, VAPID } from '../test-support/vault';
 
@@ -102,8 +104,11 @@ describe('notifications on this phone (4.14)', () => {
     const t = pushVault();
     const fake = new FakePushNative();
     await turnedOn(t, fake);
+    // A tap not yet followed is not followed for whoever signs in next.
+    fake.open = 'needs-attention';
     await fireEvent.press(screen.getByTestId('settings-sign-out'));
     await waitFor(() => expect(t.calls).toContain('POST https://vault.test/api/v1/auth/logout'));
+    expect(fake.open).toBeNull();
     const removed = t.calls.indexOf('DELETE https://vault.test/api/v1/devices');
     expect(removed).toBeGreaterThan(-1);
     expect(removed).toBeLessThan(t.calls.indexOf('POST https://vault.test/api/v1/auth/logout'));
@@ -170,6 +175,76 @@ describe('notifications on this phone (4.14)', () => {
     const t = pushVault();
     await unlocked(t, <Settings />, { push: { native: null } });
     expect(await screen.findByTestId('push-iphone')).toHaveTextContent('On iPhone, reminders come by email.');
+  });
+
+  it('a session the vault ends unregisters, so the next session gets its own address and keys', async () => {
+    const t = pushVault();
+    const fake = new FakePushNative();
+    await turnedOn(t, fake);
+    fake.open = 'needs-attention';
+    await act(async () => fake.emit({ kind: 'message', type: 'session_ended' }));
+    await waitFor(() => expect(fake.unregistered).toBe(1));
+    // The connector forgets the distributor with its last registration; a tap not followed is dropped.
+    expect(fake.saved).toBeNull();
+    expect(fake.open).toBeNull();
+  });
+
+  it('the same person signing in again gets notifications back without asking', async () => {
+    const t = pushVault();
+    const fake = new FakePushNative();
+    // Turned on before; this session has no registration, and no distributor is saved.
+    writePrefs('push', { wantedBy: ownerKey('https://vault.test', 'fake-member'), registered: null });
+    await settingsOn(t, fake);
+    await screen.findByText('On, through ntfy.');
+    expect(fake.saved).toBe('io.heckel.ntfy');
+    expect(fake.registered).toEqual([VAPID]);
+    expect(t.push.posted.map((p) => p.endpoint)).toEqual([PHONE]);
+  });
+
+  it("somebody else signing in does not get the last person's notifications", async () => {
+    const t = pushVault();
+    const fake = new FakePushNative();
+    writePrefs('push', { wantedBy: ownerKey('https://vault.test', 'someone-else'), registered: null });
+    await settingsOn(t, fake);
+    expect(await screen.findByTestId('push-turn-on')).toBeTruthy();
+    expect(fake.registered).toEqual([]);
+    expect(readPrefs('push', null)).toEqual({ wantedBy: null, registered: null });
+  });
+
+  it('the vault refusing the device says so, and they can be turned off', async () => {
+    const t = pushVault();
+    const fake = new FakePushNative();
+    const fetch = t.fetch;
+    t.fetch = async (url, init) =>
+      url.endsWith('/api/v1/devices') && init.method === 'POST'
+        ? respond(422, { error: { code: 'validation_failed', message: 'Push addresses must start with https://.' } })
+        : fetch(url, init);
+    await settingsOn(t, fake);
+    await fireEvent.press(await screen.findByTestId('push-turn-on'));
+    expect(await screen.findByTestId('push-failed')).toHaveTextContent(
+      "Notifications couldn't be set up: Push addresses must start with https://.",
+    );
+    await fireEvent.press(screen.getByTestId('push-turn-off'));
+    await screen.findByTestId('push-turn-on');
+    expect(fake.unregistered).toBe(1);
+  });
+
+  it('a session_ended with nobody signed in still removes the copies', async () => {
+    const t = pushVault();
+    const fake = new FakePushNative();
+    fake.ended = true;
+    const parts = phoneParts();
+    parts.stores.set('everyday', new MemoryEssentialsStore());
+    knownVault();
+    await renderApp(<></>, {
+      fetch: t.fetch,
+      lock: parts.lock,
+      essentials: parts.essentials,
+      push: { native: fake },
+      deps: { push: fake },
+    });
+    await waitFor(() => expect(parts.stores.size).toBe(0));
+    await waitFor(() => expect(fake.ended).toBe(false));
   });
 
   it('the session_ended flag wipes before the first screen', async () => {

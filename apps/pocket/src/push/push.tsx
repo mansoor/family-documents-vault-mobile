@@ -18,7 +18,10 @@ import { pushNative, type Distributor, type PushNative } from './native';
  * told to the vault as this phone's device. A new address is told again.
  * Signing out removes the device and unregisters first, while the session
  * still works: the vault then has nobody here to tell "you were signed
- * out". The same person signing in again gets them back without asking.
+ * out". A session the vault ends unregisters too: every session gets its
+ * own address and keys, so a message meant for an old one — late, or
+ * sent again — reaches nobody. The same person signing in again gets
+ * them back without asking; somebody else does not.
  */
 export type PushStatus =
   /** No push here: an iPhone, the web build. */
@@ -34,7 +37,8 @@ export type PushStatus =
   | { kind: 'off' }
   | { kind: 'waiting' }
   | { kind: 'on'; distributor: string | null }
-  | { kind: 'failed'; reason: string };
+  /** The distributor's reason, or the vault's own words when it refused the device. */
+  | { kind: 'failed'; reason: string; message?: string };
 
 export type TurnOn = 'on' | 'choose' | 'permission_off' | 'no_distributor' | 'not_set_up' | 'unreachable';
 
@@ -92,6 +96,10 @@ export function PushProvider(props: { children: ReactNode; deps?: Partial<PushDe
   const refresh = useCallback(() => setVersion((n) => n + 1), []);
   const [daily, setDailyState] = useState<boolean | null>(null);
   const [opened, setOpened] = useState(0);
+  // Refused when Android asked (until the app may notify after all).
+  const [refused, setRefused] = useState(false);
+  // What the vault said when it would not take the device.
+  const [trouble, setTrouble] = useState<string | null>(null);
   // A registration asked of the distributor and not yet answered.
   const asked = useRef(false);
 
@@ -114,17 +122,21 @@ export function PushProvider(props: { children: ReactNode; deps?: Partial<PushDe
     const s = native.state();
     const list = native.distributors();
     const p = read();
+    if (refused && !s.allowed) return { kind: 'permission_off' };
     if (!owner || p.wantedBy !== owner) return list.length === 0 ? { kind: 'no_distributor' } : { kind: 'off' };
     if (!s.allowed) return { kind: 'permission_off' };
     if (list.length === 0) return { kind: 'no_distributor' };
+    const saved = native.savedDistributor();
     const mine = p.registered?.owner === owner ? p.registered : null;
     if (mine && s.endpoint === mine.endpoint) {
-      const saved = native.savedDistributor();
       return { kind: 'on', distributor: list.find((d) => d.id === saved)?.name ?? null };
     }
+    if (trouble) return { kind: 'failed', reason: 'VAULT', message: trouble };
     if (s.failure) return { kind: 'failed', reason: s.failure };
+    // Nothing chosen and several to choose from: turning them on again asks which.
+    if (!s.endpoint && list.length > 1 && !list.some((d) => d.id === saved)) return { kind: 'off' };
     return { kind: 'waiting' };
-  }, [native, caps, owner, read, version]);
+  }, [native, caps, owner, read, version, refused, trouble]);
 
   /** The key the vault signs its pushes with: the distributor needs it to register. */
   const vapid = useCallback(async (): Promise<string | null> => {
@@ -144,8 +156,16 @@ export function PushProvider(props: { children: ReactNode; deps?: Partial<PushDe
     const s = native.state();
     try {
       if (!s.endpoint || !s.p256dh || !s.auth) {
-        // Signed in again, or the distributor forgot: asked again, once.
+        // Signed in again, or the distributor forgot: asked again, once —
+        // of the distributor chosen before, or the only one there is.
         if (s.failure || asked.current) return;
+        const list = native.distributors();
+        const saved = native.savedDistributor();
+        if (!saved || !list.some((d) => d.id === saved)) {
+          const only = list.length === 1 ? list[0] : undefined;
+          if (!only) return;
+          native.chooseDistributor(only.id);
+        }
         const key = await vapid();
         if (!key) return;
         asked.current = true;
@@ -157,9 +177,12 @@ export function PushProvider(props: { children: ReactNode; deps?: Partial<PushDe
       const { id } = await withToken((a, token) =>
         a.registerDevice(token, { kind: 'unified_push', endpoint, keys: { p256dh, auth } }),
       );
+      setTrouble(null);
       write({ registered: { endpoint, id, owner } });
       log.info('push.registered', {});
     } catch (err) {
+      // The vault's refusal is shown; no connection is simply tried again later.
+      if (err instanceof ApiRequestError) setTrouble(err.message);
       log.warn('push.sync_failed', { kind: err instanceof ApiRequestError ? err.code : 'network' });
     }
   }, [native, owner, phase, caps, read, write, vapid, withToken]);
@@ -195,9 +218,11 @@ export function PushProvider(props: { children: ReactNode; deps?: Partial<PushDe
     async (distributor?: string): Promise<TurnOn> => {
       if (!native || !owner) return 'unreachable';
       if (!(await ask()) || !native.state().allowed) {
-        write({ wantedBy: owner });
+        setRefused(true);
         return 'permission_off';
       }
+      setRefused(false);
+      setTrouble(null);
       const list = native.distributors();
       if (list.length === 0) return 'no_distributor';
       const saved = native.savedDistributor();
@@ -235,6 +260,7 @@ export function PushProvider(props: { children: ReactNode; deps?: Partial<PushDe
 
   const turnOff = useCallback(async () => {
     await removeHere();
+    setTrouble(null);
     write(NONE);
   }, [removeHere, write]);
 
@@ -275,17 +301,39 @@ export function PushProvider(props: { children: ReactNode; deps?: Partial<PushDe
     [native, onBeforeSignOut, removeHere, write],
   );
 
-  // A session the vault ended took its devices with it: told again at the next sign-in.
+  // A session the vault ended took its devices with it: this registration
+  // goes too, and the next sign-in makes a new one, with new keys. A tap
+  // not yet followed is nobody's any more.
   useEffect(() => {
-    const offEnded = on('sessionEnded', () => write({ registered: null }));
+    const offEnded = on('sessionEnded', () => {
+      native?.unregister();
+      native?.takeOpen();
+      asked.current = false;
+      write({ registered: null });
+    });
+    const offOut = on('signedOut', () => {
+      native?.takeOpen();
+    });
     const offIn = on('signedIn', () => {
       asked.current = false;
     });
     return () => {
       offEnded();
+      offOut();
       offIn();
     };
-  }, [write]);
+  }, [native, write]);
+
+  // Somebody else signed in on this phone: nothing of the last person's
+  // push. (The status already reads as off for them: nothing to redraw.)
+  useEffect(() => {
+    if (!native || !owner) return;
+    const p = read();
+    if ((p.wantedBy && p.wantedBy !== owner) || (p.registered && p.registered.owner !== owner)) {
+      native.unregister();
+      writePrefs(PREFS, NONE);
+    }
+  }, [native, owner, read]);
 
   // Signed in (again), or the app back at the front: anything new is told.
   useEffect(() => {
