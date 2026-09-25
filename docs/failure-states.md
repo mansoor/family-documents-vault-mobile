@@ -33,15 +33,19 @@ Written by `node apps/pocket/scripts/failure-states.mjs`; CI fails if it is out 
 | Any request that fails (wordsFor) | Every screen | `errors.offline` | Can't reach your vault right now. Check this phone's connection, then try again. |
 |  |  | `errors.timeout` | Your vault took too long to answer. Try again in a moment. |
 |  |  | `errors.rateLimited` | Too many tries. Wait a minute, then try again. / Too many tries. Wait {{count}} minutes, then try again. |
+|  |  | `errors.unavailable` | Your vault is busy or starting up. Try again in a moment. |
+|  |  | `errors.internal` | Something went wrong on your vault. Try again in a moment; if it keeps happening, whoever looks after the vault can have a look. |
+|  |  | `errors.storageUnreachable` | Your vault can't reach the place it keeps its files right now. Anything waiting on this phone is kept, and sent when it can. |
 |  |  | `errors.sessionEnded` | You were signed out. Sign in again to carry on. |
 |  |  | `errors.stepUp` | Confirm it's you to carry on. |
 |  |  | `errors.setupRequired` | This vault hasn't been set up yet. Open it in the browser first. |
-|  |  | `errors.unexpected` | Something answered that doesn't sound like your vault. Try again; if it keeps happening, whoever looks after the vault can have a look. |
+|  |  | `errors.unexpected` | Something went wrong between this phone and your vault. Try again in a moment; if it keeps happening, whoever looks after the vault can have a look. |
+|  |  | `errors.stranger` | Nothing was sent: something other than your vault is answering at its address on this network. |
+|  |  | `errors.wifiOnly` | Nothing was sent: this vault is only used on Wi-Fi. Join your Wi-Fi, then try again. |
 |  |  | `errors.invalidCredentials` | That email and password don't match. Check them and try again. |
 |  |  | `errors.notFound` | That isn't there any more, or it isn't yours to see. |
 |  |  | `errors.previewPending` | The vault is still drawing the pages. Try again in a minute. |
 |  |  | `errors.noPreview` | The vault can't draw pages for this file. Save a copy to open it. |
-|  |  | `errors.scanInProgress` | This scan is still being filed. It will be ready in a moment. |
 |  |  | `errors.uploadInProgress` | This is still on its way to the vault. Try again in a moment. |
 |  |  | `errors.general` | That didn't work. Try again in a moment. |
 | The lock | Lock screen, Settings | `lock.tooMany` | Too many tries. Unlock with your phone's PIN or pattern instead. |

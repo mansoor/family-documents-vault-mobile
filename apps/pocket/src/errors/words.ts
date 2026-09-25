@@ -30,8 +30,30 @@ export const CATALOGUE: Readonly<Record<string, string>> = {
   not_found: 'errors.notFound',
   preview_pending: 'errors.previewPending',
   no_preview: 'errors.noPreview',
-  scan_in_progress: 'errors.scanInProgress',
   upload_in_progress: 'errors.uploadInProgress',
+  // Busy for now: a scan waiting on these is tried again by itself.
+  unavailable: 'errors.unavailable',
+  request_timeout: 'errors.timeout',
+  internal_error: 'errors.internal',
+  storage_unreachable: 'errors.storageUnreachable',
+};
+
+/** The vault's "not now" answers: a scan waiting on one of these is sent again later by itself. */
+export const BUSY_CODES: ReadonlySet<string> = new Set([
+  'rate_limited',
+  'unavailable',
+  'upload_in_progress',
+  'request_timeout',
+  'internal_error',
+]);
+
+/**
+ * What the phone itself refused to send (state/vault.tsx), by the error's
+ * name: nothing reached the vault, so nothing it could have said is true.
+ */
+const PHONE_REFUSED: Readonly<Record<string, string>> = {
+  StrangerError: 'errors.stranger',
+  WifiOnlyError: 'errors.wifiOnly',
 };
 
 /**
@@ -55,5 +77,12 @@ export function wordsFor(err: unknown, t: TFunction, general = 'errors.general')
     if (key) return t(key);
     return err.message || t(general);
   }
+  if (err instanceof Error && PHONE_REFUSED[err.name]) return t(PHONE_REFUSED[err.name] as string);
   return t(general);
+}
+
+/** The words for a code kept from a refusal (a scan the vault did not take), with no message of its own. */
+export function wordsForCode(code: string | null | undefined, t: TFunction): string {
+  const key = code ? CATALOGUE[code] : undefined;
+  return t(key ?? 'errors.general');
 }

@@ -23,6 +23,8 @@ import { httpDecision, identityCheck, type NetworkKind } from '../net/policy';
 import { firstLaunch } from '../platform/prefs';
 import { pushNative, type PushNative } from '../push/native';
 import { forgetPreviousInstallation, installationId, SecureTokenStore } from '../session/store';
+import { wordsFor } from '../errors/words';
+import i18n from '../i18n';
 import { emit } from './events';
 import { leaveVault, readVaults, saveVault, updateVault, type VaultRecord } from './vaults';
 
@@ -551,10 +553,12 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
     if (err instanceof StrangerError) return { kind: 'stranger' };
     if (err instanceof WifiOnlyError) return { kind: 'wifi_only' };
     if (err instanceof NetworkError) return { kind: 'unreachable' };
+    // The vault's words for a wrong password; the catalogue's for anything else (4.17).
+    const words = wordsFor(err, i18n.t.bind(i18n));
     if (err instanceof ApiRequestError) {
-      return { kind: 'refused', message: err.message, passkeyHint: err.code === 'invalid_credentials' };
+      return { kind: 'refused', message: words, passkeyHint: err.code === 'invalid_credentials' };
     }
-    return { kind: 'refused', message: (err as Error).message, passkeyHint: false };
+    return { kind: 'refused', message: words, passkeyHint: false };
   };
 
   const signIn = useCallback(

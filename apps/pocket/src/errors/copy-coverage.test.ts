@@ -2,7 +2,7 @@ import { ApiRequestError, NetworkError } from '@fdv/client';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import i18n from '../i18n';
-import { CATALOGUE, wordsFor } from './words';
+import { BUSY_CODES, CATALOGUE, wordsFor, wordsForCode } from './words';
 
 const t = i18n.t.bind(i18n);
 
@@ -14,15 +14,25 @@ function sources(dir: string): string[] {
     if (e.isDirectory()) {
       if (e.name === 'test-support' || e.name === 'testing' || e.name === 'node_modules') continue;
       out.push(...sources(full));
-    } else if (/\.tsx?$/.test(e.name) && !/\.test\.tsx?$/.test(e.name) && !e.name.endsWith('.d.ts')) {
+    } else if (
+      /\.tsx?$/.test(e.name) &&
+      !/\.test\.tsx?$/.test(e.name) &&
+      !e.name.endsWith('.d.ts') &&
+      // A native module's errors (the scanner's own "already scanning") are never the vault's, never shown.
+      !e.name.endsWith('.native.ts')
+    ) {
       out.push(full);
     }
   }
   return out;
 }
 
-/** A comparison against an error code: `code === 'x'`, `err.code !== "y"`. */
-const COMPARED = /\bcode\s*[!=]==?\s*['"]([a-z_]+)['"]/g;
+/**
+ * An error code in the code: compared (`code === 'x'`, `err.code !== "y"`),
+ * or made by the client itself (`code: 'x'`, `new ApiRequestError(status, 'x'`).
+ */
+const COMPARED =
+  /\b[A-Za-z]*[cC]ode\s*[!=]==?\s*['"]([a-z_]+)['"]|\bcode:\s*['"]([a-z_]+)['"]|ApiRequestError\(\s*[^,()]+,\s*['"]([a-z_]+)['"]/g;
 
 describe('every failure in words (4.17)', () => {
   it('every code the app or its client acts on has words in the catalogue', () => {
@@ -33,11 +43,18 @@ describe('every failure in words (4.17)', () => {
     const codes = new Set<string>();
     for (const root of roots) {
       for (const file of sources(root)) {
-        for (const m of readFileSync(file, 'utf8').matchAll(COMPARED)) if (m[1]) codes.add(m[1]);
+        for (const m of readFileSync(file, 'utf8').matchAll(COMPARED)) {
+          const code = m[1] ?? m[2] ?? m[3];
+          if (code) codes.add(code);
+        }
       }
     }
-    // It did find them: the client's own, and the screens'.
-    expect([...codes]).toEqual(expect.arrayContaining(['session_ended', 'invalid_credentials', 'preview_pending']));
+    // Codes the queue treats as "not now", kept as a set rather than compared one by one.
+    for (const code of BUSY_CODES) codes.add(code);
+    // It did find them: the client's own, and the screens' (a stored lastCode among them).
+    expect([...codes]).toEqual(
+      expect.arrayContaining(['session_ended', 'invalid_credentials', 'preview_pending', 'storage_unreachable']),
+    );
     expect([...codes].filter((c) => !CATALOGUE[c])).toEqual([]);
     const wordless = Object.entries(CATALOGUE).filter(([, key]) => !i18n.exists(key) && !i18n.exists(`${key}_other`));
     expect(wordless).toEqual([]);
@@ -49,6 +66,21 @@ describe('every failure in words (4.17)', () => {
     // And one with no words at all gets the general ones, never a code.
     expect(wordsFor(new ApiRequestError(500, 'internal', ''), t)).toBe(t('errors.general'));
     expect(wordsFor(new Error('TypeError: x is undefined'), t)).toBe(t('errors.general'));
+  });
+
+  it('what the phone itself refused to send says so, not "that did not match"', () => {
+    const stranger = Object.assign(new Error('Something else is answering at this address.'), {
+      name: 'StrangerError',
+    });
+    const wifi = Object.assign(new Error('This vault is only used on Wi-Fi.'), { name: 'WifiOnlyError' });
+    expect(wordsFor(stranger, t, 'stepUp.failed')).toBe(t('errors.stranger'));
+    expect(wordsFor(wifi, t, 'stepUp.failed')).toBe(t('errors.wifiOnly'));
+  });
+
+  it("a refusal kept with only its code says the catalogue's words, never the code", () => {
+    expect(wordsForCode('upload_in_progress', t)).toBe(t('errors.uploadInProgress'));
+    expect(wordsForCode('validation_failed', t)).toBe(t('errors.general'));
+    expect(wordsForCode(null, t)).toBe(t('errors.general'));
   });
 
   it("no answer, a timeout, too many tries, a session that is over: the app's own words", () => {

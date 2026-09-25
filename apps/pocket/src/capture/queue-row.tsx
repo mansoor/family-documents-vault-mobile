@@ -1,4 +1,5 @@
 import { colours, type CaptureMetadata, type Member } from '@fdv/shared';
+import { BUSY_CODES, wordsForCode } from '../errors/words';
 import { useTranslation } from 'react-i18next';
 import { StyleSheet, View } from 'react-native';
 import type { QueueItem } from '../queue/item';
@@ -6,7 +7,6 @@ import { Button, Card, Text } from '../ui';
 import { Chip, ChipRow, sizeWords } from './ui';
 
 /** Codes that mean the vault is there but not taking it just now. */
-const BUSY = new Set(['rate_limited', 'unavailable', 'upload_in_progress', 'request_timeout', 'internal_error']);
 
 /**
  * Whether a refusal is about the person it was for: someone who has left
@@ -71,14 +71,14 @@ export function QueueRow(props: {
               : t('queue.noLongerAdd')
             : gone
               ? t('queue.ownerGone')
-              : t('queue.refused', { reason: p?.message ?? p?.code ?? '' })
+              : t('queue.refused', { reason: p?.message || wordsForCode(p?.code, t) })
       : item.state === 'sending'
         ? null
         : props.offline || item.lastCode === 'offline'
           ? t('queue.notYet')
           : item.lastCode === 'storage_unreachable'
             ? t('queue.storage')
-            : item.lastCode && BUSY.has(item.lastCode)
+            : item.lastCode && BUSY_CODES.has(item.lastCode)
               ? t('queue.busy')
               : null;
   const title = item.kind === 'version' ? t('queue.newVersion') : (item.metadata?.title ?? t('queue.untitled'));

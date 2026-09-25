@@ -65,9 +65,12 @@ export function audit(): string[] {
     const words = v.queryAll(
       (n) =>
         n.type === 'Text' &&
-        ([] as unknown[]).concat(n.props.children).some((c) => typeof c === 'string' && c.trim() !== ''),
+        ([] as unknown[])
+          .concat(n.props.children)
+          .some((c) => (typeof c === 'string' && c.trim() !== '') || typeof c === 'number'),
     );
-    if (words.length === 0 && !label(v)) problems.push(`${describeIt(v)} shows a status by colour alone`);
+    const read = label(v) !== '' && (v.props.accessible === true || !!v.props.accessibilityRole);
+    if (words.length === 0 && !read) problems.push(`${describeIt(v)} shows a status by colour alone`);
   }
   return problems;
 }

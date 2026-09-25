@@ -25,7 +25,7 @@ const AREAS = [
     'Any request that fails (wordsFor)',
     'Every screen',
     'errors',
-    'offline timeout rateLimited sessionEnded stepUp setupRequired unexpected invalidCredentials notFound previewPending noPreview scanInProgress uploadInProgress general',
+    'offline timeout rateLimited unavailable internal storageUnreachable sessionEnded stepUp setupRequired unexpected stranger wifiOnly invalidCredentials notFound previewPending noPreview uploadInProgress general',
   ],
   ['The lock', 'Lock screen, Settings', 'lock', 'tooMany noScreenLock weakBiometrics enrolmentChanged'],
   [
@@ -72,6 +72,24 @@ const AREAS = [
   ],
 ];
 
+/** Words in those sections that are not failures (titles, buttons). */
+const IGNORED = new Set([
+  'push.title',
+  'push.openSettings',
+  'push.offHint',
+  'push.turnOn',
+  'push.choose',
+  'push.waiting',
+  'push.on',
+  'push.onThrough',
+  'push.daily',
+  'push.dailyHint',
+  'push.sendTest',
+  'push.testSent',
+  'push.turnOff',
+  'push.tryAgain',
+]);
+
 const said = (section, key) => {
   const s = words[section] ?? {};
   if (typeof s[key] === 'string') return s[key];
@@ -80,13 +98,27 @@ const said = (section, key) => {
   throw new Error(`${section}.${key} is not in the catalogue`);
 };
 
+// Every word in the catalogue's failure sections is in the inventory: a new one fails CI until it is.
+for (const section of ['errors', 'push']) {
+  const listed = new Set(AREAS.filter(([, , s]) => s === section).flatMap(([, , , keys]) => keys.split(' ')));
+  const missing = Object.keys(words[section] ?? {})
+    .map((k) => k.replace(/_(one|other)$/, ''))
+    .filter((k) => !listed.has(k) && !IGNORED.has(`${section}.${k}`));
+  if (missing.length) {
+    console.error(
+      `not in the failure-state inventory: ${[...new Set(missing)].map((k) => `${section}.${k}`).join(', ')}`,
+    );
+    process.exit(1);
+  }
+}
+
 const lines = [
   '# Failure states',
   '',
   'Every way the app can fail that the person sees, where they meet it, and',
   'the words it uses — taken from the catalogue (`apps/pocket/src/i18n/en-GB.json`),',
   'so they are the words on the screen. Anything the vault refuses with a',
-  'reason of its own is shown in the vault\'s words, verbatim (`errors/words.ts`).',
+  "reason of its own is shown in the vault's words, verbatim (`errors/words.ts`).",
   '',
   'Written by `node apps/pocket/scripts/failure-states.mjs`; CI fails if it is out of date.',
   '',

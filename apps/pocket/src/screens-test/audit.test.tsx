@@ -25,7 +25,14 @@ describe('the accessibility audit', () => {
         <View style={{ backgroundColor: colours.warnSoft }}>
           <Text>Expires in 12 days</Text>
         </View>
-        <View accessibilityLabel="Expired" style={{ backgroundColor: colours.danger, width: 8, height: 8 }} />
+        <View
+          accessible
+          accessibilityLabel="Expired"
+          style={{ backgroundColor: colours.danger, width: 8, height: 8 }}
+        />
+        <View style={{ backgroundColor: colours.ok }}>
+          <Text>{3}</Text>
+        </View>
       </View>,
     );
     expect(audit()).toEqual([]);
