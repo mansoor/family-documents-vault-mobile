@@ -55,7 +55,22 @@ export interface TestVault {
   upcoming: ReminderView[];
   /** What the fake does not do, for the screens of 4.12. */
   library: Library;
+  /** Push (4.14): the vault's side of this phone's notifications. */
+  push: PushSide;
 }
+
+export interface PushSide {
+  key: { public_key: string | null; enabled: boolean };
+  /** Devices as the vault keeps them, newest last. */
+  devices: { id: string; kind: string; endpoint: string; keys: { p256dh: string; auth: string } }[];
+  /** Every POST /devices body, in order. */
+  posted: { kind?: string; endpoint: string; keys: { p256dh: string; auth: string } }[];
+  tests: string[];
+  prefs: { daily_push: boolean; daily_email: boolean; weekly_email: boolean };
+}
+
+/** The vault's VAPID public key in the tests: 87 characters, as the connector wants. */
+export const VAPID = `B${'x'.repeat(86)}`;
 
 /**
  * The vault's documents as 4.12's screens use them, beside the client's
@@ -99,6 +114,13 @@ export function testVault(origins: string[] = ['https://vault.test']): TestVault
     calls: [],
     reminders: [],
     upcoming: [],
+    push: {
+      key: { public_key: VAPID, enabled: true },
+      devices: [],
+      posted: [],
+      tests: [],
+      prefs: { daily_push: true, daily_email: false, weekly_email: true },
+    },
     library: {
       documents: new Map(),
       versions: new Map(),
@@ -157,6 +179,41 @@ function bytes(data: Uint8Array, type: string): Reply {
   } as unknown as Reply;
 }
 
+let devices = 0;
+
+/** Push (4.14): the key, the devices (one per address), a test, the preferences. */
+async function pushRoutes(
+  t: TestVault,
+  q: string,
+  method: string | undefined,
+  body: Record<string, unknown>,
+): Promise<Reply | null> {
+  const p = t.push;
+  if (q === '/api/v1/notifications/push-key' && method === 'GET') return json(p.key);
+  if (q === '/api/v1/devices' && method === 'POST') {
+    const b = body as unknown as PushSide['posted'][number];
+    p.posted.push(b);
+    const id = `device-${++devices}`;
+    p.devices = [...p.devices.filter((d) => d.endpoint !== b.endpoint), { id, kind: b.kind ?? 'web_push', ...b }];
+    return { ...json({ id }), status: 201 } as Reply;
+  }
+  if (q === '/api/v1/devices' && method === 'DELETE') {
+    p.devices = p.devices.filter((d) => d.endpoint !== body.endpoint);
+    return { ...json(null), status: 204, text: async () => '' } as Reply;
+  }
+  const m = /^\/api\/v1\/devices\/([^/]+)\/test$/.exec(q);
+  if (m?.[1] && method === 'POST') {
+    if (!p.devices.some((d) => d.id === m[1])) return failure(404, 'not_found', 'There is no such device of yours.');
+    p.tests.push(m[1]);
+    return { ...json({ queued: true }), status: 202 } as Reply;
+  }
+  if (q === '/api/v1/notifications/preferences') {
+    if (method === 'PUT') p.prefs = { ...p.prefs, ...(body as Partial<PushSide['prefs']>) };
+    if (method === 'PUT' || method === 'GET') return json(p.prefs);
+  }
+  return null;
+}
+
 /** The library's routes, when the path is one of them; null otherwise. */
 async function library(t: TestVault, path: string, init: Parameters<FetchLike>[1]): Promise<Reply | null> {
   const lib = t.library;
@@ -173,6 +230,8 @@ async function library(t: TestVault, path: string, init: Parameters<FetchLike>[1
       ? failure(403, 'step_up_required', 'Please confirm it is you to see this document.')
       : null;
 
+  const pushed = await pushRoutes(t, q, init.method, body);
+  if (pushed) return pushed;
   if (q === '/api/v1/auth/step-up' && init.method === 'POST') {
     const ok = body.password === t.vault.state.password || body.code === '123456';
     if (!ok) return failure(401, 'invalid_credentials', "That password isn't right.");

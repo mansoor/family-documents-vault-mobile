@@ -12,6 +12,8 @@ import { CaptureProvider } from '../state/capture';
 import { saveCopyIo } from '../documents/save-copy';
 import { recoverBrightness } from '../show/brightness';
 import { defaultShowPlatform } from '../show/platform';
+import { PushLinks } from '../push/links';
+import { PushProvider } from '../push/push';
 import { EssentialsProvider, useEssentials } from '../state/essentials';
 import { LockProvider, useLock } from '../state/lock';
 import { StepUpProvider } from '../state/step-up';
@@ -107,15 +109,18 @@ export default function RootLayout() {
           <LockProvider>
             <EssentialsProvider>
               <CaptureProvider>
-                <StepUpProvider>
-                  <View style={styles.root}>
-                    <ShowRecovery />
-                    {extra.testBanner ? <TestBanner /> : null}
-                    <LockGate>
-                      <Gates />
-                    </LockGate>
-                  </View>
-                </StepUpProvider>
+                <PushProvider>
+                  <StepUpProvider>
+                    <View style={styles.root}>
+                      <ShowRecovery />
+                      <PushLinks />
+                      {extra.testBanner ? <TestBanner /> : null}
+                      <LockGate>
+                        <Gates />
+                      </LockGate>
+                    </View>
+                  </StepUpProvider>
+                </PushProvider>
               </CaptureProvider>
             </EssentialsProvider>
           </LockProvider>

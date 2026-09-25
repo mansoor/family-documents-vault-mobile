@@ -14,6 +14,8 @@ import type { EssentialsDeps } from '../state/essentials';
 import { useLock, type LockDeps } from '../state/lock';
 import { useVault } from '../state/vault';
 import type { CaptureDeps } from '../state/capture';
+import type { PushDeps } from '../push/push';
+import type { VaultDeps } from '../state/vault';
 import { renderApp, signedIn, testCapture } from './render';
 import { back, useTopRoute } from './router';
 import { nextEtag, type TestVault } from './vault';
@@ -138,6 +140,9 @@ export async function unlocked(
     parts?: ReturnType<typeof phoneParts>;
     capture?: Partial<CaptureDeps>;
     before?: () => void | Promise<void>;
+    /** A phone with push (4.14), and the vault's side of it. */
+    push?: Partial<PushDeps>;
+    deps?: Partial<VaultDeps>;
   } = {},
 ) {
   const parts = opts.parts ?? phoneParts();
@@ -149,6 +154,8 @@ export async function unlocked(
     lock: parts.lock,
     essentials: parts.essentials,
     capture: opts.capture ?? testCapture(),
+    ...(opts.push ? { push: opts.push } : {}),
+    ...(opts.deps ? { deps: opts.deps } : {}),
   });
   await fireEvent.press(await screen.findByTestId('lock-unlock'));
   return { app, parts };

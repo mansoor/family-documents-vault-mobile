@@ -6,6 +6,37 @@ app's own, tagged `vX.Y.Z` in this repository.
 
 ## [Unreleased]
 
+## [0.1.8] — iteration 4.14: push on Android
+
+Needs a vault of 0.4.14 or later for notifications; with an older one,
+Settings says so.
+
+### Added
+- Notifications on this phone, through a free notification app of your
+  own such as ntfy (UnifiedPush): nothing goes through Google. Settings →
+  Notifications turns them on, after saying what they are; Android asks
+  whether the app may notify. With several notification apps it asks which
+  one; with none, it says to install one (the daily email works either way).
+  - What the phone shows is the app's own words, picked by what happened —
+    "3 things need attention", "A new device signed in to your vault",
+    "You were signed out on this phone", "Notifications are working." — on
+    two channels, Reminders and Security. Nothing the message carries is
+    shown, and the vault sends no titles or names in the first place.
+  - A tap opens Needs attention, or Settings for a new device, once the app
+    is unlocked; never before, and nothing else.
+  - Send a test; the daily reminders switch, as the vault keeps it.
+  - A new address from the notification app is told to the vault.
+- **Signed out by the vault, the copies go at once.** When the vault signs
+  this phone out (revoked from another device, say), the Essentials kept for
+  no signal are deleted the moment the message arrives, with the app closed.
+  The app finishes signing out before it shows anything.
+
+### Changed
+- Signing out removes this phone's notifications first, so the vault has no
+  reason to tell it "you were signed out". The same person signing in again
+  gets them back without asking.
+- The lock timeout choices in Settings are named for screen readers.
+
 ## [0.1.7] — iteration 4.12: look it up
 
 ### Added

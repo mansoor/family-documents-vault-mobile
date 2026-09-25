@@ -21,6 +21,7 @@ import type { ConnectOutcome } from '../net/connect';
 import { currentNetwork, onNetworkChange } from '../net/network';
 import { httpDecision, identityCheck, type NetworkKind } from '../net/policy';
 import { firstLaunch } from '../platform/prefs';
+import { pushNative, type PushNative } from '../push/native';
 import { forgetPreviousInstallation, installationId, SecureTokenStore } from '../session/store';
 import { emit } from './events';
 import { leaveVault, readVaults, saveVault, updateVault, type VaultRecord } from './vaults';
@@ -61,6 +62,12 @@ export interface VaultDeps {
   onNetworkChange: (callback: () => void) => () => void;
   store: TokenStore;
   now: () => number;
+  /**
+   * UnifiedPush's side of a session the vault ended (4.14): a flag the
+   * native code set when the message came with the app closed, and the
+   * message itself when it is open. Null where there is no push.
+   */
+  push: Pick<PushNative, 'sessionEnded' | 'clearSessionEnded' | 'addListener'> | null;
 }
 
 interface VaultValue {
@@ -87,6 +94,12 @@ interface VaultValue {
   chooseAnotherVault: () => Promise<void>;
   withToken: <T>(fn: (api: Api, token: string) => Promise<T>) => Promise<T>;
   recheck: () => Promise<void>;
+  /**
+   * Work that must be done while the session still works, before signing
+   * out or leaving the vault (4.14: the phone's push device is removed, so
+   * the vault does not tell it "you were signed out"). Returns the undo.
+   */
+  onBeforeSignOut: (fn: () => Promise<void>) => () => void;
 }
 
 const VaultContext = createContext<VaultValue | null>(null);
@@ -158,6 +171,7 @@ const defaultDeps = (): VaultDeps => ({
   onNetworkChange,
   store: new SecureTokenStore(),
   now: () => Date.now(),
+  push: pushNative(),
 });
 
 export function VaultProvider(props: { children: ReactNode; deps?: Partial<VaultDeps> }) {
@@ -380,6 +394,24 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
     }
   }, [api, vault, session, gate]);
 
+  /**
+   * The vault signed this phone out and said so by push (4.14): signed out
+   * here too, and the phone's copies go (sessionEnded, as when the vault
+   * refuses a token). The native side already deleted the offline
+   * databases when the message came.
+   */
+  const endedByPush = useCallback(async () => {
+    const signedIn = session.signedIn;
+    if (signedIn) {
+      await session.clear();
+      emit('sessionEnded', 'revoked');
+      setNotice('signed_out_here');
+      setPhase('sign_in');
+      log.info('session.ended_by_push', {});
+    }
+    deps.push?.clearSessionEnded();
+  }, [session, deps.push]);
+
   // Once the vault and its session core exist: signed in or not.
   useEffect(() => {
     if (!vault || !api || phase !== 'loading') return;
@@ -387,6 +419,12 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
     void (async () => {
       await hydrated(session);
       if (cancelled) return;
+      // Told while the app was closed: finished before any screen shows.
+      if (deps.push?.sessionEnded()) {
+        await endedByPush();
+        if (!cancelled) setPhase('sign_in');
+        return;
+      }
       setPhase(session.signedIn ? 'ready' : 'sign_in');
       // Signed in from the start (a session kept from before): what the
       // vault can do is learned now, not only the next time the app comes
@@ -397,7 +435,15 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
     return () => {
       cancelled = true;
     };
-  }, [vault, api, session, phase, hydrated, recheck]);
+  }, [vault, api, session, phase, hydrated, recheck, deps.push, endedByPush]);
+
+  // Told while the app is open: at once.
+  useEffect(() => {
+    const sub = deps.push?.addListener('onPush', (e) => {
+      if (e.kind === 'message' && e.type === 'session_ended') void endedByPush();
+    });
+    return () => sub?.remove();
+  }, [deps.push, endedByPush]);
 
   useEffect(() => {
     offlineRef.current = offline;
@@ -542,7 +588,25 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
     [api, gate, accepted],
   );
 
+  const beforeSignOut = useRef(new Set<() => Promise<void>>());
+  const onBeforeSignOut = useCallback((fn: () => Promise<void>) => {
+    beforeSignOut.current.add(fn);
+    return () => {
+      beforeSignOut.current.delete(fn);
+    };
+  }, []);
+  const runBeforeSignOut = useCallback(async () => {
+    for (const fn of [...beforeSignOut.current]) {
+      try {
+        await fn();
+      } catch {
+        // Best done, never in the way of signing out.
+      }
+    }
+  }, []);
+
   const signOut = useCallback(async () => {
+    await runBeforeSignOut();
     try {
       await withToken((a, token) => a.logout(token));
     } catch {
@@ -552,9 +616,10 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
     emit('signedOut');
     setNotice(null);
     setPhase('sign_in');
-  }, [withToken, session]);
+  }, [withToken, session, runBeforeSignOut]);
 
   const chooseAnotherVault = useCallback(async () => {
+    await runBeforeSignOut();
     await session.clear();
     emit('signedOut');
     leaveVault();
@@ -563,7 +628,7 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
     setCaps(null);
     setNotice(null);
     setPhase('connect');
-  }, [session]);
+  }, [session, runBeforeSignOut]);
 
   const sessionOwner = useCallback(() => {
     const info = session.info;
@@ -596,6 +661,7 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
       chooseAnotherVault,
       withToken,
       recheck,
+      onBeforeSignOut,
     }),
     [
       phase,
@@ -614,6 +680,7 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
       chooseAnotherVault,
       withToken,
       recheck,
+      onBeforeSignOut,
     ],
   );
   return <VaultContext.Provider value={value}>{props.children}</VaultContext.Provider>;

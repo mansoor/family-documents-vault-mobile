@@ -5,6 +5,7 @@ import type { ReactElement } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { fixtureScanner } from '../capture/scanner';
 import { writePrefs } from '../platform/prefs';
+import { PushProvider, type PushDeps } from '../push/push';
 import { MemoryQueueStore } from '../queue/store';
 import { installationId, SecureTokenStore } from '../session/store';
 import { CaptureProvider, type CaptureDeps } from '../state/capture';
@@ -124,6 +125,8 @@ export async function renderApp(
     lock?: Partial<LockDeps>;
     /** With the kept Essentials (4.10), inside the lock; on these parts. */
     essentials?: Partial<EssentialsDeps>;
+    /** A phone with push (4.14); without, one with none (an iPhone, say). */
+    push?: Partial<PushDeps>;
   } = {},
 ) {
   const t = testVault();
@@ -137,25 +140,27 @@ export async function renderApp(
     <SafeAreaProvider>
       <TextScaleProvider {...(opts.large !== undefined ? { initialLarge: opts.large } : {})}>
         <VaultProvider deps={deps}>
-          {opts.lock ? (
-            <LockProvider deps={opts.lock}>
-              {opts.essentials ? (
-                <EssentialsProvider deps={opts.essentials}>
+          <PushProvider deps={{ native: null, ...opts.push }}>
+            {opts.lock ? (
+              <LockProvider deps={opts.lock}>
+                {opts.essentials ? (
+                  <EssentialsProvider deps={opts.essentials}>
+                    <CaptureProvider deps={capture}>
+                      <StepUpProvider>{ui}</StepUpProvider>
+                    </CaptureProvider>
+                  </EssentialsProvider>
+                ) : (
                   <CaptureProvider deps={capture}>
                     <StepUpProvider>{ui}</StepUpProvider>
                   </CaptureProvider>
-                </EssentialsProvider>
-              ) : (
-                <CaptureProvider deps={capture}>
-                  <StepUpProvider>{ui}</StepUpProvider>
-                </CaptureProvider>
-              )}
-            </LockProvider>
-          ) : (
-            <CaptureProvider deps={capture}>
-              <StepUpProvider>{ui}</StepUpProvider>
-            </CaptureProvider>
-          )}
+                )}
+              </LockProvider>
+            ) : (
+              <CaptureProvider deps={capture}>
+                <StepUpProvider>{ui}</StepUpProvider>
+              </CaptureProvider>
+            )}
+          </PushProvider>
         </VaultProvider>
       </TextScaleProvider>
     </SafeAreaProvider>,

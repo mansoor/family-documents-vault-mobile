@@ -4,14 +4,16 @@ name: Maestro
 # Essentials in airplane mode, and wiped by a revoked session, 4.10; Show
 # mode, 4.11): the e2e build
 # (x86_64, fixture scanner) runs .maestro/ flows while a vault from the
-# published images runs on the host, reached as 10.0.2.2. A run costs
-# about 40 runner minutes, so it runs on demand, and on a pull request that
-# changes the flows or this workflow — not on every push.
+# published images runs on the host, reached as 10.0.2.2. The push
+# module's JVM tests (4.14) run with the build. A run costs about 40
+# runner minutes, so it runs on demand, and on a pull request that changes
+# the flows, the app's own native code or this workflow — not on every push.
 on:
   workflow_dispatch:
   pull_request:
     paths:
       - apps/pocket/.maestro/**
+      - apps/pocket/modules/**
       - .github/workflows/maestro.yml
 
 concurrency:
@@ -70,7 +72,8 @@ jobs:
         working-directory: apps/pocket
         run: |
           npx expo prebuild --platform android --no-install --clean
-          cd android && ./gradlew assembleRelease -PreactNativeArchitectures=x86_64 --no-daemon
+          # With the push module's JVM tests: what a notification may say (4.14).
+          cd android && ./gradlew assembleRelease :unifiedpush:testDebugUnitTest -PreactNativeArchitectures=x86_64 --no-daemon
           cp "$(find app/build/outputs/apk -name '*.apk' | head -1)" "$GITHUB_WORKSPACE/fv-e2e.apk"
           # The APK is out; the build's intermediates are gigabytes the vault needs.
           rm -rf app/build build .gradle
