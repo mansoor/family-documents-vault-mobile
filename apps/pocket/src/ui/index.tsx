@@ -1,7 +1,8 @@
 import { colours, radii, statusTone, TAP_MIN, type as typeScale, type Status } from '@fdv/shared';
 import { AlertTriangle, CheckCircle2, Clock, Info, XCircle, type LucideIcon } from 'lucide-react-native';
-import type { ReactNode } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import {
+  AccessibilityInfo,
   Pressable,
   Text as RNText,
   TextInput,
@@ -118,14 +119,24 @@ const NOTICE: Record<'info' | 'ok' | 'warn' | 'danger', { icon: LucideIcon; ink:
   danger: { icon: XCircle, ink: colours.danger, bg: colours.dangerSoft },
 };
 
-/** A sentence with an icon and a tone — never a colour alone. */
-export function Notice(props: { tone?: keyof typeof NOTICE; children: ReactNode; testID?: string }) {
+/**
+ * A sentence with an icon and a tone — never a colour alone. Said aloud
+ * when it appears: Android reads out neither a new view nor the alert
+ * role by itself. `announce` is what to say when the children are more
+ * than words.
+ */
+export function Notice(props: { tone?: keyof typeof NOTICE; children: ReactNode; testID?: string; announce?: string }) {
   const n = NOTICE[props.tone ?? 'info'];
   const Icon = n.icon;
+  const words = props.announce ?? (typeof props.children === 'string' ? props.children : null);
+  useEffect(() => {
+    if (words) AccessibilityInfo.announceForAccessibility(words);
+  }, [words]);
   return (
     <View
       testID={props.testID}
       accessibilityRole="alert"
+      accessibilityLiveRegion={props.tone === 'danger' ? 'assertive' : 'polite'}
       style={[styles.notice, { backgroundColor: n.bg }]}
     >
       <Icon color={n.ink} size={20} accessibilityElementsHidden importantForAccessibility="no" />

@@ -1,0 +1,175 @@
+import type { QueueItem } from './item';
+import type { QueueStore } from './store';
+
+/**
+ * queue.db: captures waiting for the vault, encrypted with SQLCipher under
+ * the queue key (queue/key.ts). The bytes sit in a table of their own, so
+ * listing the queue never reads a scan.
+ */
+
+type SqlParam = string | number | null | Uint8Array;
+
+/** The part of expo-sqlite's database this store uses. */
+export interface SqlDb {
+  execAsync(source: string): Promise<void>;
+  runAsync(source: string, params: SqlParam[]): Promise<unknown>;
+  getAllAsync<T>(source: string, params: SqlParam[]): Promise<T[]>;
+  getFirstAsync<T>(source: string, params: SqlParam[]): Promise<T | null>;
+  withTransactionAsync(task: () => Promise<void>): Promise<void>;
+}
+
+const SCHEMA = `
+create table if not exists queue_item (
+  id text primary key,
+  key text not null,
+  origin text not null,
+  account text not null,
+  created_at integer not null,
+  state text not null,
+  metadata text,
+  filename text not null,
+  mime text not null,
+  size integer not null,
+  attempts integer not null,
+  next_at integer not null,
+  ask_first integer not null,
+  problem text
+);
+create table if not exists queue_bytes (
+  id text primary key,
+  bytes blob not null
+);
+`;
+
+interface Row {
+  id: string;
+  key: string;
+  origin: string;
+  account: string;
+  created_at: number;
+  state: QueueItem['state'];
+  metadata: string | null;
+  filename: string;
+  mime: string;
+  size: number;
+  attempts: number;
+  next_at: number;
+  ask_first: number;
+  problem: string | null;
+}
+
+const COLUMNS: Record<Exclude<keyof QueueItem, 'id'>, keyof Row> = {
+  key: 'key',
+  origin: 'origin',
+  account: 'account',
+  createdAt: 'created_at',
+  state: 'state',
+  metadata: 'metadata',
+  filename: 'filename',
+  mime: 'mime',
+  size: 'size',
+  attempts: 'attempts',
+  nextAt: 'next_at',
+  askFirst: 'ask_first',
+  problem: 'problem',
+};
+
+function toParam(field: Exclude<keyof QueueItem, 'id'>, value: unknown): SqlParam {
+  if (field === 'metadata' || field === 'problem') return value === null ? null : JSON.stringify(value);
+  if (field === 'askFirst') return value ? 1 : 0;
+  return value as SqlParam;
+}
+
+function fromRow(r: Row): QueueItem {
+  return {
+    id: r.id,
+    key: r.key,
+    origin: r.origin,
+    account: r.account,
+    createdAt: r.created_at,
+    state: r.state,
+    metadata: r.metadata === null ? null : (JSON.parse(r.metadata) as QueueItem['metadata']),
+    filename: r.filename,
+    mime: r.mime,
+    size: r.size,
+    attempts: r.attempts,
+    nextAt: r.next_at,
+    askFirst: r.ask_first === 1,
+    problem: r.problem === null ? null : (JSON.parse(r.problem) as QueueItem['problem']),
+  };
+}
+
+/**
+ * One connection, one statement at a time. expo-sqlite's transactions are
+ * plain BEGIN … COMMIT on the shared connection, so a Save and the
+ * uploader's clean-up after a 201 must never overlap: one would roll back
+ * the other. (Its exclusive transactions open a second connection, which
+ * would not have the SQLCipher key.)
+ */
+export class SqliteQueueStore implements QueueStore {
+  private tail: Promise<unknown> = Promise.resolve();
+
+  private constructor(private readonly db: SqlDb) {}
+
+  /** A store over a database already opened and keyed. */
+  static async over(db: SqlDb): Promise<SqliteQueueStore> {
+    await db.execAsync(SCHEMA);
+    // Bytes whose item is gone: never sent, never shown, only taking room.
+    await db.runAsync('delete from queue_bytes where id not in (select id from queue_item)', []);
+    return new SqliteQueueStore(db);
+  }
+
+  private serial<T>(fn: () => Promise<T>): Promise<T> {
+    const run = this.tail.then(fn, fn);
+    this.tail = run.catch(() => undefined);
+    return run;
+  }
+
+  add(item: QueueItem, bytes: Uint8Array): Promise<void> {
+    const fields = Object.keys(COLUMNS) as Exclude<keyof QueueItem, 'id'>[];
+    return this.serial(() =>
+      this.db.withTransactionAsync(async () => {
+        await this.db.runAsync(
+          `insert into queue_item (id, ${fields.map((f) => COLUMNS[f]).join(', ')}) values (?${', ?'.repeat(fields.length)})`,
+          [item.id, ...fields.map((f) => toParam(f, item[f]))],
+        );
+        await this.db.runAsync('insert into queue_bytes (id, bytes) values (?, ?)', [item.id, bytes]);
+      }),
+    );
+  }
+
+  list(): Promise<QueueItem[]> {
+    return this.serial(async () =>
+      (await this.db.getAllAsync<Row>('select * from queue_item order by created_at, id', [])).map(fromRow),
+    );
+  }
+
+  bytes(id: string): Promise<Uint8Array | null> {
+    return this.serial(async () => {
+      const row = await this.db.getFirstAsync<{ bytes: Uint8Array }>('select bytes from queue_bytes where id = ?', [
+        id,
+      ]);
+      return row ? new Uint8Array(row.bytes) : null;
+    });
+  }
+
+  update(id: string, patch: Partial<Omit<QueueItem, 'id'>>): Promise<void> {
+    const fields = (Object.keys(patch) as Exclude<keyof QueueItem, 'id'>[]).filter((f) => f in COLUMNS);
+    if (fields.length === 0) return Promise.resolve();
+    return this.serial(async () => {
+      await this.db.runAsync(
+        `update queue_item set ${fields.map((f) => `${COLUMNS[f]} = ?`).join(', ')} where id = ?`,
+        [...fields.map((f) => toParam(f, patch[f])), id],
+      );
+    });
+  }
+
+  remove(id: string): Promise<void> {
+    return this.serial(() =>
+      this.db.withTransactionAsync(async () => {
+        await this.db.runAsync('delete from queue_bytes where id = ?', [id]);
+        await this.db.runAsync('delete from queue_item where id = ?', [id]);
+      }),
+    );
+  }
+}

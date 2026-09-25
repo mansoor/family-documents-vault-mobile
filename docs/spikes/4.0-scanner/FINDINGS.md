@@ -76,11 +76,14 @@ Gradle or ccache cache yet (cold):
 | preview (release, minified, arm64) | 20.7 | 53 MB |
 
 Both run in parallel when a tag or a native change triggers them, so a
-release costs about 39 runner minutes. Still to measure: the same builds
-warm (the Gradle cache from these runs), and the emulator boot probe.
-The monthly budget is re-derived once the warm figures are in. At cold
-figures, GitHub Free's 2,000 private-repo minutes a month would cover
-about 50 releases (both builds each), less what the check job uses.
+release costs about 39 runner minutes. Still to measure: the emulator
+boot probe.
+
+Warm, with the Gradle cache from those runs (v0.1.1, 24 Sep 2026): dev
+19.4 minutes, preview 24.2 — no faster than cold, so the cache does not
+pay for itself on a 2-vCPU runner and the budget stays at the cold
+figures: GitHub Free's 2,000 private-repo minutes a month cover about 50
+releases (both builds each), less what the check job uses.
 
 ## 6. ML Kit
 

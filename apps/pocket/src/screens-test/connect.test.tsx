@@ -35,7 +35,7 @@ describe('Connect', () => {
     t.caps = { ...t.caps, server_version: '0.4.2' };
     await renderApp(<Connect deps={{ fetch: t.fetch, network: async () => 'wifi' }} />);
     await go('vault.test');
-    await screen.findByText(/Your vault is on version 0\.4\.2\. This app needs 0\.4\.4 or newer\. Whoever looks after the vault can update it/);
+    await screen.findByText(/Your vault is on version 0\.4\.2\. This app needs 0\.4\.10 or newer\. Whoever looks after the vault can update it/);
     await fireEvent.press(screen.getByText('Show how'));
     expect(Linking.openURL).toHaveBeenCalledWith(expect.stringContaining('#upgrading'));
   });

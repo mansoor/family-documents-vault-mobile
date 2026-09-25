@@ -2,8 +2,12 @@ import '../i18n';
 import { createApi, createHttp, SessionCore, type FetchLike } from '@fdv/client';
 import { render } from '@testing-library/react-native';
 import type { ReactElement } from 'react';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { fixtureScanner } from '../capture/scanner';
 import { writePrefs } from '../platform/prefs';
+import { MemoryQueueStore } from '../queue/store';
 import { SecureTokenStore } from '../session/store';
+import { CaptureProvider, type CaptureDeps } from '../state/capture';
 import { VaultProvider, type VaultDeps } from '../state/vault';
 import type { Vaults } from '../state/vaults';
 import { TextScaleProvider } from '../ui/text-scale';
@@ -82,17 +86,53 @@ export function respond(status: number, body: unknown) {
   } as unknown as Awaited<ReturnType<FetchLike>>;
 }
 
-export async function renderApp(ui: ReactElement, opts: { fetch?: FetchLike; deps?: Partial<VaultDeps>; large?: boolean } = {}) {
+/** A phone for the capture tests: files in memory, a queue in memory, pages from the test. */
+export function testCapture(over: Partial<CaptureDeps> = {}): CaptureDeps & { files: Map<string, Uint8Array> } {
+  const files = new Map<string, Uint8Array>();
+  let n = 0;
+  return {
+    files,
+    scanner: fixtureScanner([]),
+    openStore: async () => new MemoryQueueStore(),
+    read: async (uri) => {
+      const f = files.get(uri);
+      if (!f) throw new Error(`no such file ${uri}`);
+      return f;
+    },
+    discard: async (uri) => {
+      files.delete(uri);
+    },
+    uuid: () => `00000000-0000-4000-8000-${String(++n).padStart(12, '0')}`,
+    now: () => Date.now(),
+    schedule: () => () => undefined,
+    ...over,
+  };
+}
+
+export async function renderApp(
+  ui: ReactElement,
+  opts: {
+    fetch?: FetchLike;
+    deps?: Partial<VaultDeps>;
+    large?: boolean;
+    capture?: Partial<CaptureDeps>;
+  } = {},
+) {
   const t = testVault();
   const deps: Partial<VaultDeps> = {
     fetch: opts.fetch ?? t.fetch,
     network: async () => 'wifi',
     ...opts.deps,
   };
+  const capture = opts.capture ?? testCapture();
   const utils = await render(
-    <TextScaleProvider {...(opts.large !== undefined ? { initialLarge: opts.large } : {})}>
-      <VaultProvider deps={deps}>{ui}</VaultProvider>
-    </TextScaleProvider>,
+    <SafeAreaProvider>
+      <TextScaleProvider {...(opts.large !== undefined ? { initialLarge: opts.large } : {})}>
+        <VaultProvider deps={deps}>
+          <CaptureProvider deps={capture}>{ui}</CaptureProvider>
+        </VaultProvider>
+      </TextScaleProvider>
+    </SafeAreaProvider>,
   );
   return { ...utils, vault: t };
 }

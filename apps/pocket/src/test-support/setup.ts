@@ -66,6 +66,25 @@ jest.mock('expo-network', () => {
 
 jest.mock('expo-device', () => ({ manufacturer: 'Test', modelName: 'Phone 1', osVersion: '15' }));
 
+// Native modules the capture path imports. The tests hand the app their own
+// scanner, files and queue; these only have to load.
+jest.mock('@preeternal/react-native-document-scanner-plugin', () => ({
+  scanDocument: jest.fn(async () => ({ status: 'cancel', scannedImages: [] })),
+  ResponseType: { ImageFilePath: 'imageFilePath', Base64: 'base64' },
+  ScanDocumentResponseStatus: { Success: 'success', Cancel: 'cancel' },
+}));
+jest.mock('expo-document-picker', () => ({ getDocumentAsync: jest.fn(async () => ({ canceled: true, assets: null })) }));
+jest.mock('expo-image-picker', () => ({ launchImageLibraryAsync: jest.fn(async () => ({ canceled: true, assets: null })) }));
+jest.mock('expo-sqlite', () => ({
+  openDatabaseAsync: jest.fn(async () => {
+    throw new Error('the tests use their own queue');
+  }),
+  deleteDatabaseAsync: jest.fn(async () => undefined),
+}));
+jest.mock('expo-sharing', () => ({ shareAsync: jest.fn(async () => undefined) }));
+// The library's own stand-in: no native view to wait for, insets of zero.
+jest.mock('react-native-safe-area-context', () => jest.requireActual('react-native-safe-area-context/jest/mock').default);
+
 jest.mock('expo-crypto', () => {
   const node = jest.requireActual<typeof import('crypto')>('crypto');
   return {

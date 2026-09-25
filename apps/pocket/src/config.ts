@@ -13,7 +13,9 @@ export const SPIKE = extra.variant === 'dev' || extra.variant === 'preview';
 export const APP_VERSION = Constants.expoConfig?.version ?? '0.0.0';
 
 /**
- * The oldest vault this app works with: 0.4.4 is the first that reports
- * its real version and its installation id, which the http rules need.
+ * The oldest vault this app works with. 0.4.4 was the first to report its
+ * real version and its installation id, which the http rules need; a scan
+ * needs more: an upload that can be retried safely (0.4.8), the card's
+ * details sent with the file (0.4.9) and who issued it (0.4.10).
  */
-export const MIN_SERVER_VERSION = '0.4.4';
+export const MIN_SERVER_VERSION = '0.4.10';
