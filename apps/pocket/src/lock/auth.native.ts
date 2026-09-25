@@ -43,5 +43,6 @@ export function defaultAuth(): AuthPort {
       });
       return r.success ? 'ok' : outcome(r.error);
     },
+    cancel: () => LocalAuthentication.cancelAuthenticate(),
   };
 }

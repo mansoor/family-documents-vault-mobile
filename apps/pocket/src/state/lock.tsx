@@ -3,9 +3,10 @@ import { useTranslation } from 'react-i18next';
 import { AppState, BackHandler } from 'react-native';
 import { extra } from '../config';
 import { defaultAuth } from '../lock/auth';
+import { onSignedIn } from '../lock/bridge';
 import { KeyRing } from '../lock/keys';
 import { defaultScreenGuard } from '../lock/screen-guard';
-import type { AuthPort, LockLevel, ScreenGuardPort } from '../lock/types';
+import type { AuthOutcome, AuthPort, LockLevel, ScreenGuardPort } from '../lock/types';
 import { log } from '../log';
 import { readPrefs, writePrefs } from '../platform/prefs';
 import { useVault } from './vault';
@@ -20,14 +21,24 @@ import { useVault } from './vault';
  * with a password counts as unlocking. A phone with no screen lock has no
  * app lock either, and keeps nothing offline; everything else works.
  *
- * Opening it reads the everyday Essentials' key into memory; locking drops
- * it. While it is open the screen is kept out of screenshots and the recent
- * apps view, unless the person allows screenshots — which never covers
- * documents or the card.
+ * While the app is away its screen is covered, so coming back never shows
+ * the last screen before the lock decides. Opening it reads the everyday
+ * Essentials' key into memory; locking drops it. While it is open the
+ * screen is kept out of screenshots and the recent apps view, unless the
+ * person allows screenshots — which never covers documents or the card.
  */
 
 export type LockTimeout = 'immediately' | '1m' | '5m';
 const AWAY_MS: Record<LockTimeout, number> = { immediately: 0, '1m': 60_000, '5m': 300_000 };
+/**
+ * The app's own screens (the scanner, a picker, the phone's prompt) take it
+ * to the back without the person leaving; time spent there counts only
+ * past this, so a long scan does not lock — and leaving the phone from
+ * inside the scanner still does.
+ */
+const OWN_SCREEN_GRACE_MS = 5 * 60_000;
+/** A prompt that has not answered in this long is taken away (it can hang when asked from the back). */
+const PROMPT_TIMEOUT_MS = 60_000;
 
 /** checking: not known yet; none: this phone has no screen lock. */
 export type LockStatus = 'checking' | 'locked' | 'unlocked' | 'none';
@@ -50,6 +61,8 @@ interface LockPrefs {
 interface LockValue {
   status: LockStatus;
   level: LockLevel | null;
+  /** The app is away: its screen is covered until it is back, or locked. */
+  covered: boolean;
   tooManyTries: boolean;
   unlock(): Promise<void>;
   timeout: LockTimeout;
@@ -87,6 +100,7 @@ export function LockProvider(props: { children: ReactNode; deps?: Partial<LockDe
   const { phase } = useVault();
   const [status, setStatusState] = useState<LockStatus>('checking');
   const [level, setLevel] = useState<LockLevel | null>(null);
+  const [covered, setCovered] = useState(false);
   const [tooManyTries, setTooManyTries] = useState(false);
   const [prefs, setPrefsState] = useState<LockPrefs>(() => readPrefs('lock', { timeout: '1m', screenshots: false }));
 
@@ -98,8 +112,8 @@ export function LockProvider(props: { children: ReactNode; deps?: Partial<LockDe
   }, []);
   const timeoutRef = useRef(prefs.timeout);
   const leftAt = useRef<number | null>(null);
-  // One of the app's own screens is up (the scanner, a picker, the prompt),
-  // and whether the app went to the back for it: then coming back is too.
+  // One of the app's own screens is up (holding), and whether the app went
+  // to the back while it was (ownScreen): then coming back gets the grace.
   const holding = useRef(0);
   const ownScreen = useRef(false);
   const signedInHere = useRef(false);
@@ -110,10 +124,11 @@ export function LockProvider(props: { children: ReactNode; deps?: Partial<LockDe
     setStatus('locked');
   }, [d, setStatus]);
 
-  const open = useCallback(async () => {
-    await d.keys.openEveryday().catch(() => log.error('essentials.key_unreadable', {}));
+  /** Open now; the everyday key follows (nothing reads it before a store opens). */
+  const open = useCallback(() => {
     setTooManyTries(false);
     setStatus('unlocked');
+    void d.keys.openEveryday().catch(() => log.error('essentials.key_unreadable', {}));
   }, [d, setStatus]);
 
   // Starting: locked, if the phone has a lock at all.
@@ -126,49 +141,62 @@ export function LockProvider(props: { children: ReactNode; deps?: Partial<LockDe
         if (cancelled) return;
         setLevel(l);
         if (l === 'none') setStatus('none');
-        else if (signedInHere.current) void open();
-        else setStatus('locked');
+        else if (signedInHere.current) open();
+        else if (statusRef.current === 'checking') setStatus('locked');
       });
     return () => {
       cancelled = true;
     };
   }, [d, open, setStatus]);
 
-  // Signing in with a password is proving who you are; signing out closes everything.
+  // A password sign-in opens the lock in the same moment it signs in: the
+  // lock screen never appears, and nothing asks for a fingerprint on top.
+  useEffect(
+    () =>
+      onSignedIn(() => {
+        signedInHere.current = true;
+        if (statusRef.current === 'locked' || statusRef.current === 'checking') open();
+      }),
+    [open],
+  );
+
+  // Signing out closes everything.
   useEffect(() => {
     const was = lastPhase.current;
     lastPhase.current = phase;
-    if (phase === 'ready' && was === 'sign_in') {
-      signedInHere.current = true;
-      if (statusRef.current === 'locked') void open();
-    } else if (was === 'ready' && phase !== 'ready') {
+    if (was === 'ready' && phase !== 'ready') {
       signedInHere.current = false;
       if (statusRef.current === 'unlocked') lock();
     }
-  }, [phase, open, lock]);
+  }, [phase, lock]);
 
   // Away and back.
   useEffect(() => {
     const sub = AppState.addEventListener('change', (next) => {
-      if (next === 'background' && holding.current > 0) {
-        ownScreen.current = true;
-        return;
-      }
-      if (next === 'active' && ownScreen.current) {
-        ownScreen.current = false;
-        return;
-      }
       if (next === 'background') {
         leftAt.current = d.now();
-        // Locked now, so nothing is on screen when it comes back.
-        if (timeoutRef.current === 'immediately' && statusRef.current === 'unlocked') lock();
+        if (holding.current > 0) {
+          ownScreen.current = true;
+          return;
+        }
+        if (statusRef.current !== 'unlocked') return;
+        // Locked now, so nothing is on screen when it comes back; otherwise
+        // covered until it is known whether it locks.
+        if (timeoutRef.current === 'immediately') lock();
+        else setCovered(true);
         return;
       }
       if (next !== 'active') return;
       const left = leftAt.current;
+      const own = ownScreen.current;
       leftAt.current = null;
-      if (left === null) return;
-      if (statusRef.current === 'unlocked' && d.now() - left >= AWAY_MS[timeoutRef.current]) lock();
+      ownScreen.current = false;
+      if (left !== null && statusRef.current === 'unlocked') {
+        const allowed = own ? Math.max(AWAY_MS[timeoutRef.current], OWN_SCREEN_GRACE_MS) : AWAY_MS[timeoutRef.current];
+        if (d.now() - left >= allowed) lock();
+      }
+      setCovered(false);
+      if (left === null || own) return;
       // A screen lock added or removed while away changes what the app can do.
       void d.auth
         .level()
@@ -179,7 +207,7 @@ export function LockProvider(props: { children: ReactNode; deps?: Partial<LockDe
             d.keys.drop();
             setStatus('none');
           } else if (l !== 'none' && statusRef.current === 'none') {
-            void open();
+            open();
           }
         });
     });
@@ -197,8 +225,19 @@ export function LockProvider(props: { children: ReactNode; deps?: Partial<LockDe
 
   const unlock = useCallback(async () => {
     if (statusRef.current !== 'locked' || holding.current > 0) return;
-    const outcome = await away(() => d.auth.authenticate(t('lock.prompt')));
-    if (outcome === 'ok') await open();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const outcome = await away(() =>
+      Promise.race([
+        d.auth.authenticate(t('lock.prompt')),
+        new Promise<AuthOutcome>((resolve) => {
+          timer = setTimeout(() => {
+            void d.auth.cancel?.().catch(() => undefined);
+            resolve('cancelled');
+          }, PROMPT_TIMEOUT_MS);
+        }),
+      ]),
+    ).finally(() => clearTimeout(timer));
+    if (outcome === 'ok') open();
     else if (outcome === 'lockout') setTooManyTries(true);
     else if (outcome === 'unavailable') {
       const l = await d.auth.level().catch((): LockLevel => 'none');
@@ -231,6 +270,7 @@ export function LockProvider(props: { children: ReactNode; deps?: Partial<LockDe
     () => ({
       status,
       level,
+      covered,
       tooManyTries,
       unlock,
       timeout: prefs.timeout,
@@ -243,7 +283,7 @@ export function LockProvider(props: { children: ReactNode; deps?: Partial<LockDe
       exitApp: d.exitApp,
       autoPrompt: d.autoPrompt,
     }),
-    [status, level, tooManyTries, unlock, prefs, setPrefs, d, away, guard],
+    [status, level, covered, tooManyTries, unlock, prefs, setPrefs, d, away, guard],
   );
   return <Ctx.Provider value={value}>{props.children}</Ctx.Provider>;
 }
@@ -252,6 +292,7 @@ export function LockProvider(props: { children: ReactNode; deps?: Partial<LockDe
 const NO_LOCK: LockValue = {
   status: 'none',
   level: 'none',
+  covered: false,
   tooManyTries: false,
   unlock: async () => undefined,
   timeout: '1m',

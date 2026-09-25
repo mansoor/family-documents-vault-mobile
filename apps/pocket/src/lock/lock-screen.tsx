@@ -2,7 +2,7 @@ import { colours } from '@fdv/shared';
 import { Lock } from 'lucide-react-native';
 import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { BackHandler, StyleSheet, View } from 'react-native';
+import { AppState, BackHandler, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLock } from '../state/lock';
 import { Button, Notice, Text } from '../ui';
@@ -25,11 +25,24 @@ export function LockScreen() {
     return () => sub.remove();
   }, [exitApp]);
 
-  // Straight to the phone's own prompt, once; after that, the button.
+  // Straight to the phone's own prompt, once, when the app is in front —
+  // never while it is going to the back ("Immediately" locks as it leaves),
+  // where the prompt can hang. After that, the button.
   useEffect(() => {
     if (!autoPrompt || asked.current) return;
-    asked.current = true;
-    void unlock();
+    const ask = () => {
+      if (asked.current) return;
+      asked.current = true;
+      void unlock();
+    };
+    if (AppState.currentState === 'active') {
+      ask();
+      return;
+    }
+    const sub = AppState.addEventListener('change', (next) => {
+      if (next === 'active') ask();
+    });
+    return () => sub.remove();
   }, [autoPrompt, unlock]);
 
   return (

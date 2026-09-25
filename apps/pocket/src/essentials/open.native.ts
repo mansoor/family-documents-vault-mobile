@@ -36,7 +36,13 @@ export async function openEssentials(tier: Tier, hex: string): Promise<Essential
     await deleteDatabaseAsync(NAMES[tier]).catch(() => undefined);
     db = await keyed();
   }
-  return SqliteEssentialsStore.over(db);
+  try {
+    return await SqliteEssentialsStore.over(db);
+  } catch (err) {
+    // Not left open behind us: the next try, or a delete, gets the file.
+    await (db as unknown as { closeAsync(): Promise<void> }).closeAsync().catch(() => undefined);
+    throw err;
+  }
 }
 
 /** Gone: the Only me copies after an enrolment change, or everything on a new installation. */

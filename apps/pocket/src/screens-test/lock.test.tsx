@@ -1,11 +1,11 @@
-import { act, fireEvent, screen } from '@testing-library/react-native';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react-native';
 import { useEffect } from 'react';
 import { AppState, BackHandler, type AppStateStatus } from 'react-native';
 import Home from '../app/index';
 import Settings from '../app/settings';
 import SignIn from '../app/sign-in';
 import { KeyRing } from '../lock/keys';
-import { LockScreen } from '../lock/lock-screen';
+import { LockGate } from '../lock/gate';
 import type { AuthOutcome, LockLevel } from '../lock/types';
 import { writePrefs } from '../platform/prefs';
 import { useLock, useScreenGuard, type LockDeps } from '../state/lock';
@@ -19,14 +19,19 @@ jest.mock('expo-router', () => ({
   useNavigation: () => ({ addListener: () => () => undefined, dispatch: jest.fn() }),
 }));
 
-/** What the app shows, as its root layout decides it: the lock screen alone while locked. */
+/** What the app shows, as its root layout decides it: through the lock's gate. */
 function App(props: { page?: 'home' | 'settings' }) {
   const { phase } = useVault();
   const { status } = useLock();
-  if (phase === 'ready' && status === 'locked') return <LockScreen />;
-  if (phase === 'sign_in') return <SignIn />;
-  if (phase !== 'ready' || status === 'checking') return null;
-  return props.page === 'settings' ? <Settings /> : <Home />;
+  const screen =
+    phase === 'sign_in' ? (
+      <SignIn />
+    ) : phase !== 'ready' || status === 'checking' ? null : props.page === 'settings' ? (
+      <Settings />
+    ) : (
+      <Home />
+    );
+  return <LockGate>{screen}</LockGate>;
 }
 
 let clock = 1_000_000;
@@ -44,7 +49,7 @@ const pressBack = () =>
     for (const h of [...backs].reverse()) if (h()) break;
   });
 
-function phone(over: { level?: LockLevel; outcome?: AuthOutcome } = {}) {
+function phone(over: { level?: LockLevel; outcome?: AuthOutcome; autoPrompt?: boolean } = {}) {
   const calls = { prompts: 0, exited: 0, shielded: new Set<string>() };
   let outcome: AuthOutcome = over.outcome ?? 'ok';
   const keys = new KeyRing();
@@ -63,7 +68,7 @@ function phone(over: { level?: LockLevel; outcome?: AuthOutcome } = {}) {
     },
     now: () => clock,
     exitApp: () => void (calls.exited += 1),
-    autoPrompt: false,
+    autoPrompt: over.autoPrompt ?? false,
   };
   return { deps, calls, keys, answer: (o: AuthOutcome) => void (outcome = o) };
 }
@@ -203,7 +208,7 @@ describe('the lock', () => {
     expect(p.keys.everydayKey).toMatch(/^[0-9a-f]{64}$/);
   });
 
-  it('the app’s own screens — the scanner, a picker, the prompt — are not leaving it', async () => {
+  it('the app’s own screens — the scanner, a picker, the prompt — are not leaving it, for a while', async () => {
     writePrefs('lock', { timeout: 'immediately', screenshots: false });
     const p = phone();
     const grabbed: { lock: ReturnType<typeof useLock> | null } = { lock: null };
@@ -225,14 +230,64 @@ describe('the lock', () => {
     );
     await fireEvent.press(await screen.findByTestId('lock-unlock'));
     await screen.findByTestId('home-calm');
-    await act(async () => {
-      await (grabbed.lock as ReturnType<typeof useLock>).away(async () => {
-        emit('background');
-        clock += 600_000;
-        emit('active');
+    const scan = (minutes: number) =>
+      act(async () => {
+        await (grabbed.lock as ReturnType<typeof useLock>).away(async () => {
+          emit('background');
+          clock += minutes * 60_000;
+          emit('active');
+        });
       });
-    });
+    // A four-minute scan, with "Immediately": still open.
+    await scan(4);
     expect(screen.queryByTestId('lock-screen')).toBeNull();
+    // Home pressed inside the scanner, and the phone left for ten minutes: locked.
+    await scan(10);
+    expect(await screen.findByTestId('lock-screen')).toBeTruthy();
+    expect(p.keys.everydayKey).toBeNull();
+  });
+
+  it('a password sign-in never brings up the phone’s own prompt', async () => {
+    knownVault();
+    const t = testVault();
+    const p = phone({ autoPrompt: true });
+    await renderApp(<App />, { fetch: t.fetch, lock: p.deps });
+    await fireEvent.changeText(await screen.findByTestId('sign-in-email'), 'owner@example.test');
+    await fireEvent.changeText(screen.getByTestId('sign-in-password'), 'correct horse battery staple');
+    await fireEvent.press(screen.getByTestId('sign-in-go'));
+    expect(await screen.findByTestId('home-calm')).toBeTruthy();
+    expect(p.calls.prompts).toBe(0);
+  });
+
+  it('away, the app is covered until it is known whether it locks', async () => {
+    const p = phone();
+    await signedInApp(p);
+    await fireEvent.press(await screen.findByTestId('lock-unlock'));
+    await screen.findByTestId('home-calm');
+    await goTo('background');
+    expect(screen.getByTestId('lock-cover')).toBeTruthy();
+    clock += 20_000;
+    await goTo('active');
+    expect(screen.queryByTestId('lock-cover')).toBeNull();
+    expect(screen.queryByTestId('lock-screen')).toBeNull();
+  });
+
+  it('the prompt waits until the app is in front', async () => {
+    writePrefs('lock', { timeout: 'immediately', screenshots: false });
+    const p = phone({ autoPrompt: true, outcome: 'cancelled' });
+    await signedInApp(p);
+    // Asked at the cold start, in front.
+    await screen.findByTestId('lock-screen');
+    await waitFor(() => expect(p.calls.prompts).toBe(1));
+    p.answer('ok');
+    await fireEvent.press(screen.getByTestId('lock-unlock'));
+    await screen.findByTestId('home-calm');
+    // "Immediately": locked as it leaves — and not asked until it is back.
+    await goTo('background');
+    await screen.findByTestId('lock-screen');
+    expect(p.calls.prompts).toBe(2);
+    await goTo('active');
+    await waitFor(() => expect(p.calls.prompts).toBe(3));
   });
 
   it('kept out of screenshots while open, unless allowed — and the card never', async () => {

@@ -16,6 +16,8 @@ export interface AuthPort {
   level(): Promise<LockLevel>;
   /** The system's prompt, with the phone's PIN or pattern allowed. */
   authenticate(prompt: string): Promise<AuthOutcome>;
+  /** Takes the prompt away (one that has not answered in a minute). */
+  cancel?(): Promise<void>;
 }
 
 /**
