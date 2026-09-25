@@ -1,7 +1,7 @@
 import { act, fireEvent, screen, waitFor } from '@testing-library/react-native';
 import { useEffect } from 'react';
 import { AppState, BackHandler, type AppStateStatus } from 'react-native';
-import Home from '../app/index';
+import Home from '../app/(tabs)/index';
 import Settings from '../app/settings';
 import SignIn from '../app/sign-in';
 import { KeyRing } from '../lock/keys';

@@ -2,7 +2,7 @@ import type { ReminderView } from '@fdv/shared';
 import { act, fireEvent, screen, waitFor } from '@testing-library/react-native';
 import { AppState, type AppStateStatus } from 'react-native';
 import CaptureScreen from '../app/capture';
-import Home from '../app/index';
+import Home from '../test-support/home';
 import Settings from '../app/settings';
 import SignIn from '../app/sign-in';
 import { fixtureScanner, type ScanOutcome } from '../capture/scanner';

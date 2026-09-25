@@ -6,6 +6,48 @@ app's own, tagged `vX.Y.Z` in this repository.
 
 ## [Unreleased]
 
+## [0.1.7] — iteration 4.12: look it up
+
+### Added
+- A tab bar: Home, Search, the camera in the middle (for those who may
+  add documents), Needs attention and People. Adding a file or a photo
+  stays on Home.
+- The Document screen, from any list.
+  - Its primary action is Show for an Essential and Save a copy for
+    everything else.
+  - Its pages come from the phone without asking anything when they are
+    kept there. Otherwise they come from the vault, and "Confirm it's you"
+    (password, or a code from the authenticator app; pasting allowed) is
+    asked when the vault wants it, with the vault's own words.
+  - Then its details, its status, and who can see it.
+  - The Essential switch works online only. A change somebody else made
+    meanwhile is shown, not overwritten: "Someone changed this while you
+    were looking. Here's the latest."
+  - Its versions, and Add a new version.
+- Save a copy: to a temporary file, then the phone's share sheet, then
+  deleted, whatever happened. A copy left by the app stopping is swept at
+  the next launch. The first time, it says "The copy you save is outside
+  the vault, where the vault can't protect it."
+- Show and the pages work for an Essential that is not kept on the phone
+  (or kept in an older version), from the vault. For Show, the pages are
+  confirmed and fetched on the Document screen first, so Show mode itself
+  never asks anybody to confirm it is them. "Confirm it's you" is withdrawn
+  whenever the app locks.
+- Search: results a quarter of a second after you stop typing, narrowed
+  by person and by kind. Matches inside the pages are shown in bold, never
+  as markup. Your own sealed documents are searched in a second pass.
+  "Search needs a connection. Your Essentials are under On this phone."
+- Needs attention: what is due and what is coming up. Each can be put off
+  a week or a month, or marked done, and a document running out can have
+  its new one scanned straight in.
+- People: the family, each leading to their documents.
+
+### Tests
+- document, search, reminders and tabs screen tests, as the plan names
+  them, each with the a11y audit.
+- Playwright on the web build against a real vault: search, open, the
+  pages (confirming it is you if asked), snooze.
+
 ## [0.1.6] — iteration 4.11: Show mode
 
 ### Added

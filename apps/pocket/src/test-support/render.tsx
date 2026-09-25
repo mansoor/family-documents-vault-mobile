@@ -10,6 +10,7 @@ import { installationId, SecureTokenStore } from '../session/store';
 import { CaptureProvider, type CaptureDeps } from '../state/capture';
 import { EssentialsProvider, type EssentialsDeps } from '../state/essentials';
 import { LockProvider, type LockDeps } from '../state/lock';
+import { StepUpProvider } from '../state/step-up';
 import { VaultProvider, type VaultDeps } from '../state/vault';
 import type { Vaults } from '../state/vaults';
 import { TextScaleProvider } from '../ui/text-scale';
@@ -140,14 +141,20 @@ export async function renderApp(
             <LockProvider deps={opts.lock}>
               {opts.essentials ? (
                 <EssentialsProvider deps={opts.essentials}>
-                  <CaptureProvider deps={capture}>{ui}</CaptureProvider>
+                  <CaptureProvider deps={capture}>
+                    <StepUpProvider>{ui}</StepUpProvider>
+                  </CaptureProvider>
                 </EssentialsProvider>
               ) : (
-                <CaptureProvider deps={capture}>{ui}</CaptureProvider>
+                <CaptureProvider deps={capture}>
+                  <StepUpProvider>{ui}</StepUpProvider>
+                </CaptureProvider>
               )}
             </LockProvider>
           ) : (
-            <CaptureProvider deps={capture}>{ui}</CaptureProvider>
+            <CaptureProvider deps={capture}>
+              <StepUpProvider>{ui}</StepUpProvider>
+            </CaptureProvider>
           )}
         </VaultProvider>
       </TextScaleProvider>

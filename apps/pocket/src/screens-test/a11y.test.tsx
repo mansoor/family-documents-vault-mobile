@@ -1,6 +1,6 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react-native';
 import CaptureScreen from '../app/capture';
-import Home from '../app/index';
+import Home from '../test-support/home';
 import Connect from '../app/connect';
 import Settings from '../app/settings';
 import SignIn from '../app/sign-in';

@@ -53,7 +53,7 @@ test('connect over http after saying yes, sign in, stay signed in', async ({ pag
   await page.getByLabel('Password').fill(PASSWORD);
   await page.getByRole('button', { name: 'Sign in' }).click();
   await expect(page.getByRole('heading', { name: family })).toBeVisible();
-  await expect(page.getByText('Needs attention')).toBeVisible();
+  await expect(page.getByText('Needs attention').first()).toBeVisible();
 
   // A reload starts from what was kept: straight back to Home.
   await page.reload();

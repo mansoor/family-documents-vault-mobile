@@ -8,6 +8,8 @@ interface Events {
   signedIn: [];
   signedOut: [];
   sessionEnded: [reason: string];
+  /** A reminder put off or done (4.12): lists showing it look again. */
+  remindersChanged: [];
 }
 
 type Listener<K extends keyof Events> = (...args: Events[K]) => void;
@@ -16,6 +18,7 @@ const listeners: { [K in keyof Events]: Set<Listener<K>> } = {
   signedIn: new Set(),
   signedOut: new Set(),
   sessionEnded: new Set(),
+  remindersChanged: new Set(),
 };
 
 export function on<K extends keyof Events>(event: K, fn: Listener<K>): () => void {

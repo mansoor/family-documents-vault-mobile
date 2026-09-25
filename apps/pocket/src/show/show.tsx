@@ -17,6 +17,7 @@ import { useEssentials, type OpenCopy } from '../state/essentials';
 import { useLock, useScreenGuard } from '../state/lock';
 import { Text } from '../ui';
 import { brighten, restoreBrightness } from './brightness';
+import { takeForShow } from './handoff';
 import { defaultShowPlatform, type ShowPlatform } from './platform';
 
 const ZOOMS = [1, 1.5, 2, 3];
@@ -39,6 +40,8 @@ const DIM = 'rgba(255,255,255,0.72)';
 export function ShowMode(props: {
   id: string;
   onLeave: () => void;
+  /** Not kept on the phone: the pages the Document screen fetched (and confirmed) first (4.12). */
+  online?: boolean;
   platform?: ShowPlatform;
   /** Tests only: shorter than ten minutes and three seconds. */
   showForMs?: number;
@@ -47,6 +50,7 @@ export function ShowMode(props: {
   const { id, onLeave } = props;
   const { t } = useTranslation();
   const { open } = useEssentials();
+  const { online } = props;
   const { lockNow } = useLock();
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
@@ -68,8 +72,9 @@ export function ShowMode(props: {
   useEffect(() => {
     if (opened.current || !id) return;
     opened.current = true;
-    void open(id, 'show').then((c) => setCopy(c ?? 'missing'));
-  }, [id, open]);
+    const load = online ? Promise.resolve(takeForShow(id)) : open(id, 'show');
+    void load.then((c) => setCopy(c ?? 'missing')).catch(() => setCopy('missing'));
+  }, [id, open, online]);
 
   useEffect(() => {
     if (!copy || copy === 'missing' || copy.pages === 0) return;

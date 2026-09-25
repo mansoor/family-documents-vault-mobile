@@ -9,10 +9,12 @@ import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { extra, SPIKE } from '../config';
 import { LockGate } from '../lock/gate';
 import { CaptureProvider } from '../state/capture';
+import { saveCopyIo } from '../documents/save-copy';
 import { recoverBrightness } from '../show/brightness';
 import { defaultShowPlatform } from '../show/platform';
 import { EssentialsProvider, useEssentials } from '../state/essentials';
 import { LockProvider, useLock } from '../state/lock';
+import { StepUpProvider } from '../state/step-up';
 import { useVault, VaultProvider } from '../state/vault';
 import { TextScaleProvider } from '../ui/text-scale';
 
@@ -57,7 +59,9 @@ function Gates() {
       }}
     >
       <Stack.Protected guard={phase === 'ready'}>
-        <Stack.Screen name="index" options={{ headerShown: false }} />
+        <Stack.Screen name="(tabs)" options={{ headerShown: false, title: t('tabs.home') }} />
+        <Stack.Screen name="document/[id]" options={{ title: '' }} />
+        <Stack.Screen name="person/[id]" options={{ title: '' }} />
         <Stack.Screen name="capture" options={{ title: '', gestureEnabled: false }} />
         <Stack.Screen name="settings" options={{ title: t('settings.title') }} />
         <Stack.Screen name="timings" options={{ title: t('timings.title') }} />
@@ -88,6 +92,8 @@ function ShowRecovery() {
     } catch {
       // Never in the way of the app starting.
     }
+    // A copy being saved when the app stopped (4.12) does not stay behind.
+    void saveCopyIo.sweep().catch(() => undefined);
   }, []);
   return null;
 }
@@ -101,13 +107,15 @@ export default function RootLayout() {
           <LockProvider>
             <EssentialsProvider>
               <CaptureProvider>
-                <View style={styles.root}>
-                  <ShowRecovery />
-                  {extra.testBanner ? <TestBanner /> : null}
-                  <LockGate>
-                    <Gates />
-                  </LockGate>
-                </View>
+                <StepUpProvider>
+                  <View style={styles.root}>
+                    <ShowRecovery />
+                    {extra.testBanner ? <TestBanner /> : null}
+                    <LockGate>
+                      <Gates />
+                    </LockGate>
+                  </View>
+                </StepUpProvider>
               </CaptureProvider>
             </EssentialsProvider>
           </LockProvider>
