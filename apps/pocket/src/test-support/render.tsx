@@ -8,6 +8,7 @@ import { writePrefs } from '../platform/prefs';
 import { MemoryQueueStore } from '../queue/store';
 import { SecureTokenStore } from '../session/store';
 import { CaptureProvider, type CaptureDeps } from '../state/capture';
+import { LockProvider, type LockDeps } from '../state/lock';
 import { VaultProvider, type VaultDeps } from '../state/vault';
 import type { Vaults } from '../state/vaults';
 import { TextScaleProvider } from '../ui/text-scale';
@@ -116,6 +117,8 @@ export async function renderApp(
     deps?: Partial<VaultDeps>;
     large?: boolean;
     capture?: Partial<CaptureDeps>;
+    /** With the app's lock (4.8), on these parts; without, a phone with no lock. */
+    lock?: Partial<LockDeps>;
   } = {},
 ) {
   const t = testVault();
@@ -129,7 +132,13 @@ export async function renderApp(
     <SafeAreaProvider>
       <TextScaleProvider {...(opts.large !== undefined ? { initialLarge: opts.large } : {})}>
         <VaultProvider deps={deps}>
-          <CaptureProvider deps={capture}>{ui}</CaptureProvider>
+          {opts.lock ? (
+            <LockProvider deps={opts.lock}>
+              <CaptureProvider deps={capture}>{ui}</CaptureProvider>
+            </LockProvider>
+          ) : (
+            <CaptureProvider deps={capture}>{ui}</CaptureProvider>
+          )}
         </VaultProvider>
       </TextScaleProvider>
     </SafeAreaProvider>,

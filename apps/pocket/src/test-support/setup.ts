@@ -23,6 +23,18 @@ jest.mock('expo-secure-store', () => {
   };
 });
 
+// The phone's lock (4.8): no screen lock unless a test says so; tests pass
+// their own AuthPort and ScreenGuardPort to the LockProvider.
+jest.mock('expo-local-authentication', () => ({
+  SecurityLevel: { NONE: 0, SECRET: 1, BIOMETRIC_WEAK: 2, BIOMETRIC_STRONG: 3 },
+  getEnrolledLevelAsync: jest.fn(async () => 0),
+  authenticateAsync: jest.fn(async () => ({ success: false, error: 'not_available' })),
+}));
+jest.mock('expo-screen-capture', () => ({
+  preventScreenCaptureAsync: jest.fn(async () => undefined),
+  allowScreenCaptureAsync: jest.fn(async () => undefined),
+}));
+
 jest.mock('expo-file-system', () => {
   const fs = (globalThis as unknown as { __files: Map<string, string> }).__files;
   class File {

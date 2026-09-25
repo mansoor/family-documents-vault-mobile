@@ -6,7 +6,9 @@ import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { extra, SPIKE } from '../config';
+import { LockScreen } from '../lock/lock-screen';
 import { CaptureProvider } from '../state/capture';
+import { LockProvider, useLock } from '../state/lock';
 import { useVault, VaultProvider } from '../state/vault';
 import { TextScaleProvider } from '../ui/text-scale';
 
@@ -29,8 +31,11 @@ function TestBanner() {
  */
 function Gates() {
   const { phase } = useVault();
+  const { status } = useLock();
   const { t } = useTranslation();
-  if (phase === 'loading') {
+  // Locked: the lock screen and nothing else — no screen of the app behind it.
+  if (phase === 'ready' && status === 'locked') return <LockScreen />;
+  if (phase === 'loading' || (phase === 'ready' && status === 'checking')) {
     return (
       <View style={styles.loading}>
         <ActivityIndicator color={colours.accent} accessibilityLabel={t('common.working')} />
@@ -72,12 +77,14 @@ export default function RootLayout() {
       <StatusBar style="dark" />
       <TextScaleProvider>
         <VaultProvider>
-          <CaptureProvider>
-            <View style={styles.root}>
-              {extra.testBanner ? <TestBanner /> : null}
-              <Gates />
-            </View>
-          </CaptureProvider>
+          <LockProvider>
+            <CaptureProvider>
+              <View style={styles.root}>
+                {extra.testBanner ? <TestBanner /> : null}
+                <Gates />
+              </View>
+            </CaptureProvider>
+          </LockProvider>
         </VaultProvider>
       </TextScaleProvider>
     </SafeAreaProvider>

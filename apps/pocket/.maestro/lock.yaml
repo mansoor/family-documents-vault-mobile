@@ -1,0 +1,73 @@
+# Iteration 4.8's lock, on an emulator (the e2e build: a fake phone lock,
+# opened by a tap on Unlock, since nothing could answer the system's own
+# prompt). Against the same vault as the capture flow (10.0.2.2:8099).
+#  - Signing in with a password is not asked to unlock again.
+#  - Cold start with somebody signed in: locked, and nothing behind it.
+#  - Away for 70 s (the default is a minute): locked when it comes back.
+#  - Back on the lock screen leaves the app.
+appId: io.github.mansoor.familyvault.e2e
+env:
+  VAULT: 10.0.2.2:8099
+---
+- launchApp:
+    clearState: true
+- tapOn:
+    id: connect-address
+- inputText: ${VAULT}
+- hideKeyboard
+- tapOn:
+    id: connect-go
+- tapOn:
+    id: connect-approve-http
+- tapOn:
+    id: sign-in-email
+- inputText: ${EMAIL}
+- tapOn:
+    id: sign-in-password
+- inputText: ${PASSWORD}
+- hideKeyboard
+- tapOn:
+    id: sign-in-go
+- extendedWaitUntil:
+    visible:
+      id: home-calm
+    timeout: 30000
+- assertNotVisible:
+    id: lock-screen
+
+# Cold start.
+- stopApp
+- launchApp
+- extendedWaitUntil:
+    visible:
+      id: lock-screen
+    timeout: 30000
+- assertNotVisible:
+    id: home-calm
+- tapOn:
+    id: lock-unlock
+- extendedWaitUntil:
+    visible:
+      id: home-calm
+    timeout: 30000
+
+# Away for longer than a minute.
+- pressKey: Home
+- extendedWaitUntil:
+    visible:
+      id: never-there
+    timeout: 70000
+    optional: true
+- launchApp:
+    stopApp: false
+- extendedWaitUntil:
+    visible:
+      id: lock-screen
+    timeout: 30000
+- assertNotVisible:
+    id: home-calm
+
+# Back leaves.
+- back
+- assertNotVisible:
+    id: lock-screen

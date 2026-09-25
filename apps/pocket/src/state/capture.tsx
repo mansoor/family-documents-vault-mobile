@@ -21,6 +21,7 @@ import type { QueueItem } from '../queue/item';
 import { openQueue } from '../queue/open';
 import type { QueueStore } from '../queue/store';
 import { NotThisAccountError, Uploader } from '../queue/uploader';
+import { useLock } from './lock';
 import { useVault } from './vault';
 
 /**
@@ -130,6 +131,8 @@ const inFront = () => AppState.currentState !== 'background' && AppState.current
 export function CaptureProvider(props: { children: ReactNode; deps?: Partial<CaptureDeps> }) {
   const deps = useMemo<CaptureDeps>(() => ({ ...defaultDeps(), ...props.deps }), [props.deps]);
   const { who, withToken, uploadApi, api, sessionOwner, vault, offline } = useVault();
+  // Leaving for the scanner or a picker is not leaving the app: it does not lock.
+  const lock = useLock();
   const origin = vault?.origin ?? null;
   const [store, setStore] = useState<QueueStore | null>(null);
   const [openTry, setOpenTry] = useState(0);
@@ -367,14 +370,14 @@ export function CaptureProvider(props: { children: ReactNode; deps?: Partial<Cap
         })
       : null;
     try {
-      return await open();
+      return await lock.away(open);
     } catch {
       return { kind: 'cancelled' };
     } finally {
       sub?.remove();
       busyScanning.current = false;
     }
-  }, []);
+  }, [lock]);
 
   const start = useCallback(
     async (how: 'scan' | 'file' | 'photo'): Promise<StartOutcome> => {

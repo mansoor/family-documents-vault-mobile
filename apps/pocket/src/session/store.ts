@@ -1,6 +1,9 @@
 import type { StoredSession, TokenStore } from '@fdv/client';
 import { randomUUID } from 'expo-crypto';
+import { ESSENTIALS_KEY, PRIVATE_KEY } from '../lock/keys';
+import { writePrefs } from '../platform/prefs';
 import { secureDelete, secureGet, secureSet } from '../platform/secure';
+import { QUEUE_KEY } from '../queue/key';
 
 /**
  * Where the session lives: the refresh token and who it is for, in the
@@ -31,11 +34,14 @@ export class SecureTokenStore implements TokenStore {
 /**
  * The keystore can outlive the app (a reinstall on some phones, and always
  * on iOS). A fresh installation starts from nothing: no session, a new
- * installation id.
+ * installation id, and none of the old installation's keys — the queue's
+ * and the offline stores' (4.8).
  */
 export async function forgetPreviousInstallation(): Promise<void> {
   await secureDelete(SESSION_KEY);
   await secureDelete(INSTALLATION_KEY);
+  for (const key of [QUEUE_KEY, ESSENTIALS_KEY, PRIVATE_KEY]) await secureDelete(key).catch(() => undefined);
+  writePrefs('private-key', { made: false });
 }
 
 let installation: string | null = null;

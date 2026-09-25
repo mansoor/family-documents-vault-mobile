@@ -91,7 +91,14 @@
     "keepThem": "Keep them for next time",
     "removeThem": "Remove them",
     "onItsWay_one": "One is already on its way and will reach the vault.",
-    "onItsWay_other": "{{count}} are already on their way and will reach the vault."
+    "onItsWay_other": "{{count}} are already on their way and will reach the vault.",
+    "lock": "Lock",
+    "lockAfter": "Lock the app when you leave it",
+    "lockImmediately": "Immediately",
+    "lockOneMinute": "After 1 minute",
+    "lockFiveMinutes": "After 5 minutes",
+    "screenshots": "Allow screenshots",
+    "screenshotsHint": "Of the lists and Settings only. Your documents and the card are never captured."
   },
   "queue": {
     "sending": "Sending to the vault…",
@@ -180,5 +187,15 @@
     "stage_created": "In the vault",
     "run": "{{kind}}, {{pages}} p. · {{at}}",
     "total": "Tap to Save: {{seconds}} s"
+  },
+  "lock": {
+    "prompt": "Unlock Family Document Vault",
+    "title": "Unlock to open your vault.",
+    "unlock": "Unlock",
+    "tooMany": "Too many tries. Unlock with your phone's PIN or pattern instead.",
+    "noScreenLock": "To lock the app and keep documents on this phone, set a screen lock in your phone's settings first. Everything else works as it is.",
+    "weakBiometrics": "This phone's face or fingerprint unlock isn't strong enough to protect your Only me documents, so they can't be kept here.",
+    "enrolmentChanged": "The fingerprints or faces on this phone changed, so your Only me copies were removed to be safe. They'll come back next time you're online.",
+    "privatePrompt": "Open your Only me documents"
   }
 }

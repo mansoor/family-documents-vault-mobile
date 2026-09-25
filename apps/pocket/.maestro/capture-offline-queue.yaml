@@ -60,6 +60,13 @@ env:
 - stopApp
 - setAirplaneMode: disabled
 - launchApp
+# Cold start with somebody signed in: the lock (4.8; the e2e build's opens with a tap).
+- extendedWaitUntil:
+    visible:
+      id: lock-screen
+    timeout: 30000
+- tapOn:
+    id: lock-unlock
 # The scan is on Home — on its way, or already in Recently added — and
 # then gone from the queue: it has reached the vault.
 - extendedWaitUntil:
