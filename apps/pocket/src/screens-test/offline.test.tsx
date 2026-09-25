@@ -1,12 +1,13 @@
 import type { ReminderView } from '@fdv/shared';
 import { act, fireEvent, screen, waitFor } from '@testing-library/react-native';
+import { AppState, type AppStateStatus } from 'react-native';
 import CaptureScreen from '../app/capture';
 import Home from '../app/index';
 import Settings from '../app/settings';
 import SignIn from '../app/sign-in';
 import { fixtureScanner, type ScanOutcome } from '../capture/scanner';
 import type { QueueItem } from '../queue/item';
-import { MemoryQueueStore } from '../queue/store';
+import { MemoryQueueStore, type QueueStore } from '../queue/store';
 import { useCapture } from '../state/capture';
 import { useVault } from '../state/vault';
 import { jpeg, reply } from '../test-support/capture';
@@ -172,6 +173,86 @@ describe('the card with no connection', () => {
   });
 });
 
+describe('the queue on the phone opens once', () => {
+  /** The app's AppState listeners, to bring it to the front by hand. */
+  function frontListeners() {
+    let listeners: ((s: AppStateStatus) => void)[] = [];
+    // The test setup's AppState is itself a mock: spying on it returns that
+    // mock, and restoring would leave it with no implementation at all.
+    const original = AppState.addEventListener;
+    const before = jest.isMockFunction(original) ? original.getMockImplementation() : undefined;
+    const mocked = jest.spyOn(AppState, 'addEventListener').mockImplementation((_type, fn) => {
+      const l = fn as (s: AppStateStatus) => void;
+      listeners.push(l);
+      return { remove: () => void (listeners = listeners.filter((x) => x !== l)) };
+    });
+    const spy = { mockRestore: () => (before ? mocked.mockImplementation(before) : mocked.mockRestore()) };
+    const toFront = () =>
+      act(async () => {
+        for (const l of [...listeners]) l('active');
+      });
+    return { spy, toFront };
+  }
+
+  it('coming to the front while it is still opening does not open it a second time', async () => {
+    const t = testVault([ORIGIN]);
+    await signedIn(t);
+    const store = new MemoryQueueStore();
+    // Somebody else's scan: shown once the queue is open, and never sent from here.
+    await store.add(item({ id: 'theirs', account: 'someone-else' }), new Uint8Array([1]));
+    let opens = 0;
+    let app: { unmount(): unknown } | null = null;
+    let finish: (s: QueueStore) => void = () => undefined;
+    const front = frontListeners();
+    try {
+      const openStore = () => {
+        opens += 1;
+        return new Promise<QueueStore>((resolve) => {
+          finish = resolve;
+        });
+      };
+      app = await renderApp(<App />, { fetch: withStatus(t), capture: testCapture({ openStore }) });
+      // The app comes to the front as it starts: the queue is still opening.
+      await front.toFront();
+      await act(async () => finish(store));
+      expect(await screen.findByTestId('home-others')).toBeTruthy();
+      expect(opens).toBe(1);
+    } finally {
+      // Unmounted while the spy still answers, so its listeners go through it.
+      await app?.unmount();
+      front.spy.mockRestore();
+    }
+  });
+
+  it('a queue that would not open is tried again when the app comes back to the front', async () => {
+    const t = testVault([ORIGIN]);
+    await signedIn(t);
+    const store = new MemoryQueueStore();
+    // Somebody else's scan: shown once the queue is open, and never sent from here.
+    await store.add(item({ id: 'theirs', account: 'someone-else' }), new Uint8Array([1]));
+    let opens = 0;
+    let app: { unmount(): unknown } | null = null;
+    const front = frontListeners();
+    try {
+      const openStore = async () => {
+        opens += 1;
+        if (opens === 1) throw new Error('database is locked');
+        return store;
+      };
+      app = await renderApp(<App />, { fetch: withStatus(t), capture: testCapture({ openStore }) });
+      await waitFor(() => expect(opens).toBe(1));
+      expect(screen.queryByTestId('home-others')).toBeNull();
+      await front.toFront();
+      expect(await screen.findByTestId('home-others')).toBeTruthy();
+      expect(opens).toBe(2);
+    } finally {
+      // Unmounted while the spy still answers, so its listeners go through it.
+      await app?.unmount();
+      front.spy.mockRestore();
+    }
+  });
+});
+
 describe('scans belong to the person who made them', () => {
   it('Home offers to remove scans made by someone else who used this phone', async () => {
     const t = testVault([ORIGIN]);
@@ -281,7 +362,9 @@ describe('Needs you, and renewals', () => {
     });
     t.reminders = [reminder('r-180', 180), reminder('r-30', 30)];
     const busy: TestVault['fetch'] = async (url, init) =>
-      url.includes('/versions') ? reply(503, { error: { code: 'unavailable', message: 'Busy.', retriable: true } }) : withStatus(t)(url, init);
+      url.includes('/versions')
+        ? reply(503, { error: { code: 'unavailable', message: 'Busy.', retriable: true } })
+        : withStatus(t)(url, init);
     const phone = testCapture({ scanner: fixtureScanner([TWO_PAGES]) });
     phone.files.set('cache:/scan/1.jpg', jpeg('letter-with-exif.jpg'));
     phone.files.set('cache:/scan/2.jpg', jpeg('card.jpg'));

@@ -127,6 +127,15 @@ const defaultDeps = (): CaptureDeps => ({
   now: () => Date.now(),
 });
 
+/** A queue that would not open, as the log says it: busy, the key, the file, or something else. */
+function openFailure(err: unknown): string {
+  const m = String((err as Error | undefined)?.message ?? err);
+  if (/locked|busy/i.test(m)) return 'busy';
+  if (/keystore|secure ?store|decrypt|authenticat/i.test(m)) return 'key';
+  if (/not a database|corrupt|malformed|i\/o|disk|full/i.test(m)) return 'file';
+  return 'other';
+}
+
 /** In front, or not yet known to be anywhere else (AppState says 'unknown' until its first event). */
 const inFront = () => AppState.currentState !== 'background' && AppState.currentState !== 'inactive';
 
@@ -147,28 +156,47 @@ export function CaptureProvider(props: { children: ReactNode; deps?: Partial<Cap
   const timings = useMemo(() => new TimingRecorder(deps.now), [deps.now]);
   const storeRef = useRef<QueueStore | null>(null);
 
+  // One open at a time: a second, while the first is still opening the
+  // same file, would find it busy — and the first one's store would be
+  // left where only some of the app could see it.
+  const opening = useRef<Promise<QueueStore> | null>(null);
+  const [openFailed, setOpenFailed] = useState(false);
+  const openOnce = useCallback((): Promise<QueueStore> => {
+    if (storeRef.current) return Promise.resolve(storeRef.current);
+    if (!opening.current) {
+      opening.current = deps
+        .openStore()
+        .then((s) => {
+          storeRef.current = s;
+          setStore(s);
+          setOpenFailed(false);
+          return s;
+        })
+        .catch((err: unknown) => {
+          // What kind of failure, never SQLite's own words (they can quote the statement).
+          log.error('queue.open_failed', { kind: openFailure(err) });
+          setOpenFailed(true);
+          throw err;
+        })
+        .finally(() => {
+          opening.current = null;
+        });
+    }
+    return opening.current;
+  }, [deps]);
   useEffect(() => {
-    let cancelled = false;
-    deps
-      .openStore()
-      .then((s) => {
-        storeRef.current = s;
-        if (!cancelled) setStore(s);
-      })
-      .catch(() => log.error('queue.open_failed', {}));
-    return () => {
-      cancelled = true;
-    };
-  }, [deps, openTry]);
+    openOnce().catch(() => undefined);
+  }, [openOnce, openTry]);
 
-  // A queue that would not open is tried again when the app comes back to the front.
+  // A queue that would not open is tried again when the app comes back to
+  // the front — only once it has failed, never while it is still opening.
   useEffect(() => {
-    if (store) return;
+    if (store || !openFailed) return;
     const sub = AppState.addEventListener('change', (state) => {
       if (state === 'active') setOpenTry((n) => n + 1);
     });
     return () => sub.remove();
-  }, [store]);
+  }, [store, openFailed]);
 
   // The uploader reads who is signed in, and how to reach the vault, when
   // it runs — through a ref, so one uploader lives as long as the store.
@@ -336,7 +364,8 @@ export function CaptureProvider(props: { children: ReactNode; deps?: Partial<Cap
   // …and kept once it is.
   useEffect(() => {
     const held = cardFresh.current;
-    if (store && held && held.key === cardKey && cardKept !== cardKey) void keepCard(held.key, held.data).catch(() => undefined);
+    if (store && held && held.key === cardKey && cardKept !== cardKey)
+      void keepCard(held.key, held.data).catch(() => undefined);
   }, [store, cardKey, cardKept, keepCard]);
 
   // Foreground only: sending stops in the background and starts again in
@@ -362,24 +391,27 @@ export function CaptureProvider(props: { children: ReactNode; deps?: Partial<Cap
 
   // One scanner or picker at a time: a second tap while it opens is nothing.
   const busyScanning = useRef(false);
-  const run = useCallback(async (open: () => Promise<ScanOutcome>, onOpened?: () => void): Promise<ScanOutcome> => {
-    if (busyScanning.current) return { kind: 'cancelled' };
-    busyScanning.current = true;
-    // The scanner and the pickers are screens of their own: the app leaves the front when they open.
-    const sub = onOpened
-      ? AppState.addEventListener('change', (state) => {
-          if (state !== 'active') onOpened();
-        })
-      : null;
-    try {
-      return await lock.away(open);
-    } catch {
-      return { kind: 'cancelled' };
-    } finally {
-      sub?.remove();
-      busyScanning.current = false;
-    }
-  }, [lock]);
+  const run = useCallback(
+    async (open: () => Promise<ScanOutcome>, onOpened?: () => void): Promise<ScanOutcome> => {
+      if (busyScanning.current) return { kind: 'cancelled' };
+      busyScanning.current = true;
+      // The scanner and the pickers are screens of their own: the app leaves the front when they open.
+      const sub = onOpened
+        ? AppState.addEventListener('change', (state) => {
+            if (state !== 'active') onOpened();
+          })
+        : null;
+      try {
+        return await lock.away(open);
+      } catch {
+        return { kind: 'cancelled' };
+      } finally {
+        sub?.remove();
+        busyScanning.current = false;
+      }
+    },
+    [lock],
+  );
 
   const start = useCallback(
     async (how: 'scan' | 'file' | 'photo'): Promise<StartOutcome> => {
@@ -428,16 +460,12 @@ export function CaptureProvider(props: { children: ReactNode; deps?: Partial<Cap
       const run = (async (): Promise<SaveOutcome> => {
         const w = who;
         if (!w || !can(w.role, 'document.add')) return { kind: 'refused', problem: 'not_allowed' };
-        let s = storeRef.current;
-        if (!s) {
-          // The queue would not open before; one more try, now.
-          try {
-            s = await deps.openStore();
-            storeRef.current = s;
-            setStore(s);
-          } catch {
-            return { kind: 'refused', problem: 'queue_unavailable' };
-          }
+        let s: QueueStore;
+        try {
+          // Open already, or still opening, or it would not open before: one more try, now.
+          s = await openOnce();
+        } catch {
+          return { kind: 'refused', problem: 'queue_unavailable' };
         }
         timings.mark('save');
         try {
@@ -475,7 +503,7 @@ export function CaptureProvider(props: { children: ReactNode; deps?: Partial<Cap
       });
       return run;
     },
-    [who, deps, timings, refresh, uploader],
+    [who, deps, timings, refresh, uploader, openOnce],
   );
 
   const throwAway = useCallback(
