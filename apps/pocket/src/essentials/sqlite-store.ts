@@ -81,6 +81,14 @@ export class SqliteEssentialsStore implements EssentialsStore {
     });
   }
 
+  async bytes() {
+    const row = await this.db.getFirstAsync<{ n: number }>(
+      'select coalesce(sum(length(jpeg)), 0) as n from offline_page',
+      [],
+    );
+    return row?.n ?? 0;
+  }
+
   async removeDocument(id: string) {
     await this.db.withTransactionAsync(async () => {
       await this.db.runAsync(

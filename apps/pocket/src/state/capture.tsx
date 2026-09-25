@@ -87,6 +87,12 @@ interface CaptureValue {
   /** Captures waiting on this phone for this vault: this account's, or anyone's when signed out. */
   waitingHere: number;
   removeMany: (ids: string[]) => Promise<void>;
+  /**
+   * A vault left for good (4.15, Use another vault): every scan waiting for
+   * it — anybody's — goes, and what the card kept of it. One already on
+   * its way cannot be called back: it is left to arrive. Returns how many.
+   */
+  forgetVault: (origin: string) => Promise<number>;
   pending: CaptureSource | null;
   start: (how: 'scan' | 'file' | 'photo') => Promise<StartOutcome>;
   /** Add page, or Retake: more pages from the scanner, at most `max`. */
@@ -533,6 +539,18 @@ export function CaptureProvider(props: { children: ReactNode; deps?: Partial<Cap
     [store, refresh],
   );
 
+  const forgetVault = useCallback(
+    async (origin: string): Promise<number> => {
+      if (!store) return 0;
+      const theirs = (await store.list()).filter((i) => i.origin === origin);
+      for (const i of theirs) if (i.state !== 'sending') await store.remove(i.id);
+      await store.forgetCached(`card|${origin}|`);
+      await refresh();
+      return theirs.filter((i) => i.state === 'sending').length;
+    },
+    [store, refresh],
+  );
+
   // Put right and sent again, under the same key: the vault kept nothing of
   // a refused try. The visibility is the card's, never less private.
   const retry = useCallback(
@@ -593,6 +611,7 @@ export function CaptureProvider(props: { children: ReactNode; deps?: Partial<Cap
       others,
       waitingHere,
       removeMany,
+      forgetVault,
       pending,
       start,
       morePages,
@@ -618,6 +637,7 @@ export function CaptureProvider(props: { children: ReactNode; deps?: Partial<Cap
       others,
       waitingHere,
       removeMany,
+      forgetVault,
       pending,
       start,
       morePages,

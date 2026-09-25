@@ -9,6 +9,7 @@ import {
 } from '@fdv/client';
 import type { Capabilities } from '@fdv/shared';
 import { httpDecision, identityCheck, type KnownVault, type NetworkKind } from './policy';
+import { certificateTrouble, type CertificateTrouble } from './tls';
 
 /**
  * Connect: from what somebody typed to a vault the app can work with, or
@@ -27,6 +28,14 @@ export interface ConnectDeps {
   minServerVersion: string;
   headers?: () => Record<string, string>;
   timeoutMs?: number;
+  /**
+   * The platform's own words for why an https request failed — expo/fetch
+   * passes them on, the phone's fetch does not — or null when it went
+   * through or cannot say. Asked only after a failure (4.15).
+   */
+  whyFailed?: (url: string) => Promise<unknown>;
+  /** Whether this network reaches the internet: false behind a Wi-Fi sign-in page. */
+  validated?: () => Promise<boolean | null>;
 }
 
 export type ConnectOutcome =
@@ -45,7 +54,11 @@ export type ConnectOutcome =
   /** Something other than the approved vault is answering at this address. */
   | { kind: 'stranger'; host: string }
   /** Same https address, a new installation: whatever was signed in there is gone. */
-  | { kind: 'reinstalled'; origin: string; caps: Capabilities };
+  | { kind: 'reinstalled'; origin: string; caps: Capabilities }
+  /** The vault's certificate is not one this phone accepts (4.15). */
+  | { kind: 'certificate'; host: string; trouble: CertificateTrouble }
+  /** A Wi-Fi sign-in page answered instead (4.15). */
+  | { kind: 'captive_portal' };
 
 /** https first; for a private host with no scheme typed, http after it. */
 function candidates(address: ServerAddress): string[] {
@@ -64,6 +77,9 @@ export async function connect(
   const network = await deps.network();
   let reachedAny = false;
   let refusal: ConnectOutcome | null = null;
+  let certificate: Extract<ConnectOutcome, { kind: 'certificate' }> | null = null;
+  // On Wi-Fi that does not reach the internet, what answered may be its sign-in page.
+  const captive = async () => network === 'wifi' && (await deps.validated?.().catch(() => null)) === false;
 
   for (const origin of candidates(address)) {
     const secure = origin.startsWith('https://');
@@ -92,16 +108,25 @@ export async function connect(
     try {
       caps = await api.capabilities();
     } catch (err) {
-      if (err instanceof NetworkError) continue; // nothing there on this scheme
+      if (err instanceof NetworkError) {
+        // Nothing there on this scheme — or a certificate the phone refused.
+        if (secure && deps.whyFailed && !certificate && err.kind !== 'timeout') {
+          const why = await deps.whyFailed(`${origin}/api/v1/capabilities`).catch((e: unknown) => e);
+          const trouble = certificateTrouble(why);
+          if (trouble) certificate = { kind: 'certificate', host: address.host, trouble };
+        }
+        continue;
+      }
       // It answered, with something that is not the capability document.
       reachedAny = true;
-      return { kind: 'not_a_vault' };
+      return (await captive()) ? { kind: 'captive_portal' } : { kind: 'not_a_vault' };
     }
     reachedAny = true;
 
     const n = negotiate(caps, { clientVersion: deps.clientVersion, minServerVersion: deps.minServerVersion });
     switch (n.kind) {
       case 'not_a_vault':
+        return (await captive()) ? { kind: 'captive_portal' } : n;
       case 'server_too_old':
       case 'client_too_old':
       case 'api_version':
@@ -119,6 +144,14 @@ export async function connect(
     }
     return { kind: 'ok', origin, caps: n.caps, firstTime: identity.kind === 'first' };
   }
+  // Only https records a certificate problem, and it says more than the
+  // refusal of the http tried after it (mobile data, say).
+  if (certificate && !reachedAny) {
+    // A sign-in page answering for https shows its own name; a vault that
+    // makes its own certificate is simply not trusted yet, internet or not.
+    return certificate.trouble === 'wrong_name' && (await captive()) ? { kind: 'captive_portal' } : certificate;
+  }
   if (refusal) return refusal;
-  return reachedAny ? { kind: 'not_a_vault' } : { kind: 'unreachable', host: address.host };
+  if (reachedAny) return (await captive()) ? { kind: 'captive_portal' } : { kind: 'not_a_vault' };
+  return { kind: 'unreachable', host: address.host };
 }

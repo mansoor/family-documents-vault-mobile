@@ -20,6 +20,8 @@ export interface QueueStore {
    */
   cached<T>(key: string): Promise<T | null>;
   cache(key: string, value: unknown): Promise<void>;
+  /** Everything cached under keys that start so (a vault forgotten, 4.15). */
+  forgetCached(prefix: string): Promise<void>;
 }
 
 export class MemoryQueueStore implements QueueStore {
@@ -57,5 +59,9 @@ export class MemoryQueueStore implements QueueStore {
 
   async cache(key: string, value: unknown): Promise<void> {
     this.kept.set(key, JSON.stringify(value));
+  }
+
+  async forgetCached(prefix: string): Promise<void> {
+    for (const key of [...this.kept.keys()]) if (key.startsWith(prefix)) this.kept.delete(key);
   }
 }

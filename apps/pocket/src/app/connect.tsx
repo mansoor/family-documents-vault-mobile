@@ -4,8 +4,10 @@ import { useTranslation } from 'react-i18next';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { APP_VERSION, MIN_SERVER_VERSION } from '../config';
+import { CertificateTroubleNotice } from '../connect/certificate-guide';
 import { connect, type ConnectDeps, type ConnectOutcome } from '../net/connect';
-import { currentNetwork } from '../net/network';
+import { readPasted, type Pasted } from '../net/links';
+import { currentNetwork, internetReachable, whyFailed } from '../net/network';
 import { readVaults } from '../state/vaults';
 import { useVault } from '../state/vault';
 import { Button, Card, Field, Notice, Text } from '../ui';
@@ -20,6 +22,8 @@ export default function Connect(props: { deps?: Partial<ConnectDeps> }) {
   const [address, setAddress] = useState(() => readVaults().known.at(-1)?.origin ?? '');
   const [busy, setBusy] = useState(false);
   const [outcome, setOutcome] = useState<ConnectOutcome | null>(null);
+  // A link from the vault's own pages: held here, for the browser only (4.15).
+  const [link, setLink] = useState<Exclude<Pasted, { kind: 'address' }> | null>(null);
 
   const deps: ConnectDeps = {
     fetch: (url, init) => globalThis.fetch(url, init as RequestInit) as never,
@@ -27,6 +31,8 @@ export default function Connect(props: { deps?: Partial<ConnectDeps> }) {
     known: (origin) => readVaults().known.find((k) => k.origin === origin),
     clientVersion: APP_VERSION,
     minServerVersion: MIN_SERVER_VERSION,
+    whyFailed,
+    validated: internetReachable,
     ...props.deps,
   };
 
@@ -58,8 +64,16 @@ export default function Connect(props: { deps?: Partial<ConnectDeps> }) {
               placeholder={t('connect.addressHint')}
               value={address}
               onChangeText={(v) => {
-                setAddress(v);
                 setOutcome(null);
+                // A pasted invitation, reset or share link: its secret never stays in the field.
+                const pasted = readPasted(v);
+                if (pasted.kind === 'address') {
+                  setAddress(v);
+                  setLink(null);
+                  return;
+                }
+                setLink(pasted);
+                setAddress(pasted.kind === 'shared' ? '' : pasted.origin);
               }}
               keyboardType="url"
               textContentType="URL"
@@ -67,12 +81,38 @@ export default function Connect(props: { deps?: Partial<ConnectDeps> }) {
               returnKeyType="go"
               onSubmitEditing={() => void run()}
             />
-            <Button testID="connect-go" label={t('connect.connect')} onPress={() => void run()} busy={busy} disabled={!address.trim()} />
+            <Button
+              testID="connect-go"
+              label={t('connect.connect')}
+              onPress={() => void run()}
+              busy={busy}
+              disabled={!address.trim()}
+            />
           </Card>
+          {link ? <PastedLink link={link} /> : null}
           {outcome ? <Outcome outcome={outcome} busy={busy} onApproveHttp={() => void run(true)} /> : null}
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
+  );
+}
+
+/** What a pasted link is for, and the browser to open it in. */
+function PastedLink(props: { link: Exclude<Pasted, { kind: 'address' }> }) {
+  const { t } = useTranslation();
+  const l = props.link;
+  const words =
+    l.kind === 'join' ? t('connect.linkJoin') : l.kind === 'reset' ? t('connect.linkReset') : t('connect.linkShared');
+  return (
+    <Notice tone="info" testID={`connect-link-${l.kind}`}>
+      <Text>{words}</Text>
+      <Button
+        testID="connect-link-open"
+        kind="quiet"
+        label={t('common.openInBrowser')}
+        onPress={() => void Linking.openURL(l.link)}
+      />
+    </Notice>
   );
 }
 
@@ -114,13 +154,26 @@ function Outcome(props: { outcome: ConnectOutcome; busy: boolean; onApproveHttp:
       return <Notice tone="warn">{t('connect.refuseMobileData')}</Notice>;
     case 'stranger':
       return <Notice tone="danger">{t('connect.stranger', { host: o.host })}</Notice>;
+    case 'certificate':
+      return <CertificateTroubleNotice trouble={o.trouble} />;
+    case 'captive_portal':
+      return (
+        <Notice tone="warn" testID="connect-captive">
+          {t('connect.captivePortal')}
+        </Notice>
+      );
     case 'ask_http':
       return (
         <Card>
           <Text variant="title">{t('connect.askHttpTitle')}</Text>
           <Text>{t('connect.askHttp', { host: o.host })}</Text>
           <View style={styles.row}>
-            <Button testID="connect-approve-http" label={t('connect.askHttpYes')} onPress={props.onApproveHttp} busy={props.busy} />
+            <Button
+              testID="connect-approve-http"
+              label={t('connect.askHttpYes')}
+              onPress={props.onApproveHttp}
+              busy={props.busy}
+            />
           </View>
         </Card>
       );

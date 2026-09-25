@@ -90,6 +90,17 @@ describe.each(stores)('the queue store: %s', (_name, make) => {
     expect(await store.bytes('b')).toEqual(new Uint8Array([2]));
   });
 
+  it("forgets a vault's card data, and nobody else's", async () => {
+    const s = await make();
+    await s.cache('card|https://vault.test|member-1', { types: ['passport'] });
+    await s.cache('card|https://vault.test|member-2', { types: ['will'] });
+    await s.cache('card|https://other.test|member-1', { types: ['deed'] });
+    await s.forgetCached('card|https://vault.test|');
+    expect(await s.cached('card|https://vault.test|member-1')).toBeNull();
+    expect(await s.cached('card|https://vault.test|member-2')).toBeNull();
+    expect(await s.cached('card|https://other.test|member-1')).toEqual({ types: ['deed'] });
+  });
+
   it('removing an item takes its bytes and its key with it', async () => {
     const store = await make();
     await store.add(item('a'), new Uint8Array([1]));

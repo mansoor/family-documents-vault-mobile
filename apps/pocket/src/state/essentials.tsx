@@ -4,6 +4,7 @@ import {
   localToday,
   type DocumentView,
   type OfflineGrant,
+  type OfflineOpen,
   type Status,
   type StatusInput,
 } from '@fdv/shared';
@@ -170,6 +171,14 @@ interface EssentialsValue {
   /** Which version is kept on this phone, if any. */
   keptVersion(id: string): Promise<string | null>;
   open(id: string, mode: 'view' | 'show'): Promise<OpenCopy | null>;
+  /** How much the kept pages take on this phone, in bytes (4.15). */
+  copiesSize(): Promise<number>;
+  /**
+   * Settings → Remove offline copies (4.15): the vault is told this phone
+   * keeps nothing any more (the grant ends), and every copy goes. Without
+   * a connection the copies still go; the grant lapses by itself.
+   */
+  removeCopies(): Promise<void>;
   offered(): void;
   dismissNotice(): void;
 }
@@ -178,6 +187,8 @@ const DAY = 86_400_000;
 const RENEW_WITHIN = 3 * DAY;
 /** The document types, as much as today's status needs: kept with the copies. */
 const TYPES_KEY = 'types';
+/** Openings not yet told when the copies were removed: told when the vault next answers. */
+const UNSENT_OPENS = 'essentials-unsent-opens';
 type StatusType = NonNullable<StatusInput['type']>;
 
 function defaultDeps(): EssentialsDeps {
@@ -672,8 +683,9 @@ export function EssentialsProvider(props: { children: ReactNode; deps?: Partial<
         owner: who ? ownerKey(who.origin, who.member_id) : null,
       });
       // The Only me copies: their own store, opened with the person's biometrics.
+      // Otherwise a fresh sync, after any running one: it took the old scope.
       if (includePrivate) await openPrivate();
-      else void runRef.current();
+      else void (busy.current?.promise ?? Promise.resolve()).then(() => runRef.current());
       return 'ok';
     },
     [granted, setPrefs, who, openPrivate],
@@ -734,6 +746,56 @@ export function EssentialsProvider(props: { children: ReactNode; deps?: Partial<
   );
   const isKept = useCallback(async (id: string) => (await keptVersion(id)) !== null, [keptVersion]);
 
+  const copiesSize = useCallback(async (): Promise<number> => {
+    if (!storeRef.current && !openableRef.current) return 0;
+    await whenOpen();
+    let n = 0;
+    for (const s of [storeRef.current, privateRef.current]) n += s ? await s.bytes() : 0;
+    return n;
+  }, [whenOpen]);
+
+  // Openings kept aside when the copies were removed without a connection.
+  useEffect(() => {
+    if (offline || !who) return;
+    const unsent = readPrefs<OfflineOpen[]>(UNSENT_OPENS, []);
+    if (!unsent.length) return;
+    withToken((a, token) => a.offlineOpens(token, unsent))
+      .then(() => writePrefs(UNSENT_OPENS, []))
+      .catch(() => undefined);
+  }, [offline, who, withToken]);
+
+  const removeCopies = useCallback(async () => {
+    // What was opened here is the vault's to record: told first, and what
+    // cannot be told now is kept aside and told the next time it answers.
+    const send = (events: OfflineOpen[]) => withToken((a, token) => a.offlineOpens(token, events));
+    const unsent: OfflineOpen[] = [];
+    for (const s of [storeRef.current, privateRef.current]) {
+      if (!s) continue;
+      try {
+        await sendOpens(s, send);
+      } catch {
+        for (const o of await s.opens().catch(() => [])) {
+          unsent.push({
+            id: o.id,
+            version_id: o.version_id,
+            opened_at: new Date(o.at).toISOString(),
+            mode: o.mode,
+            online: o.online,
+          });
+        }
+      }
+    }
+    if (unsent.length) writePrefs(UNSENT_OPENS, [...readPrefs<OfflineOpen[]>(UNSENT_OPENS, []), ...unsent]);
+    try {
+      await withToken((a, token) => a.endOfflineGrant(token));
+    } catch {
+      // No connection, or the grant already over: it ends by itself.
+    }
+    await wipe(null);
+    setPrefs(NOT_ENROLLED);
+    log.info('essentials.removed_by_person', {});
+  }, [withToken, wipe, setPrefs]);
+
   const items = useMemo(() => [...everyday, ...privateItems], [everyday, privateItems]);
   const age = useMemo(() => (checked ? ageOf(checked, d.now()) : null), [checked, d]);
   // Lapsed (or ended by the vault): the set came back with no grant.
@@ -765,6 +827,8 @@ export function EssentialsProvider(props: { children: ReactNode; deps?: Partial<
       isKept,
       keptVersion,
       open,
+      copiesSize,
+      removeCopies,
       offered: () => setPrefs({ offered: true }),
       dismissNotice: () => setPrefs({ notice: null }),
     }),
@@ -790,6 +854,8 @@ export function EssentialsProvider(props: { children: ReactNode; deps?: Partial<
       isKept,
       keptVersion,
       open,
+      copiesSize,
+      removeCopies,
       setPrefs,
     ],
   );
@@ -819,6 +885,8 @@ const NONE: EssentialsValue = {
   isKept: async () => false,
   keptVersion: async () => null,
   open: async () => null,
+  copiesSize: async () => 0,
+  removeCopies: async () => undefined,
   offered: () => undefined,
   dismissNotice: () => undefined,
 };

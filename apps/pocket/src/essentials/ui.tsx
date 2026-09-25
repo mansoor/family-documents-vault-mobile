@@ -8,7 +8,7 @@ import { useEssentials, type EnrolOutcome } from '../state/essentials';
 import { useLock } from '../state/lock';
 import { Button, Card, Field, Notice, Text } from '../ui';
 
-const day = (ms: number) =>
+export const day = (ms: number) =>
   new Date(ms).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
 
 /**
@@ -255,7 +255,7 @@ export function KeptWhileSignedOut() {
 }
 
 /** The password, once, for keeping Essentials (the vault's offline grant). */
-function PasswordSheet(props: {
+export function PasswordSheet(props: {
   visible: boolean;
   onCancel: () => void;
   onPassword: (password: string) => Promise<EnrolOutcome>;

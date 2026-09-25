@@ -66,6 +66,7 @@ function Gates() {
         <Stack.Screen name="person/[id]" options={{ title: '' }} />
         <Stack.Screen name="capture" options={{ title: '', gestureEnabled: false }} />
         <Stack.Screen name="settings" options={{ title: t('settings.title') }} />
+        <Stack.Screen name="licences" options={{ title: t('settings.licences') }} />
         <Stack.Screen name="timings" options={{ title: t('timings.title') }} />
       </Stack.Protected>
       <Stack.Protected guard={reading}>

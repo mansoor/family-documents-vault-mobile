@@ -73,6 +73,14 @@ describe.each(makers)('the offline Essentials store, %s', (_name, make) => {
     expect(await s.opens()).toEqual([open('o3', 'a', 9)]);
   });
 
+  it('says how much the kept pages take', async () => {
+    const store = await make();
+    expect(await store.bytes()).toBe(0);
+    await store.putPage('v1', 1, new Uint8Array(1000));
+    await store.putPage('v1', 2, new Uint8Array(250));
+    expect(await store.bytes()).toBe(1250);
+  });
+
   it('keeps where syncing got to', async () => {
     const s = await make();
     expect(await s.state('since')).toBeNull();

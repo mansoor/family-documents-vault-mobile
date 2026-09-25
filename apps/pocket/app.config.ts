@@ -41,7 +41,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     name,
     slug: 'family-vault',
     scheme: variant === 'release' ? 'familyvault' : `familyvault-${variant}`,
-    version: '0.1.8',
+    version: '0.1.9',
     orientation: 'portrait',
     icon: './assets/icon.png',
     userInterfaceStyle: 'light',
