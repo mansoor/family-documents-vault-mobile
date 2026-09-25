@@ -6,6 +6,77 @@ app's own, tagged `vX.Y.Z` in this repository.
 
 ## [Unreleased]
 
+## [0.1.5] — iteration 4.10: Essentials in airplane mode
+
+Needs a vault at 0.4.13 or later (the offline grant and the offline set).
+
+### Added
+- On this phone, a section of Home. Offered once: "Keep your Essentials
+  on this phone? They'll open with no signal — at an airport, a hospital,
+  a desk. Anyone who can unlock this phone can open them." Keeping them
+  asks for your password once (the vault's offline grant, 30 days). Your
+  own Only me Essentials are a separate, explicit choice, only on a phone
+  whose fingerprint or face unlock is strong enough.
+- Each kept Essential has Open and Show, and how long it is kept for.
+  The viewer pages with Previous and Next and sizes with Larger and
+  Smaller, as well as swipe and pinch; pages go from the encrypted store to
+  memory, never to a file or an image cache.
+- Syncing only in front: when the app unlocks, comes back, is pulled to
+  refresh, or the connection returns. What the vault no longer lists — un-
+  marked, visibility or role changed, a new version — is gone from the
+  phone in the same sync. The grant is renewed with one password from
+  three days before it lapses.
+- Every open of a kept copy, online or not, is told to the vault once it
+  can be.
+- Removal: a session the vault revoked, signing out, changing vault, or
+  somebody else signing in removes every kept copy; so do copies left
+  unchecked past the vault's limit (measured on the vault's clock), with a
+  warning from 14 days before. A lost connection never removes anything.
+- A session that simply expired leaves the copies readable from the
+  sign-in screen, behind the lock: "Sign in again to keep these up to
+  date. You can still open them." Signing in again renews the grant with
+  the password just typed; until there is a grant nothing syncs, so
+  nothing kept is removed.
+
+- Your Only me copies, if you keep them: "{n} of your Only me Essentials
+  are kept here — Show them" opens them with your fingerprint or face, and
+  brings them up to date when online. Without it, every sync still checks
+  them against the vault's set by their ids alone: one gone or replaced,
+  or no grant, and they are removed whole, to come back the next time.
+- A lapsed or ended grant asks on Home for your password once; the copies
+  come back with it. A document whose pages the vault is still drawing
+  says so. Kept copies show their status worked out for today.
+
+### Fixed
+- A session kept from before, and a password sign-in, learn what the vault
+  can do at once, not only the next time the app comes to the front.
+- Keeping Essentials is the choice of the person who made it: somebody
+  else signing in on the phone is offered it afresh, and the password they
+  typed is never used for a grant; nor does anybody inherit the last
+  person's Only me choice.
+- On this phone shows after a cold start with no connection.
+- Copies being removed while their store is still opening are removed all
+  the same (it is closed first); a removal that fails is tried again at
+  the next start.
+- The copies' age is recorded as soon as the vault's set is applied; a
+  page that fails no longer stops the sync, and opens are always told.
+- The Only me download at enrolment follows an everyday sync already
+  running instead of being dropped; a wrong password is said before the
+  Only me choice is offered.
+- When the connection comes back while the app is in front, it syncs.
+- Removal notices appear where you are (the sign-in screen after the vault
+  signed the phone out) and can be dismissed; nobody who never kept
+  anything is told their copies were removed.
+
+### Tests
+- Screen tests for keeping, airplane mode, revoke, expiry, signing in
+  again (with and without the grant going through), somebody else's
+  copies, and the maximum age; the a11y audit covers the new screens.
+- Maestro: offline-essential.yaml (keep with the password, airplane mode,
+  cold start, unlock, page 1) and essentials-revoked.yaml (the vault
+  revokes the session through its API; the sign-in screen offers nothing
+  kept, and CI finds no Essentials database left on the phone).
+
 ## [0.1.4] — iteration 4.8: the lock and the encrypted stores
 
 ### Added

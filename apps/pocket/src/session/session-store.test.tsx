@@ -39,7 +39,7 @@ describe('the session on the phone', () => {
     );
     await waitFor(() => expect(screen.getByTestId('phase')).toHaveTextContent('ready'));
     // Never shown the sign-in screen, or Connect, on the way.
-    expect(seen.filter((p) => p !== 'loading')).toEqual(['ready']);
+    expect([...new Set(seen.filter((p) => p !== 'loading'))]).toEqual(['ready']);
   });
 
   it('with no vault chosen, Connect comes first', async () => {
@@ -104,7 +104,10 @@ describe('the session on the phone', () => {
 
   it('a first launch after installing forgets what the keystore still held', async () => {
     const secure = (globalThis as unknown as { __secureStore: Map<string, string> }).__secureStore;
-    secure.set(SESSION_KEY, JSON.stringify({ refresh_token: 'left-over', household_id: 'h', member_id: 'm', role: 'owner' }));
+    secure.set(
+      SESSION_KEY,
+      JSON.stringify({ refresh_token: 'left-over', household_id: 'h', member_id: 'm', role: 'owner' }),
+    );
     knownVault();
     await render(
       <VaultProvider deps={{ fetch: testVault().fetch, network: async () => 'wifi' }}>

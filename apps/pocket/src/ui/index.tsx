@@ -81,6 +81,8 @@ export function Button(props: {
   busy?: boolean;
   hint?: string;
   testID?: string;
+  /** What a screen reader says, when the label is a symbol ("‹", "+"). */
+  accessibilityLabel?: string;
 }) {
   const kind = props.kind ?? 'primary';
   const disabled = props.disabled === true || props.busy === true;
@@ -88,7 +90,7 @@ export function Button(props: {
     <Pressable
       testID={props.testID}
       accessibilityRole="button"
-      accessibilityLabel={props.label}
+      accessibilityLabel={props.accessibilityLabel ?? props.label}
       {...(props.hint ? { accessibilityHint: props.hint } : {})}
       accessibilityState={{ disabled, busy: props.busy === true }}
       disabled={disabled}

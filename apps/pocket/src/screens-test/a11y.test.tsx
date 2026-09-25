@@ -1,6 +1,4 @@
-import { TAP_MIN } from '@fdv/shared';
 import { fireEvent, screen, waitFor } from '@testing-library/react-native';
-import { StyleSheet } from 'react-native';
 import CaptureScreen from '../app/capture';
 import Home from '../app/index';
 import Connect from '../app/connect';
@@ -10,6 +8,7 @@ import Timings from '../app/timings';
 import { fixtureScanner } from '../capture/scanner';
 import { writePrefs } from '../platform/prefs';
 import { useCapture } from '../state/capture';
+import { audit } from '../test-support/a11y';
 import { jpeg, reply } from '../test-support/capture';
 import { installed, knownVault, renderApp, signedIn, testCapture, withTwoStep } from '../test-support/render';
 import { testVault } from '../test-support/vault';
@@ -20,58 +19,6 @@ jest.mock('expo-router', () => ({
   useRouter: () => ({ push: jest.fn(), replace: jest.fn(), back: jest.fn() }),
   useNavigation: () => ({ addListener: () => () => undefined, dispatch: jest.fn() }),
 }));
-
-type Instance = NonNullable<typeof screen.root>;
-
-function slop(hitSlop: unknown, a: 'top' | 'left', b: 'bottom' | 'right'): number {
-  if (typeof hitSlop === 'number') return hitSlop * 2;
-  const h = (hitSlop ?? {}) as Record<string, number | undefined>;
-  return (h[a] ?? 0) + (h[b] ?? 0);
-}
-
-function label(i: Instance): string {
-  return String(i.props.accessibilityLabel ?? i.props['aria-label'] ?? '').trim();
-}
-
-function describeIt(i: Instance): string {
-  return `${i.type}${i.props.testID ? `#${i.props.testID}` : ''}${label(i) ? ` "${label(i)}"` : ''}`;
-}
-
-/**
- * Everything on the screen a finger can use: it says what it is, it has a
- * name a screen reader can read out, and it is at least 44 dp each way
- * once its hit slop is counted. Returns what falls short, in words.
- */
-function audit(): string[] {
-  const root = screen.root;
-  if (!root) return ['nothing rendered'];
-  const problems: string[] = [];
-
-  const pressables = root.queryAll(
-    (n) => n.props.accessible === true && typeof n.props.onClick === 'function' && typeof n.props.onChangeText !== 'function',
-  );
-  if (pressables.length === 0) problems.push('no pressables found: the audit is not looking at anything');
-  for (const p of pressables) {
-    if (!p.props.accessibilityRole && !p.props.role) problems.push(`${describeIt(p)} has no role`);
-    if (!label(p)) problems.push(`${describeIt(p)} has no label`);
-    const style = StyleSheet.flatten(p.props.style) ?? {};
-    const tall = Number(style.height ?? style.minHeight ?? 0) + slop(p.props.hitSlop, 'top', 'bottom');
-    if (tall < TAP_MIN) problems.push(`${describeIt(p)} is ${tall} dp tall with its hit slop`);
-    const setWidth = style.width ?? style.minWidth;
-    if (setWidth !== undefined) {
-      const wide = Number(setWidth) + slop(p.props.hitSlop, 'left', 'right');
-      if (wide < TAP_MIN) problems.push(`${describeIt(p)} is ${wide} dp wide with its hit slop`);
-    }
-  }
-
-  for (const f of root.queryAll((n) => typeof n.props.onChangeText === 'function')) {
-    if (!label(f)) problems.push(`${describeIt(f)} is a field with no label`);
-  }
-  for (const s of root.queryAll((n) => typeof n.props.onValueChange === 'function' || String(n.type).endsWith('Switch'))) {
-    if (!label(s)) problems.push(`${describeIt(s)} is a switch with no label`);
-  }
-  return problems;
-}
 
 async function go(address: string) {
   await fireEvent.changeText(screen.getByTestId('connect-address'), address);
@@ -163,7 +110,15 @@ describe('every screen can be used with a screen reader and a thumb', () => {
         at: '2026-09-25T10:00:00.000Z',
         kind: 'scan',
         pages: 2,
-        marks: { tap: 0, scanner_shown: 40, pages_accepted: 8200, card_shown: 8500, save: 14100, queued: 14600, created: 16900 },
+        marks: {
+          tap: 0,
+          scanner_shown: 40,
+          pages_accepted: 8200,
+          card_shown: 8500,
+          save: 14100,
+          queued: 14600,
+          created: 16900,
+        },
       },
     ]);
     await renderApp(<Timings />);

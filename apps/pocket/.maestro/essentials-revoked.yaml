@@ -1,0 +1,36 @@
+# Iteration 4.10: after offline-essential.yaml, the vault revoked the
+# phone's session (the workflow did, through the API:
+# .github/scripts/essentials-revoke.sh). The next time the app reaches the
+# vault it is signed out, and every kept copy goes with the session — the
+# sign-in screen offers nothing kept, and the workflow then checks the
+# phone's files (.github/scripts/essentials-files.sh absent).
+appId: io.github.mansoor.familyvault.e2e
+---
+- stopApp
+- launchApp
+# The app may learn of the revoke while still locked (anything it asks the
+# vault for does), and put the sign-in screen where the lock screen was: a
+# tap aimed at Unlock would land on whatever is there by then (run
+# 36157652396: "Use another vault"). So: wait for that first, and unlock
+# only if the lock screen is still up.
+- extendedWaitUntil:
+    visible:
+      id: sign-in-email
+    timeout: 20000
+    optional: true
+- runFlow:
+    when:
+      visible:
+        id: lock-screen
+    commands:
+      - tapOn:
+          id: lock-unlock
+- extendedWaitUntil:
+    visible:
+      id: sign-in-email
+    timeout: 60000
+# Said where the person is, and nothing kept is offered.
+- assertVisible:
+    id: essentials-notice
+- assertNotVisible:
+    id: essentials-signed-out

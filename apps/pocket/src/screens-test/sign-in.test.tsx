@@ -4,6 +4,11 @@ import { useVault } from '../state/vault';
 import { installed, knownVault, renderApp, testVault, withTwoStep } from '../test-support/render';
 import SignIn from '../app/sign-in';
 
+// Kept Essentials on the sign-in screen open with the router (4.10).
+jest.mock('expo-router', () => ({
+  useRouter: () => ({ push: jest.fn(), back: jest.fn(), replace: jest.fn() }),
+}));
+
 function Phase() {
   const { phase } = useVault();
   return <Text testID="phase">{phase}</Text>;

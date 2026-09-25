@@ -8,10 +8,10 @@ import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { extra, SPIKE } from '../config';
 import { LockGate } from '../lock/gate';
 import { CaptureProvider } from '../state/capture';
+import { EssentialsProvider, useEssentials } from '../state/essentials';
 import { LockProvider, useLock } from '../state/lock';
 import { useVault, VaultProvider } from '../state/vault';
 import { TextScaleProvider } from '../ui/text-scale';
-
 
 /** Preview builds say so on every screen: they point at throwaway vaults only. */
 function TestBanner() {
@@ -32,7 +32,11 @@ function TestBanner() {
 function Gates() {
   const { phase } = useVault();
   const { status } = useLock();
+  const { keptWhileSignedOut } = useEssentials();
   const { t } = useTranslation();
+  // A kept Essential opens signed in, or — after the session expired — from
+  // sign-in while the lock is open; locking again takes it off the stack.
+  const reading = phase === 'ready' || (phase === 'sign_in' && keptWhileSignedOut && status === 'unlocked');
   if (phase === 'loading' || (phase === 'ready' && status === 'checking')) {
     return (
       <View style={styles.loading}>
@@ -55,6 +59,9 @@ function Gates() {
         <Stack.Screen name="settings" options={{ title: t('settings.title') }} />
         <Stack.Screen name="timings" options={{ title: t('timings.title') }} />
       </Stack.Protected>
+      <Stack.Protected guard={reading}>
+        <Stack.Screen name="essential/[id]" options={{ title: '' }} />
+      </Stack.Protected>
       <Stack.Protected guard={phase === 'sign_in'}>
         <Stack.Screen name="sign-in" options={{ headerShown: false }} />
       </Stack.Protected>
@@ -76,14 +83,16 @@ export default function RootLayout() {
       <TextScaleProvider>
         <VaultProvider>
           <LockProvider>
-            <CaptureProvider>
-              <View style={styles.root}>
-                {extra.testBanner ? <TestBanner /> : null}
-                <LockGate>
-                  <Gates />
-                </LockGate>
-              </View>
-            </CaptureProvider>
+            <EssentialsProvider>
+              <CaptureProvider>
+                <View style={styles.root}>
+                  {extra.testBanner ? <TestBanner /> : null}
+                  <LockGate>
+                    <Gates />
+                  </LockGate>
+                </View>
+              </CaptureProvider>
+            </EssentialsProvider>
           </LockProvider>
         </VaultProvider>
       </TextScaleProvider>

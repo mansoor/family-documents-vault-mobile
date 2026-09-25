@@ -1,5 +1,5 @@
 import type { SqlDb } from '../queue/sqlite-store';
-import type { EssentialsStore, OfflineDocument } from './store';
+import type { EssentialsStore, OfflineDocument, OfflineOpenRecord } from './store';
 
 /**
  * The stores' schema, one step per app version that changes it, applied in
@@ -26,6 +26,18 @@ const STEPS = [
    create table if not exists sync_state (
      key text primary key,
      value text not null
+   );`,
+  // 0.1.5: an opening carries what the vault is told — its own id, the
+  // version, how it was opened and whether there was a connection. Nothing
+  // wrote the old table.
+  `drop table if exists offline_open;
+   create table offline_open (
+     id text primary key,
+     document_id text not null,
+     version_id text not null,
+     at integer not null,
+     mode text not null check (mode in ('view', 'show')),
+     online integer not null
    );`,
 ];
 
@@ -95,19 +107,25 @@ export class SqliteEssentialsStore implements EssentialsStore {
     );
   }
 
-  async recordOpen(documentId: string, at: number) {
-    await this.db.runAsync('insert into offline_open (document_id, at) values (?, ?)', [documentId, at]);
-  }
-
-  opens() {
-    return this.db.getAllAsync<{ document_id: string; at: number }>(
-      'select document_id, at from offline_open order by at',
-      [],
+  async recordOpen(open: OfflineOpenRecord) {
+    await this.db.runAsync(
+      `insert into offline_open (id, document_id, version_id, at, mode, online) values (?, ?, ?, ?, ?, ?)
+         on conflict (id) do nothing`,
+      [open.id, open.document_id, open.version_id, open.at, open.mode, open.online ? 1 : 0],
     );
   }
 
-  async clearOpens(upTo: number) {
-    await this.db.runAsync('delete from offline_open where at <= ?', [upTo]);
+  async opens() {
+    const rows = await this.db.getAllAsync<Omit<OfflineOpenRecord, 'online'> & { online: number }>(
+      'select id, document_id, version_id, at, mode, online from offline_open order by at',
+      [],
+    );
+    return rows.map((r) => ({ ...r, online: r.online === 1 }));
+  }
+
+  async clearOpens(ids: string[]) {
+    if (!ids.length) return;
+    await this.db.runAsync(`delete from offline_open where id in (${ids.map(() => '?').join(', ')})`, ids);
   }
 
   async state(key: string) {

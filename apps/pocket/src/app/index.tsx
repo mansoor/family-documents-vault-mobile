@@ -8,6 +8,8 @@ import { useTranslation } from 'react-i18next';
 import { FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { QueueRow } from '../capture/queue-row';
+import { OnThisPhone } from '../essentials/ui';
+import { useEssentials } from '../state/essentials';
 import { extra } from '../config';
 import { useCapture, type SavedNote } from '../state/capture';
 import { useVault } from '../state/vault';
@@ -119,9 +121,11 @@ export default function Home() {
     }
   };
 
+  const essentials = useEssentials();
   const refresh = async () => {
     setRefreshing(true);
-    await load();
+    // The Essentials kept on the phone are brought up to date too.
+    await Promise.all([load(), essentials.sync()]);
     setRefreshing(false);
   };
 
@@ -180,7 +184,11 @@ export default function Home() {
                   onPress={() => void capture.removeMany(capture.others.map((i) => i.id))}
                   testID="home-others-remove"
                 />
-                <Button label={t('home.keepThem', { count: capture.others.length })} kind="quiet" onPress={() => setOthersKept(true)} />
+                <Button
+                  label={t('home.keepThem', { count: capture.others.length })}
+                  kind="quiet"
+                  onPress={() => setOthersKept(true)}
+                />
               </Notice>
             ) : null}
             {capture.queue.length > 0 ? (
@@ -200,6 +208,7 @@ export default function Home() {
                 ))}
               </View>
             ) : null}
+            <OnThisPhone />
             <Text variant="screen">{t('home.attentionTitle')}</Text>
             {data && data.unnamed > 0 ? (
               <Text weight="600" tone="warn" testID="home-unnamed">
@@ -235,50 +244,64 @@ export default function Home() {
           </View>
         }
         renderItem={({ item }) => (
-          <DocumentRow doc={item} token={data?.token ?? null} thumb={api && item.latest_version_id ? api.thumbnailUrl(item.latest_version_id) : null} />
+          <DocumentRow
+            doc={item}
+            token={data?.token ?? null}
+            thumb={api && item.latest_version_id ? api.thumbnailUrl(item.latest_version_id) : null}
+          />
         )}
       />
       {canAdd ? (
-      <View
-        style={[styles.dock, { bottom: 16 + insets.bottom }]}
-        onLayout={(e) => setDockHeight(e.nativeEvent.layout.height)}
-      >
-        {scannerFailed ? (
-          <View style={styles.dockNotice}>
-            <Notice tone="warn" testID="home-scanner-failed">
-              {t('home.scannerFailed')}
-            </Notice>
-          </View>
-        ) : null}
-        <DockButton icon={FileUp} label={t('home.addFile')} onPress={() => void begin('file')} testID="home-add-file" />
-        {/* The e2e build only: tells a flow the card is kept, before it goes offline. */}
-        {extra.fixtures && capture.cardKept ? (
-          <View testID="e2e-card-kept" collapsable={false} style={styles.e2eMarker} />
-        ) : null}
-        {/* The e2e build only: what a failed flow's view dump should say. */}
-        {extra.fixtures ? (
-          <View
-            testID="e2e-state"
-            accessible
-            accessibilityLabel={`queue ${capture.storeOpen ? 'open' : 'closed'}, card ${capture.cardKept ? 'kept' : 'not kept'}`}
-            collapsable={false}
-            style={styles.e2eMarker}
+        <View
+          style={[styles.dock, { bottom: 16 + insets.bottom }]}
+          onLayout={(e) => setDockHeight(e.nativeEvent.layout.height)}
+        >
+          {scannerFailed ? (
+            <View style={styles.dockNotice}>
+              <Notice tone="warn" testID="home-scanner-failed">
+                {t('home.scannerFailed')}
+              </Notice>
+            </View>
+          ) : null}
+          <DockButton
+            icon={FileUp}
+            label={t('home.addFile')}
+            onPress={() => void begin('file')}
+            testID="home-add-file"
           />
-        ) : null}
-        {capture.scanner.scans ? (
-          <Pressable
-            testID="home-scan"
-            accessibilityRole="button"
-            accessibilityLabel={t('home.scan')}
-            accessibilityHint={t('home.scanHint')}
-            onPress={() => void begin('scan')}
-            style={({ pressed }) => [styles.camera, pressed ? styles.pressed : null]}
-          >
-            <Camera color={colours.onAccent} size={30} accessibilityElementsHidden importantForAccessibility="no" />
-          </Pressable>
-        ) : null}
-        <DockButton icon={ImagePlus} label={t('home.addPhoto')} onPress={() => void begin('photo')} testID="home-add-photo" />
-      </View>
+          {/* The e2e build only: tells a flow the card is kept, before it goes offline. */}
+          {extra.fixtures && capture.cardKept ? (
+            <View testID="e2e-card-kept" collapsable={false} style={styles.e2eMarker} />
+          ) : null}
+          {/* The e2e build only: what a failed flow's view dump should say. */}
+          {extra.fixtures ? (
+            <View
+              testID="e2e-state"
+              accessible
+              accessibilityLabel={`queue ${capture.storeOpen ? 'open' : 'closed'}, card ${capture.cardKept ? 'kept' : 'not kept'}`}
+              collapsable={false}
+              style={styles.e2eMarker}
+            />
+          ) : null}
+          {capture.scanner.scans ? (
+            <Pressable
+              testID="home-scan"
+              accessibilityRole="button"
+              accessibilityLabel={t('home.scan')}
+              accessibilityHint={t('home.scanHint')}
+              onPress={() => void begin('scan')}
+              style={({ pressed }) => [styles.camera, pressed ? styles.pressed : null]}
+            >
+              <Camera color={colours.onAccent} size={30} accessibilityElementsHidden importantForAccessibility="no" />
+            </Pressable>
+          ) : null}
+          <DockButton
+            icon={ImagePlus}
+            label={t('home.addPhoto')}
+            onPress={() => void begin('photo')}
+            testID="home-add-photo"
+          />
+        </View>
       ) : null}
     </SafeAreaView>
   );
