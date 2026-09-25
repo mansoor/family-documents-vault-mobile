@@ -3,9 +3,11 @@ import * as KeepAwake from 'expo-keep-awake';
 import * as NavigationBar from 'expo-navigation-bar';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import { Platform } from 'react-native';
-import { screenReaderOf, type ShowPlatform } from './platform';
+// Not './platform': on the phone that name is this very file (a self-import
+// that left defaultShowPlatform throwing, found in 4.11's review).
+import { screenReaderOf, type ShowPlatform } from './types';
 
-export type { ShowPlatform } from './platform';
+export type { ShowPlatform } from './types';
 
 const TAG = 'fdv-show';
 

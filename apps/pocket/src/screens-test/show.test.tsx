@@ -237,6 +237,19 @@ describe('Show mode', () => {
     expect(await screen.findByTestId('essential-passport')).toBeTruthy();
   });
 
+  it('with the lock set to Immediately, going to the back still ends at the lock screen, with no prompt', async () => {
+    // The lock closes first as the app goes (Android): Show's reason still counts.
+    writePrefs('lock', { timeout: 'immediately', screenshots: false });
+    const fake = fakePlatform();
+    showing = { platform: fake.platform };
+    await phone();
+    await enterShow();
+    await toBack();
+    expect(await screen.findByTestId('lock-screen')).toBeTruthy();
+    expect(screen.getByTestId('lock-after-show')).toHaveTextContent('Unlock to carry on.');
+    expect(fake.calls).toContain('restore 0.4');
+  });
+
   it('Done is always reachable with TalkBack on', async () => {
     expect(CONTROLS_FOR_MS).toBe(3_000);
     // Without a screen reader the controls fade, and a tap brings them back.
@@ -275,10 +288,9 @@ describe('Show mode', () => {
     await waitFor(() => expect(width()).toBeGreaterThan(at));
     await fireEvent.press(screen.getByTestId('show-smaller'));
     await waitFor(() => expect(width()).toBe(at));
+    // Turned from however it is now: upright here, so sideways.
     await fireEvent.press(screen.getByTestId('show-rotate'));
     expect(fake.calls).toContain('turn landscape');
-    await fireEvent.press(screen.getByTestId('show-rotate'));
-    expect(fake.calls.filter((c) => c === 'turn portrait')).toHaveLength(1);
   });
 
   it('showing from the cache records an open', async () => {

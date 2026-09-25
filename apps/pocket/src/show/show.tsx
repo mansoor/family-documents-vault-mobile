@@ -2,7 +2,16 @@ import { Image } from 'expo-image';
 import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { AppState, BackHandler, PanResponder, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
+import {
+  AppState,
+  BackHandler,
+  PanResponder,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useEssentials, type OpenCopy } from '../state/essentials';
 import { useLock, useScreenGuard } from '../state/lock';
@@ -48,9 +57,10 @@ export function ShowMode(props: {
   const [n, setN] = useState(1);
   const [uri, setUri] = useState<string | null>(null);
   const [zoom, setZoom] = useState(0);
-  const [landscape, setLandscape] = useState(false);
   const [controls, setControls] = useState(true);
+  const [touched, setTouched] = useState(0);
   const [reader, setReader] = useState(false);
+  const [stage, setStage] = useState<{ w: number; h: number } | null>(null);
   const opened = useRef(false);
   const left = useRef(false);
 
@@ -87,11 +97,17 @@ export function ShowMode(props: {
     };
   }, [p]);
 
-  /** Out: brightness back first, then locked — and off the stack. */
+  /**
+   * Out: brightness back first, and the rest undone here too (not only when
+   * the screen goes); then off the stack, and locked.
+   */
   const leave = useCallback(() => {
     if (left.current) return;
     left.current = true;
     void restoreBrightness(p);
+    void p.keepAwake(false).catch(() => undefined);
+    void p.orientation('portrait').catch(() => undefined);
+    void p.immersive(false).catch(() => undefined);
     onLeave();
     lockNow('show');
   }, [p, onLeave, lockNow]);
@@ -126,11 +142,12 @@ export function ShowMode(props: {
       off();
     };
   }, [p]);
+  // Faded three seconds after the last touch, not the first.
   useEffect(() => {
     if (reader || !controls) return;
     const timer = setTimeout(() => setControls(false), props.controlsForMs ?? CONTROLS_FOR_MS);
     return () => clearTimeout(timer);
-  }, [reader, controls, props.controlsForMs]);
+  }, [reader, controls, touched, props.controlsForMs]);
   const shown = reader || controls;
 
   const pages = copy && copy !== 'missing' ? copy.pages : 0;
@@ -142,17 +159,17 @@ export function ShowMode(props: {
     },
     [pages],
   );
+  // Turned from however it is now: the phone may have turned it already.
   const turn = () => {
-    const next = !landscape;
-    setLandscape(next);
-    void p.orientation(next ? 'landscape' : 'portrait').catch(() => undefined);
+    void p.orientation(width > height ? 'portrait' : 'landscape').catch(() => undefined);
   };
 
-  // A swipe across turns the page; down, it ends; a pinch zooms.
-  const gesture = useRef({ n, go, leave, spread: 0 });
+  // A swipe across turns the page and down ends it — at its own size; made
+  // larger, one finger moves around the page instead. A pinch zooms.
+  const gesture = useRef({ n, go, leave, zoom, spread: 0 });
   useEffect(() => {
-    gesture.current = { ...gesture.current, n, go, leave };
-  }, [n, go, leave]);
+    gesture.current = { ...gesture.current, n, go, leave, zoom };
+  }, [n, go, leave, zoom]);
   const responder = useMemo(
     () =>
       // The handlers read the ref on a touch, not while rendering; the
@@ -160,7 +177,13 @@ export function ShowMode(props: {
       // eslint-disable-next-line react-hooks/refs
       PanResponder.create({
         onMoveShouldSetPanResponder: (_evt, g) =>
-          Math.abs(g.dx) > 20 || Math.abs(g.dy) > 20 || g.numberActiveTouches > 1,
+          g.numberActiveTouches > 1 || (gesture.current.zoom === 0 && (Math.abs(g.dx) > 20 || Math.abs(g.dy) > 20)),
+        onPanResponderGrant: () => {
+          gesture.current.spread = 0;
+        },
+        onPanResponderTerminate: () => {
+          gesture.current.spread = 0;
+        },
         onPanResponderMove: (evt) => {
           const touches = evt.nativeEvent.touches;
           if (touches.length !== 2) return;
@@ -178,7 +201,7 @@ export function ShowMode(props: {
         onPanResponderRelease: (_evt, g) => {
           const pinched = gesture.current.spread > 0;
           gesture.current.spread = 0;
-          if (pinched) return;
+          if (pinched || gesture.current.zoom > 0) return;
           if (g.dy > 120 && Math.abs(g.dx) < 60) gesture.current.leave();
           else if (g.dx < -60) gesture.current.go(gesture.current.n + 1);
           else if (g.dx > 60) gesture.current.go(gesture.current.n - 1);
@@ -196,77 +219,101 @@ export function ShowMode(props: {
         ? t(copy.pending ? 'show.pending' : 'show.noPreview')
         : null;
 
+  const image = uri ? (
+    <Image
+      source={{ uri }}
+      // From memory only: never written to the image cache.
+      cachePolicy="none"
+      contentFit="contain"
+      accessibilityIgnoresInvertColors
+      accessibilityLabel={t('show.pageAlt', { n, title })}
+      testID="show-image"
+      style={{ width: (stage?.w ?? width) * scale, height: (stage?.h ?? height) * scale }}
+    />
+  ) : null;
+  const top = shown ? (
+    <View style={[reader ? styles.barInFlow : styles.top, { paddingTop: insets.top + 8 }]}>
+      <Text style={styles.dim}>{t('show.hint')}</Text>
+      <ShowButton label={t('show.done')} testID="show-done" onPress={leave} strong />
+    </View>
+  ) : null;
+  const bottom = shown ? (
+    <View style={[reader ? styles.barInFlow : styles.bottom, styles.row, { paddingBottom: insets.bottom + 8 }]}>
+      <ShowButton
+        label="‹"
+        accessibilityLabel={t('show.previous')}
+        disabled={n <= 1}
+        onPress={() => go(n - 1)}
+        testID="show-previous"
+      />
+      {pages > 0 ? (
+        <Text style={styles.ink} testID="show-page">
+          {t('show.page', { n, total: pages })}
+        </Text>
+      ) : null}
+      <ShowButton
+        label="›"
+        accessibilityLabel={t('show.next')}
+        disabled={n >= pages}
+        onPress={() => go(n + 1)}
+        testID="show-next"
+      />
+      <ShowButton
+        label="−"
+        accessibilityLabel={t('show.smaller')}
+        disabled={zoom === 0}
+        onPress={() => setZoom((z) => Math.max(0, z - 1))}
+        testID="show-smaller"
+      />
+      <ShowButton
+        label="+"
+        accessibilityLabel={t('show.larger')}
+        disabled={zoom === ZOOMS.length - 1}
+        onPress={() => setZoom((z) => Math.min(ZOOMS.length - 1, z + 1))}
+        testID="show-larger"
+      />
+      <ShowButton
+        label={t('show.rotate')}
+        accessibilityHint={t('show.rotateHint')}
+        onPress={turn}
+        testID="show-rotate"
+      />
+    </View>
+  ) : null;
+
   return (
-    <View style={styles.black} testID="show-screen" onTouchStart={() => setControls(true)} {...responder.panHandlers}>
+    <View
+      style={styles.black}
+      testID="show-screen"
+      onTouchStart={() => {
+        setControls(true);
+        setTouched((x) => x + 1);
+      }}
+      {...responder.panHandlers}
+    >
       <StatusBar hidden style="light" />
-      <View style={styles.stage}>
+      {reader ? top : null}
+      <View
+        style={styles.stage}
+        onLayout={(e) => setStage({ w: e.nativeEvent.layout.width - 32, h: e.nativeEvent.layout.height - 32 })}
+      >
         {problem ? (
           <Text style={styles.ink} testID="show-problem">
             {problem}
           </Text>
         ) : null}
-        {uri ? (
-          <Image
-            source={{ uri }}
-            // From memory only: never written to the image cache.
-            cachePolicy="none"
-            contentFit="contain"
-            accessibilityIgnoresInvertColors
-            accessibilityLabel={t('show.pageAlt', { n, title })}
-            testID="show-image"
-            style={{ width: width * scale, height: height * scale }}
-          />
-        ) : null}
+        {zoom > 0 && image ? (
+          // Larger than the screen: moved around with a finger.
+          <ScrollView horizontal contentContainerStyle={styles.center}>
+            <ScrollView contentContainerStyle={styles.center}>{image}</ScrollView>
+          </ScrollView>
+        ) : (
+          image
+        )}
       </View>
-      {shown ? (
-        <>
-          <View style={[styles.top, { paddingTop: insets.top + 8 }]}>
-            <Text style={styles.dim}>{t('show.hint')}</Text>
-            <ShowButton label={t('show.done')} testID="show-done" onPress={leave} strong />
-          </View>
-          <View style={[styles.bottom, { paddingBottom: insets.bottom + 8 }]}>
-            <ShowButton
-              label="‹"
-              accessibilityLabel={t('show.previous')}
-              disabled={n <= 1}
-              onPress={() => go(n - 1)}
-              testID="show-previous"
-            />
-            {pages > 0 ? (
-              <Text style={styles.ink} testID="show-page">
-                {t('show.page', { n, total: pages })}
-              </Text>
-            ) : null}
-            <ShowButton
-              label="›"
-              accessibilityLabel={t('show.next')}
-              disabled={n >= pages}
-              onPress={() => go(n + 1)}
-              testID="show-next"
-            />
-            <ShowButton
-              label="−"
-              accessibilityLabel={t('show.smaller')}
-              disabled={zoom === 0}
-              onPress={() => setZoom((z) => Math.max(0, z - 1))}
-              testID="show-smaller"
-            />
-            <ShowButton
-              label="+"
-              accessibilityLabel={t('show.larger')}
-              disabled={zoom === ZOOMS.length - 1}
-              onPress={() => setZoom((z) => Math.min(ZOOMS.length - 1, z + 1))}
-              testID="show-larger"
-            />
-            <ShowButton
-              label={t('show.rotate')}
-              accessibilityHint={t('show.rotateHint')}
-              onPress={turn}
-              testID="show-rotate"
-            />
-          </View>
-        </>
-      ) : null}
+      {reader ? bottom : null}
+      {reader ? null : top}
+      {reader ? null : bottom}
     </View>
   );
 }
@@ -323,6 +370,8 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
+  },
+  row: {
     paddingHorizontal: 12,
     flexDirection: 'row',
     alignItems: 'center',
@@ -330,6 +379,15 @@ const styles = StyleSheet.create({
     gap: 8,
     flexWrap: 'wrap',
   },
+  /** Pinned (a screen reader is on): beside the page, never over it. */
+  barInFlow: {
+    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  center: { alignItems: 'center', justifyContent: 'center' },
   button: {
     minHeight: 48,
     minWidth: 48,

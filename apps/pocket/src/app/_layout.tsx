@@ -83,7 +83,11 @@ function Gates() {
 /** A brightness Show mode left behind (the app stopped while showing) goes back at launch. */
 function ShowRecovery() {
   useEffect(() => {
-    void recoverBrightness(defaultShowPlatform());
+    try {
+      void recoverBrightness(defaultShowPlatform());
+    } catch {
+      // Never in the way of the app starting.
+    }
   }, []);
   return null;
 }

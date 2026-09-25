@@ -6,8 +6,10 @@ import { ShowMode } from '../../show/show';
 export default function ShowScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  // Back where it came from; opened on its own (a link), Home.
   const leave = useCallback(() => {
     if (router.canGoBack()) router.back();
+    else router.replace('/');
   }, [router]);
   return <ShowMode id={id} onLeave={leave} />;
 }

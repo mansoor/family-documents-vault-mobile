@@ -21,8 +21,13 @@ app's own, tagged `vX.Y.Z` in this repository.
   without the phone's own prompt, so whoever is holding the phone gets
   nothing more. The brightness is back before anything else; a brightness
   left by the app stopping while showing is put back at the next launch.
-- "Tap Done, or press back, to finish." The controls fade after three
-  seconds and come back with a tap — never while a screen reader is on.
+- "Tap Done, or press back, to finish." The controls fade three seconds
+  after the last touch and come back with a tap — never while a screen
+  reader or another accessibility service (Switch Access, Voice Access) is
+  on; then they sit beside the page, not over it. Made larger, the page
+  moves with a finger.
+- Ended while signed out (an expired session's kept copies), Show leaves
+  the lock screen too, not the sign-in screen.
 
 ### Tests
 - show.test.tsx: brightness saved then full, restored on exit, background

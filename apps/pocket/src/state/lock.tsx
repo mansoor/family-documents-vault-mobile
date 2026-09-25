@@ -283,11 +283,13 @@ export function LockProvider(props: { children: ReactNode; deps?: Partial<LockDe
     writePrefs('lock', next);
   }, []);
 
+  // Why it is locked, even when it locked a moment before by itself (with
+  // "Immediately", going to the back from Show locks first on Android).
   const lockNow = useCallback(
     (why: 'show') => {
-      if (statusRef.current !== 'unlocked') return;
+      if (statusRef.current !== 'unlocked' && statusRef.current !== 'locked') return;
       setLockedFor(why);
-      lock();
+      if (statusRef.current === 'unlocked') lock();
     },
     [lock],
   );

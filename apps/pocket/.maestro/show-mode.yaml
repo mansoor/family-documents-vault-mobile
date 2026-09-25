@@ -21,6 +21,9 @@ appId: io.github.mansoor.familyvault.e2e
     visible:
       id: show-image
     timeout: 15000
+# The controls fade after three seconds: a tap brings them back.
+- tapOn:
+    id: show-screen
 - assertVisible:
     id: show-done
 - back

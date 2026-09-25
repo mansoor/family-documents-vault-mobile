@@ -14,8 +14,11 @@ import { LockScreen } from './lock-screen';
  */
 export function LockGate(props: { children: ReactNode }) {
   const { phase } = useVault();
-  const { status, covered } = useLock();
-  if (phase === 'ready' && status === 'locked') return <LockScreen />;
+  const { status, covered, lockedFor } = useLock();
+  // After Show mode, the lock screen whatever the phase: signed out (an
+  // expired session's kept copies), the sign-in screen is not for whoever
+  // is holding the phone.
+  if (status === 'locked' && (phase === 'ready' || lockedFor === 'show')) return <LockScreen />;
   return (
     <View style={styles.root}>
       {props.children}
