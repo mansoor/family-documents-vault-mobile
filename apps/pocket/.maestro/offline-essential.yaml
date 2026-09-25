@@ -1,0 +1,74 @@
+# Iteration 4.10's airplane half on an emulator (the e2e build: a fake
+# phone lock, opened by a tap on Unlock), against the same vault as the
+# capture flow. The workflow has made that flow's passport an Essential,
+# with its pages drawn (.github/scripts/essentials-seed.sh).
+#  - Keeping Essentials asks for the password once; then "1 on this phone".
+#  - Airplane mode, a cold start, unlock: the passport opens at page 1.
+appId: io.github.mansoor.familyvault.e2e
+env:
+  VAULT: 10.0.2.2:8099
+---
+- launchApp:
+    clearState: true
+- tapOn:
+    id: connect-address
+- inputText: ${VAULT}
+- hideKeyboard
+- tapOn:
+    id: connect-go
+- tapOn:
+    id: connect-approve-http
+- tapOn:
+    id: sign-in-email
+- inputText: ${EMAIL}
+- tapOn:
+    id: sign-in-password
+- inputText: ${PASSWORD}
+- hideKeyboard
+- tapOn:
+    id: sign-in-go
+- extendedWaitUntil:
+    visible:
+      id: home-calm
+    timeout: 30000
+
+# Keep them: the password, once.
+- scrollUntilVisible:
+    element:
+      id: essentials-keep
+- tapOn:
+    id: essentials-keep
+- tapOn:
+    id: essentials-password-field
+- inputText: ${PASSWORD}
+- hideKeyboard
+- tapOn:
+    id: essentials-password-go
+- scrollUntilVisible:
+    element:
+      text: 1 on this phone
+    timeout: 60000
+
+# No signal, and the app started from cold.
+- setAirplaneMode: enabled
+- stopApp
+- launchApp
+- extendedWaitUntil:
+    visible:
+      id: lock-screen
+    timeout: 30000
+- tapOn:
+    id: lock-unlock
+- scrollUntilVisible:
+    element:
+      text: "Open: .*"
+    timeout: 30000
+- tapOn:
+    text: "Open: .*"
+- extendedWaitUntil:
+    visible:
+      id: essential-image
+    timeout: 15000
+- assertVisible:
+    text: "Page 1 of .*"
+- setAirplaneMode: disabled

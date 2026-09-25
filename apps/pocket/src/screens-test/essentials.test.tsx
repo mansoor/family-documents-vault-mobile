@@ -1,6 +1,7 @@
 import type { FetchLike } from '@fdv/client';
 import type { DocumentView, OfflineItem } from '@fdv/shared';
 import { act, fireEvent, screen, waitFor } from '@testing-library/react-native';
+import { StyleSheet } from 'react-native';
 import { useEffect, useState } from 'react';
 import Home from '../app/index';
 import SignIn from '../app/sign-in';
@@ -15,6 +16,7 @@ import { writePrefs } from '../platform/prefs';
 import { useEssentials, type EssentialsDeps } from '../state/essentials';
 import { useLock, type LockDeps } from '../state/lock';
 import { useVault } from '../state/vault';
+import { audit } from '../test-support/a11y';
 import { installed, renderApp, signedIn } from '../test-support/render';
 import { testVault, type TestVault } from '../test-support/vault';
 import { Button } from '../ui';
@@ -220,8 +222,11 @@ describe('Essentials in airplane mode', () => {
     expect(parts.mem.removed).toEqual([]);
     // Locked with the sign-out: nothing kept is listed until it opens.
     expect(screen.queryByTestId('essential-passport')).toBeNull();
+    expect(audit()).toEqual([]);
     await fireEvent.press(screen.getByTestId('essentials-open-kept'));
-    await fireEvent.press(await screen.findByLabelText('Open: Passport'));
+    await screen.findByLabelText('Open: Passport');
+    expect(audit()).toEqual([]);
+    await fireEvent.press(screen.getByLabelText('Open: Passport'));
     expect(await screen.findByTestId('essential-image')).toBeTruthy();
     // Read, not synced: nothing asked of the vault while signed out.
     expect(t.vault.state.offlineEssentials.received.size).toBe(0);
@@ -282,6 +287,36 @@ describe('Essentials in airplane mode', () => {
     await waitFor(() => expect(screen.queryByTestId('essentials-renew')).toBeNull());
     expect(t.vault.state.sessions.find((s) => !s.revoked)?.offlineGrant).toBeTruthy();
     expect(screen.getByTestId('essential-passport')).toBeTruthy();
+  });
+
+  it('the offer, the password, the list and the viewer work with a screen reader and a thumb — and with buttons alone', async () => {
+    const t = testVault([ORIGIN]);
+    t.vault.state.offlineEssentials.items = [passport()];
+    await start(t);
+    expect(await screen.findByTestId('essentials-keep')).toBeTruthy();
+    expect(audit()).toEqual([]);
+    await fireEvent.press(screen.getByTestId('essentials-keep'));
+    await screen.findByTestId('essentials-password-field');
+    expect(audit()).toEqual([]);
+    await fireEvent.changeText(screen.getByTestId('essentials-password-field'), PASSWORD);
+    await fireEvent.press(screen.getByTestId('essentials-password-go'));
+    await screen.findByTestId('essential-passport');
+    expect(audit()).toEqual([]);
+
+    await fireEvent.press(screen.getByLabelText('Open: Passport'));
+    await screen.findByTestId('essential-image');
+    expect(audit()).toEqual([]);
+    // Pages by Previous and Next; size by Larger and Smaller — no swipe, no pinch.
+    const width = () => Number(StyleSheet.flatten(screen.getByTestId('essential-image').props.style).width);
+    const at = width();
+    await fireEvent.press(screen.getByTestId('essential-larger'));
+    await waitFor(() => expect(width()).toBeGreaterThan(at));
+    await fireEvent.press(screen.getByTestId('essential-smaller'));
+    await waitFor(() => expect(width()).toBe(at));
+    await fireEvent.press(screen.getByTestId('essential-next'));
+    await waitFor(() => expect(screen.getByTestId('essential-page')).toHaveTextContent('Page 2 of 2'));
+    await fireEvent.press(screen.getByTestId('essential-previous'));
+    await waitFor(() => expect(screen.getByTestId('essential-page')).toHaveTextContent('Page 1 of 2'));
   });
 
   it('somebody else’s copies are gone before anything is shown', async () => {

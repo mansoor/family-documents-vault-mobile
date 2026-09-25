@@ -101,7 +101,19 @@ describe('keeping the Essentials as the vault says', () => {
     expect((await everyday.documents()).map((d) => d.id)).toEqual(['passport']);
   });
 
-  it('without a grant, documents are listed but no page is fetched', async () => {
+  it('without a grant the vault says keep nothing, and what was kept goes in that sync', async () => {
+    const everyday = new MemoryEssentialsStore();
+    await syncEssentials({ ...vault([item('passport')]), everyday, private: null, now: () => 1 });
+    expect(await everyday.documents()).toHaveLength(1);
+    // The grant ended (or a password changed): the vault's set is empty.
+    const v = vault([], { grant: false });
+    const r = await syncEssentials({ ...v, everyday, private: null, now: () => 2 });
+    expect(r.grant).toBeNull();
+    expect(await everyday.documents()).toEqual([]);
+    expect(await everyday.page('passport-v1', 1)).toBeNull();
+  });
+
+  it('a set listed without a grant (an older vault) fetches no page', async () => {
     const everyday = new MemoryEssentialsStore();
     const v = vault([item('passport')], { grant: false });
     const r = await syncEssentials({ ...v, everyday, private: null, now: () => 1 });
