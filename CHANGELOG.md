@@ -6,6 +6,51 @@ app's own, tagged `vX.Y.Z` in this repository.
 
 ## [Unreleased]
 
+## [0.1.5] — iteration 4.10: Essentials in airplane mode
+
+Needs a vault at 0.4.13 or later (the offline grant and the offline set).
+
+### Added
+- On this phone, a section of Home. Offered once: "Keep your Essentials
+  on this phone? They'll open with no signal — at an airport, a hospital,
+  a desk. Anyone who can unlock this phone can open them." Keeping them
+  asks for your password once (the vault's offline grant, 30 days). Your
+  own Only me Essentials are a separate, explicit choice, only on a phone
+  whose fingerprint or face unlock is strong enough.
+- Each kept Essential has Open and Show, and how long it is kept for.
+  The viewer pages with Previous and Next and sizes with Larger and
+  Smaller, as well as swipe and pinch; pages go from the encrypted store to
+  memory, never to a file or an image cache.
+- Syncing only in front: when the app unlocks, comes back, is pulled to
+  refresh, or the connection returns. What the vault no longer lists — un-
+  marked, visibility or role changed, a new version — is gone from the
+  phone in the same sync. The grant is renewed with one password from
+  three days before it lapses.
+- Every open of a kept copy, online or not, is told to the vault once it
+  can be.
+- Removal: a session the vault revoked, signing out, changing vault, or
+  somebody else signing in removes every kept copy; so do copies left
+  unchecked past the vault's limit (measured on the vault's clock), with a
+  warning from 14 days before. A lost connection never removes anything.
+- A session that simply expired leaves the copies readable from the
+  sign-in screen, behind the lock: "Sign in again to keep these up to
+  date. You can still open them." Signing in again renews the grant with
+  the password just typed; until there is a grant nothing syncs, so
+  nothing kept is removed.
+
+### Fixed
+- A session kept from before learns what the vault can do when the app
+  starts, not only the next time it comes to the front.
+
+### Tests
+- Screen tests for keeping, airplane mode, revoke, expiry, signing in
+  again (with and without the grant going through), somebody else's
+  copies, and the maximum age; the a11y audit covers the new screens.
+- Maestro: offline-essential.yaml (keep with the password, airplane mode,
+  cold start, unlock, page 1) and essentials-revoked.yaml (the vault
+  revokes the session through its API; the sign-in screen offers nothing
+  kept, and CI finds no Essentials database left on the phone).
+
 ## [0.1.4] — iteration 4.8: the lock and the encrypted stores
 
 ### Added
