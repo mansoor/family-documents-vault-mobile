@@ -17,7 +17,7 @@ import { useEssentials, type EssentialsDeps } from '../state/essentials';
 import { useLock, type LockDeps } from '../state/lock';
 import { useVault } from '../state/vault';
 import { audit } from '../test-support/a11y';
-import { installed, renderApp, signedIn } from '../test-support/render';
+import { installed, knownVault, renderApp, signedIn } from '../test-support/render';
 import { testVault, type TestVault } from '../test-support/vault';
 import { Button } from '../ui';
 
@@ -141,11 +141,16 @@ async function keep(password = PASSWORD) {
 }
 
 /** What pull-to-refresh does for the kept Essentials: a sync, now. */
-const grabbed: { sync: (() => Promise<void>) | null } = { sync: null };
+const grabbed: { sync: (() => Promise<void>) | null; vault: ReturnType<typeof useVault> | null } = {
+  sync: null,
+  vault: null,
+};
 function Grab() {
   const { sync } = useEssentials();
+  const vault = useVault();
   useEffect(() => {
     grabbed.sync = sync;
+    grabbed.vault = vault;
   });
   return null;
 }
@@ -203,6 +208,11 @@ describe('Essentials in airplane mode', () => {
     await pullToRefresh();
     await waitFor(() => expect(parts.mem.removed).toEqual(expect.arrayContaining(['everyday', 'private'])));
     expect(parts.mem.stores.size).toBe(0);
+    // Said on the sign-in screen, where the person now is; and nothing kept is offered.
+    expect(
+      await screen.findByText('This phone was signed out of the vault, so the documents kept on it have been removed.'),
+    ).toBeTruthy();
+    expect(screen.queryByTestId('essentials-signed-out')).toBeNull();
   });
 
   it('an expired session keeps them readable, from sign-in and behind the lock', async () => {
@@ -317,6 +327,146 @@ describe('Essentials in airplane mode', () => {
     await waitFor(() => expect(screen.getByTestId('essential-page')).toHaveTextContent('Page 2 of 2'));
     await fireEvent.press(screen.getByTestId('essential-previous'));
     await waitFor(() => expect(screen.getByTestId('essential-page')).toHaveTextContent('Page 1 of 2'));
+  });
+
+  it('somebody else signing in is offered afresh: the last person’s choice is not theirs, and no grant is taken', async () => {
+    const t = testVault([ORIGIN]);
+    t.vault.state.offlineEssentials.items = [passport()];
+    const parts = phoneParts();
+    // The last person kept theirs here, and their session simply expired.
+    const left = await parts.mem.io.open('everyday');
+    await left.putDocument({
+      id: 'their-will',
+      version_id: 'w1',
+      view: '{"title":"Their will"}',
+      pages: 1,
+      kept_at: 1,
+    });
+    await left.setState(OWNER_KEY, 'https://vault.test|somebody-else');
+    writePrefs('essentials', {
+      enrolled: true,
+      offered: true,
+      kept: true,
+      expired: true,
+      owner: 'https://vault.test|somebody-else',
+    });
+    knownVault(ORIGIN, { email: 'owner@example.test' });
+    t.vault.state.email = 'owner@example.test';
+    t.vault.state.password = PASSWORD;
+    await renderApp(<App />, { fetch: t.fetch, lock: parts.lock, essentials: parts.essentials });
+    await fireEvent.changeText(await screen.findByTestId('sign-in-email'), 'owner@example.test');
+    await fireEvent.changeText(screen.getByTestId('sign-in-password'), PASSWORD);
+    await fireEvent.press(screen.getByTestId('sign-in-go'));
+    // Offered, as to anyone new — the password typed to sign in was not used for a grant.
+    expect(await screen.findByTestId('essentials-keep')).toBeTruthy();
+    expect(t.vault.state.sessions.some((x) => x.offlineGrant)).toBe(false);
+    expect(parts.mem.removed).toContain('everyday');
+    expect(screen.queryByText('Their will')).toBeNull();
+  });
+
+  it('a lapsed grant asks for the password on Home, and one brings the copies back', async () => {
+    const t = testVault([ORIGIN]);
+    t.vault.state.offlineEssentials.items = [passport()];
+    await start(t);
+    await keep();
+    await screen.findByTestId('essential-passport');
+    // Thirty days on: the vault's set says keep nothing.
+    for (const x of t.vault.state.sessions) x.offlineGrant = null;
+    await pullToRefresh();
+    await waitFor(() => expect(screen.queryByTestId('essential-passport')).toBeNull());
+    await fireEvent.press(await screen.findByTestId('essentials-renew'));
+    await fireEvent.changeText(await screen.findByTestId('essentials-password-field'), PASSWORD);
+    await fireEvent.press(screen.getByTestId('essentials-password-go'));
+    expect(await screen.findByTestId('essential-passport')).toBeTruthy();
+    expect(screen.queryByTestId('essentials-renew')).toBeNull();
+  });
+
+  it('a cold start with no connection still shows what is kept', async () => {
+    const t = testVault([ORIGIN]);
+    const parts = phoneParts();
+    const kept = await parts.mem.io.open('everyday');
+    await kept.putDocument({
+      id: 'passport',
+      version_id: 'passport-v1',
+      view: JSON.stringify(passport(1).document),
+      pages: 1,
+      kept_at: 1,
+    });
+    await kept.putPage('passport-v1', 1, new Uint8Array([0xff, 0xd8, 0xff, 0xd9]));
+    await kept.setState(OWNER_KEY, 'https://vault.test|fake-member');
+    await kept.setState(
+      CHECKED_KEY,
+      JSON.stringify({ server_time: '2026-09-20T00:00:00Z', at: Date.now() - 86_400_000, max_offline_days: 90 }),
+    );
+    writePrefs('essentials', { enrolled: true, offered: true, kept: true, owner: 'https://vault.test|fake-member' });
+    await signedIn(t);
+    // Airplane mode from the first moment: what the vault can do is not known.
+    t.reachable.delete(ORIGIN);
+    await renderApp(<App />, { fetch: t.fetch, lock: parts.lock, essentials: parts.essentials });
+    await fireEvent.press(await screen.findByTestId('lock-unlock'));
+    expect(await screen.findByTestId('essential-passport')).toBeTruthy();
+    await fireEvent.press(screen.getByLabelText('Open: Passport'));
+    expect(await screen.findByTestId('essential-image')).toBeTruthy();
+  });
+
+  it('a document whose pages are still being drawn says so, not that it cannot be shown', async () => {
+    const t = testVault([ORIGIN]);
+    const drawing = passport();
+    drawing.version = { ...drawing.version, preview_pages: null, preview_state: 'queued' };
+    t.vault.state.offlineEssentials.items = [drawing];
+    await start(t);
+    await keep();
+    await fireEvent.press(await screen.findByLabelText('Open: Passport'));
+    expect(await screen.findByTestId('essential-pending')).toBeTruthy();
+    expect(screen.queryByTestId('essential-no-preview')).toBeNull();
+  });
+
+  it('a revoke that lands while the copies are still opening removes them all the same', async () => {
+    const t = testVault([ORIGIN]);
+    const parts = phoneParts();
+    // As expo-sqlite does: an open database is not deleted.
+    const store = new MemoryEssentialsStore();
+    await store.putDocument({
+      id: 'passport',
+      version_id: 'passport-v1',
+      view: '{"title":"Passport"}',
+      pages: 1,
+      kept_at: 1,
+    });
+    await store.setState(OWNER_KEY, 'https://vault.test|fake-member');
+    let open = 0;
+    let release: () => void = () => undefined;
+    const held = new Promise<void>((r) => {
+      release = r;
+    });
+    const removed: string[] = [];
+    const realClose = store.close.bind(store);
+    store.close = async () => {
+      open = Math.max(0, open - 1);
+      await realClose();
+    };
+    parts.essentials.io = {
+      // Held open from the moment opening starts, as a real database is.
+      open: async () => {
+        open += 1;
+        await held;
+        return store;
+      },
+      remove: async (tier) => {
+        if (open > 0) throw new Error('Unable to delete database: it is currently open');
+        removed.push(tier);
+      },
+    };
+    writePrefs('essentials', { enrolled: true, offered: true, kept: true, owner: 'https://vault.test|fake-member' });
+    await start(t, parts);
+    // The store is still opening when the vault says the session is over.
+    for (const x of t.vault.state.sessions) x.revoked = true;
+    await act(async () => {
+      await grabbed.vault?.withToken((a, token) => a.documents(token, { limit: 1 })).catch(() => undefined);
+    });
+    await act(async () => release());
+    await waitFor(() => expect(removed).toEqual(expect.arrayContaining(['everyday', 'private'])));
+    expect(open).toBe(0);
   });
 
   it('somebody else’s copies are gone before anything is shown', async () => {

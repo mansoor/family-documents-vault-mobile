@@ -8,15 +8,29 @@ appId: io.github.mansoor.familyvault.e2e
 ---
 - stopApp
 - launchApp
+# The app may learn of the revoke while still locked (anything it asks the
+# vault for does), and put the sign-in screen where the lock screen was: a
+# tap aimed at Unlock would land on whatever is there by then (run
+# 36157652396: "Use another vault"). So: wait for that first, and unlock
+# only if the lock screen is still up.
 - extendedWaitUntil:
     visible:
-      id: lock-screen
-    timeout: 30000
-- tapOn:
-    id: lock-unlock
+      id: sign-in-email
+    timeout: 20000
+    optional: true
+- runFlow:
+    when:
+      visible:
+        id: lock-screen
+    commands:
+      - tapOn:
+          id: lock-unlock
 - extendedWaitUntil:
     visible:
       id: sign-in-email
     timeout: 60000
+# Said where the person is, and nothing kept is offered.
+- assertVisible:
+    id: essentials-notice
 - assertNotVisible:
     id: essentials-signed-out

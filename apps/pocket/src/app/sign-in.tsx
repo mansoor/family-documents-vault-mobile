@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { KeptWhileSignedOut } from '../essentials/ui';
+import { EssentialsNotice, KeptWhileSignedOut } from '../essentials/ui';
 import { useCapture } from '../state/capture';
 import { useEssentials } from '../state/essentials';
 import { useVault, type SignInResult } from '../state/vault';
@@ -136,6 +136,7 @@ export default function SignIn() {
               {t('connect.refuseMobileData')}
             </Notice>
           ) : null}
+          <EssentialsNotice />
           <KeptWhileSignedOut />
           <Button kind="quiet" label={t('signIn.otherVault')} onPress={() => void chooseAnotherVault()} />
         </ScrollView>

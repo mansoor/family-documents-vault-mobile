@@ -6,7 +6,7 @@ import { PanResponder, ScrollView, StyleSheet, useWindowDimensions, View } from 
 import { useEssentials, type OpenCopy } from '../state/essentials';
 import { useScreenGuard } from '../state/lock';
 import { useVault } from '../state/vault';
-import { Button, Notice, Text } from '../ui';
+import { Button, Notice, StatusLine, Text } from '../ui';
 
 const ZOOMS = [1, 1.5, 2, 3];
 
@@ -107,10 +107,16 @@ export function EssentialPages(props: { id: string; mode?: string }) {
         </Notice>
       ) : null}
       {copy === 'missing' ? <Notice tone="warn">{t('essentials.notKept')}</Notice> : null}
-      {copy && copy !== 'missing' && pages === 0 ? <Notice tone="info">{t('essentials.noPreview')}</Notice> : null}
+      {copy && copy !== 'missing' && pages === 0 ? (
+        <Notice tone="info" testID={copy.pending ? 'essential-pending' : 'essential-no-preview'}>
+          {t(copy.pending ? 'essentials.pending' : 'essentials.noPreview')}
+        </Notice>
+      ) : null}
       {pages > 0 ? (
         <>
           <Text variant="title">{title}</Text>
+          {/* Worked out for today on the phone: the vault's may be days old. */}
+          {copy && copy !== 'missing' && copy.status ? <StatusLine status={copy.status} /> : null}
           <View style={styles.tools}>
             <Button
               kind="quiet"

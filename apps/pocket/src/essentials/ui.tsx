@@ -6,7 +6,6 @@ import { Modal, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useEssentials, type EnrolOutcome } from '../state/essentials';
 import { useLock } from '../state/lock';
-import { useVault } from '../state/vault';
 import { Button, Card, Field, Notice, Text } from '../ui';
 
 const day = (ms: number) =>
@@ -21,32 +20,34 @@ export function OnThisPhone() {
   const { t } = useTranslation();
   const e = useEssentials();
   const lock = useLock();
-  const { withToken, who } = useVault();
   const [asking, setAsking] = useState<null | { includePrivate: boolean; renew?: boolean }>(null);
   const [privateChoice, setPrivateChoice] = useState<null | { password: string; count: number }>(null);
+  const [privateProblem, setPrivateProblem] = useState<string | null>(null);
 
   if (!e.available) return null;
 
-  /** How many of the person's own Essentials are Only me: offered as a separate choice. */
-  const ownPrivateCount = async () => {
-    try {
-      const page = await withToken((a, token) => a.documents(token, { essential: 'true', limit: 200 }));
-      return page.items.filter((d) => d.visibility === 'private' && d.owner_member_id === who?.member_id).length;
-    } catch {
-      return 0;
-    }
-  };
-
   const afterPassword = async (password: string): Promise<EnrolOutcome> => {
     if (asking?.includePrivate) return e.enrol(password, true);
-    // The Only me ones are a separate, explicit choice — and need strong biometrics.
-    const count = lock.level === 'strong' ? await ownPrivateCount() : 0;
-    if (count > 0) {
-      setAsking(null);
-      setPrivateChoice({ password, count });
-      return 'ok';
-    }
-    return e.enrol(password, false);
+    // The password first (a wrong one is said here, on the sheet); then the
+    // Only me ones, a separate, explicit choice — needing strong biometrics.
+    const outcome = await e.enrol(password, false);
+    if (outcome !== 'ok') return outcome;
+    const count = lock.level === 'strong' ? await e.countOwnPrivate() : 0;
+    if (count > 0) setPrivateChoice({ password, count });
+    return 'ok';
+  };
+
+  const keepPrivateToo = async (password: string) => {
+    const outcome = await e.enrol(password, true);
+    // Not kept: the password again, with what went wrong.
+    if (outcome !== 'ok') setAsking({ includePrivate: true });
+  };
+
+  const showPrivate = async () => {
+    setPrivateProblem(null);
+    const outcome = await e.openPrivate();
+    if (outcome === 'changed') setPrivateProblem(t('essentials.privateChanged'));
+    else if (outcome === 'unavailable') setPrivateProblem(t('essentials.privateUnavailable'));
   };
 
   const offer = !e.prefs.enrolled && !e.prefs.offered;
@@ -54,17 +55,7 @@ export function OnThisPhone() {
 
   return (
     <View style={styles.section} testID="essentials">
-      {e.notice ? (
-        <Notice tone={e.notice === 'short_of_space' ? 'warn' : 'info'} testID="essentials-notice">
-          {t(
-            e.notice === 'removed_age'
-              ? 'essentials.removedAge'
-              : e.notice === 'signed_out'
-                ? 'essentials.removedSignedOut'
-                : 'essentials.shortOfSpace',
-          )}
-        </Notice>
-      ) : null}
+      <EssentialsNotice />
       {offer ? (
         <Card>
           <Text>{t('essentials.offer')}</Text>
@@ -104,6 +95,20 @@ export function OnThisPhone() {
             </Text>
           )}
           <KeptRows />
+          {e.privateKept > 0 && !e.privateOpen && lock.level === 'strong' ? (
+            <View style={styles.row}>
+              <Text tone="soft" style={styles.rowText}>
+                {t('essentials.privateKept', { count: e.privateKept })}
+              </Text>
+              <Button
+                kind="quiet"
+                testID="essentials-private-open"
+                label={t('essentials.privateShow')}
+                onPress={() => void showPrivate()}
+              />
+            </View>
+          ) : null}
+          {privateProblem ? <Notice tone="warn">{privateProblem}</Notice> : null}
           {privateMissing > 0 && lock.level === 'strong' ? (
             <View style={styles.row}>
               <Text tone="soft" style={styles.rowText}>
@@ -142,23 +147,48 @@ export function OnThisPhone() {
               onPress={() => {
                 const c = privateChoice;
                 setPrivateChoice(null);
-                if (c) void e.enrol(c.password, true);
+                if (c) void keepPrivateToo(c.password);
               }}
             />
             <Button
               testID="essentials-private-no"
               kind="quiet"
               label={t('essentials.alsoPrivateNo')}
-              onPress={() => {
-                const c = privateChoice;
-                setPrivateChoice(null);
-                if (c) void e.enrol(c.password, false);
-              }}
+              onPress={() => setPrivateChoice(null)}
             />
           </View>
         </View>
       </Modal>
     </View>
+  );
+}
+
+/**
+ * Why kept copies went, where the person is when they go (Home, or the
+ * sign-in screen after the vault signed the phone out); dismissable.
+ */
+export function EssentialsNotice() {
+  const { t } = useTranslation();
+  const e = useEssentials();
+  if (!e.notice) return null;
+  return (
+    <Notice tone={e.notice === 'short_of_space' ? 'warn' : 'info'} testID="essentials-notice">
+      <Text>
+        {t(
+          e.notice === 'removed_age'
+            ? 'essentials.removedAge'
+            : e.notice === 'signed_out'
+              ? 'essentials.removedSignedOut'
+              : 'essentials.shortOfSpace',
+        )}
+      </Text>
+      <Button
+        kind="quiet"
+        label={t('essentials.dismiss')}
+        onPress={e.dismissNotice}
+        testID="essentials-notice-dismiss"
+      />
+    </Notice>
   );
 }
 

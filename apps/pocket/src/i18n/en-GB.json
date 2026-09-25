@@ -240,6 +240,13 @@
     "pageAlt": "Page {{n}} of {{title}}",
     "untitled": "Untitled document",
     "count_one": "1 on this phone",
-    "count_other": "{{count}} on this phone"
+    "count_other": "{{count}} on this phone",
+    "privateKept_one": "Your Only me Essential is kept here.",
+    "privateKept_other": "{{count}} of your Only me Essentials are kept here.",
+    "privateShow": "Show them",
+    "privateChanged": "A fingerprint or face was added or changed on this phone, so your Only me copies were removed. They'll be kept again when you're online.",
+    "privateUnavailable": "This phone's fingerprint or face unlock can't open your Only me copies.",
+    "dismiss": "Dismiss",
+    "pending": "The vault is still preparing this document's pages. They'll be kept here the next time the phone is online."
   }
 }

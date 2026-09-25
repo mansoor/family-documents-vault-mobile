@@ -38,9 +38,35 @@ Needs a vault at 0.4.13 or later (the offline grant and the offline set).
   the password just typed; until there is a grant nothing syncs, so
   nothing kept is removed.
 
+- Your Only me copies, if you keep them: "{n} of your Only me Essentials
+  are kept here — Show them" opens them with your fingerprint or face, and
+  brings them up to date when online. Without it, every sync still checks
+  them against the vault's set by their ids alone: one gone or replaced,
+  or no grant, and they are removed whole, to come back the next time.
+- A lapsed or ended grant asks on Home for your password once; the copies
+  come back with it. A document whose pages the vault is still drawing
+  says so. Kept copies show their status worked out for today.
+
 ### Fixed
-- A session kept from before learns what the vault can do when the app
-  starts, not only the next time it comes to the front.
+- A session kept from before, and a password sign-in, learn what the vault
+  can do at once, not only the next time the app comes to the front.
+- Keeping Essentials is the choice of the person who made it: somebody
+  else signing in on the phone is offered it afresh, and the password they
+  typed is never used for a grant; nor does anybody inherit the last
+  person's Only me choice.
+- On this phone shows after a cold start with no connection.
+- Copies being removed while their store is still opening are removed all
+  the same (it is closed first); a removal that fails is tried again at
+  the next start.
+- The copies' age is recorded as soon as the vault's set is applied; a
+  page that fails no longer stops the sync, and opens are always told.
+- The Only me download at enrolment follows an everyday sync already
+  running instead of being dropped; a wrong password is said before the
+  Only me choice is offered.
+- When the connection comes back while the app is in front, it syncs.
+- Removal notices appear where you are (the sign-in screen after the vault
+  signed the phone out) and can be dismissed; nobody who never kept
+  anything is told their copies were removed.
 
 ### Tests
 - Screen tests for keeping, airplane mode, revoke, expiry, signing in

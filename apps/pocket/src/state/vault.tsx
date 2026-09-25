@@ -209,11 +209,17 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
     );
   }, [origin, installation, deps.uploadFetch]);
 
+  // A network change: anything checked on the old one is checked again.
+  // And if the app had found no connection, it looks now — what waited
+  // for the connection (kept Essentials, 4.10) carries on when it answers.
+  const offlineRef = useRef(false);
+  const recheckRef = useRef<() => Promise<void>>(async () => undefined);
   useEffect(
     () =>
       deps.onNetworkChange(() => {
         epoch.current += 1;
         verified.current = null;
+        if (offlineRef.current && AppState.currentState === 'active') void recheckRef.current();
       }),
     [deps],
   );
@@ -393,6 +399,11 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
     };
   }, [vault, api, session, phase, hydrated, recheck]);
 
+  useEffect(() => {
+    offlineRef.current = offline;
+    recheckRef.current = recheck;
+  }, [offline, recheck]);
+
   // Coming back to the front: look again, as the network may have changed.
   useEffect(() => {
     const sub = AppState.addEventListener('change', (state) => {
@@ -476,6 +487,9 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
       // The password was just given: the app's lock opens with it.
       emit('signedIn');
       setPhase('ready');
+      // What the vault can do, learned now — keeping Essentials depends on
+      // it (4.10). Over http the gate learns it before anything is sent.
+      if (vault?.origin.startsWith('https://')) void recheckRef.current();
     },
     [session, vault],
   );

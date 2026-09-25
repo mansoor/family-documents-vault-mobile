@@ -133,6 +133,52 @@ describe('keeping the Essentials as the vault says', () => {
     expect((await everyday.documents()).map((d) => d.id)).toEqual(['passport']);
   });
 
+  it('Only me copies are checked against the set without their store: one gone, and the store goes whole', async () => {
+    const everyday = new MemoryEssentialsStore();
+    const priv = new MemoryEssentialsStore();
+    const both = vault([item('passport'), item('will', { private: true })]);
+    await syncEssentials({ ...both, everyday, private: priv, now: () => 1 });
+    expect(await priv.documents()).toHaveLength(1);
+    // Closed (no fingerprint asked for), and still in the set: left alone.
+    let removed = 0;
+    const removePrivate = async () => void (removed += 1);
+    await syncEssentials({ ...both, everyday, private: null, now: () => 2, removePrivate });
+    expect(removed).toBe(0);
+    // A newer version of it, or gone from the set, or no grant: removed whole.
+    const newer = vault([item('passport'), item('will', { private: true, version: 'will-v2' })]);
+    const r = await syncEssentials({ ...newer, everyday, private: null, now: () => 3, removePrivate });
+    expect(r.privateRemoved).toBe(true);
+    expect(removed).toBe(1);
+    // Nothing more is remembered of it, so the next sync removes nothing again.
+    await syncEssentials({
+      ...vault([item('passport')], { grant: false }),
+      everyday,
+      private: null,
+      now: () => 4,
+      removePrivate,
+    });
+    expect(removed).toBe(1);
+  });
+
+  it('a page that fails still leaves the copies checked, and stops only this sync’s fetching', async () => {
+    const everyday = new MemoryEssentialsStore();
+    const v = vault([item('passport', { pages: 2 }), item('card')]);
+    let calls = 0;
+    const fetchPage = async (versionId: string, n: number): Promise<PageFetch> => {
+      calls += 1;
+      if (calls === 2) throw new Error('Network request failed');
+      return v.fetchPage(versionId, n);
+    };
+    const r = await syncEssentials({ ...v, fetchPage, everyday, private: null, now: () => 7 });
+    expect(r.pageError).toBeTruthy();
+    expect(await lastChecked(everyday)).toMatchObject({ at: 7 });
+    expect((await everyday.documents()).map((doc) => doc.id).sort()).toEqual(['card', 'passport']);
+    // The next sync carries on from there.
+    const again = await syncEssentials({ ...v, everyday, private: null, now: () => 8 });
+    expect(again.pageError).toBeNull();
+    expect(await everyday.page('passport-v1', 2)).not.toBeNull();
+  });
+
   it('a network error changes nothing', async () => {
     const everyday = new MemoryEssentialsStore();
     await syncEssentials({ ...vault([item('passport')]), everyday, private: null, now: () => 1 });
