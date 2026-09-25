@@ -3,7 +3,12 @@
 The Android (and later iPhone) companion to
 [Family Document Vault](https://github.com/mansoor/family-documents-vault):
 capture a document in three taps, keep Essentials on the phone for when there
-is no signal, and show an ID at a counter.
+is no signal, show an ID at a counter, and hear about reminders through a
+notification app of your own (UnifiedPush, such as ntfy — never Google's).
+
+The push side is a local Expo module, `apps/pocket/modules/unifiedpush`
+(Kotlin, around the UnifiedPush connector); its JVM tests run with the e2e
+build in the Maestro workflow.
 
 This repository is private. It consumes the public repository's
 platform-neutral packages (`@fdv/shared`, `@fdv/client`) as a git submodule at

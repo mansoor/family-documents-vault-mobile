@@ -1,0 +1,14 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <!-- Android 13 and later ask; the app asks only when it is turned on. -->
+  <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+  <application>
+    <!-- Not exported: the connector's receiver hands it each event, within the app. -->
+    <service
+      android:name="io.github.mansoor.familyvault.push.VaultPushService"
+      android:exported="false">
+      <intent-filter>
+        <action android:name="org.unifiedpush.android.connector.PUSH_EVENT" />
+      </intent-filter>
+    </service>
+  </application>
+</manifest>

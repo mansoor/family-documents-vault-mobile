@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Every word a push can show (4.14). Nothing in a push message is ever
+  shown: its type picks one of these, and a digest's count fills in the
+  number. Each ends up on a lock screen, so none names a document or a
+  person.
+-->
+<resources>
+  <string name="fv_push_channel_reminders">Reminders</string>
+  <string name="fv_push_channel_reminders_about">What needs attention in your family vault today.</string>
+  <string name="fv_push_channel_security">Security</string>
+  <string name="fv_push_channel_security_about">A new sign-in, a change of owner, or this phone being signed out.</string>
+  <plurals name="fv_push_digest">
+    <item quantity="one">%d thing needs attention</item>
+    <item quantity="other">%d things need attention</item>
+  </plurals>
+  <string name="fv_push_new_device">A new device signed in to your vault</string>
+  <string name="fv_push_owner_change">Something changed about who owns your family vault</string>
+  <string name="fv_push_session_ended">You were signed out on this phone</string>
+  <string name="fv_push_test">Notifications are working.</string>
+  <!-- What the distributor may show for this registration. -->
+  <string name="fv_push_register_label">Family Vault reminders</string>
+</resources>

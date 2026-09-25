@@ -360,5 +360,30 @@
     "you": "{{name}} (you)",
     "none": "No documents for {{name}} yet.",
     "needsConnection": "People need a connection."
+  },
+  "push": {
+    "title": "Notifications",
+    "iphone": "On iPhone, reminders come by email.",
+    "oldVault": "This vault can't send reminders to phones yet. Updating it will fix that.",
+    "noDistributor": "To get reminders on this phone, install a free notification app such as ntfy, then come back. The daily email still works either way.",
+    "permissionOff": "Notifications are off for this app. You can turn them on in your phone's settings.",
+    "openSettings": "Open settings",
+    "offHint": "A note on this phone when something needs attention, and when your account is used somewhere new. It never names a document. Android will ask whether Family Vault may show notifications.",
+    "turnOn": "Turn on",
+    "choose": "Which notification app should bring them?",
+    "waiting": "Setting up…",
+    "on": "On.",
+    "onThrough": "On, through {{distributor}}.",
+    "daily": "Daily reminders",
+    "dailyHint": "On days when something needs attention.",
+    "sendTest": "Send a test",
+    "testSent": "Sent. It should arrive in a moment.",
+    "turnOff": "Turn off",
+    "failed": "Notifications couldn't be set up: {{why}}",
+    "failedNetwork": "there was no connection.",
+    "failedAction": "the notification app needs you to open it first.",
+    "failedOther": "the notification app said no.",
+    "tryAgain": "Try again",
+    "unreachable": "Couldn't reach your vault. Try again when you're online."
   }
 }

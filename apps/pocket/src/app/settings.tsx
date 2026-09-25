@@ -5,13 +5,14 @@ import { useTranslation } from 'react-i18next';
 import { Modal, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { APP_VERSION, SPIKE } from '../config';
+import { NotificationsCard } from '../push/card';
 import { useCapture } from '../state/capture';
 import { useLock, type LockTimeout } from '../state/lock';
 import { useVault } from '../state/vault';
 import { Button, Card, Notice, Text } from '../ui';
 import { useTextScale } from '../ui/text-scale';
 
-/** Settings: which vault, who is signed in, Large text, the lock, sign out. */
+/** Settings: which vault, who is signed in, Large text, the lock, notifications, sign out. */
 export default function Settings() {
   const { t } = useTranslation();
   const router = useRouter();
@@ -96,6 +97,7 @@ export default function Settings() {
                 key={value}
                 testID={`settings-lock-${value}`}
                 accessibilityRole="radio"
+                accessibilityLabel={label}
                 accessibilityState={{ checked: lock.timeout === value }}
                 onPress={() => lock.setTimeout(value)}
                 style={styles.choice}
@@ -126,15 +128,25 @@ export default function Settings() {
           />
         </View>
       </Card>
+      <NotificationsCard />
       <Button testID="settings-sign-out" kind="quiet" label={t('settings.signOut')} onPress={leave} />
       {SPIKE ? <Button kind="quiet" label={t('settings.spike')} onPress={() => router.push('/spike')} /> : null}
       <Modal visible={asking} transparent animationType="fade" onRequestClose={() => setAsking(false)}>
         <View style={styles.scrim}>
-          <View style={[styles.sheet, { paddingBottom: 20 + insets.bottom }]} accessibilityViewIsModal testID="sign-out-question">
+          <View
+            style={[styles.sheet, { paddingBottom: 20 + insets.bottom }]}
+            accessibilityViewIsModal
+            testID="sign-out-question"
+          >
             <Text variant="screen">{t('settings.waiting', { count: capture.queue.length })}</Text>
             {sending > 0 ? <Text tone="soft">{t('settings.onItsWay', { count: sending })}</Text> : null}
             <Button label={t('settings.keepThem')} onPress={() => void leaveAnyway(false)} testID="sign-out-keep" />
-            <Button label={t('settings.removeThem')} kind="danger" onPress={() => void leaveAnyway(true)} testID="sign-out-remove" />
+            <Button
+              label={t('settings.removeThem')}
+              kind="danger"
+              onPress={() => void leaveAnyway(true)}
+              testID="sign-out-remove"
+            />
             <Button label={t('common.cancel')} kind="quiet" onPress={() => setAsking(false)} testID="sign-out-cancel" />
           </View>
         </View>
@@ -145,7 +157,13 @@ export default function Settings() {
 
 const styles = StyleSheet.create({
   scrim: { flex: 1, backgroundColor: 'rgba(28,26,23,0.45)', justifyContent: 'flex-end' },
-  sheet: { backgroundColor: colours.bg, padding: 20, gap: 12, borderTopLeftRadius: radii.l, borderTopRightRadius: radii.l },
+  sheet: {
+    backgroundColor: colours.bg,
+    padding: 20,
+    gap: 12,
+    borderTopLeftRadius: radii.l,
+    borderTopRightRadius: radii.l,
+  },
   page: { padding: 20, gap: 16 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   version: { minHeight: 44, justifyContent: 'center' },
