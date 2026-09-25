@@ -103,11 +103,62 @@ describe('connect', () => {
 
   it('a reinstalled https vault says so', async () => {
     const t = testVault(['https://vault.test']);
-    const known: KnownVault = { origin: 'https://vault.test', instanceId: '11111111-1111-4111-8111-111111111111', httpApproved: false };
+    const known: KnownVault = {
+      origin: 'https://vault.test',
+      instanceId: '11111111-1111-4111-8111-111111111111',
+      httpApproved: false,
+    };
     expect(await connect('vault.test', deps(t, { known: [known] }))).toMatchObject({ kind: 'reinstalled' });
   });
 
   it('something that is not an address is refused', async () => {
     expect(await connect('not an address', deps(testVault()))).toEqual({ kind: 'invalid_address' });
+  });
+});
+
+describe('connect: certificates and Wi-Fi sign-in pages (4.15)', () => {
+  const trust = new Error(
+    'javax.net.ssl.SSLHandshakeException: java.security.cert.CertPathValidatorException: Trust anchor for certification path not found.',
+  );
+  const otherName = new Error('javax.net.ssl.SSLPeerUnverifiedException: Hostname vault.test not verified');
+
+  it('a certificate the phone does not trust says so, not "can\'t reach"', async () => {
+    const t = testVault([]);
+    const out = await connect('vault.test', { ...deps(t), whyFailed: async () => trust });
+    expect(out).toEqual({ kind: 'certificate', host: 'vault.test', trouble: 'untrusted' });
+  });
+
+  it('with nothing wrong with the certificate, it is still "can\'t reach"', async () => {
+    const t = testVault([]);
+    const out = await connect('vault.test', {
+      ...deps(t),
+      whyFailed: async () => new TypeError('Network request failed'),
+    });
+    expect(out).toEqual({ kind: 'unreachable', host: 'vault.test' });
+  });
+
+  it('a vault reached over http on the home network is not held up by its https certificate', async () => {
+    const t = testVault(['http://192.168.1.20:8080']);
+    const out = await connect('192.168.1.20:8080', { ...deps(t), whyFailed: async () => trust });
+    expect(out).toMatchObject({ kind: 'ask_http', origin: 'http://192.168.1.20:8080' });
+  });
+
+  it('a Wi-Fi sign-in page gets its own words', async () => {
+    const t = testVault(['https://vault.test']);
+    t.impostor.set('https://vault.test', '<html>Welcome to Café Wi-Fi</html>');
+    expect(await connect('vault.test', { ...deps(t), validated: async () => false })).toEqual({
+      kind: 'captive_portal',
+    });
+    // On a network that does reach the internet, it is simply not a vault.
+    expect(await connect('vault.test', { ...deps(t), validated: async () => true })).toEqual({ kind: 'not_a_vault' });
+    // A sign-in page answering for https shows a certificate for its own name.
+    const none = testVault([]);
+    expect(
+      await connect('vault.test', { ...deps(none), whyFailed: async () => otherName, validated: async () => false }),
+    ).toEqual({ kind: 'captive_portal' });
+    // A vault that makes its own certificate, on a network with no internet: the certificate words.
+    expect(
+      await connect('vault.test', { ...deps(none), whyFailed: async () => trust, validated: async () => false }),
+    ).toEqual({ kind: 'certificate', host: 'vault.test', trouble: 'untrusted' });
   });
 });
