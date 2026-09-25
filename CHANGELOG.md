@@ -38,6 +38,13 @@ app's own, tagged `vX.Y.Z` in this repository.
 - Probes L1 (the store under SQLCipher, read back, and not plain SQLite on
   disk) and L2 (the Only me key, and what a new fingerprint does to it).
 
+### Fixed
+- A scan saved while the app was still opening its queue at start (most
+  likely just after install or a restart) was kept but never listed as
+  waiting: the queue could be opened twice when the app came to the front
+  at start. It now opens once, and is tried again on coming back only
+  after it failed.
+
 ### Tests
 - The e2e build has a fake phone lock, opened by a tap. Maestro's lock
   flow: not asked again after signing in, locked at a cold start, locked
