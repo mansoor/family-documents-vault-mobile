@@ -216,7 +216,7 @@ function KeptRows() {
         kind="quiet"
         label={t('essentials.show')}
         testID={`essential-show-${item.id}`}
-        onPress={() => router.push({ pathname: '/essential/[id]', params: { id: item.id, mode: 'show' } })}
+        onPress={() => router.push({ pathname: '/show/[id]', params: { id: item.id } })}
       />
     </View>
   ));

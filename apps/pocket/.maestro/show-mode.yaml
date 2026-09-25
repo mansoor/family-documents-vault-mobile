@@ -1,0 +1,45 @@
+# Iteration 4.11's Show mode on an emulator, after offline-essential.yaml
+# has kept the passport on the phone: Show opens it full-screen, Back ends
+# it, and the app is left locked ("Unlock to carry on.").
+appId: io.github.mansoor.familyvault.e2e
+---
+- stopApp
+- launchApp
+- extendedWaitUntil:
+    visible:
+      id: lock-screen
+    timeout: 30000
+- tapOn:
+    id: lock-unlock
+- scrollUntilVisible:
+    element:
+      id: essential-show-.*
+    timeout: 30000
+- tapOn:
+    id: essential-show-.*
+- extendedWaitUntil:
+    visible:
+      id: show-image
+    timeout: 15000
+# Android's own "Viewing full screen" notice, if it is up, would take the Back.
+- runFlow:
+    when:
+      visible:
+        text: Got it
+    commands:
+      - tapOn:
+          text: Got it
+# The controls fade after three seconds: a tap brings them back.
+- tapOn:
+    id: show-screen
+- assertVisible:
+    id: show-done
+- back
+- extendedWaitUntil:
+    visible:
+      id: lock-screen
+    timeout: 10000
+- assertVisible:
+    id: lock-after-show
+- assertNotVisible:
+    id: show-screen

@@ -79,6 +79,9 @@ interface LockValue {
   away<T>(task: () => Promise<T>): Promise<T>;
   /** A part of the app that is never captured, whatever the setting: the card, a document's pages. */
   guard(name: string): () => void;
+  /** Locked now, and why: after Show mode (4.11) the phone may be in someone else's hand. */
+  lockNow(why: 'show'): void;
+  lockedFor: 'show' | null;
   exitApp(): void;
   autoPrompt: boolean;
 }
@@ -105,6 +108,7 @@ export function LockProvider(props: { children: ReactNode; deps?: Partial<LockDe
   const [covered, setCovered] = useState(false);
   const [tooManyTries, setTooManyTries] = useState(false);
   const [everydayKey, setEverydayKey] = useState<string | null>(null);
+  const [lockedFor, setLockedFor] = useState<'show' | null>(null);
   const [prefs, setPrefsState] = useState<LockPrefs>(() => readPrefs('lock', { timeout: '1m', screenshots: false }));
 
   // Read by the AppState listener and the prompt, which outlive a render.
@@ -131,6 +135,7 @@ export function LockProvider(props: { children: ReactNode; deps?: Partial<LockDe
   /** Open now; the everyday key follows (nothing reads it before a store opens). */
   const open = useCallback(() => {
     setTooManyTries(false);
+    setLockedFor(null);
     setStatus('unlocked');
     void d.keys
       .openEveryday()
@@ -278,6 +283,17 @@ export function LockProvider(props: { children: ReactNode; deps?: Partial<LockDe
     writePrefs('lock', next);
   }, []);
 
+  // Why it is locked, even when it locked a moment before by itself (with
+  // "Immediately", going to the back from Show locks first on Android).
+  const lockNow = useCallback(
+    (why: 'show') => {
+      if (statusRef.current !== 'unlocked' && statusRef.current !== 'locked') return;
+      setLockedFor(why);
+      if (statusRef.current === 'unlocked') lock();
+    },
+    [lock],
+  );
+
   const value = useMemo<LockValue>(
     () => ({
       status,
@@ -293,10 +309,12 @@ export function LockProvider(props: { children: ReactNode; deps?: Partial<LockDe
       everydayKey,
       away,
       guard,
+      lockNow,
+      lockedFor,
       exitApp: d.exitApp,
       autoPrompt: d.autoPrompt,
     }),
-    [status, level, covered, tooManyTries, unlock, prefs, setPrefs, d, everydayKey, away, guard],
+    [status, level, covered, tooManyTries, unlock, prefs, setPrefs, d, everydayKey, away, guard, lockNow, lockedFor],
   );
   return <Ctx.Provider value={value}>{props.children}</Ctx.Provider>;
 }
@@ -316,6 +334,8 @@ const NO_LOCK: LockValue = {
   everydayKey: null,
   away: (task) => task(),
   guard: () => () => undefined,
+  lockNow: () => undefined,
+  lockedFor: null,
   exitApp: () => undefined,
   autoPrompt: false,
 };

@@ -6,6 +6,36 @@ app's own, tagged `vX.Y.Z` in this repository.
 
 ## [Unreleased]
 
+## [0.1.6] — iteration 4.11: Show mode
+
+### Added
+- Show, on each Essential kept on the phone: the document full-screen on
+  black, for somebody else to read — at a desk, a gate, a counter. The
+  screen goes to full brightness and stays awake; the system bars are
+  hidden; it is never captured. It turns with the phone, and a Turn button
+  turns it anyway (many phones have auto-rotate off; ID cards are
+  landscape). Previous and Next, Larger and Smaller, as well as swipe and
+  pinch. Works with no connection; every show is told to the vault.
+- Done, Back or a swipe down ends it, and so do going to the back and ten
+  minutes. Ending it always leaves the app locked ("Unlock to carry on."),
+  without the phone's own prompt, so whoever is holding the phone gets
+  nothing more. The brightness is back before anything else; a brightness
+  left by the app stopping while showing is put back at the next launch.
+- "Tap Done, or press back, to finish." The controls fade three seconds
+  after the last touch and come back with a tap — never while a screen
+  reader or another accessibility service (Switch Access, Voice Access) is
+  on; then they sit beside the page, not over it. Made larger, the page
+  moves with a finger.
+- Ended while signed out (an expired session's kept copies), Show leaves
+  the lock screen too, not the sign-in screen.
+
+### Tests
+- show.test.tsx: brightness saved then full, restored on exit, background
+  and unmount, and after a crash; keep-awake only while showing, out after
+  ten minutes; Back to the lock screen; Done always reachable with a
+  screen reader; buttons page, zoom and turn; a show records an open.
+- Maestro show-mode.yaml: enter, Back, and the lock screen is shown.
+
 ## [0.1.5] — iteration 4.10: Essentials in airplane mode
 
 Needs a vault at 0.4.13 or later (the offline grant and the offline set).
