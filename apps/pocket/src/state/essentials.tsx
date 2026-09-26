@@ -1,13 +1,5 @@
 import { ApiRequestError, NetworkError } from '@fdv/client';
-import {
-  deriveStatus,
-  localToday,
-  type DocumentView,
-  type OfflineGrant,
-  type OfflineOpen,
-  type Status,
-  type StatusInput,
-} from '@fdv/shared';
+import type { DocumentView, OfflineGrant, OfflineOpen, Status } from '@fdv/shared';
 import { randomUUID } from 'expo-crypto';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -16,6 +8,7 @@ import { jpegDataUri } from '../essentials/base64';
 import { openPrivateCopies, type CopiesIo } from '../essentials/copies';
 import { deleteEssentials, openEssentials, type Tier } from '../essentials/open';
 import { sendOpens } from '../essentials/opens';
+import { keptType, statusHere, type StatusType } from '../essentials/status';
 import type { EssentialsStore, OfflineDocument } from '../essentials/store';
 import {
   ageOf,
@@ -189,7 +182,6 @@ const RENEW_WITHIN = 3 * DAY;
 const TYPES_KEY = 'types';
 /** Openings not yet told when the copies were removed: told when the vault next answers. */
 const UNSENT_OPENS = 'essentials-unsent-opens';
-type StatusType = NonNullable<StatusInput['type']>;
 
 function defaultDeps(): EssentialsDeps {
   return {
@@ -218,18 +210,6 @@ function listOf(docs: OfflineDocument[], isPrivate: boolean): KeptDocument[] {
     keptAt: doc.kept_at,
     private: isPrivate,
   }));
-}
-
-/** Today's status on the phone, from the kept types; the vault's own word when they are not known. */
-function statusToday(doc: DocumentView, types: StatusType[]): Status | null {
-  const type = types.find((x) => x.key === doc.type_key) ?? null;
-  if (doc.type_key && !type) return doc.status ?? null;
-  try {
-    const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    return deriveStatus({ type, owner_member_id: doc.owner_member_id, expires: doc.expires }, localToday(zone));
-  } catch {
-    return doc.status ?? null;
-  }
 }
 
 async function typesOf(store: EssentialsStore): Promise<StatusType[]> {
@@ -563,14 +543,11 @@ export function EssentialsProvider(props: { children: ReactNode; deps?: Partial<
           problem = result.pageError;
           setGrant(result.grant);
           setSynced(true);
-          // For today's status without a connection.
+          // For today's status without a connection: each type's expiry,
+          // and what it requires (0.2.1), as the vault works status out.
           try {
             const types = await withToken((a, token) => a.documentTypes(token));
-            const kept: StatusType[] = types.items.map((x) => ({
-              key: x.key,
-              expiry_driver: x.expiry_driver,
-              reminder_leads: x.reminder_leads,
-            }));
+            const kept: StatusType[] = types.items.map(keptType);
             await s.setState(TYPES_KEY, JSON.stringify(kept));
           } catch {
             // The last types kept stay.
@@ -712,7 +689,7 @@ export function EssentialsProvider(props: { children: ReactNode; deps?: Partial<
           versionId: doc.version_id,
           pages: Math.max(0, doc.pages),
           pending: doc.pages === PAGES_PENDING,
-          status: statusToday(document, types),
+          status: statusHere(document, types),
           page: async (n) => {
             const bytes = await s.page(doc.version_id, n);
             return bytes ? jpegDataUri(bytes) : null;

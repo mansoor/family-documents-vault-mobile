@@ -8,8 +8,10 @@ import type { QueueStore } from './store';
  * the app is in the foreground. It never gives up by itself: anything that
  * trying again could fix is tried again — the vault's Retry-After when it
  * gives one, growing waits with jitter when it does not — and anything it
- * could not (too big, a kind of file the vault does not keep, details it
- * refuses) waits for a person, with the vault's reason.
+ * could not (too big, a kind of file the vault does not keep, a person no
+ * longer in the family) waits for a person, with the vault's reason. A
+ * detail the vault no longer takes is left out, and said, rather than
+ * leaving the scan unfiled.
  *
  * Every try carries the item's one idempotency key, and a try whose
  * answer never arrived — the connection dropped, the app was closed —
@@ -242,6 +244,9 @@ export class Uploader {
           lastCode: err.code,
         });
       }
+      if (err.status === 422 && err.code === 'invalid_extra' && Object.keys(item.metadata?.extra ?? {}).length > 0) {
+        return this.withoutDetails(item, attempts, err.detail);
+      }
       if (FINAL.has(err.status) || (err.status === 409 && !err.retriable)) {
         await this.deps.store.update(item.id, {
           state: 'needs_you',
@@ -262,6 +267,31 @@ export class Uploader {
     // Wi-Fi): try again later, asking first — or as soon as that changes.
     this.phoneSide.add(item.id);
     return this.wait(item, { attempts, nextAt: later(err), lastCode: 'offline' });
+  }
+
+  /**
+   * The vault no longer takes one of the scan's details (422
+   * invalid_extra): its kind lost the field, or the answer, while the scan
+   * waited on the phone. A scan is never lost for a detail — none is needed
+   * to file one — so the detail it names, or every one when it names none,
+   * is left out and remembered, to be said by its name, and the scan goes
+   * again straight away under the same key: a refusal claims nothing.
+   */
+  private async withoutDetails(item: QueueItem, attempts: number, named: string | undefined): Promise<void> {
+    const { extra = {}, ...rest } = item.metadata ?? {};
+    const keys = Object.keys(extra);
+    const gone = named !== undefined && keys.includes(named) ? [named] : keys;
+    const left = Object.fromEntries(Object.entries(extra).filter(([k]) => !gone.includes(k)));
+    await this.deps.store.update(item.id, {
+      state: 'waiting',
+      attempts,
+      nextAt: 0,
+      lastCode: 'invalid_extra',
+      metadata: Object.keys(left).length > 0 ? { ...rest, extra: left } : rest,
+      dropped: [...(item.dropped ?? []), ...gone],
+    });
+    this.again = true;
+    this.deps.onEvent?.({ kind: 'changed' });
   }
 }
 

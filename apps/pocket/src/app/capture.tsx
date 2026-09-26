@@ -13,12 +13,17 @@ import { AccessibilityInfo, ScrollView, StyleSheet, Switch, View } from 'react-n
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   addPages,
+  andList,
   chooseOwner,
   chooseType,
+  coreAsk,
+  detailError,
   essentialOf,
+  isCardCore,
   moveEarlier,
   moveLater,
   newDraft,
+  ownFields,
   pagesLeft,
   removePage,
   replacePage,
@@ -27,17 +32,18 @@ import {
   typeOf,
   visibilityChoices,
   visibilityOf,
+  type CardCore,
   type Draft,
   type FieldErrors,
   type Household,
 } from '../capture/draft';
 import { matchTypes, rankTypes } from '../capture/types';
-import { Chip, ChipRow, FileRow, LeaveQuestion, PageStrip } from '../capture/ui';
+import { Chip, ChipRow, detailInput, FileRow, LeaveQuestion, PageStrip } from '../capture/ui';
 import type { CaptureSource } from '../queue/commit';
 import { useCapture, type CardData, type SaveProblem } from '../state/capture';
 import { useScreenGuard } from '../state/lock';
 import { useVault } from '../state/vault';
-import { Button, Field, Notice, Text } from '../ui';
+import { Button, Field, Notice, requiredLabel, Text } from '../ui';
 
 type Loaded = CardData;
 
@@ -111,10 +117,24 @@ function Card(props: { initial: CaptureSource }) {
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [asking, setAsking] = useState(false);
+  const scroll = useRef<ScrollView>(null);
+  // Save waited: the first field it waits for is brought into view and
+  // typed in, as on the web (each input moves to itself: Field's goTo).
+  // One with no box to type in (a choice): the notice under the details,
+  // which says what is needed, is brought into view instead.
+  const [goTo, setGoTo] = useState<{ key: string; box: boolean } | null>(null);
+  useEffect(() => {
+    if (goTo && !goTo.box) scroll.current?.scrollToEnd();
+  }, [goTo]);
+  /** Given to the input for `key`: it moves to itself when Save waits for it first. */
+  const goToFor = (key: string) => (goTo?.key === key ? goTo : null);
   const leaving = useRef(false);
   const saving = useRef(false);
   const blocked = useRef<unknown>(null);
   const issuedByOn = caps?.features.issued_by === true;
+  // A type's own details, and what it requires (0.5.11): as the vault says
+  // now, or — with no connection — as it said when the card's choices were kept.
+  const detailsOn = caps ? caps.features.custom_types === true : data?.customTypes === true;
 
   // The vault's choices — or, with no connection, the ones this phone last saw.
   useEffect(() => {
@@ -146,8 +166,11 @@ function Card(props: { initial: CaptureSource }) {
   }, [issuedByOn, data, draft.typeKey, withToken]);
 
   const household = useMemo<Household | null>(
-    () => (data && me ? { types: data.types, members: data.members, me, issuedBy: issuedByOn } : null),
-    [data, me, issuedByOn],
+    () =>
+      data && me
+        ? { types: data.types, members: data.members, me, issuedBy: issuedByOn, details: detailsOn }
+        : null,
+    [data, me, issuedByOn, detailsOn],
   );
 
   // The card can be used once its choices are in: that is when it counts as shown.
@@ -215,6 +238,7 @@ function Card(props: { initial: CaptureSource }) {
       reminder: null,
       noExpiry: false,
     };
+    let labels: Record<string, string> = {};
     if (!skip) {
       if (!household) return;
       const out = toMetadata(draft, household);
@@ -228,7 +252,19 @@ function Card(props: { initial: CaptureSource }) {
         fail(out.problem.message);
         return;
       }
+      // Save waits for what the type requires, and says what; Skip never waits.
+      if (out.missing.length > 0) {
+        setDetails(true);
+        fail(t('capture.stillNeeded', { fields: andList(out.missing.map(labelOf)), count: out.missing.length }));
+        const first = out.missing[0] as string;
+        const kind = own.find((f) => f.key === first)?.kind;
+        setGoTo({ key: first, box: kind !== 'choice' && kind !== 'yes_no' });
+        return;
+      }
       metadata = out.metadata;
+      // The names of the details sent, kept with the scan: what becomes of one is said by its name.
+      const sent = Object.keys(out.metadata.extra ?? {});
+      labels = Object.fromEntries(own.filter((f) => sent.includes(f.key)).map((f) => [f.key, f.label]));
       // Reminders only for what has the date they come from.
       const ty = typeOf(draft, household);
       note = {
@@ -240,7 +276,7 @@ function Card(props: { initial: CaptureSource }) {
     setBusy(true);
     let done = false;
     try {
-      const r = await capture.save(latest.current.source, metadata, note);
+      const r = await capture.save(latest.current.source, metadata, note, labels);
       done = r.kind === 'saved';
       if (done) leave();
       else if (r.kind === 'refused') fail(problemWords(r.problem));
@@ -316,10 +352,36 @@ function Card(props: { initial: CaptureSource }) {
     return [...new Set([...fromFile, ...ranked])].slice(0, 4);
   }, [issuedByOn, draft.issuedBy, draft.source, draft.typeKey, known]);
   const set = (patch: Partial<Draft>) => setDraft((d) => ({ ...d, ...patch }));
+  const setDetail = (key: string, value: string | boolean) =>
+    setDraft((d) => ({ ...d, details: { ...d.details, [key]: value } }));
+
+  // How the card asks for each fixed field (custom_types: the type's own
+  // name for it, and whether Save waits for it; otherwise as in 0.2.0).
+  const rules = household ?? { details: false, issuedBy: issuedByOn };
+  const ask = (key: CardCore) => coreAsk(type, key, rules);
+  const cardWord: Record<CardCore, string> = {
+    issued_by: issuedByLabel(type),
+    identifier: t('capture.number'),
+    issued: t('capture.issued'),
+    expires: t('capture.expires'),
+    physical_location: t('capture.location'),
+  };
+  const coreLabel = (key: CardCore) => ask(key).label ?? cardWord[key];
+  const requiredWord = (required: boolean | undefined) => (required ? t('capture.required') : null);
+  const own = ownFields(type, rules);
+  /** A field's name, as the card shows it. */
+  function labelOf(key: string): string {
+    return isCardCore(key) ? coreLabel(key) : (own.find((f) => f.key === key)?.label ?? key);
+  }
 
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
-      <ScrollView contentContainerStyle={styles.page} keyboardShouldPersistTaps="handled" testID="capture-card">
+      <ScrollView
+        ref={scroll}
+        contentContainerStyle={styles.page}
+        keyboardShouldPersistTaps="handled"
+        testID="capture-card"
+      >
         <Text variant="title">{t('capture.title')}</Text>
 
         {draft.source.kind === 'pages' ? (
@@ -475,7 +537,11 @@ function Card(props: { initial: CaptureSource }) {
             <Button
               label={t('capture.moreDetails')}
               kind="quiet"
-              onPress={() => setDetails((d) => !d)}
+              onPress={() => {
+                setDetails((d) => !d);
+                // Opened again later, the card does not move by itself.
+                setGoTo(null);
+              }}
               testID="more-details"
             />
             {details ? (
@@ -488,17 +554,19 @@ function Card(props: { initial: CaptureSource }) {
                   autoCapitalize="sentences"
                   testID="field-name"
                 />
-                {issuedByOn ? (
+                {ask('issued_by').shown ? (
                   <>
                     <Field
-                      label={issuedByLabel(type)}
+                      label={coreLabel('issued_by')}
+                      required={requiredWord(ask('issued_by').required)}
                       value={draft.issuedBy}
                       onChangeText={(v) => set({ issuedBy: v })}
                       autoCapitalize="words"
+                      goTo={goToFor('issued_by')}
                       testID="field-issued-by"
                     />
                     {issuerOffers.length > 0 ? (
-                      <ChipRow label={issuedByLabel(type)} role="none">
+                      <ChipRow label={coreLabel('issued_by')} role="none">
                         {issuerOffers.map((name) => (
                           <Chip
                             key={name}
@@ -510,40 +578,113 @@ function Card(props: { initial: CaptureSource }) {
                     ) : null}
                   </>
                 ) : null}
-                <Field
-                  label={t('capture.number')}
-                  value={draft.identifier}
-                  onChangeText={(v) => set({ identifier: v })}
-                  testID="field-number"
-                />
-                <Field
-                  label={t('capture.issued')}
-                  value={draft.issued}
-                  onChangeText={(v) => set({ issued: v })}
-                  placeholder="14 Mar 2021"
-                  error={fieldErrors.issued ?? null}
-                  testID="field-issued"
-                />
-                {type?.expiry_driver ? (
+                {ask('identifier').shown ? (
                   <Field
-                    label={t('capture.expires')}
+                    label={coreLabel('identifier')}
+                    required={requiredWord(ask('identifier').required)}
+                    value={draft.identifier}
+                    onChangeText={(v) => set({ identifier: v })}
+                    goTo={goToFor('identifier')}
+                    testID="field-number"
+                  />
+                ) : null}
+                {ask('issued').shown ? (
+                  <Field
+                    label={coreLabel('issued')}
+                    required={requiredWord(ask('issued').required)}
+                    value={draft.issued}
+                    onChangeText={(v) => set({ issued: v })}
+                    placeholder="14 Mar 2021"
+                    error={fieldErrors.issued ?? null}
+                    goTo={goToFor('issued')}
+                    testID="field-issued"
+                  />
+                ) : null}
+                {ask('expires').shown ? (
+                  <Field
+                    label={coreLabel('expires')}
+                    required={requiredWord(ask('expires').required)}
                     value={draft.expires}
                     onChangeText={(v) => set({ expires: v })}
                     placeholder="14 Mar 2031"
                     error={fieldErrors.expires ?? null}
+                    goTo={goToFor('expires')}
                     testID="field-expires"
                   />
                 ) : null}
                 <Text variant="secondary" tone="muted">
                   {t('capture.dateHint')}
                 </Text>
-                <Field
-                  label={t('capture.location')}
-                  value={draft.location}
-                  onChangeText={(v) => set({ location: v })}
-                  autoCapitalize="sentences"
-                  testID="field-location"
-                />
+                {ask('physical_location').shown ? (
+                  <Field
+                    label={coreLabel('physical_location')}
+                    required={requiredWord(ask('physical_location').required)}
+                    value={draft.location}
+                    onChangeText={(v) => set({ location: v })}
+                    autoCapitalize="sentences"
+                    goTo={goToFor('physical_location')}
+                    testID="field-location"
+                  />
+                ) : null}
+                {/* The type's own details (custom_types), each with the input its kind asks for. */}
+                {own.map((f) => {
+                  const value = draft.details[f.key];
+                  const error = fieldErrors[detailError(f.key)] ?? null;
+                  const required = requiredWord(f.required);
+                  if (f.kind === 'yes_no') {
+                    return (
+                      <View key={f.key} style={styles.switchRow}>
+                        <Text weight="600" style={styles.flex}>
+                          {requiredLabel(f.label, required)}
+                        </Text>
+                        <Switch
+                          accessibilityLabel={required ? `${f.label}, ${required}` : f.label}
+                          value={value === true}
+                          onValueChange={(v) => setDetail(f.key, v)}
+                          trackColor={{ true: colours.accent, false: colours.borderInput }}
+                          testID={`field-detail-${f.key}`}
+                        />
+                      </View>
+                    );
+                  }
+                  if (f.kind === 'choice') {
+                    return (
+                      <View key={f.key} style={styles.section}>
+                        <Text variant="secondary" weight="600" tone="soft">
+                          {requiredLabel(f.label, required)}
+                        </Text>
+                        <ChipRow label={required ? `${f.label}, ${required}` : f.label}>
+                          {(f.choices ?? []).map((c) => (
+                            <Chip
+                              key={c}
+                              label={c}
+                              selected={value === c}
+                              onPress={() => setDetail(f.key, value === c ? '' : c)}
+                            />
+                          ))}
+                        </ChipRow>
+                        {error ? (
+                          <Text variant="secondary" tone="danger" role="alert">
+                            {error}
+                          </Text>
+                        ) : null}
+                      </View>
+                    );
+                  }
+                  return (
+                    <Field
+                      key={f.key}
+                      label={f.label}
+                      required={required}
+                      value={typeof value === 'string' ? value : ''}
+                      onChangeText={(v) => setDetail(f.key, v)}
+                      error={error}
+                      goTo={goToFor(f.key)}
+                      testID={`field-detail-${f.key}`}
+                      {...detailInput(f.kind)}
+                    />
+                  );
+                })}
               </View>
             ) : null}
 

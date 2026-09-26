@@ -31,6 +31,8 @@ export const CATALOGUE: Readonly<Record<string, string>> = {
   preview_pending: 'errors.previewPending',
   no_preview: 'errors.noPreview',
   upload_in_progress: 'errors.uploadInProgress',
+  // The vault's own words name the detail by its key: never shown (the queue files the scan without it).
+  invalid_extra: 'errors.invalidExtra',
   // Busy for now: a scan waiting on these is tried again by itself.
   unavailable: 'errors.unavailable',
   request_timeout: 'errors.timeout',

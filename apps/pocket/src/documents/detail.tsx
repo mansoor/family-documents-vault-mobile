@@ -5,7 +5,9 @@ import {
   colours,
   formatDate,
   radii,
+  whenExactly,
   whenWords,
+  type DocumentTypeView,
   type DocumentView,
   type Member,
   type VersionView,
@@ -23,6 +25,7 @@ import { useLock } from '../state/lock';
 import { useStepUp } from '../state/step-up';
 import { useVault } from '../state/vault';
 import { Button, Notice, StatusLine, Text } from '../ui';
+import { detailFacts } from './details';
 import { latestOf, openOnline } from './online';
 import { markWarnedAboutCopies, saveCopy, warnedAboutCopies } from './save-copy';
 
@@ -51,6 +54,7 @@ export function DocumentDetail(props: { id: string }) {
   const [doc, setDoc] = useState<DocumentView | null>(null);
   const [versions, setVersions] = useState<VersionView[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
+  const [types, setTypes] = useState<DocumentTypeView[]>([]);
   const [problem, setProblem] = useState<Problem>(null);
   const [notice, setNotice] = useState<{ tone: 'ok' | 'warn'; text: string } | null>(null);
   const [warning, setWarning] = useState(false);
@@ -70,12 +74,19 @@ export function DocumentDetail(props: { id: string }) {
 
   const load = useCallback(async () => {
     try {
-      const [d, v, m] = await withToken((a, token) =>
-        Promise.all([a.document(token, id), a.versions(token, id), a.members(token).catch(() => ({ items: [] }))]),
+      const [d, v, m, ty] = await withToken((a, token) =>
+        Promise.all([
+          a.document(token, id),
+          a.versions(token, id),
+          a.members(token).catch(() => ({ items: [] })),
+          // For the type's details: its own fields, and its names for them.
+          a.documentTypes(token).catch(() => ({ items: [] })),
+        ]),
       );
       setDoc(d);
       setVersions(v.items);
       setMembers(m.items);
+      setTypes(ty.items);
       setProblem(null);
     } catch (err) {
       if (err instanceof ApiRequestError && (err.status === 404 || err.code === 'not_found')) setProblem('not_found');
@@ -201,11 +212,17 @@ export function DocumentDetail(props: { id: string }) {
   }
 
   const owner = members.find((m) => m.id === shown.owner_member_id);
+  // The type's own details, from the vault's answer for this document only:
+  // an Only me document's are sealed everywhere else (a list, the offline
+  // set, so a kept copy) and opened there for its owner (0.5.8).
+  const type = types.find((x) => x.key === shown.type_key);
+  const details = doc ? detailFacts(type?.fields, doc.extra, { yes: t('document.yes'), no: t('document.no') }) : [];
   const facts: [string, string | null][] = [
     [t('document.owner'), owner?.display_name ?? null],
     [t('document.issuedBy'), shown.issued_by ?? null],
     [t('document.issued'), shown.issued ? formatDate(shown.issued) : null],
     [t('document.expires'), shown.expires ? formatDate(shown.expires) : null],
+    ...details,
   ];
   const primaryIsShow = shown.is_essential;
 
@@ -291,7 +308,7 @@ export function DocumentDetail(props: { id: string }) {
               {v.id === latest?.id ? ` · ${t('document.current')}` : ''}
             </Text>
             <Text tone="soft" variant="secondary">
-              {t('document.versionAdded', { when: whenWords(v.uploaded_at) })}
+              {versionLine(v)}
             </Text>
           </View>
         ))}
@@ -310,6 +327,20 @@ export function DocumentDetail(props: { id: string }) {
     setRefreshing(true);
     await load();
     setRefreshing(false);
+  }
+
+  /**
+   * When a version was added, and by whom (a vault of 0.5.1 or later):
+   * "Added 25 Sept 2026, 4:12pm by Sarah". A viewer is told only when, and
+   * so is anybody about someone who has left; an older vault says neither,
+   * and its history reads as in 0.2.0.
+   */
+  function versionLine(v: VersionView): string {
+    if (v.uploaded_by_name === undefined) return t('document.versionAdded', { when: whenWords(v.uploaded_at) });
+    const when = whenExactly(v.uploaded_at);
+    return v.uploaded_by_name
+      ? t('document.versionAddedBy', { when, name: v.uploaded_by_name })
+      : t('document.versionAdded', { when });
   }
 }
 

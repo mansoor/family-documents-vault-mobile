@@ -3,11 +3,14 @@ import {
   can,
   checkCaptureMetadata,
   effectiveVisibility,
+  missingFields,
   parseDateInput,
   type CaptureMetadata,
   type CaptureProblem,
   type DocumentTypeView,
+  type RequiredValues,
   type Role,
+  type TypeField,
   type Visibility,
 } from '@fdv/shared';
 import { MAX_PAGES, type CaptureSource, type PageRef } from '../queue/commit';
@@ -32,6 +35,12 @@ export interface Draft {
   issued: string;
   expires: string;
   location: string;
+  /**
+   * The type's own details, by field key, as the card holds them (a vault
+   * with custom_types, 0.2.1): what was typed, the answer chosen, or a
+   * yes/no.
+   */
+  details: Record<string, string | boolean>;
 }
 
 export interface Me {
@@ -45,6 +54,12 @@ export interface Household {
   me: Me;
   /** The vault takes issued_by (0.4.10). */
   issuedBy: boolean;
+  /**
+   * The vault keeps each type's own details and says which fields it
+   * requires (`features.custom_types`, 0.5.11): the card asks for them, and
+   * Save waits for the required ones. Without it the card is as in 0.2.0.
+   */
+  details: boolean;
 }
 
 /** The app speaks en-GB: 14/03/2031 is the fourteenth of March. */
@@ -64,6 +79,7 @@ export function newDraft(source: CaptureSource, me: Me): Draft {
     issued: '',
     expires: '',
     location: '',
+    details: {},
   };
 }
 
@@ -143,6 +159,8 @@ export function chooseType(d: Draft, key: string | null): Draft {
     visibility: null,
     essential: null,
     expires: key === d.typeKey ? d.expires : '',
+    // Another type asks for other details.
+    details: key === d.typeKey ? d.details : {},
   };
 }
 
@@ -173,13 +191,119 @@ export function suggestedTitle(d: Draft, h: Household): string | null {
   });
 }
 
-export type FieldErrors = Partial<Record<'issued' | 'expires', string>>;
+/**
+ * What the card says is wrong with a field, by the field: `issued`,
+ * `expires`, or `detail:<key>` for one of the type's own details.
+ */
+export type FieldErrors = Partial<Record<string, string>>;
+
+/** Where a type's own detail is wrong, in FieldErrors. */
+export const detailError = (key: string) => `detail:${key}`;
 
 export const DATE_HINT = 'A date, a month (March 2031) or a year';
 
+/** The fixed fields the card has an input for, in its order. Tags and notes it does not ask. */
+export const CARD_CORE = ['issued_by', 'identifier', 'issued', 'expires', 'physical_location'] as const;
+export type CardCore = (typeof CARD_CORE)[number];
+
+/** How the card asks for one of the fixed fields: whether, the type's own name for it, and whether Save waits. */
+export interface CoreAsk {
+  shown: boolean;
+  /** The type's name for it ("Passport number"); null is the card's own word. */
+  label: string | null;
+  required: boolean;
+}
+
+/**
+ * The fields a type requires, by the vault's own rule (`missingFields` of a
+ * document with nothing in it): an expiry for every type that expires, the
+ * fixed fields it requires, then its own. None on a vault without
+ * custom_types, where the card never waits.
+ */
+export function requiredKeys(type: DocumentTypeView | undefined, h: Pick<Household, 'details'>): Set<string> {
+  return new Set(h.details && type ? missingFields(type, {}).map((m) => m.key) : []);
+}
+
+/** How the card asks for a fixed field, for this type (as in 0.2.0 on a vault without custom_types). */
+export function coreAsk(
+  type: DocumentTypeView | undefined,
+  key: CardCore,
+  h: Pick<Household, 'details' | 'issuedBy'>,
+): CoreAsk {
+  const rule = h.details ? type?.core?.[key] : undefined;
+  const shown =
+    key === 'expires'
+      ? Boolean(type?.expiry_driver)
+      : (key !== 'issued_by' || h.issuedBy) && rule?.shown !== false;
+  return { shown, label: rule?.label ?? null, required: shown && requiredKeys(type, h).has(key) };
+}
+
+/** The type's own fields the card asks for, in the type's order: none without custom_types. */
+export function ownFields(type: DocumentTypeView | undefined, h: Pick<Household, 'details'>): TypeField[] {
+  return h.details && type ? type.fields : [];
+}
+
+/**
+ * A comma is read only where it groups thousands: 1,234 and 1,234.50. Any
+ * other (12,50, 3,5) may be a decimal comma, and is never guessed at: read
+ * as thousands it would keep an amount 100 times too big. The web card's
+ * rule (apps/web/src/details.tsx, 0.5.11); @fdv/shared has no reader to share.
+ */
+const THOUSANDS = /^[-+]?\d{1,3}(,\d{3})+(\.\d*)?$/;
+
+/**
+ * One of the type's own details as the vault keeps it, from what the card
+ * holds: null for no value, or why it cannot be read. A required yes/no
+ * left alone says no, as its switch shows, and is sent so.
+ */
+export function readDetail(
+  field: Pick<TypeField, 'kind' | 'required'>,
+  raw: string | boolean | undefined,
+): { value: unknown } | { message: string } {
+  if (field.kind === 'yes_no') return { value: typeof raw === 'boolean' ? raw : field.required ? false : null };
+  const text = typeof raw === 'string' ? raw.trim() : '';
+  if (text === '') return { value: null };
+  switch (field.kind) {
+    case 'date': {
+      const v = parseDateInput(text, { order: DATE_ORDER });
+      return v ? { value: v } : { message: `That isn't a date we can read. ${DATE_HINT}.` };
+    }
+    case 'year':
+      return /^\d{4}$/.test(text) ? { value: Number(text) } : { message: 'That should be a year, such as 2026.' };
+    case 'number': {
+      const typed = text.replace(/\s/g, '');
+      if (typed.includes(',') && !THOUSANDS.test(typed)) return { message: 'Use a point for a decimal, such as 3.5.' };
+      // Written out in figures, as the web card takes it: never 0x10 or 1e3.
+      const n = typed.replace(/,/g, '');
+      return /^[-+]?(\d+\.?\d*|\.\d+)$/.test(n)
+        ? { value: Number(n) }
+        : { message: 'That should be a number, such as 42.' };
+    }
+    case 'money': {
+      const typed = text.replace(/[£$€\s]/g, '');
+      if (typed.includes(',') && !THOUSANDS.test(typed)) return { message: 'Use a point for pence, such as 12.50.' };
+      const amount = typed.replace(/,/g, '');
+      return /^-?(\d+(\.\d{1,2})?|\.\d{1,2})$/.test(amount)
+        ? { value: Number(amount) }
+        : { message: 'That should be an amount, such as 12.50.' };
+    }
+    default:
+      // Text, a choice, and a kind this app does not know yet: as written.
+      return { value: text };
+  }
+}
+
+/** "Passport number and Expires"; "A, B and C". */
+export function andList(words: readonly string[]): string {
+  if (words.length <= 1) return words[0] ?? '';
+  return `${words.slice(0, -1).join(', ')} and ${words[words.length - 1]}`;
+}
+
 /**
  * Save: every answer given, as the vault takes it — or what is wrong with
- * them, in the vault's own words, before anything is kept.
+ * them, in the vault's own words, before anything is kept. `missing` is
+ * what Save waits for (custom_types): the required fields the card asks
+ * for and has no value for, in its order.
  */
 export function toMetadata(
   d: Draft,
@@ -188,6 +312,7 @@ export function toMetadata(
   metadata: CaptureMetadata;
   fields: FieldErrors;
   problem: CaptureProblem | null;
+  missing: string[];
 } {
   const type = typeOf(d, h);
   const fields: FieldErrors = {};
@@ -198,6 +323,8 @@ export function toMetadata(
     return v ?? undefined;
   };
   const text = (s: string) => (s.trim() === '' ? undefined : s.trim());
+  // A fixed field the type does not show is not sent (custom_types).
+  const asks = (key: CardCore) => coreAsk(type, key, h).shown;
   const m: CaptureMetadata = {};
   if (d.typeKey) m.type_key = d.typeKey;
   if (d.ownerId) m.owner_member_id = d.ownerId;
@@ -205,20 +332,48 @@ export function toMetadata(
   m.is_essential = essentialOf(d, h);
   const title = text(d.title) ?? suggestedTitle(d, h);
   if (title) m.title = title;
-  const issued = date(d.issued, 'issued');
+  const issued = asks('issued') ? date(d.issued, 'issued') : undefined;
   if (issued) m.issued = issued;
   const expires = type?.expiry_driver ? date(d.expires, 'expires') : undefined;
   if (expires) m.expires = expires;
-  const identifier = text(d.identifier);
+  const identifier = asks('identifier') ? text(d.identifier) : undefined;
   if (identifier) m.identifier = identifier;
-  const issuedBy = h.issuedBy ? text(d.issuedBy) : undefined;
+  const issuedBy = asks('issued_by') ? text(d.issuedBy) : undefined;
   if (issuedBy) m.issued_by = issuedBy.replace(/\s+/g, ' ');
-  const location = text(d.location);
+  const location = asks('physical_location') ? text(d.location) : undefined;
   if (location) m.physical_location = location;
-  const problem = checkCaptureMetadata(m, {
+  // The type's own details (custom_types): only those with a value.
+  const own = ownFields(type, h);
+  const extra: Record<string, unknown> = {};
+  for (const f of own) {
+    const read = readDetail(f, d.details[f.key]);
+    if ('message' in read) fields[detailError(f.key)] = read.message;
+    else if (read.value !== null) extra[f.key] = read.value;
+  }
+  if (Object.keys(extra).length > 0) m.extra = extra;
+  let problem = checkCaptureMetadata(m, {
     me: h.me,
     members: h.members,
     types: h.types,
   });
-  return { metadata: m, fields, problem };
+  // A detail the vault would refuse is said on the detail itself.
+  if (problem?.field === 'extra' && problem.key && own.some((f) => f.key === problem?.key)) {
+    fields[detailError(problem.key)] = problem.message;
+    problem = null;
+  }
+  // What Save waits for: what the vault would find missing, by the same rule, among what the card asks.
+  const held: RequiredValues = {
+    identifier: m.identifier ?? null,
+    issued_by: m.issued_by ?? null,
+    issued: m.issued ?? null,
+    expires: m.expires ?? null,
+    physical_location: m.physical_location ?? null,
+    extra,
+  };
+  const need = new Set(h.details && type ? missingFields(type, held).map((x) => x.key) : []);
+  const missing = [...CARD_CORE.filter(asks), ...own.map((f) => f.key)].filter((k) => need.has(k));
+  return { metadata: m, fields, problem, missing };
 }
+
+/** One of the fixed fields the card has an input for, rather than one of the type's own. */
+export const isCardCore = (key: string): key is CardCore => (CARD_CORE as readonly string[]).includes(key);

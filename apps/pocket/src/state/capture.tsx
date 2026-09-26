@@ -17,7 +17,7 @@ import {
   type CommitProblem,
   type PageRef,
 } from '../queue/commit';
-import type { QueueItem } from '../queue/item';
+import { filedWithout as leftOut, type FiledWithout, type QueueItem } from '../queue/item';
 import { openQueue } from '../queue/open';
 import type { QueueStore } from '../queue/store';
 import { NotThisAccountError, Uploader } from '../queue/uploader';
@@ -64,10 +64,17 @@ export interface SavedNote {
 
 /** What the card offers, as last seen from the vault: kept so it works offline. */
 export interface CardData {
+  /** Each with its own fields and what it requires: a scan's details are checked against them offline. */
   types: DocumentTypeView[];
   members: Member[];
   /** The type of each document the phone could see, for ranking the chips. */
   filed: (string | null)[];
+  /**
+   * After a start with no connection, whether the vault asked for each
+   * type's details (`features.custom_types`) when it last said: the card
+   * asks as it did then (0.2.1). Otherwise absent: the vault's word is at hand.
+   */
+  customTypes?: boolean;
 }
 
 interface CaptureValue {
@@ -103,6 +110,8 @@ interface CaptureValue {
     source: CaptureSource,
     metadata: CaptureMetadata | null,
     note: Omit<SavedNote, 'unnamed'>,
+    /** The card's names for the type's own details it sends, by field key. */
+    labels?: Record<string, string>,
   ) => Promise<SaveOutcome>;
   throwAway: (source: CaptureSource) => Promise<void>;
   discard: (uri: string) => Promise<void>;
@@ -112,6 +121,9 @@ interface CaptureValue {
   delivered: number;
   saved: SavedNote | null;
   dismissSaved: () => void;
+  /** Scans the vault took without some of their details, since this person last dismissed them. */
+  filedWithout: FiledWithout[];
+  dismissFiledWithout: () => void;
   remove: (id: string) => Promise<void>;
   timings: TimingRecorder;
 }
@@ -142,12 +154,15 @@ function openFailure(err: unknown): string {
   return 'other';
 }
 
+/** Where the vault's custom_types is kept beside a card's choices (forgotten with them: same prefix). */
+const kindsKey = (cardKey: string) => `${cardKey}|kinds`;
+
 /** In front, or not yet known to be anywhere else (AppState says 'unknown' until its first event). */
 const inFront = () => AppState.currentState !== 'background' && AppState.currentState !== 'inactive';
 
 export function CaptureProvider(props: { children: ReactNode; deps?: Partial<CaptureDeps> }) {
   const deps = useMemo<CaptureDeps>(() => ({ ...defaultDeps(), ...props.deps }), [props.deps]);
-  const { who, withToken, uploadApi, api, sessionOwner, vault, offline } = useVault();
+  const { who, withToken, uploadApi, api, sessionOwner, vault, offline, caps } = useVault();
   // Leaving for the scanner or a picker is not leaving the app: it does not lock.
   const lock = useLock();
   const origin = vault?.origin ?? null;
@@ -159,6 +174,7 @@ export function CaptureProvider(props: { children: ReactNode; deps?: Partial<Cap
   const [waitingHere, setWaitingHere] = useState(0);
   const [delivered, setDelivered] = useState(0);
   const [saved, setSaved] = useState<SavedNote | null>(null);
+  const [filedWithout, setFiledWithout] = useState<FiledWithout[]>([]);
   const timings = useMemo(() => new TimingRecorder(deps.now), [deps.now]);
   const storeRef = useRef<QueueStore | null>(null);
 
@@ -286,6 +302,9 @@ export function CaptureProvider(props: { children: ReactNode; deps?: Partial<Cap
         if (e.kind === 'sent') {
           timings.created(e.item.id);
           setDelivered((n) => n + 1);
+          // Filed without a detail its kind no longer takes: said, by the detail's name.
+          const without = leftOut(e.item);
+          if (without) setFiledWithout((l) => [...l, without]);
         }
         void refresh();
       },
@@ -302,6 +321,7 @@ export function CaptureProvider(props: { children: ReactNode; deps?: Partial<Cap
     // Only when the account changes: the Saved line was the last person's.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setSaved(null);
+    setFiledWithout([]);
     setPending((p) => {
       if (p && pendingFor.current !== whoKey) {
         for (const uri of sourceFiles(p)) void deps.discard(uri);
@@ -355,7 +375,10 @@ export function CaptureProvider(props: { children: ReactNode; deps?: Partial<Cap
       } catch {
         const held = cardFresh.current;
         if (held && held.key === key) return held.data;
-        return (await storeRef.current?.cached<CardData>(key)) ?? null;
+        const kept = (await storeRef.current?.cached<CardData>(key)) ?? null;
+        // Started with no connection: whether the vault asked for details, as it last said.
+        const said = kept && (await storeRef.current?.cached<{ customTypes: boolean }>(kindsKey(key)));
+        return kept && said ? { ...kept, customTypes: said.customTypes } : kept;
       } finally {
         if (cardFetch.current === entry) cardFetch.current = null;
       }
@@ -373,6 +396,14 @@ export function CaptureProvider(props: { children: ReactNode; deps?: Partial<Cap
     if (store && held && held.key === cardKey && cardKept !== cardKey)
       void keepCard(held.key, held.data).catch(() => undefined);
   }, [store, cardKey, cardKept, keepCard]);
+  // Whether the vault asks for each type's details (custom_types), kept
+  // beside the card's choices each time it says, for a card opened after a
+  // start with no connection (0.2.1).
+  const customTypes = caps ? caps.features.custom_types === true : null;
+  useEffect(() => {
+    if (store && cardKey && customTypes !== null)
+      void store.cache(kindsKey(cardKey), { customTypes }).catch(() => undefined);
+  }, [store, cardKey, customTypes]);
 
   // Foreground only: sending stops in the background and starts again in
   // front; a network change is worth a look only while in front.
@@ -461,6 +492,7 @@ export function CaptureProvider(props: { children: ReactNode; deps?: Partial<Cap
       source: CaptureSource,
       metadata: CaptureMetadata | null,
       note: Omit<SavedNote, 'unnamed'>,
+      labels?: Record<string, string>,
     ): Promise<SaveOutcome> => {
       if (saving.current) return saving.current;
       const run = (async (): Promise<SaveOutcome> => {
@@ -476,7 +508,7 @@ export function CaptureProvider(props: { children: ReactNode; deps?: Partial<Cap
         timings.mark('save');
         try {
           const item = await commitCapture(
-            { source, metadata, origin: w.origin, account: w.member_id },
+            { source, metadata, origin: w.origin, account: w.member_id, labels: labels ?? null },
             {
               store: s,
               read: deps.read,
@@ -623,6 +655,8 @@ export function CaptureProvider(props: { children: ReactNode; deps?: Partial<Cap
       delivered,
       saved,
       dismissSaved: () => setSaved(null),
+      filedWithout,
+      dismissFiledWithout: () => setFiledWithout([]),
       remove,
       timings,
     }),
@@ -646,6 +680,7 @@ export function CaptureProvider(props: { children: ReactNode; deps?: Partial<Cap
       queue,
       delivered,
       saved,
+      filedWithout,
       remove,
       timings,
     ],

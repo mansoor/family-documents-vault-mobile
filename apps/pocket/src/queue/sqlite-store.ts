@@ -57,6 +57,11 @@ create table card_cache (
   saved_at integer not null
 );
 `,
+  // 0.2.1: the card's names for a scan's details, and those left out to file it.
+  `
+alter table queue_item add column labels text;
+alter table queue_item add column dropped text;
+`,
 ];
 
 interface Row {
@@ -77,12 +82,16 @@ interface Row {
   kind: QueueItem['kind'];
   target: string | null;
   last_code: string | null;
+  labels: string | null;
+  dropped: string | null;
 }
 
 const COLUMNS: Record<Exclude<keyof QueueItem, 'id'>, keyof Row> = {
   kind: 'kind',
   target: 'target',
   lastCode: 'last_code',
+  labels: 'labels',
+  dropped: 'dropped',
   key: 'key',
   origin: 'origin',
   account: 'account',
@@ -98,8 +107,11 @@ const COLUMNS: Record<Exclude<keyof QueueItem, 'id'>, keyof Row> = {
   problem: 'problem',
 };
 
+/** Kept as JSON; absent (the optional ones) as null. */
+const JSON_FIELDS = new Set<keyof QueueItem>(['metadata', 'problem', 'labels', 'dropped']);
+
 function toParam(field: Exclude<keyof QueueItem, 'id'>, value: unknown): SqlParam {
-  if (field === 'metadata' || field === 'problem') return value === null ? null : JSON.stringify(value);
+  if (JSON_FIELDS.has(field)) return value === null || value === undefined ? null : JSON.stringify(value);
   if (field === 'askFirst') return value ? 1 : 0;
   return value as SqlParam;
 }
@@ -123,6 +135,8 @@ function fromRow(r: Row): QueueItem {
     nextAt: r.next_at,
     askFirst: r.ask_first === 1,
     problem: r.problem === null ? null : (JSON.parse(r.problem) as QueueItem['problem']),
+    ...(r.labels === null ? {} : { labels: JSON.parse(r.labels) as Record<string, string> }),
+    ...(r.dropped === null ? {} : { dropped: JSON.parse(r.dropped) as string[] }),
   };
 }
 

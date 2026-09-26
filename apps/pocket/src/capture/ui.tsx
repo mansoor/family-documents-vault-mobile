@@ -3,7 +3,16 @@ import { Image } from 'expo-image';
 import { ArrowLeft, ArrowRight, Camera, FileText, Plus, Trash2 } from 'lucide-react-native';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import {
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  View,
+  type PlatformOSType,
+  type TextInputProps,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { PageRef, PickedFile } from '../queue/commit';
 import { Button, Text } from '../ui';
@@ -169,6 +178,37 @@ export function PageStrip(props: {
       ) : null}
     </ScrollView>
   );
+}
+
+type DetailInput = Pick<TextInputProps, 'autoCapitalize' | 'multiline' | 'keyboardType' | 'placeholder'>;
+
+/**
+ * How each kind of the type's own details is typed: the keyboard, and an
+ * example. Each platform gets a keyboard it has: Android opens its letters
+ * for one it does not know (numbers-and-punctuation is iOS's), and its
+ * `numeric` takes a sign and a point. A decimal is typed with a point
+ * (readDetail), which iOS's decimal pad may not offer — it shows the
+ * region's separator, a comma in much of Europe — so iOS types numbers
+ * and amounts on its numbers-and-punctuation keyboard.
+ */
+export function detailInput(kind: string, os: PlatformOSType = Platform.OS): DetailInput | undefined {
+  const ios = os === 'ios';
+  switch (kind) {
+    case 'text':
+      return { autoCapitalize: 'sentences' };
+    case 'long_text':
+      return { autoCapitalize: 'sentences', multiline: true };
+    case 'date':
+      return { placeholder: '14 Mar 2031' };
+    case 'year':
+      return { keyboardType: 'number-pad', placeholder: '2026' };
+    case 'number':
+      return { keyboardType: ios ? 'numbers-and-punctuation' : 'numeric' };
+    case 'money':
+      return { keyboardType: ios ? 'numbers-and-punctuation' : 'decimal-pad', placeholder: '12.50' };
+    default:
+      return undefined;
+  }
 }
 
 export function sizeWords(bytes: number | null): string {

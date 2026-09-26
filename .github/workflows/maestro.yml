@@ -161,11 +161,15 @@ jobs:
           TOKEN=$(curl -sf http://localhost:8099/api/v1/auth/password -H 'content-type: application/json' \
             -d "{\"email\":\"$EMAIL\",\"password\":\"$PASSWORD\"}" | jq -r .access_token)
           curl -sf "http://localhost:8099/api/v1/documents?limit=200" -H "authorization: Bearer $TOKEN" > docs.json
-          jq '.items | map({title, type_key, owner_member_id})' docs.json
+          jq '.items | map({title, type_key, owner_member_id, identifier, expires, status})' docs.json
           test "$(jq '.items | length' docs.json)" = "1"
           test "$(jq -r '.items[0].type_key' docs.json)" = "passport"
           test "$(jq -r '.items[0].owner_member_id' docs.json)" != "null"
-          echo "One document, a passport with its person: the scan saved offline arrived once." >> "$GITHUB_STEP_SUMMARY"
+          # What the card waited for (0.2.1): the passport's number and expiry, so it needs nothing more.
+          test "$(jq -r '.items[0].identifier' docs.json)" = "123456789"
+          test "$(jq -r '.items[0].expires.date' docs.json)" = "2031-03-14"
+          test "$(jq -r '.items[0].status.value' docs.json)" != "needs_info"
+          echo "One document, a passport with its person, number and expiry: the scan saved offline arrived once." >> "$GITHUB_STEP_SUMMARY"
 
       - name: Vault logs on failure
         if: failure()

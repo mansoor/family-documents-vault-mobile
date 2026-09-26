@@ -1,4 +1,4 @@
-import type { DocumentView } from '@fdv/shared';
+import { whenExactly, whenWords, type DocumentView } from '@fdv/shared';
 import { fireEvent, screen, waitFor } from '@testing-library/react-native';
 import { DocumentDetail } from '../documents/detail';
 import { copySettings, saveCopyIo } from '../documents/save-copy';
@@ -8,6 +8,7 @@ import { OWNER_KEY } from '../essentials/wipe';
 import { writePrefs } from '../platform/prefs';
 import { SecureTokenStore } from '../session/store';
 import { audit } from '../test-support/a11y';
+import { addCar, fieldOf, ownerApi } from '../test-support/kinds';
 import { libraryDoc, phoneParts, unlocked } from '../test-support/lookup';
 import { installed } from '../test-support/render';
 import { resetRoutes, routes } from '../test-support/router';
@@ -20,6 +21,7 @@ jest.mock(
 
 const ORIGIN = 'https://vault.test';
 const PASSWORD = 'correct horse battery staple';
+const PDF = new TextEncoder().encode('%PDF-1.4\n%%EOF\n');
 
 beforeEach(() => {
   installed();
@@ -292,6 +294,85 @@ describe('a document', () => {
     await waitFor(() => expect(t.library.documents.get('passport')?.is_essential).toBe(true));
     expect(screen.queryByTestId('step-up-sheet')).toBeNull();
     expect(t.library.stepUps).toEqual([]);
+  });
+
+  it('a version shows who and when, or only when for a viewer', async () => {
+    const t = testVault([ORIGIN]);
+    // Added by the family's owner, through the vault's own capture (0.5.11 names who).
+    const { api, token } = await ownerApi(t.vault);
+    const made = await api.capture(
+      token,
+      {
+        file: { kind: 'bytes', filename: 'passport.pdf', contentType: 'application/pdf', bytes: PDF },
+        metadata: { type_key: 'passport', title: 'Passport', owner_member_id: 'fake-member' },
+      },
+      '6c1f2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d',
+    );
+    const at = [...t.vault.state.captures.values()][0]?.uploaded_at as string;
+    const { app } = await unlocked(t, <DocumentDetail id={made.document_id} />);
+    // "Added 26 Sept 2026, 4:12pm by Fake Owner".
+    expect(await screen.findByText(`Added ${whenExactly(at)} by Fake Owner`)).toBeTruthy();
+    // A captured document is the client's fake's, which keeps no Essential
+    // (a 501 since 0.5.11): the test vault keeps it, and the edit goes through.
+    await fireEvent(screen.getByTestId('document-essential'), 'valueChange', true);
+    await waitFor(() => expect(t.library.essential.get(made.document_id)).toBe(true));
+    expect(screen.queryByTestId('document-notice')).toBeNull();
+    await app.unmount();
+
+    // A viewer is told when, never who.
+    t.vault.state.role = 'viewer';
+    await unlocked(t, <DocumentDetail id={made.document_id} />);
+    expect(await screen.findByText(`Added ${whenExactly(at)}`)).toBeTruthy();
+    expect(screen.getByTestId('version-1')).not.toHaveTextContent(/ by /);
+  });
+
+  it('an older vault says neither who nor the exact time, as 0.2.0 did', async () => {
+    const t = testVault([ORIGIN]);
+    libraryDoc(t, { id: 'bill', title: 'Council tax bill' }, { uploaded_at: '2026-09-01T09:14:00Z' });
+    await unlocked(t, <DocumentDetail id="bill" />);
+    expect(await screen.findByText(`Added ${whenWords('2026-09-01T09:14:00Z')}`)).toBeTruthy();
+  });
+
+  it("shows the type's details; an Only me document's come only from the vault itself, for its owner", async () => {
+    const t = testVault([ORIGIN]);
+    const car = await addCar(t.vault);
+    const [plate, fuel, financed] = ['Registration plate', 'Fuel', 'On finance'].map((l) => fieldOf(car, l)) as [
+      string,
+      string,
+      string,
+    ];
+    libraryDoc(t, {
+      id: 'car',
+      title: 'The car',
+      type_key: car.key,
+      visibility: 'private',
+      is_essential: true,
+      extra: { [plate]: 'AB12 CDE', [fuel]: 'Electric', [financed]: true },
+    });
+    // Kept on this phone as well, as the offline set has it: its details
+    // are never read from the copy, whatever it holds.
+    const parts = phoneParts();
+    const kept = new MemoryEssentialsStore();
+    await kept.putDocument({
+      id: 'car',
+      version_id: 'car-v1',
+      view: JSON.stringify({ ...t.library.documents.get('car'), extra: { [plate]: 'NOT FROM HERE' } }),
+      pages: 1,
+      kept_at: 1,
+    });
+    await kept.setState(OWNER_KEY, 'https://vault.test|fake-member');
+    await kept.setState(
+      CHECKED_KEY,
+      JSON.stringify({ server_time: '2026-09-25T00:00:00Z', at: Date.now(), max_offline_days: 90 }),
+    );
+    parts.stores.set('everyday', kept);
+    writePrefs('essentials', { enrolled: true, offered: true, kept: true, owner: 'https://vault.test|fake-member' });
+    await unlocked(t, <DocumentDetail id="car" />, { parts });
+    // From GET /documents/{id}, which opens them for their owner: in the type's order, under its names.
+    expect(await screen.findByText('AB12 CDE')).toBeTruthy();
+    const facts = screen.getByTestId('document');
+    expect(facts).toHaveTextContent(/Registration plateAB12 CDEFuelElectricOn financeYes/);
+    expect(screen.queryByText('NOT FROM HERE')).toBeNull();
   });
 
   it('can be used with a screen reader and a thumb', async () => {

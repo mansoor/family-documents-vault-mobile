@@ -64,4 +64,33 @@ export interface QueueItem {
    * before the first try.
    */
   lastCode: string | null;
+  /**
+   * The card's names for the type's own details it sent, by field key
+   * (0.2.1): what becomes of one is said by its name, never by its key.
+   */
+  labels?: Record<string, string>;
+  /**
+   * The details left out so the scan could be filed, by field key: the
+   * vault no longer took them — the kind lost the field, or the answer,
+   * while the scan waited on the phone (0.2.1).
+   */
+  dropped?: string[];
+}
+
+/** A scan filed, or to be filed, without some of its details: its kind no longer took them. */
+export interface FiledWithout {
+  title: string | null;
+  /** Those details as the card named them; null when a name was not kept. */
+  names: string[] | null;
+}
+
+/** What an item left out, in words to say — never its keys; null when it left nothing out. */
+export function filedWithout(item: Pick<QueueItem, 'metadata' | 'labels' | 'dropped'>): FiledWithout | null {
+  const dropped = [...new Set(item.dropped ?? [])];
+  if (dropped.length === 0) return null;
+  const names = dropped.map((key) => item.labels?.[key] ?? null);
+  return {
+    title: item.metadata?.title ?? null,
+    names: names.every((n): n is string => typeof n === 'string' && n.trim() !== '') ? names : null,
+  };
 }

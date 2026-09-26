@@ -48,6 +48,7 @@ Written by `node apps/pocket/scripts/failure-states.mjs`; CI fails if it is out 
 |  |  | `errors.previewPending` | The vault is still drawing the pages. Try again in a minute. |
 |  |  | `errors.noPreview` | The vault can't draw pages for this file. Save a copy to open it. |
 |  |  | `errors.uploadInProgress` | This is still on its way to the vault. Try again in a moment. |
+|  |  | `errors.invalidExtra` | One of its details isn't one its kind of document takes any more. |
 |  |  | `errors.general` | That didn't work. Try again in a moment. |
 | The lock | Lock screen, Settings | `lock.tooMany` | Too many tries. Unlock with your phone's PIN or pattern instead. |
 |  |  | `lock.noScreenLock` | To lock the app and keep documents on this phone, set a screen lock in your phone's settings first. Everything else works as it is. |
@@ -61,6 +62,7 @@ Written by `node apps/pocket/scripts/failure-states.mjs`; CI fails if it is out 
 |  |  | `capture.offlineSkip` | No connection, and this phone hasn't seen the vault's choices yet. Skip keeps the scan: you can name it when you're back online. |
 |  |  | `capture.queueUnavailable` | Couldn't keep it on this phone just now. Try Save again in a moment. |
 |  |  | `capture.notAllowed` | Your account can open documents but not add them. Ask whoever runs the vault. |
+|  |  | `capture.stillNeeded` | Still needed: {{fields}}. Fill it in, or skip for now. / Still needed: {{fields}}. Fill them in, or skip for now. |
 | Scans on their way | Home, the queue | `queue.busy` | The vault is busy. Trying again in a moment. |
 |  |  | `queue.notYet` | Not sent yet. Your scan is safe on this phone and will go by itself. |
 |  |  | `queue.tooBigForVault` | This file is bigger than your vault accepts ({{limit}}). Try fewer pages, or a smaller file. |
@@ -71,6 +73,8 @@ Written by `node apps/pocket/scripts/failure-states.mjs`; CI fails if it is out 
 |  |  | `queue.noLongerAdd` | You can no longer add documents to this vault. Ask an owner. |
 |  |  | `queue.ownerGone` | The person it was for is no longer in the family. Choose someone else, or save it without a person — it keeps who can see it. |
 |  |  | `queue.versionRefused` | The vault didn't let you add a new version of this document. Whoever it belongs to can. |
+|  |  | `queue.goesWithout` | It will go without {{names}}: its kind of document no longer asks for it. / It will go without {{names}}: its kind of document no longer asks for them. |
+|  |  | `queue.filedWithout` | {{title}} is in the vault without {{names}}: its kind of document no longer asks for it. / {{title}} is in the vault without {{names}}: its kind of document no longer asks for them. |
 | The scanner | Home | `home.scannerFailed` | The scanner couldn't start on this phone. Add a photo or a file instead — the first scan also needs an internet connection to set the scanner up. |
 |  |  | `home.savedOffline` | Saved on this phone. It'll go to the vault as soon as there's a connection. |
 |  |  | `home.offline` | No connection. What you see may be out of date. |

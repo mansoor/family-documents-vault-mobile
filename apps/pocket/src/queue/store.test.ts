@@ -41,6 +41,14 @@ describe.each(stores)('the queue store: %s', (_name, make) => {
     expect(await store.bytes('a')).toEqual(new Uint8Array([1, 2, 3]));
   });
 
+  it('keeps the card’s names for the details, and which ones it went without', async () => {
+    const store = await make();
+    await store.add(item('d', { labels: { fuel: 'Fuel' } }), new Uint8Array([1]));
+    expect(await store.list()).toEqual([item('d', { labels: { fuel: 'Fuel' } })]);
+    await store.update('d', { dropped: ['fuel'] });
+    expect(await store.list()).toEqual([item('d', { labels: { fuel: 'Fuel' }, dropped: ['fuel'] })]);
+  });
+
   it('a Skip keeps no details at all', async () => {
     const store = await make();
     await store.add(item('s', { metadata: null }), new Uint8Array([9]));
