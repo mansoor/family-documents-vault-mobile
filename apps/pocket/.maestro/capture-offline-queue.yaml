@@ -40,8 +40,11 @@ env:
 
 # Airplane mode on: the card works from what the phone last saw.
 - setAirplaneMode: enabled
+# The + in the tab bar, then Camera.
 - tapOn:
-    id: home-scan
+    id: home-add
+- tapOn:
+    id: add-camera
 - scrollUntilVisible:
     element: Passport
 - tapOn: Passport

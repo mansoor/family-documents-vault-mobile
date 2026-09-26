@@ -2,6 +2,7 @@
 # same vault as the other flows (10.0.2.2:8099):
 #  - Settings: Back on "Use another vault?" keeps this vault; Back again
 #    goes Home.
+#  - The + menu: Back closes it, and so does a tap outside it.
 #  - The capture card with a scan: Back asks; Keep editing stays on the
 #    card; Throw away leaves it — nothing reaches the vault (the document
 #    count after the flows stays at one).
@@ -56,9 +57,40 @@ env:
       id: home-calm
     timeout: 15000
 
-# The capture card with a scan on it.
+# The + menu: Back closes it; a tap above it closes it too.
 - tapOn:
-    id: home-scan
+    id: home-add
+- extendedWaitUntil:
+    visible:
+      id: add-menu
+    timeout: 10000
+- assertVisible:
+    id: add-file
+- assertVisible:
+    id: add-camera
+- assertVisible:
+    id: add-picture
+- back
+- assertNotVisible:
+    id: add-menu
+- assertVisible:
+    id: home-calm
+- tapOn:
+    id: home-add
+- extendedWaitUntil:
+    visible:
+      id: add-menu
+    timeout: 10000
+- tapOn:
+    point: 50%,15%
+- assertNotVisible:
+    id: add-menu
+
+# The capture card with a scan on it: the +, then Camera.
+- tapOn:
+    id: home-add
+- tapOn:
+    id: add-camera
 - extendedWaitUntil:
     visible:
       id: capture-card

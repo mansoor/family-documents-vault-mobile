@@ -6,6 +6,17 @@ app's own, tagged `vX.Y.Z` in this repository.
 
 ## [Unreleased]
 
+### Changed
+- **The button in the middle of the tab bar is a +, as on the web**, and
+  it opens a menu: **Add a file**, **Camera** and **Add a picture**. It is
+  there for everyone who may add documents, also on a phone without a
+  scanner, where the menu leaves Camera out; before, such a phone had no
+  button at all. Back, a tap outside the menu or Cancel closes it. A
+  screen reader hears "Add a document", is taken to the first choice when
+  the menu opens and back to the + when it closes; the choices scroll at
+  the largest text sizes. Add a file and Add a photo stay on Home, and a
+  scanner that cannot start still says so.
+
 ## [0.2.0] — Phase 4 — Pocket
 
 The family vault in a pocket, for Android: scan a document and file it

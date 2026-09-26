@@ -1,11 +1,13 @@
 import { type as typeScale } from '@fdv/shared';
-import { fireEvent, screen, waitFor } from '@testing-library/react-native';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react-native';
 import { StyleSheet } from 'react-native';
 import Connect from '../app/connect';
+import { AddButton } from '../capture/add-button';
+import { fixtureScanner } from '../capture/scanner';
 import Settings from '../app/settings';
 import SignIn from '../app/sign-in';
 import { readPrefs } from '../platform/prefs';
-import { installed, knownVault, renderApp, signedIn } from '../test-support/render';
+import { installed, knownVault, renderApp, signedIn, testCapture } from '../test-support/render';
 import { testVault } from '../test-support/vault';
 import { LARGE } from '../ui/text-scale';
 
@@ -77,5 +79,37 @@ describe('Large text', () => {
     await screen.findByTestId('settings-sign-out');
     expect(signOutSize()).toBeCloseTo(typeScale.body * LARGE, 5);
     expect(screen.getByTestId('settings-large-text').props.value).toBe(true);
+  });
+
+  it("the +'s menu: every word is 1.3 times the size, nothing is cut short, and the choices scroll", async () => {
+    const t = testVault();
+    await signedIn(t);
+    const open = async (large: boolean) => {
+      const r = await renderApp(<AddButton />, {
+        fetch: t.fetch,
+        large,
+        capture: testCapture({ scanner: fixtureScanner([]) }),
+      });
+      await fireEvent.press(await screen.findByTestId('home-add'));
+      await screen.findByTestId('add-menu');
+      return r;
+    };
+    const normal = await open(false);
+    const before = sizes();
+    await normal.unmount();
+
+    await open(true);
+    const after = sizes();
+    expect(after.map((a) => a.what)).toEqual(before.map((b) => b.what));
+    // The title, three choices and Cancel.
+    expect(before.length).toBeGreaterThanOrEqual(5);
+    after.forEach((a, i) => {
+      const b = before[i];
+      if (!b) throw new Error(`nothing to compare ${a.what} with`);
+      expect({ what: a.what, size: a.size }).toEqual({ what: a.what, size: expect.closeTo(b.size * LARGE, 5) });
+      expect({ what: a.what, cut: a.cut }).toEqual({ what: a.what, cut: false });
+    });
+    // At the phone's largest text the choices scroll rather than run off the screen.
+    expect(within(screen.getByTestId('add-menu-scroll')).getAllByRole('menuitem')).toHaveLength(3);
   });
 });

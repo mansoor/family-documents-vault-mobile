@@ -3,11 +3,11 @@ import { BellRing, House, Search, Users, type LucideIcon } from 'lucide-react-na
 import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ScanButton } from '../capture/scan-button';
+import { AddButton } from '../capture/add-button';
 import { useVault } from '../state/vault';
 import { Text } from './index';
 
-/** The tabs, in order; the camera sits between the second and the third. */
+/** The tabs, in order; the + sits between the second and the third. */
 const TABS: Record<string, { label: string; icon: LucideIcon; testID: string }> = {
   index: { label: 'tabs.home', icon: House, testID: 'tab-home' },
   search: { label: 'tabs.search', icon: Search, testID: 'tab-search' },
@@ -21,8 +21,8 @@ export interface TabBarProps {
 }
 
 /**
- * The tab bar (4.12): Home, Search, the camera, Needs attention, People.
- * The camera is only for those who may add documents.
+ * The tab bar (4.12): Home, Search, the +, Needs attention, People.
+ * The + is only for those who may add documents.
  */
 export function TabBar(props: TabBarProps) {
   const { t } = useTranslation();
@@ -57,7 +57,7 @@ export function TabBar(props: TabBarProps) {
   return (
     <View style={[styles.bar, { paddingBottom: 6 + insets.bottom }]} accessibilityRole="tablist">
       {routes.slice(0, 2).map(tab)}
-      {canAdd ? <ScanButton /> : null}
+      {canAdd ? <AddButton /> : null}
       {routes.slice(2).map(tab)}
     </View>
   );

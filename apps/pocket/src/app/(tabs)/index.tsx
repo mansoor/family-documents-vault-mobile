@@ -8,7 +8,7 @@ import { useTranslation } from 'react-i18next';
 import { FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { QueueRow } from '../../capture/queue-row';
-import { useBeginCapture } from '../../capture/scan-button';
+import { useBeginCapture } from '../../capture/add-button';
 import { OnThisPhone } from '../../essentials/ui';
 import { useEssentials } from '../../state/essentials';
 import { extra } from '../../config';
@@ -36,7 +36,7 @@ export default function Home() {
   const insets = useSafeAreaInsets();
   const [data, setData] = useState<HomeData | null>(null);
   const [refreshing, setRefreshing] = useState(false);
-  // The camera is in the tab bar (4.12); a file or a photo starts here.
+  // The tab bar's + offers a file, the camera or a picture; a file or a photo also starts here.
   const { begin, scannerFailed, setScannerFailed } = useBeginCapture();
   const [dockHeight, setDockHeight] = useState(84);
   const [othersKept, setOthersKept] = useState(false);

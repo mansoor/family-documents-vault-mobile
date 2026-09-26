@@ -19,7 +19,8 @@ jest.mock('expo-router', () => require('../test-support/router').routerMock);
  *    away" (confirm.test.tsx: Back with a scan on the card asks);
  *  - Show mode goes to the lock screen with the brightness put back
  *    (show.test.tsx: Back leaves Show mode for the lock screen);
- *  - the lock screen leaves the app, and reveals nothing (lock.test.tsx).
+ *  - the lock screen leaves the app, and reveals nothing (lock.test.tsx);
+ *  - the + menu closes, and nothing is started (tabs.test.tsx: Back closes it).
  */
 const back = (inside: string) => fireEvent(screen.getByTestId(inside), 'requestClose');
 
