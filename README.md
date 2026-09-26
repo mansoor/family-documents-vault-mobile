@@ -41,6 +41,20 @@ on port 8099, never the family's own vault on 8080.
 APKs are built by GitHub Actions (`android.yml`), never on the laptop: run it
 by hand from the Actions tab, or push a `v*` tag for a preview build.
 
+## Releases
+
+The owner's own build is `io.github.mansoor.familyvault`, signed with the
+owner's key. Before the first one, add four repository secrets
+(Settings → Secrets and variables → Actions):
+
+- `FV_RELEASE_KEYSTORE` — the keystore, base64 (`base64 -w0 release.jks`)
+- `FV_RELEASE_STORE_PASSWORD`, `FV_RELEASE_KEY_ALIAS`, `FV_RELEASE_KEY_PASSWORD`
+
+Then push a tag `v0.2.x` (or run the Release workflow by hand with the tag):
+the signed APK is attached to that tag's release, and the Maestro flows run
+on it. Keep the keystore somewhere safe off GitHub too: an app signed with
+a different key cannot update this one.
+
 ## Working on it
 
 Node 22 and pnpm 9.15.9. Clone with `--recurse-submodules` into a path without

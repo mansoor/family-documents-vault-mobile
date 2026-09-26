@@ -6,6 +6,23 @@ app's own, tagged `vX.Y.Z` in this repository.
 
 ## [Unreleased]
 
+## [0.2.0] — Phase 4 — Pocket
+
+The family vault in a pocket, for Android: scan a document and file it
+from the sofa, with its details, exactly once whatever the connection
+does; look anything up; keep the Essentials for when there is no signal
+and show an ID at a counter; hear about reminders through a notification
+app of your own. Works with a vault of 0.4.10 or later; notifications
+need 0.4.14. Everything in 0.1.1–0.1.10 below.
+
+### Added
+- **The owner's signed build.** `release.yml` builds
+  `io.github.mansoor.familyvault` signed with the owner's own key (four
+  repository secrets), minified, arm64, checks the signature with
+  apksigner — never a debug key — and attaches it to a private GitHub
+  Release: `v0.2.0-rc` first, `v0.2.0` after the exit demonstration.
+- The Maestro flows run on the release tags.
+
 ## [0.1.10] — iteration 4.17: accessibility, copy and the failure states
 
 (0.1.10 rather than 0.1.11: Expo SDK 58, iteration 4.16, waits until it is

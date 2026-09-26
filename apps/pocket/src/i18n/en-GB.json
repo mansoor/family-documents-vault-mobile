@@ -51,6 +51,7 @@
     "codeStep": "One more step: the six-digit code from your authenticator app.",
     "code": "Six-digit code",
     "confirm": "Confirm",
+    "startAgain": "Start again from your password.",
     "passkeyOnly": "You sign in with a passkey. The app can't use passkeys yet, so set a password in the browser (Settings → Password), then sign in here with it.",
     "signedOutHere": "You've been signed out on this phone. Sign in again to carry on.",
     "otherVault": "Use a different vault",
