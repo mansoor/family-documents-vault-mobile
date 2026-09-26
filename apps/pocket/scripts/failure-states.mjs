@@ -20,7 +20,7 @@ const AREAS = [
     'connect',
     'invalid notAVault unreachable setupRequired serverTooOld clientTooOld apiVersion askHttp refusePublicHttp refuseMobileData stranger reinstalled certificateUntrusted certificateWrongName certificateExpired captivePortal linkJoin linkReset linkShared',
   ],
-  ['Signing in', 'Sign in', 'signIn', 'signedOutHere passkeyOnly'],
+  ['Signing in', 'Sign in', 'signIn', 'signedOutHere passkeyOnly startAgain'],
   [
     'Any request that fails (wordsFor)',
     'Every screen',

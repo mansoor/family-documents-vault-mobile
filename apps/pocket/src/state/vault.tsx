@@ -584,7 +584,7 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
   const signInCode = useCallback(
     async (code: string): Promise<SignInResult> => {
       if (!api || !mfaToken.current)
-        return { kind: 'refused', message: 'Start again from your password.', passkeyHint: false };
+        return { kind: 'refused', message: i18n.t('signIn.startAgain'), passkeyHint: false };
       try {
         await gate();
         const tokens = await api.signInMfa(mfaToken.current, code.replace(/\s/g, ''));

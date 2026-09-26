@@ -30,6 +30,7 @@ Written by `node apps/pocket/scripts/failure-states.mjs`; CI fails if it is out 
 |  |  | `connect.linkShared` | That's a link for someone outside the family. It opens in the browser. |
 | Signing in | Sign in | `signIn.signedOutHere` | You've been signed out on this phone. Sign in again to carry on. |
 |  |  | `signIn.passkeyOnly` | You sign in with a passkey. The app can't use passkeys yet, so set a password in the browser (Settings → Password), then sign in here with it. |
+|  |  | `signIn.startAgain` | Start again from your password. |
 | Any request that fails (wordsFor) | Every screen | `errors.offline` | Can't reach your vault right now. Check this phone's connection, then try again. |
 |  |  | `errors.timeout` | Your vault took too long to answer. Try again in a moment. |
 |  |  | `errors.rateLimited` | Too many tries. Wait a minute, then try again. / Too many tries. Wait {{count}} minutes, then try again. |
