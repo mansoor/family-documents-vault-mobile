@@ -1,4 +1,4 @@
-import { TAP_MIN } from '@fdv/shared';
+import { colours, TAP_MIN } from '@fdv/shared';
 import { screen } from '@testing-library/react-native';
 import { StyleSheet } from 'react-native';
 
@@ -56,5 +56,26 @@ export function audit(): string[] {
   )) {
     if (!label(s)) problems.push(`${describeIt(s)} is a switch with no label`);
   }
+  // A status is never colour alone (4.17): whatever is filled with a
+  // status colour says in words what it means, or is labelled.
+  for (const v of root.queryAll((n) => {
+    const bg = (StyleSheet.flatten(n.props.style) ?? {}).backgroundColor;
+    return typeof bg === 'string' && STATUS.has(bg.toLowerCase());
+  })) {
+    const words = v.queryAll(
+      (n) =>
+        n.type === 'Text' &&
+        ([] as unknown[])
+          .concat(n.props.children)
+          .some((c) => (typeof c === 'string' && c.trim() !== '') || typeof c === 'number'),
+    );
+    const read = label(v) !== '' && (v.props.accessible === true || !!v.props.accessibilityRole);
+    if (words.length === 0 && !read) problems.push(`${describeIt(v)} shows a status by colour alone`);
+  }
   return problems;
 }
+
+/** The colours that mean something: fine, a warning, a danger. */
+const STATUS = new Set(
+  [colours.ok, colours.warn, colours.warnSoft, colours.danger, colours.dangerSoft].map((c) => c.toLowerCase()),
+);

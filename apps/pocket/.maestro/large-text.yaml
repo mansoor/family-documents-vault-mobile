@@ -1,0 +1,82 @@
+# Iteration 4.17: the app at the phone's largest text (font_scale 2.0, set
+# by the workflow around this flow) with the app's own Large text on as
+# well. Everything that matters is still reached — by scrolling where it
+# must — on Home, in Settings and on the capture card; nothing is thrown
+# away but the scan made here. Home is known by its list, always at the top:
+# at this size the "all calm" line can sit below the fold, under the offer
+# to keep the Essentials.
+appId: io.github.mansoor.familyvault.e2e
+env:
+  VAULT: 10.0.2.2:8099
+---
+- launchApp:
+    clearState: true
+- tapOn:
+    id: connect-address
+- inputText: ${VAULT}
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      id: connect-go
+- tapOn:
+    id: connect-go
+- scrollUntilVisible:
+    element:
+      id: connect-approve-http
+- tapOn:
+    id: connect-approve-http
+- tapOn:
+    id: sign-in-email
+- inputText: ${EMAIL}
+- tapOn:
+    id: sign-in-password
+- inputText: ${PASSWORD}
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      id: sign-in-go
+- tapOn:
+    id: sign-in-go
+- extendedWaitUntil:
+    visible:
+      id: home-list
+    timeout: 30000
+- waitForAnimationToEnd
+
+# Large text on, in Settings; the rest of Settings still reached.
+- tapOn: Settings
+- scrollUntilVisible:
+    element:
+      id: settings-large-text
+- tapOn:
+    id: settings-large-text
+- scrollUntilVisible:
+    element:
+      id: settings-sign-out
+- assertVisible:
+    id: settings-sign-out
+- back
+- extendedWaitUntil:
+    visible:
+      id: home-list
+    timeout: 15000
+
+# The capture card, at that size: Save is reached, then the scan thrown away.
+- tapOn:
+    id: home-scan
+- extendedWaitUntil:
+    visible:
+      id: capture-card
+    timeout: 30000
+- scrollUntilVisible:
+    element:
+      id: capture-save
+- assertVisible:
+    id: capture-save
+- back
+- tapOn:
+    id: leave-throw
+- extendedWaitUntil:
+    visible:
+      id: home-list
+    timeout: 15000

@@ -1,4 +1,5 @@
 import { ApiRequestError, StepUpCoordinator, type Api } from '@fdv/client';
+import { wordsFor } from '../errors/words';
 import { colours, radii } from '@fdv/shared';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -122,7 +123,7 @@ function StepUpSheet(props: { asking: Asking | null }) {
       answering?.settle(true);
     } catch (err) {
       // The vault's own words when it has them, said aloud too.
-      const words = err instanceof ApiRequestError && err.message ? err.message : t('stepUp.failed');
+      const words = wordsFor(err, t, 'stepUp.failed');
       setError(words);
       AccessibilityInfo.announceForAccessibility(words);
     } finally {

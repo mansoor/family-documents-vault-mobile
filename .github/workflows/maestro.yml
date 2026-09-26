@@ -2,7 +2,7 @@ name: Maestro
 
 # The phone on an emulator, against a real vault (4.5; the lock, 4.8; kept
 # Essentials in airplane mode, and wiped by a revoked session, 4.10; Show
-# mode, 4.11; Back, 4.15): the e2e build
+# mode, 4.11; Back, 4.15; the largest text, 4.17): the e2e build
 # (x86_64, fixture scanner) runs .maestro/ flows while a vault from the
 # published images runs on the host, reached as 10.0.2.2. The push
 # module's JVM tests (4.14) run with the build. A run costs about 40
@@ -132,6 +132,10 @@ jobs:
             $HOME/.maestro/bin/maestro test -e EMAIL="$EMAIL" -e PASSWORD="$PASSWORD" --format junit --output maestro-lock.xml apps/pocket/.maestro/lock.yaml || sh .github/scripts/on-flow-failure.sh lock
             # Starts from a clean app, as the lock flow does: before the Essentials are seeded and kept.
             $HOME/.maestro/bin/maestro test -e EMAIL="$EMAIL" -e PASSWORD="$PASSWORD" --format junit --output maestro-back.xml apps/pocket/.maestro/back-button.yaml || sh .github/scripts/on-flow-failure.sh back
+            # The phone's largest text (4.17), then back to normal for the flows after it.
+            adb shell settings put system font_scale 2.0
+            $HOME/.maestro/bin/maestro test -e EMAIL="$EMAIL" -e PASSWORD="$PASSWORD" --format junit --output maestro-large-text.xml apps/pocket/.maestro/large-text.yaml || sh .github/scripts/on-flow-failure.sh large-text
+            adb shell settings put system font_scale 1.0
             sh .github/scripts/essentials-seed.sh || touch essentials-seed-failed
             $HOME/.maestro/bin/maestro test -e EMAIL="$EMAIL" -e PASSWORD="$PASSWORD" --format junit --output maestro-essentials.xml apps/pocket/.maestro/offline-essential.yaml || sh .github/scripts/on-flow-failure.sh essentials
             $HOME/.maestro/bin/maestro test --format junit --output maestro-show.xml apps/pocket/.maestro/show-mode.yaml || sh .github/scripts/on-flow-failure.sh show
@@ -139,7 +143,7 @@ jobs:
             sh .github/scripts/essentials-revoke.sh || touch essentials-revoke-failed
             $HOME/.maestro/bin/maestro test --format junit --output maestro-revoked.xml apps/pocket/.maestro/essentials-revoked.yaml || sh .github/scripts/on-flow-failure.sh revoked
             sh .github/scripts/essentials-files.sh absent || touch essentials-gone-failed
-            sh -c 'for f in capture-failed lock-failed cache-check-failed essentials-seed-failed essentials-failed show-failed back-failed essentials-kept-failed essentials-revoke-failed revoked-failed essentials-gone-failed; do if [ -f "$f" ]; then echo "failed: $f"; exit 1; fi; done'
+            sh -c 'for f in capture-failed lock-failed cache-check-failed essentials-seed-failed essentials-failed show-failed back-failed large-text-failed essentials-kept-failed essentials-revoke-failed revoked-failed essentials-gone-failed; do if [ -f "$f" ]; then echo "failed: $f"; exit 1; fi; done'
 
       - name: Exactly one document, carrying the card's fields
         run: |
@@ -163,6 +167,7 @@ jobs:
           path: |
             maestro-report.xml
             maestro-lock.xml
+            maestro-large-text.xml
             maestro-back.xml
             maestro-essentials.xml
             maestro-show.xml

@@ -55,6 +55,8 @@ jobs:
       - name: The About screen's licence list is this build's (node scripts/licences.mjs to update)
         working-directory: apps/pocket
         run: node scripts/licences.mjs --check
+      - name: The failure-state inventory is this catalogue's (node apps/pocket/scripts/failure-states.mjs to update)
+        run: node apps/pocket/scripts/failure-states.mjs --check
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test

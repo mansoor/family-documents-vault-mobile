@@ -2,6 +2,8 @@ import { ApiRequestError } from '@fdv/client';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { AppState, PermissionsAndroid, Platform } from 'react-native';
 import { ownerKey } from '../essentials/wipe';
+import { wordsFor } from '../errors/words';
+import i18n from '../i18n';
 import { log } from '../log';
 import { readPrefs, writePrefs } from '../platform/prefs';
 import { emit, on } from '../state/events';
@@ -182,7 +184,7 @@ export function PushProvider(props: { children: ReactNode; deps?: Partial<PushDe
       log.info('push.registered', {});
     } catch (err) {
       // The vault's refusal is shown; no connection is simply tried again later.
-      if (err instanceof ApiRequestError) setTrouble(err.message);
+      if (err instanceof ApiRequestError) setTrouble(wordsFor(err, i18n.t.bind(i18n)));
       log.warn('push.sync_failed', { kind: err instanceof ApiRequestError ? err.code : 'network' });
     }
   }, [native, owner, phase, caps, read, write, vapid, withToken]);
