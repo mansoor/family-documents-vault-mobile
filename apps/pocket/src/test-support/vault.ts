@@ -97,6 +97,12 @@ export interface Library {
   snoozed: { id: string; until: string }[];
   acknowledged: string[];
   searches: string[];
+  /**
+   * Whether each captured document is an Essential. Those are the client's
+   * fake's, which keeps no Essential and answers 501 for a field it does not
+   * keep: the test vault keeps it, and passes the rest of an edit on.
+   */
+  essential: Map<string, boolean>;
 }
 
 const JPEG = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x02, 0xff, 0xd9]);
@@ -159,6 +165,7 @@ export function testVault(origins: string[] = ['https://vault.test']): TestVault
       snoozed: [],
       acknowledged: [],
       searches: [],
+      essential: new Map(),
     },
     fetch: async (url, init) => {
       t.calls.push(`${init.method} ${url}`);
@@ -172,10 +179,41 @@ export function testVault(origins: string[] = ['https://vault.test']): TestVault
       if (url.endsWith('/api/v1/capabilities')) {
         return json(t.impostor.get(origin) ?? t.caps);
       }
-      return vault.fetch(url, init);
+      return (await captured(t, url, path, init)) ?? vault.fetch(url, init);
     },
   };
   return t;
+}
+
+/**
+ * A captured document, one by id: the fake's, with whether it is an
+ * Essential, which the fake does not keep (it answers 501 for an edit of a
+ * field it does not keep, 0.5.11). An edit's other fields are the fake's,
+ * with its If-Match check. Null for anything else.
+ */
+async function captured(
+  t: TestVault,
+  url: string,
+  path: string,
+  init: Parameters<FetchLike>[1],
+): Promise<Reply | null> {
+  const id = /^\/api\/v1\/documents\/([^/?]+)$/.exec(path)?.[1];
+  if (!id || (init.method !== 'GET' && init.method !== 'PATCH')) return null;
+  if (!t.vault.state.documents.some((d) => d.id === id)) return null;
+  let forward = init;
+  let essential: boolean | undefined;
+  if (init.method === 'PATCH' && typeof init.body === 'string') {
+    const { is_essential, ...rest } = JSON.parse(init.body) as Record<string, unknown>;
+    if (typeof is_essential === 'boolean') {
+      essential = is_essential;
+      forward = { ...init, body: JSON.stringify(rest) };
+    }
+  }
+  const res = await t.vault.fetch(url, forward);
+  if (!res.ok) return res;
+  if (essential !== undefined) t.library.essential.set(id, essential);
+  const view = (await res.json()) as DocumentView;
+  return json({ ...view, is_essential: t.library.essential.get(id) ?? false });
 }
 
 type Reply = Awaited<ReturnType<FetchLike>>;

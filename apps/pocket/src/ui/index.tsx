@@ -173,23 +173,30 @@ export function StatusLine(props: { status: Status }) {
   );
 }
 
+/** A field's label, marked when the card waits for it: "Passport number * required". */
+export function requiredLabel(label: string, required?: string | null): string {
+  return required ? `${label} * ${required}` : label;
+}
+
 export function Field(
   props: {
     label: string;
     error?: string | null;
     testID?: string;
+    /** The word for a field Save waits for ("required"), shown after the label with a star. */
+    required?: string | null;
   } & Omit<TextInputProps, 'style'>,
 ) {
-  const { label, error, testID, ...input } = props;
+  const { label, error, testID, required, ...input } = props;
   const { scale } = useTextScale();
   return (
     <View style={styles.field}>
       <Text variant="secondary" weight="600" tone="soft">
-        {label}
+        {requiredLabel(label, required)}
       </Text>
       <TextInput
         testID={testID}
-        accessibilityLabel={label}
+        accessibilityLabel={required ? `${label}, ${required}` : label}
         autoCapitalize="none"
         autoCorrect={false}
         placeholderTextColor={colours.inkMuted}

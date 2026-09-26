@@ -32,7 +32,7 @@ const AREAS = [
     'Scanning and filing',
     'Capture, the card',
     'capture',
-    'pageLimit tooBig noSpace unreadable signedOut offlineSkip queueUnavailable notAllowed',
+    'pageLimit tooBig noSpace unreadable signedOut offlineSkip queueUnavailable notAllowed stillNeeded',
   ],
   [
     'Scans on their way',

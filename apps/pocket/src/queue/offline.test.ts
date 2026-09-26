@@ -2,6 +2,7 @@ import { rmSync } from 'fs';
 import { tmpdir } from 'os';
 import { reassignChoices } from '../capture/queue-row';
 import { captureVault, jpeg } from '../test-support/capture';
+import { addCar, fieldOf } from '../test-support/kinds';
 import { nodeSqlDb } from '../test-support/node-sqlite';
 import { commitCapture, type CommitDeps } from './commit';
 import type { QueueItem } from './item';
@@ -88,6 +89,43 @@ describe('the queue in airplane mode', () => {
     const cv = await captureVault();
     await new Uploader(cv.deps(store)).kick();
     expect(cv.vault.state.documents.map((d) => d.title)).toEqual(['Kept']);
+    again.close();
+    rmSync(path, { force: true });
+  });
+
+  it('a queued capture with details survives a restart and is sent once', async () => {
+    const cv = await captureVault();
+    const car = await addCar(cv.vault);
+    const plate = fieldOf(car, 'Registration plate');
+    const fuel = fieldOf(car, 'Fuel');
+    const extra = { [plate]: 'AB12 CDE', [fuel]: 'Electric' };
+    const path = `${tmpdir()}/fdv-details-${Date.now()}.db`;
+    const first = nodeSqlDb(path);
+    const item = await commitCapture(
+      {
+        source: PAGES,
+        metadata: { type_key: car.key, title: 'The car', owner_member_id: 'fake-member', extra },
+        origin: ORIGIN,
+        account: 'fake-member',
+      },
+      phone(await SqliteQueueStore.over(first)),
+    );
+    first.close();
+    // Killed in airplane mode, opened again: the details are still with the scan.
+    const again = nodeSqlDb(path);
+    const store = await SqliteQueueStore.over(again);
+    expect(await store.list()).toEqual([
+      expect.objectContaining({ key: item.key, metadata: expect.objectContaining({ extra }) }),
+    ]);
+    // The connection comes back; the answer is lost on the way, and the phone asks again.
+    cv.turns.push('lost');
+    const uploader = new Uploader(cv.deps(store));
+    await uploader.kick();
+    await uploader.kick({ fresh: true });
+    await uploader.kick({ fresh: true });
+    expect(cv.vault.state.documents).toEqual([expect.objectContaining({ title: 'The car', type_key: car.key, extra })]);
+    expect(cv.calls.filter((c) => c === 'POST /api/v1/capture')).toHaveLength(1);
+    expect(await store.list()).toEqual([]);
     again.close();
     rmSync(path, { force: true });
   });

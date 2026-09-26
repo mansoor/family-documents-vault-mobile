@@ -49,6 +49,83 @@ describe('the type chips', () => {
     expect(matchTypes(TYPES, 'INVEST state').map((t) => t.key)).toEqual(['bank_statement']);
     expect(matchTypes(TYPES, '')).toHaveLength(TYPES.length);
   });
+
+  it('a kind the household has hidden is not offered, not even as one of the usual first ones', () => {
+    // The vault still lists it while a document uses it (0.5.6), so that document's kind is known.
+    const hidden = TYPES.map((t) => (t.key === 'passport' ? { ...t, hidden: true } : t));
+    const { top, rest } = rankTypes(hidden, ['passport', 'passport', 'warranty'], 4);
+    expect(top.map((t) => t.key)).toEqual(['warranty', 'bank_statement', 'utility_bill']);
+    expect(rest.map((t) => t.key)).toEqual(['pet_record', 'other']);
+    expect(matchTypes(hidden, 'pass')).toEqual([]);
+  });
+});
+
+describe('a type’s details on the card (custom_types)', () => {
+  const car = type('h_car0000000', 'Car', {
+    fields: [
+      { key: 'plate', label: 'Registration plate', kind: 'text', required: true },
+      { key: 'first_registered', label: 'First registered', kind: 'date' },
+      { key: 'seats', label: 'Seats', kind: 'number' },
+      { key: 'fuel', label: 'Fuel', kind: 'choice', choices: ['Petrol', 'Electric'] },
+      { key: 'financed', label: 'On finance', kind: 'yes_no', required: true },
+    ],
+  });
+  const passport = type('passport', 'Passport', {
+    expiry_driver: 'expires_on',
+    core: {
+      identifier: { shown: true, required: true, label: 'Passport number' },
+      issued_by: { shown: true, required: false, label: 'Issuing country' },
+      issued: { shown: true, required: false, label: null },
+      expires: { shown: true, required: true, label: null },
+      physical_location: { shown: false, required: false, label: null },
+      tags: { shown: true, required: false, label: null },
+      notes: { shown: true, required: true, label: null },
+    },
+  });
+  const h: Household = {
+    types: [car, passport],
+    members: [{ id: 'me', display_name: 'Aisha' }],
+    me: { member_id: 'me', role: 'owner' },
+    issuedBy: true,
+    details: true,
+  };
+  const source = { kind: 'pages' as const, pages: [{ uri: 'cache:/1.jpg' }] };
+
+  it('waits for what the type requires among what the card asks, and sends each detail as its kind', () => {
+    let d = chooseType(newDraft(source, h.me), 'h_car0000000');
+    // A required yes/no left alone says no, as its switch shows: only the plate is missing.
+    expect(toMetadata(d, h).missing).toEqual(['plate']);
+    d = { ...d, details: { plate: ' AB12 CDE ', first_registered: 'March 2019', seats: '5', fuel: 'Electric' } };
+    const out = toMetadata(d, h);
+    expect(out.missing).toEqual([]);
+    expect(out.metadata.extra).toEqual({
+      plate: 'AB12 CDE',
+      first_registered: { date: '2019-03-31', precision: 'month' },
+      seats: 5,
+      fuel: 'Electric',
+      financed: false,
+    });
+    // One it cannot read is said on the detail itself, and nothing is sent.
+    expect(toMetadata({ ...d, details: { ...d.details, seats: 'five' } }, h).fields).toEqual({
+      'detail:seats': 'That should be a number, such as 42.',
+    });
+    // Offline too, the vault's own check: an answer the field does not offer.
+    expect(toMetadata({ ...d, details: { ...d.details, fuel: 'Diesel' } }, h).fields).toEqual({
+      'detail:fuel': 'Fuel must be one of: Petrol, Electric.',
+    });
+  });
+
+  it('a fixed field the type hides is neither asked for nor sent; one the card has no box for is not waited for', () => {
+    const d = { ...chooseType(newDraft(source, h.me), 'passport'), location: 'The safe', identifier: '' };
+    const out = toMetadata(d, h);
+    expect(out.missing).toEqual(['identifier', 'expires']);
+    expect(out.metadata).not.toHaveProperty('physical_location');
+    // Without custom_types, as in 0.2.0: nothing waited for, nothing new sent.
+    const old = toMetadata({ ...d, details: { plate: 'X' } }, { ...h, details: false });
+    expect(old.missing).toEqual([]);
+    expect(old.metadata).toMatchObject({ physical_location: 'The safe' });
+    expect(old.metadata).not.toHaveProperty('extra');
+  });
 });
 
 describe('a teen’s card', () => {
@@ -60,6 +137,7 @@ describe('a teen’s card', () => {
     ],
     me: { member_id: 'sam', role: 'teen' },
     issuedBy: true,
+    details: false,
   };
   const source = { kind: 'pages' as const, pages: [{ uri: 'cache:/1.jpg' }] };
 

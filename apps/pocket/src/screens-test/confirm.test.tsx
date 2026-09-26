@@ -7,8 +7,10 @@ import { fixtureScanner, type ScanOutcome } from '../capture/scanner';
 import { MemoryQueueStore } from '../queue/store';
 import type { QueueItem } from '../queue/item';
 import { jpeg, reply } from '../test-support/capture';
+import { audit } from '../test-support/a11y';
+import { addCar, fieldOf } from '../test-support/kinds';
 import { installed, renderApp, signedIn, testCapture } from '../test-support/render';
-import { testVault, type TestVault } from '../test-support/vault';
+import { capabilities, testVault, type TestVault } from '../test-support/vault';
 import { useCapture } from '../state/capture';
 import { useVault } from '../state/vault';
 
@@ -83,8 +85,19 @@ function recording(t: TestVault) {
   return { fetch, sent, metadata };
 }
 
-async function openCard(opts: { outcomes?: ScanOutcome[]; how?: 'scan' | 'file' } = {}) {
+async function openCard(
+  opts: {
+    outcomes?: ScanOutcome[];
+    how?: 'scan' | 'file';
+    /** A vault of 0.5.11, which asks for each type's details. */
+    kinds?: boolean;
+    /** The vault set up first, as the family left it. */
+    before?: (t: TestVault) => Promise<void>;
+  } = {},
+) {
   const t = testVault();
+  if (opts.kinds) t.caps = kindsCaps();
+  await opts.before?.(t);
   await withMembers(t);
   const rec = recording(t);
   const phone = testCapture({ scanner: fixtureScanner(opts.outcomes ?? [TWO_PAGES]) });
@@ -95,6 +108,10 @@ async function openCard(opts: { outcomes?: ScanOutcome[]; how?: 'scan' | 'file' 
   await screen.findByText('What it is');
   return { ...utils, t, phone, rec };
 }
+
+/** A vault of 0.5.11: it keeps each type's details, and says which fields each requires. */
+const kindsCaps = () =>
+  capabilities({ server_version: '0.5.11', features: { ...capabilities().features, custom_types: true } });
 
 const captures = (t: TestVault) => t.calls.filter((c) => c.startsWith('POST') && c.endsWith('/api/v1/capture'));
 const chip = (name: string | RegExp) => screen.getByRole('button', { name });
@@ -335,6 +352,95 @@ describe('the page strip', () => {
     expect(screen.getByRole('button', { name: 'Remove page 1' }).props.accessibilityState).toMatchObject({
       disabled: true,
     });
+  });
+});
+
+describe('a type’s details (a vault of 0.5.11)', () => {
+  it('a passport card asks for its number when the vault has the flag', async () => {
+    const { t, rec } = await openCard({ kinds: true });
+    await fireEvent.press(chip('Passport'));
+    await fireEvent.press(chip('Fake Owner (Yours)'));
+    await fireEvent.press(screen.getByTestId('more-details'));
+    // The type's own names for its fields, and the ones it requires marked.
+    expect(screen.getByText('Passport number * required')).toBeTruthy();
+    expect(screen.getByLabelText('Passport number, required').props.testID).toBe('field-number');
+    expect(screen.getByLabelText('Expires, required').props.testID).toBe('field-expires');
+    expect(screen.getByLabelText('Issuing country').props.testID).toBe('field-issued-by');
+    // Save waits for them, and says which.
+    await fireEvent.press(screen.getByTestId('capture-save'));
+    expect(await screen.findByTestId('capture-error')).toHaveTextContent(
+      'Still needed: Passport number and Expires. Fill them in, or skip for now.',
+    );
+    expect(captures(t)).toHaveLength(0);
+    await fireEvent.changeText(screen.getByTestId('field-number'), ' 123456789 ');
+    await fireEvent.press(screen.getByTestId('capture-save'));
+    expect(await screen.findByText('Still needed: Expires. Fill it in, or skip for now.')).toBeTruthy();
+    await fireEvent.changeText(screen.getByTestId('field-expires'), '14 Mar 2031');
+    await fireEvent.press(screen.getByTestId('capture-save'));
+    await waitFor(() => expect(t.vault.state.documents).toHaveLength(1));
+    expect(rec.metadata()[0]).toMatchObject({
+      type_key: 'passport',
+      identifier: '123456789',
+      expires: { date: '2031-03-14', precision: 'day' },
+    });
+    // A passport has no details of its own: nothing else is sent.
+    expect(rec.metadata()[0]).not.toHaveProperty('extra');
+  });
+
+  it('a kind of the household’s own asks for its details, waits for the required one, and sends them', async () => {
+    let car = { key: '' } as Awaited<ReturnType<typeof addCar>>;
+    const { t, rec } = await openCard({ kinds: true, before: async (v) => void (car = await addCar(v.vault)) });
+    const plate = fieldOf(car, 'Registration plate');
+    await fireEvent.press(screen.getByTestId('types-more'));
+    await fireEvent.changeText(screen.getByTestId('types-search'), 'car');
+    await fireEvent.press(chip('Car'));
+    await fireEvent.press(screen.getByTestId('more-details'));
+    expect(screen.getByText('Registration plate * required')).toBeTruthy();
+    expect(screen.getByLabelText('On finance')).toBeTruthy();
+    // Each answer, and the switch, work with a screen reader and a thumb.
+    expect(audit()).toEqual([]);
+    await fireEvent.press(screen.getByTestId('capture-save'));
+    expect(await screen.findByTestId('capture-error')).toHaveTextContent(
+      'Still needed: Registration plate. Fill it in, or skip for now.',
+    );
+    expect(captures(t)).toHaveLength(0);
+    await fireEvent.changeText(screen.getByTestId(`field-detail-${plate}`), 'AB12 CDE');
+    await fireEvent.press(chip('Electric'));
+    await fireEvent.press(screen.getByTestId('capture-save'));
+    await waitFor(() => expect(t.vault.state.documents).toHaveLength(1));
+    const fuel = fieldOf(car, 'Fuel');
+    // Only what has a value: On finance was left alone, and is not required.
+    expect(rec.metadata()[0]).toMatchObject({ type_key: car.key, extra: { [plate]: 'AB12 CDE', [fuel]: 'Electric' } });
+    expect(Object.keys(rec.metadata()[0]?.extra as object)).toHaveLength(2);
+    expect(t.vault.state.documents[0]?.extra).toEqual({ [plate]: 'AB12 CDE', [fuel]: 'Electric' });
+  });
+
+  it('Skip never waits', async () => {
+    const { t } = await openCard({ kinds: true });
+    await fireEvent.press(chip('Passport'));
+    await fireEvent.press(screen.getByTestId('capture-skip'));
+    await waitFor(() => expect(t.vault.state.documents).toHaveLength(1));
+    expect(screen.queryByTestId('capture-error')).toBeNull();
+  });
+
+  it('nothing new is sent to a vault without it', async () => {
+    let car = { key: '' } as Awaited<ReturnType<typeof addCar>>;
+    const { t, rec } = await openCard({ before: async (v) => void (car = await addCar(v.vault)) });
+    // The card as in 0.2.0: its own words, nothing marked, no details of a kind's own.
+    await fireEvent.press(chip('Passport'));
+    await fireEvent.press(screen.getByTestId('more-details'));
+    expect(screen.getByLabelText('Number').props.testID).toBe('field-number');
+    expect(screen.queryByText(/required/)).toBeNull();
+    await fireEvent.press(screen.getByTestId('types-more'));
+    await fireEvent.changeText(screen.getByTestId('types-search'), 'car');
+    await fireEvent.press(chip('Car'));
+    expect(screen.queryByTestId(`field-detail-${fieldOf(car, 'Registration plate')}`)).toBeNull();
+    expect(screen.queryByText(/required/)).toBeNull();
+    // Save does not wait.
+    await fireEvent.press(screen.getByTestId('capture-save'));
+    await waitFor(() => expect(t.vault.state.documents).toHaveLength(1));
+    expect(rec.metadata()[0]).toMatchObject({ type_key: car.key });
+    expect(rec.metadata()[0]).not.toHaveProperty('extra');
   });
 });
 

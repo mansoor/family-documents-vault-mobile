@@ -3,6 +3,9 @@
 # (10.0.2.2:8099). A scan saved in airplane mode survives the app being
 # stopped, and reaches the vault once, with the card's details. The
 # workflow then asks the vault's API that exactly one such document exists.
+# Since 0.2.1 (a vault of 0.5.11, custom_types) the card knows, offline,
+# what a passport requires — its number and its expiry — and Save waits
+# for them.
 appId: io.github.mansoor.familyvault.e2e
 env:
   VAULT: 10.0.2.2:8099
@@ -51,6 +54,29 @@ env:
 - scrollUntilVisible:
     element: .*\(Yours\)
 - tapOn: .*\(Yours\)
+- scrollUntilVisible:
+    element:
+      id: capture-save
+- tapOn:
+    id: capture-save
+# Save waits for what a passport requires, says what, and opens the details.
+- assertVisible: 'Still needed: Passport number and Expires.*'
+- scrollUntilVisible:
+    element:
+      id: field-number
+    direction: UP
+- assertVisible: 'Passport number \* required'
+- tapOn:
+    id: field-number
+- inputText: '123456789'
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      id: field-expires
+- tapOn:
+    id: field-expires
+- inputText: 14/03/2031
+- hideKeyboard
 - scrollUntilVisible:
     element:
       id: capture-save

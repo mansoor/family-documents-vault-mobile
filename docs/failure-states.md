@@ -61,6 +61,7 @@ Written by `node apps/pocket/scripts/failure-states.mjs`; CI fails if it is out 
 |  |  | `capture.offlineSkip` | No connection, and this phone hasn't seen the vault's choices yet. Skip keeps the scan: you can name it when you're back online. |
 |  |  | `capture.queueUnavailable` | Couldn't keep it on this phone just now. Try Save again in a moment. |
 |  |  | `capture.notAllowed` | Your account can open documents but not add them. Ask whoever runs the vault. |
+|  |  | `capture.stillNeeded` | Still needed: {{fields}}. Fill it in, or skip for now. / Still needed: {{fields}}. Fill them in, or skip for now. |
 | Scans on their way | Home, the queue | `queue.busy` | The vault is busy. Trying again in a moment. |
 |  |  | `queue.notYet` | Not sent yet. Your scan is safe on this phone and will go by itself. |
 |  |  | `queue.tooBigForVault` | This file is bigger than your vault accepts ({{limit}}). Try fewer pages, or a smaller file. |

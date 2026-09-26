@@ -6,6 +6,28 @@ app's own, tagged `vX.Y.Z` in this repository.
 
 ## [Unreleased]
 
+Iteration 5.13: a kind of document's details on the phone, and who added
+each version. And the tab bar's +, as on the web.
+
+### Added
+- **The card asks for a kind's details**, with a vault of 0.5.11 or later
+  (`custom_types`). More details uses the kind's own name for each field
+  ("Passport number", not "Number"), leaves out the fixed fields the kind
+  does not use, and adds its own fields, each with the input its kind
+  needs: text, a date, a year, a number, an amount, one of its answers, or
+  yes/no. The fields it requires are marked "* required"; Save waits for
+  them and says which are still needed, and Skip never waits. The details
+  go with the scan, checked on the phone against the kinds it last saw —
+  offline too — so the vault refuses nothing when it arrives. With an
+  older vault the card is as in 0.2.0 and nothing new is sent.
+- **A document's page shows its kind's details**, under the kind's names
+  for them. An Only me document's come only from the vault's own answer
+  for that document, which opens them for its owner; never from a list or
+  a kept copy.
+- **Who added each version, and when exactly**: "Added 25 Sept 2026,
+  4:12pm by Sarah". A viewer is told only when, as in the vault's activity
+  log. An older vault's history reads as before.
+
 ### Changed
 - **The button in the middle of the tab bar is a +, as on the web**, and
   it opens a menu: **Add a file**, **Camera** and **Add a picture**. It is
@@ -24,6 +46,20 @@ app's own, tagged `vX.Y.Z` in this repository.
   and the screen keeps its title); the labels are the web's size; the +
   is 56 across, as on the web, in a slot of its own, so no label runs up
   against it.
+- Kinds of document the household has hidden are no longer offered on the
+  card, not even among the usual first ones. The vault still lists them
+  while a document uses them, so those documents keep their kind.
+- Built against the vault's shared code of v0.5.11 (was v0.5.0-rc.1).
+
+### Fixed
+- **An Essential's status with no connection agrees with the vault's.**
+  The phone worked it out from the expiry date alone, so a kept passport
+  with no number said "Valid for 3 years" where the vault said "Needs a
+  passport number". The kinds are now kept with what each requires, and
+  the status is worked out by the vault's own rule. For an Only me
+  document, whose details are sealed and never kept on the phone, the
+  vault's Needs info stands, unless its expiry has since come near or
+  passed, which comes first.
 
 ## [0.2.0] — Phase 4 — Pocket
 

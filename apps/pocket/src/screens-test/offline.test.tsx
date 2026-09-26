@@ -11,8 +11,9 @@ import { MemoryQueueStore, type QueueStore } from '../queue/store';
 import { useCapture } from '../state/capture';
 import { useVault } from '../state/vault';
 import { jpeg, reply } from '../test-support/capture';
+import { addCar, fieldOf } from '../test-support/kinds';
 import { installed, renderApp, signedIn, testCapture } from '../test-support/render';
-import { testVault, type TestVault } from '../test-support/vault';
+import { capabilities, testVault, type TestVault } from '../test-support/vault';
 
 jest.mock('expo-router', () => ({
   Link: (p: { children: unknown }) => p.children,
@@ -152,6 +153,62 @@ describe('the card with no connection', () => {
     await act(async () => release());
     expect(await screen.findByRole('button', { name: 'Passport' })).toBeTruthy();
     expect(screen.queryByText(/hasn't seen the vault's choices/)).toBeNull();
+  });
+
+  it('a cached custom type is offered offline, and asks for its details as the vault did', async () => {
+    const t = testVault([ORIGIN]);
+    // A vault of 0.5.11, with a kind of the household's own that requires its plate.
+    t.caps = capabilities({ server_version: '0.5.11', features: { ...capabilities().features, custom_types: true } });
+    const car = await addCar(t.vault);
+    const plate = fieldOf(car, 'Registration plate');
+    await signedIn(t);
+    const store = new MemoryQueueStore();
+    const phone = () => {
+      const p = testCapture({ scanner: fixtureScanner([TWO_PAGES]), openStore: async () => store });
+      p.files.set('cache:/scan/1.jpg', jpeg('letter-with-exif.jpg'));
+      p.files.set('cache:/scan/2.jpg', jpeg('card.jpg'));
+      return p;
+    };
+    // Online once: the card's choices are kept on the phone, and what the vault asks for.
+    const first = await renderApp(<App />, { fetch: withStatus(t), capture: phone() });
+    await screen.findByTestId('home-calm');
+    const key = `card|${ORIGIN}|fake-member`;
+    await waitFor(async () => expect(await store.cached(key)).not.toBeNull());
+    await waitFor(async () => expect(await store.cached(`${key}|kinds`)).toEqual({ customTypes: true }));
+    await first.unmount();
+
+    // Opened again in airplane mode: nothing is asked of the vault this time.
+    t.reachable.delete(ORIGIN);
+    await renderApp(<App />, { fetch: withStatus(t), capture: phone() });
+    await add();
+    await fireEvent.press(await screen.findByTestId('types-more'));
+    await fireEvent.changeText(screen.getByTestId('types-search'), 'car');
+    await fireEvent.press(screen.getByRole('button', { name: 'Car' }));
+    await fireEvent.press(screen.getByRole('button', { name: /\(Yours\)$/ }));
+    await fireEvent.press(screen.getByTestId('more-details'));
+    expect(screen.getByText('Registration plate * required')).toBeTruthy();
+    await fireEvent.press(screen.getByTestId('capture-save'));
+    expect(await screen.findByTestId('capture-error')).toHaveTextContent(
+      'Still needed: Registration plate. Fill it in, or skip for now.',
+    );
+    // Checked on the phone against the kept kind, as the vault will check it.
+    await fireEvent.changeText(screen.getByTestId(`field-detail-${plate}`), 'x'.repeat(501));
+    await fireEvent.press(screen.getByTestId('capture-save'));
+    expect(await screen.findByText('Registration plate is too long: 500 characters at most.')).toBeTruthy();
+    await fireEvent.changeText(screen.getByTestId(`field-detail-${plate}`), 'AB12 CDE');
+    await fireEvent.press(screen.getByTestId('capture-save'));
+    expect(await screen.findByTestId('home-saved')).toHaveTextContent(/^Saved on this phone\./);
+    expect(t.vault.state.documents).toHaveLength(0);
+
+    // The connection comes back: filed under the household's own kind, with its plate.
+    t.reachable.add(ORIGIN);
+    await networkChanged();
+    await waitFor(() => expect(t.vault.state.documents).toHaveLength(1));
+    expect(t.vault.state.documents[0]).toMatchObject({
+      type_key: car.key,
+      owner_member_id: 'fake-member',
+      extra: { [plate]: 'AB12 CDE' },
+    });
   });
 
   it('never having seen the choices, offers Skip only', async () => {
