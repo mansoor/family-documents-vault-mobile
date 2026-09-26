@@ -41,6 +41,10 @@ need 0.4.14. Everything in 0.1.1–0.1.10 below.
   every answer, so an upgrade is noticed from what the app already asks.
   Over plain http nothing changes: the check that this is still your
   vault happens as before.
+- **Turning Essential off asks to confirm it's you**, as a vault of
+  0.5.3 or later requires: it takes a check away from the document.
+  Turning it on asks nothing. Before, such a vault refused the change
+  with "Confirm it's you to carry on." and no way to.
 
 ## [0.1.10] — iteration 4.17: accessibility, copy and the failure states
 
