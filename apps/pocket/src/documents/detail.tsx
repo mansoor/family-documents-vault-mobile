@@ -138,7 +138,10 @@ export function DocumentDetail(props: { id: string }) {
     if (offline) return warn(t('document.needsConnection'));
     setToggling(true);
     try {
-      setDoc(await withToken((a, token) => a.updateDocument(token, id, { is_essential: value }, doc.etag)));
+      // Turning Essential off takes a check away, so a vault of 0.5.3 or
+      // later asks who it is first; not confirmed, nothing changes.
+      const saved = await guarded((a, token) => a.updateDocument(token, id, { is_essential: value }, doc.etag));
+      if (saved) setDoc(saved);
     } catch (err) {
       if (err instanceof ApiRequestError && err.status === 409) {
         // Changed meanwhile by somebody else: theirs is shown, not overwritten.

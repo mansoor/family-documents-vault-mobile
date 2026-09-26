@@ -263,6 +263,37 @@ describe('a document', () => {
     expect(t.library.documents.get('passport')?.is_essential).toBe(false);
   });
 
+  it('turning Essential off asks to confirm it is you first, and changes nothing until then (vault 0.5.3)', async () => {
+    const t = testVault([ORIGIN]);
+    libraryDoc(t, { id: 'passport', title: 'Passport', is_essential: true });
+    await unlocked(t, <DocumentDetail id="passport" />);
+    await screen.findByText('Passport');
+    await fireEvent(screen.getByTestId('document-essential'), 'valueChange', false);
+    expect(await screen.findByTestId('step-up-sheet')).toBeTruthy();
+    expect(t.library.documents.get('passport')?.is_essential).toBe(true);
+    // Not now: it stays an Essential.
+    await fireEvent.press(screen.getByTestId('step-up-cancel'));
+    await waitFor(() => expect(screen.queryByTestId('step-up-sheet')).toBeNull());
+    expect(t.library.documents.get('passport')?.is_essential).toBe(true);
+    // Asked again, and confirmed: now it is not.
+    await fireEvent(screen.getByTestId('document-essential'), 'valueChange', false);
+    await fireEvent.changeText(await screen.findByTestId('step-up-password'), PASSWORD);
+    await fireEvent.press(screen.getByTestId('step-up-go'));
+    await waitFor(() => expect(t.library.documents.get('passport')?.is_essential).toBe(false));
+    expect(t.library.stepUps).toEqual([PASSWORD]);
+  });
+
+  it('turning Essential on takes nothing away, so it asks nothing', async () => {
+    const t = testVault([ORIGIN]);
+    libraryDoc(t, { id: 'passport', title: 'Passport' });
+    await unlocked(t, <DocumentDetail id="passport" />);
+    await screen.findByText('Passport');
+    await fireEvent(screen.getByTestId('document-essential'), 'valueChange', true);
+    await waitFor(() => expect(t.library.documents.get('passport')?.is_essential).toBe(true));
+    expect(screen.queryByTestId('step-up-sheet')).toBeNull();
+    expect(t.library.stepUps).toEqual([]);
+  });
+
   it('can be used with a screen reader and a thumb', async () => {
     const t = testVault([ORIGIN]);
     libraryDoc(t, { id: 'passport', title: 'Passport', is_essential: true });

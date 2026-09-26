@@ -279,6 +279,10 @@ async function library(t: TestVault, path: string, init: Parameters<FetchLike>[1
     if (init.method === 'PATCH') {
       const ifMatch = Object.entries(init.headers).find(([k]) => k.toLowerCase() === 'if-match')?.[1];
       if (ifMatch && ifMatch !== doc.etag) return failure(409, 'conflict', 'Someone changed this.');
+      // As the vault since 0.5.3: taking a check away asks who it is first.
+      if (doc.is_essential && body.is_essential === false && !lib.verified) {
+        return failure(403, 'step_up_required', 'Please confirm it is you to stop keeping this as an Essential.');
+      }
       const next = { ...doc, ...body, etag: nextEtag() } as DocumentView;
       lib.documents.set(doc.id, next);
       return json(next);
