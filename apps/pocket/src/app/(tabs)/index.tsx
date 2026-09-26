@@ -1,12 +1,12 @@
-import { can, colours, radii, TAP_MIN, type DocumentView, type Member, type ReminderView } from '@fdv/shared';
+import { can, colours, radii, type DocumentView, type Member, type ReminderView } from '@fdv/shared';
 import { Image } from 'expo-image';
 import { Link, useRouter } from 'expo-router';
-import { FileUp, ImagePlus, Settings as SettingsIcon, type LucideIcon } from 'lucide-react-native';
+import { Settings as SettingsIcon } from 'lucide-react-native';
 import { useCallback, useEffect, useState } from 'react';
 import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
 import { FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { QueueRow } from '../../capture/queue-row';
 import { useBeginCapture } from '../../capture/add-button';
 import { OnThisPhone } from '../../essentials/ui';
@@ -33,12 +33,11 @@ export default function Home() {
   const { t } = useTranslation();
   const { caps, vault, offline, notice, withToken, api, who } = useVault();
   const capture = useCapture();
-  const insets = useSafeAreaInsets();
   const [data, setData] = useState<HomeData | null>(null);
   const [refreshing, setRefreshing] = useState(false);
-  // The tab bar's + offers a file, the camera or a picture; a file or a photo also starts here.
-  const { begin, scannerFailed, setScannerFailed } = useBeginCapture();
-  const [dockHeight, setDockHeight] = useState(84);
+  // A document is added with the tab bar's + (a file, the camera or a
+  // picture); here, a renewal's scanner that cannot start is said.
+  const { scannerFailed, setScannerFailed } = useBeginCapture();
   const [othersKept, setOthersKept] = useState(false);
   const [members, setMembers] = useState<Member[] | null>(null);
   const canAdd = who ? can(who.role, 'document.add') : false;
@@ -132,7 +131,7 @@ export default function Home() {
         data={data?.recent ?? []}
         keyExtractor={(d) => d.id}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void refresh()} />}
-        contentContainerStyle={[styles.page, { paddingBottom: dockHeight + insets.bottom + 32 }]}
+        contentContainerStyle={styles.page}
         ListHeaderComponent={
           <View style={styles.header}>
             <View style={styles.titleRow}>
@@ -167,6 +166,11 @@ export default function Home() {
             {renewProblem ? (
               <Notice tone="danger" testID="home-renew-problem">
                 {renewProblem}
+              </Notice>
+            ) : null}
+            {scannerFailed ? (
+              <Notice tone="warn" testID="home-scanner-failed">
+                {t('home.scannerFailed')}
               </Notice>
             ) : null}
             {capture.others.length > 0 && !othersKept ? (
@@ -234,7 +238,11 @@ export default function Home() {
             <Text variant="screen" style={styles.recentTitle}>
               {t('home.recentTitle')}
             </Text>
-            {data && data.recent.length === 0 ? <Text tone="soft">{t('home.none')}</Text> : null}
+            {data && data.recent.length === 0 ? (
+              <Text tone="soft" testID="home-none">
+                {t(canAdd ? 'home.none' : 'home.noneViewer')}
+              </Text>
+            ) : null}
           </View>
         }
         renderItem={({ item }) => (
@@ -245,62 +253,22 @@ export default function Home() {
           />
         )}
       />
-      {canAdd ? (
-        <View style={[styles.dock, { bottom: 12 }]} onLayout={(e) => setDockHeight(e.nativeEvent.layout.height)}>
-          {scannerFailed ? (
-            <View style={styles.dockNotice}>
-              <Notice tone="warn" testID="home-scanner-failed">
-                {t('home.scannerFailed')}
-              </Notice>
-            </View>
-          ) : null}
-          <DockButton
-            icon={FileUp}
-            label={t('home.addFile')}
-            onPress={() => void begin('file')}
-            testID="home-add-file"
-          />
-          {/* The e2e build only: tells a flow the card is kept, before it goes offline. */}
-          {extra.fixtures && capture.cardKept ? (
-            <View testID="e2e-card-kept" collapsable={false} style={styles.e2eMarker} />
-          ) : null}
-          {/* The e2e build only: what a failed flow's view dump should say. */}
-          {extra.fixtures ? (
-            <View
-              testID="e2e-state"
-              accessible
-              accessibilityLabel={`queue ${capture.storeOpen ? 'open' : 'closed'}, card ${capture.cardKept ? 'kept' : 'not kept'}`}
-              collapsable={false}
-              style={styles.e2eMarker}
-            />
-          ) : null}
-          <DockButton
-            icon={ImagePlus}
-            label={t('home.addPhoto')}
-            onPress={() => void begin('photo')}
-            testID="home-add-photo"
+      {/* The e2e build only, always on the screen: a flow's markers. */}
+      {extra.fixtures ? (
+        <View style={styles.e2eMarkers}>
+          {/* Tells a flow the card is kept, before it goes offline. */}
+          {capture.cardKept ? <View testID="e2e-card-kept" collapsable={false} style={styles.e2eMarker} /> : null}
+          {/* What a failed flow's view dump should say. */}
+          <View
+            testID="e2e-state"
+            accessible
+            accessibilityLabel={`queue ${capture.storeOpen ? 'open' : 'closed'}, card ${capture.cardKept ? 'kept' : 'not kept'}`}
+            collapsable={false}
+            style={styles.e2eMarker}
           />
         </View>
       ) : null}
     </SafeAreaView>
-  );
-}
-
-function DockButton(props: { icon: LucideIcon; label: string; onPress: () => void; testID: string }) {
-  const Icon = props.icon;
-  return (
-    <Pressable
-      testID={props.testID}
-      accessibilityRole="button"
-      accessibilityLabel={props.label}
-      onPress={props.onPress}
-      style={({ pressed }) => [styles.dockButton, pressed ? styles.pressed : null]}
-    >
-      <Icon color={colours.accent} size={22} accessibilityElementsHidden importantForAccessibility="no" />
-      <Text variant="secondary" weight="600" tone="accent" role="text">
-        {props.label}
-      </Text>
-    </Pressable>
   );
 }
 
@@ -358,39 +326,13 @@ function DocumentRow(props: { doc: DocumentView; token: string | null; thumb: st
 }
 
 const styles = StyleSheet.create({
+  e2eMarkers: { position: 'absolute', left: 0, bottom: 0, flexDirection: 'row' },
   e2eMarker: { width: 1, height: 1 },
   safe: { flex: 1, backgroundColor: colours.bg },
   page: { padding: 20, gap: 10 },
   queue: { gap: 8 },
   needsYou: { gap: 6, borderColor: colours.danger },
   pressed: { opacity: 0.8 },
-  dock: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    paddingHorizontal: 16,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 16,
-    rowGap: 8,
-  },
-  dockNotice: { width: '100%' },
-  dockButton: {
-    minHeight: TAP_MIN,
-    minWidth: 96,
-    flexShrink: 1,
-    paddingHorizontal: 12,
-    borderRadius: radii.pill,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    backgroundColor: colours.surface,
-    borderWidth: 1,
-    borderColor: colours.border,
-  },
   header: { gap: 12, marginBottom: 4 },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   flex: { flex: 1 },

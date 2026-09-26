@@ -14,8 +14,16 @@ app's own, tagged `vX.Y.Z` in this repository.
   button at all. Back, a tap outside the menu or Cancel closes it. A
   screen reader hears "Add a document", is taken to the first choice when
   the menu opens and back to the + when it closes; the choices scroll at
-  the largest text sizes. Add a file and Add a photo stay on Home, and a
-  scanner that cannot start still says so.
+  the largest text sizes. A scanner that cannot start still says so.
+- **Home no longer has its own Add a file and Add a photo buttons**, which
+  floated over Recently added: the + offers both. With no documents yet,
+  Home points to the + (a viewer, who cannot add, is told only that there
+  are none).
+- **The tab bar fits a small phone at Large text.** Needs attention's tab
+  is labelled "Attention" (a screen reader still hears "Needs attention",
+  and the screen keeps its title); the labels are the web's size; the +
+  is 56 across, as on the web, in a slot of its own, so no label runs up
+  against it.
 
 ## [0.2.0] — Phase 4 — Pocket
 

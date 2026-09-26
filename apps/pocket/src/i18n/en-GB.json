@@ -62,13 +62,12 @@
     "attentionTitle": "Needs attention",
     "calm": "Nothing needs you right now.",
     "recentTitle": "Recently added",
-    "none": "No documents yet. Add one with the + button.",
+    "none": "No documents yet. Add one with the + button below.",
+    "noneViewer": "No documents yet.",
     "needsAName": "Needs a name",
     "untitled": "Untitled document",
     "offline": "No connection. What you see may be out of date.",
     "settings": "Settings",
-    "addFile": "Add a file",
-    "addPhoto": "Add a photo",
     "needName_one": "{{count}} document needs a name",
     "needName_other": "{{count}} documents need a name",
     "scannerFailed": "The scanner couldn't start on this phone. Add a photo or a file instead — the first scan also needs an internet connection to set the scanner up.",
@@ -337,8 +336,8 @@
   "tabs": {
     "home": "Home",
     "search": "Search",
-    "scan": "Scan a document",
-    "attention": "Needs attention",
+    "attention": "Attention",
+    "attentionName": "Needs attention",
     "people": "People"
   },
   "document": {

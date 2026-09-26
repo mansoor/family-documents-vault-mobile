@@ -95,7 +95,7 @@ export function AddButton() {
   );
 
   return (
-    <View style={styles.wrap}>
+    <View style={styles.slot} testID="home-add-slot">
       {scannerFailed ? (
         <View style={styles.notice}>
           <Notice tone="warn" testID="home-scanner-failed">
@@ -116,7 +116,7 @@ export function AddButton() {
       >
         <Plus
           color={colours.onAccent}
-          size={30}
+          size={28}
           strokeWidth={2.5}
           accessibilityElementsHidden
           importantForAccessibility="no"
@@ -204,7 +204,12 @@ export function AddMenu(props: {
                     style={({ pressed }) => [styles.choice, pressed ? styles.pressed : null]}
                   >
                     <View style={styles.icon}>
-                      <Icon color={colours.accent} size={24} accessibilityElementsHidden importantForAccessibility="no" />
+                      <Icon
+                        color={colours.accent}
+                        size={24}
+                        accessibilityElementsHidden
+                        importantForAccessibility="no"
+                      />
                     </View>
                     <Text weight="600" role="text" style={styles.label}>
                       {c.label}
@@ -221,13 +226,18 @@ export function AddMenu(props: {
   );
 }
 
+const PLUS = 56;
+
 const styles = StyleSheet.create({
-  wrap: { alignItems: 'center' },
+  // The tab bar's centre: a fixed width, the + and a little air either
+  // side, so the tabs' labels never run up against it.
+  slot: { width: PLUS + 8, alignItems: 'center' },
   notice: { position: 'absolute', bottom: 72, width: 300 },
+  // As on the web: 56 across.
   plus: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: PLUS,
+    height: PLUS,
+    borderRadius: PLUS / 2,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colours.accent,

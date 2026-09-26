@@ -1,11 +1,14 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react-native';
+import type { ReactElement } from 'react';
 import { AccessibilityInfo } from 'react-native';
+import Home from '../app/(tabs)/index';
 import PeopleScreen from '../app/(tabs)/people';
 import { SecureTokenStore } from '../session/store';
 import { audit } from '../test-support/a11y';
 import { unlocked } from '../test-support/lookup';
 import { fixtureScanner, type ScanOutcome } from '../capture/scanner';
 import { MAX_PAGES } from '../queue/commit';
+import { reply } from '../test-support/capture';
 import { installed, renderApp, signedIn, testCapture } from '../test-support/render';
 import { resetRoutes, routes } from '../test-support/router';
 import { testVault } from '../test-support/vault';
@@ -22,8 +25,11 @@ const STATE = {
   routes: ['index', 'search', 'attention', 'people'].map((name) => ({ key: name, name })),
 };
 
-/** Somebody signed in with this role, as the phone keeps it; by default on a phone with a scanner. */
-async function as(role: string, scanner = fixtureScanner([])) {
+/**
+ * Somebody signed in with this role, as the phone keeps it, looking at the
+ * tab bar (or `ui`); by default on a phone with a scanner.
+ */
+async function as(role: string, scanner = fixtureScanner([]), ui?: ReactElement) {
   installed();
   const t = testVault([ORIGIN]);
   await signedIn(t);
@@ -31,9 +37,16 @@ async function as(role: string, scanner = fixtureScanner([])) {
   const store = new SecureTokenStore();
   const kept = await store.load();
   await store.save({ ...(kept as NonNullable<typeof kept>), role: role as never });
+  // …and the vault says so too, whenever it says who this is (who am I, a refreshed session).
+  const fetch: typeof t.fetch = async (url, init) => {
+    const res = await t.fetch(url, init);
+    if (!/\/api\/v1\/(me|auth\/)/.test(url) || res.status !== 200) return res;
+    const body = (await res.json()) as Record<string, unknown>;
+    return reply(200, 'role' in body ? { ...body, role } : body);
+  };
   const navigated: string[] = [];
-  await renderApp(<TabBar state={STATE} navigation={{ navigate: (n) => void navigated.push(n) }} />, {
-    fetch: t.fetch,
+  await renderApp(ui ?? <TabBar state={STATE} navigation={{ navigate: (n) => void navigated.push(n) }} />, {
+    fetch,
     capture: testCapture({ scanner }),
   });
   return navigated;
@@ -73,6 +86,13 @@ describe('the tab bar', () => {
     expect(audit()).toEqual([]);
   });
 
+  it('Needs attention is "Attention" on its tab, and its whole name to a screen reader', async () => {
+    await as('owner');
+    const tab = await screen.findByTestId('tab-attention');
+    expect(within(tab).getByText('Attention')).toBeTruthy();
+    expect(tab.props.accessibilityLabel).toBe('Needs attention');
+  });
+
   it('People lists the family, each leading to their documents', async () => {
     installed();
     const t = testVault([ORIGIN]);
@@ -81,6 +101,23 @@ describe('the tab bar', () => {
     expect(audit()).toEqual([]);
     await fireEvent.press(screen.getByTestId('person-fake-member'));
     expect(routes().at(-1)).toEqual({ pathname: '/person/[id]', params: { id: 'fake-member', name: 'Fake Owner' } });
+  });
+});
+
+describe('Home, with the + as the way to add', () => {
+  it('has no add buttons of its own; with nothing yet, it points to the +', async () => {
+    await as('owner', fixtureScanner([]), <Home />);
+    expect(await screen.findByTestId('home-none')).toHaveTextContent(
+      'No documents yet. Add one with the + button below.',
+    );
+    expect(screen.queryByText('Add a file')).toBeNull();
+    expect(screen.queryByText('Add a photo')).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Add a/ })).toBeNull();
+  });
+
+  it('to a viewer, who has no +, it only says there is nothing yet', async () => {
+    await as('viewer', fixtureScanner([]), <Home />);
+    expect(await screen.findByTestId('home-none')).toHaveTextContent(/^No documents yet\.$/);
   });
 });
 

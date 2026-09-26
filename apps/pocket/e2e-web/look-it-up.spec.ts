@@ -78,7 +78,9 @@ test("search, open, confirm it's you, snooze", async ({ page, baseURL, request }
 
   // A passport added from the phone, as anybody would.
   const chooser = page.waitForEvent('filechooser');
-  await page.getByRole('button', { name: 'Add a file' }).click();
+  // The tab bar's +, then Add a file.
+  await page.getByRole('button', { name: 'Add a document' }).click();
+  await page.getByRole('menuitem', { name: 'Add a file' }).click();
   await (await chooser).setFiles({ name: `${word}.pdf`, mimeType: 'application/pdf', buffer: pdf(word) });
   await page.getByRole('button', { name: 'More details' }).click();
   await page.getByLabel('Name', { exact: true }).fill(title);
