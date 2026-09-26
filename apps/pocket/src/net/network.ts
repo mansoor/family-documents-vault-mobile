@@ -56,7 +56,9 @@ export async function whyFailed(url: string): Promise<unknown> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 8_000);
   try {
-    await fetch(url, { signal: controller.signal });
+    // Asked of the network, never of the phone's HTTP cache (0.2.0): a kept
+    // capability document would say nothing is wrong.
+    await fetch(url, { signal: controller.signal, headers: { 'cache-control': 'no-cache, no-store' } });
     return null;
   } catch (err) {
     return err;

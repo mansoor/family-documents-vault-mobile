@@ -10,6 +10,7 @@ import { extra, SPIKE } from '../config';
 import { LockGate } from '../lock/gate';
 import { CaptureProvider } from '../state/capture';
 import { saveCopyIo } from '../documents/save-copy';
+import { watchHttpCache } from '../net/http-cache';
 import { recoverBrightness } from '../show/brightness';
 import { defaultShowPlatform } from '../show/platform';
 import { PushLinks } from '../push/links';
@@ -87,6 +88,16 @@ function Gates() {
   );
 }
 
+/**
+ * What the phone's HTTP stack kept of the vault goes at launch — before the
+ * first request, as a child's effects run before its providers' — and again
+ * whenever a session ends here.
+ */
+function ForgetHttpCache() {
+  useEffect(() => watchHttpCache(), []);
+  return null;
+}
+
 /** A brightness Show mode left behind (the app stopped while showing) goes back at launch. */
 function ShowRecovery() {
   useEffect(() => {
@@ -113,6 +124,7 @@ export default function RootLayout() {
                 <PushProvider>
                   <StepUpProvider>
                     <View style={styles.root}>
+                      <ForgetHttpCache />
                       <ShowRecovery />
                       <PushLinks />
                       {extra.testBanner ? <TestBanner /> : null}
