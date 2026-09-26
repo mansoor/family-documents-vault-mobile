@@ -129,6 +129,14 @@ jobs:
             # Android's "Viewing full screen" notice, shown the first time an app hides the bars (Show mode, 4.11), takes the next Back: seen already here.
             adb shell settings put secure immersive_mode_confirmations confirmed
             adb shell am broadcast -a android.intent.action.CLOSE_SYSTEM_DIALOGS || true
+            # An http vault is used only on Wi-Fi. A freshly booted emulator
+            # can still count its cellular network when the first flow signs
+            # in, and the sign-in is refused as "not on Wi-Fi" (run
+            # 36225210222). No flow needs mobile data: off, and wait for Wi-Fi.
+            # (The action runs each line of this script on its own: one line per command.)
+            adb shell svc data disable || true
+            for i in $(seq 1 30); do adb shell dumpsys connectivity | grep -iE 'NetworkAgentInfo' | grep -qi wifi && break; sleep 2; done
+            adb shell dumpsys connectivity | grep -iE 'NetworkAgentInfo' | head -3 || true
             adb install -r fv-e2e.apk
             $HOME/.maestro/bin/maestro test -e EMAIL="$EMAIL" -e PASSWORD="$PASSWORD" --format junit --output maestro-report.xml apps/pocket/.maestro/capture-offline-queue.yaml || sh .github/scripts/on-flow-failure.sh capture
             sh .github/scripts/cache-check.sh || touch cache-check-failed

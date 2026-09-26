@@ -14,6 +14,7 @@ import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { RefreshControl, ScrollView, StyleSheet, Switch, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { renewWords } from '../capture/renew-words';
 import { holdForShow } from '../show/handoff';
 import { useCapture } from '../state/capture';
@@ -42,6 +43,8 @@ export function DocumentDetail(props: { id: string }) {
   const router = useRouter();
   const { withToken, offline, who } = useVault();
   const { guarded } = useStepUp();
+  // The last control clears the gesture bar (0.2.0), as in Settings.
+  const insets = useSafeAreaInsets();
   const essentials = useEssentials();
   const capture = useCapture();
   const lock = useLock();
@@ -206,7 +209,7 @@ export function DocumentDetail(props: { id: string }) {
   return (
     <ScrollView
       testID="document"
-      contentContainerStyle={styles.page}
+      contentContainerStyle={[styles.page, { paddingBottom: 20 + insets.bottom }]}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void refreshNow()} />}
     >
       <Text variant="hero">{shown.title ?? t('document.untitled')}</Text>
