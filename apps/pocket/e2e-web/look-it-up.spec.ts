@@ -88,11 +88,21 @@ test("search, open, confirm it's you, snooze", async ({ page, baseURL, request }
   // In the vault: made an Essential (its pages then ask to confirm it is you), with a reminder due today.
   const bearer = await token(request);
   const auth = { authorization: `Bearer ${bearer}` };
-  const listed = (await (await request.get(`${VAULT}/api/v1/documents?limit=200`, { headers: auth })).json()) as {
-    items: { id: string; title: string | null }[];
-  };
-  const doc = listed.items.find((d) => d.title === title);
-  expect(doc).toBeTruthy();
+  // "On its way" can be absent for a moment before the scan is even queued:
+  // the vault is asked until it has it (run 36230772547 read too soon).
+  let doc: { id: string; title: string | null } | undefined;
+  await expect
+    .poll(
+      async () => {
+        const listed = (await (await request.get(`${VAULT}/api/v1/documents?limit=200`, { headers: auth })).json()) as {
+          items: { id: string; title: string | null }[];
+        };
+        doc = listed.items.find((d) => d.title === title);
+        return doc?.id;
+      },
+      { timeout: 30_000 },
+    )
+    .toBeTruthy();
   const marked = await request.patch(`${VAULT}/api/v1/documents/${doc?.id}`, {
     headers: auth,
     data: { is_essential: true },
