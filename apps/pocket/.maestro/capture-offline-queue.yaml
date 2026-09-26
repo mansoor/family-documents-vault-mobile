@@ -61,7 +61,10 @@ env:
     id: capture-save
 # Save waits for what a passport requires: it opens the details and goes to
 # the first one it waits for, which puts what it says — under the details,
-# above Save — below the fold. Found from wherever the card was left.
+# above Save — below the fold. Found from wherever the card was left: first
+# the keyboard is put away, since the first field it waits for takes the
+# focus, and the keyboard covers the lower half of the card.
+- hideKeyboard
 - scrollUntilVisible:
     element: 'Still needed: Passport number and Expires.*'
 - scrollUntilVisible:
