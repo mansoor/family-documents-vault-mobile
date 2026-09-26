@@ -113,6 +113,8 @@ export const useVault = (): VaultValue => {
 };
 
 const IDENTITY_TTL = 5 * 60_000;
+/** How long an https vault's capability document is believed before the front looks again. */
+const RECHECK_TTL = 5 * 60_000;
 
 /** The vault answering on this network is not the one approved. */
 export class StrangerError extends Error {
@@ -197,6 +199,13 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
   // previous network says nothing about this one.
   const epoch = useRef(0);
   const mfaToken = useRef<string | null>(null);
+  // When the capability document was last read over https, and the version
+  // an answer last said: the vault is asked again when there is a reason —
+  // an upgrade, a new network, a while away — not every time the app comes
+  // to the front (0.2.0).
+  const checkedAt = useRef(0);
+  const versionHeard = useRef<(version: string) => void>(() => undefined);
+  const versionSeen = useRef<string | null>(null);
 
   // Keyed on the origin, not the record: saving the email after sign-in
   // must not make a new client, and with it a new session core that has
@@ -205,11 +214,15 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
   const api = useMemo(() => {
     if (!origin || !installation) return null;
     return createApi(
+      // onServerVersion reads its ref when an answer arrives, not while
+      // rendering; the compiler cannot see that from here.
+      // eslint-disable-next-line react-hooks/refs
       createHttp({
         baseUrl: origin,
         fetch: deps.fetch,
         headers: () => appHeaders(installation),
         timeoutMs: 20_000,
+        onServerVersion: (version) => versionHeard.current(version),
       }),
     );
   }, [origin, installation, deps.fetch]);
@@ -217,10 +230,13 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
   const uploadApi = useMemo(() => {
     if (!origin || !installation) return null;
     return createApi(
+      // As above: onServerVersion reads its ref when an answer arrives.
+      // eslint-disable-next-line react-hooks/refs
       createHttp({
         baseUrl: origin,
         fetch: withSizedTimeout(deps.uploadFetch),
         headers: () => appHeaders(installation),
+        onServerVersion: (version) => versionHeard.current(version),
       }),
     );
   }, [origin, installation, deps.uploadFetch]);
@@ -386,6 +402,7 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
         setVault(next.known.find((k) => k.origin === vault.origin) ?? vault);
       }
       setCaps(answered);
+      checkedAt.current = deps.now();
       if (identity.kind === 'reinstalled') {
         await session.clear();
         setNotice('reinstalled');
@@ -394,7 +411,7 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
     } catch (err) {
       if (err instanceof NetworkError) setOffline(true);
     }
-  }, [api, vault, session, gate]);
+  }, [api, vault, session, gate, deps]);
 
   /**
    * The vault signed this phone out and said so by push (4.14): signed out
@@ -457,13 +474,33 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
     recheckRef.current = recheck;
   }, [offline, recheck]);
 
+  // An answer from another version than the one last read: the vault was
+  // upgraded (or rolled back), so what it can do is read again. Once per
+  // version, so a vault that says two things cannot make every answer a
+  // check. A vault before 0.5.0 says nothing, and is read as before.
+  useEffect(() => {
+    versionHeard.current = (version) => {
+      const known = caps?.server_version;
+      if (!known || known === version || versionSeen.current === version) return;
+      versionSeen.current = version;
+      void recheck();
+    };
+  }, [caps, recheck]);
+
   // Coming back to the front: look again, as the network may have changed.
+  // Over http the gate always looks — it is what vouches for the vault.
+  // Over https the certificate does that, so the capability document is
+  // read again only after a while away, or when the app had found no
+  // connection; an upgrade is noticed from the version every answer says.
   useEffect(() => {
     const sub = AppState.addEventListener('change', (state) => {
-      if (state === 'active') void recheck();
+      if (state !== 'active') return;
+      const secure = vault?.origin.startsWith('https://') ?? false;
+      if (secure && !offlineRef.current && deps.now() - checkedAt.current < RECHECK_TTL) return;
+      void recheck();
     });
     return () => sub.remove();
-  }, [recheck]);
+  }, [recheck, vault, deps]);
 
   const withToken = useCallback(
     async <T,>(fn: (a: Api, token: string) => Promise<T>): Promise<T> => {

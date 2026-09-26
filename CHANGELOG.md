@@ -23,6 +23,25 @@ need 0.4.14. Everything in 0.1.1–0.1.10 below.
   Release: `v0.2.0-rc` first, `v0.2.0` after the exit demonstration.
 - The Maestro flows run on the release tags.
 
+### Fixed
+- **The phone kept the vault's answers in its HTTP cache.** The app's
+  fetch keeps a disk cache in the app's cache folder and ignored the
+  app's "don't cache": after a vault was upgraded the app went on saying
+  its old version for five minutes; the check that the phone is still
+  talking to your vault over plain http could be answered from that
+  cache after the phone changed networks; and lists of documents and
+  people stayed on the phone after signing out. Every request now asks
+  for no kept answer and keeps none, and what earlier versions kept is
+  removed at launch, at sign-out and when the vault ends the session.
+  With a vault of 0.5.0 or later, the vault says the same.
+- **The vault is asked again when there is a reason, not every time the
+  app comes to the front.** Over https the app reads what the vault can
+  do at launch, after signing in, after five minutes away, or when it had
+  found no connection; a vault of 0.5.0 or later says its version with
+  every answer, so an upgrade is noticed from what the app already asks.
+  Over plain http nothing changes: the check that this is still your
+  vault happens as before.
+
 ## [0.1.10] — iteration 4.17: accessibility, copy and the failure states
 
 (0.1.10 rather than 0.1.11: Expo SDK 58, iteration 4.16, waits until it is

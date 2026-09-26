@@ -82,7 +82,9 @@ export default function Settings() {
   const version = t('settings.version', { server: caps?.server_version ?? '…', app: APP_VERSION });
 
   return (
-    <ScrollView contentContainerStyle={styles.page}>
+    // Below the last card, room for the gesture bar: at the largest text
+    // "Sign out" sat partly under it, even scrolled to the end (0.2.0).
+    <ScrollView contentContainerStyle={[styles.page, { paddingBottom: 20 + insets.bottom }]}>
       <Card>
         <Text variant="title">{t('settings.vault')}</Text>
         <Text>{vault?.origin.replace(/^https?:\/\//, '') ?? ''}</Text>

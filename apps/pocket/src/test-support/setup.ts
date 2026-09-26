@@ -58,7 +58,20 @@ jest.mock('expo-file-system', () => {
       return fs.get(this.uri) ?? '';
     }
   }
-  return { File, Paths: { document: { uri: 'doc:' }, cache: { uri: 'cache:' } } };
+  /** A folder is the files under it. */
+  class Directory {
+    uri: string;
+    constructor(...parts: unknown[]) {
+      this.uri = parts.map((p) => (typeof p === 'string' ? p : (p as { uri: string }).uri)).join('/');
+    }
+    get exists() {
+      return [...fs.keys()].some((k) => k.startsWith(`${this.uri}/`));
+    }
+    delete() {
+      for (const k of [...fs.keys()]) if (k.startsWith(`${this.uri}/`)) fs.delete(k);
+    }
+  }
+  return { File, Directory, Paths: { document: { uri: 'doc:' }, cache: { uri: 'cache:' } } };
 });
 
 const networkListeners = new Set<() => void>();
