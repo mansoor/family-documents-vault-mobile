@@ -91,9 +91,10 @@ test('a PDF saved as Only me is invisible to the second adult', async ({ page, b
   const title = `Only me proof ${randomUUID().slice(0, 8)}`;
   await signIn(page, new URL(baseURL ?? '').host);
 
-  // Add a file: the browser's own file chooser.
+  // Add a file, from the tab bar's +: the browser's own file chooser.
   const chooser = page.waitForEvent('filechooser');
-  await page.getByRole('button', { name: 'Add a file' }).click();
+  await page.getByRole('button', { name: 'Add a document' }).click();
+  await page.getByRole('menuitem', { name: 'Add a file' }).click();
   await (
     await chooser
   ).setFiles({ name: 'counselling-letter.pdf', mimeType: 'application/pdf', buffer: pdf('A private letter') });

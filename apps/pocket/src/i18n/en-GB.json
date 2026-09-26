@@ -62,15 +62,12 @@
     "attentionTitle": "Needs attention",
     "calm": "Nothing needs you right now.",
     "recentTitle": "Recently added",
-    "none": "No documents yet. Scan one with the camera button, or add a file.",
+    "none": "No documents yet. Add one with the + button below.",
+    "noneViewer": "No documents yet.",
     "needsAName": "Needs a name",
     "untitled": "Untitled document",
     "offline": "No connection. What you see may be out of date.",
     "settings": "Settings",
-    "scan": "Scan a document",
-    "scanHint": "Opens the camera. You can also add a photo or a file.",
-    "addFile": "Add a file",
-    "addPhoto": "Add a photo",
     "needName_one": "{{count}} document needs a name",
     "needName_other": "{{count}} documents need a name",
     "scannerFailed": "The scanner couldn't start on this phone. Add a photo or a file instead — the first scan also needs an internet connection to set the scanner up.",
@@ -91,6 +88,18 @@
     "keepThem_one": "Keep it",
     "keepThem_other": "Keep them",
     "dismissNotice": "Dismiss"
+  },
+  "add": {
+    "button": "Add a document",
+    "hint": "Opens a menu: add a file, use the camera or add a picture.",
+    "hintNoCamera": "Opens a menu: add a file or a picture.",
+    "title": "Add a document",
+    "file": "Add a file",
+    "fileHint": "Opens your files, to choose a PDF, a picture, or a Word or Excel file.",
+    "camera": "Camera",
+    "cameraHint": "Opens the camera, to scan the pages.",
+    "picture": "Add a picture",
+    "pictureHint": "Opens your photos, to choose one."
   },
   "settings": {
     "title": "Settings",
@@ -327,8 +336,8 @@
   "tabs": {
     "home": "Home",
     "search": "Search",
-    "scan": "Scan a document",
-    "attention": "Needs attention",
+    "attention": "Attention",
+    "attentionName": "Needs attention",
     "people": "People"
   },
   "document": {

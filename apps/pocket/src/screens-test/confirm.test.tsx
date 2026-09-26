@@ -2,7 +2,7 @@ import { act, fireEvent, screen, waitFor, within } from '@testing-library/react-
 import { PDFDocument } from 'pdf-lib';
 import { useEffect, useRef, useState } from 'react';
 import CaptureScreen from '../app/capture';
-import Home from '../test-support/home';
+import Home, { add } from '../test-support/home';
 import { fixtureScanner, type ScanOutcome } from '../capture/scanner';
 import { MemoryQueueStore } from '../queue/store';
 import type { QueueItem } from '../queue/item';
@@ -355,7 +355,7 @@ describe('after the save', () => {
     await renderApp(<Both />, { fetch: recording(t).fetch, capture: phone });
 
     // A passport with its expiry date: the reminders it will get.
-    await fireEvent.press(await screen.findByTestId('home-scan'));
+    await add();
     await fireEvent.press(await screen.findByRole('button', { name: 'Passport' }));
     await fireEvent.press(screen.getByTestId('more-details'));
     await fireEvent.changeText(screen.getByTestId('field-expires'), '14/03/2031');
@@ -367,7 +367,7 @@ describe('after the save', () => {
 
     // Without it: no promise of reminders it cannot keep.
     pages();
-    await fireEvent.press(screen.getByTestId('home-scan'));
+    await add();
     await fireEvent.press(await screen.findByRole('button', { name: 'Passport' }));
     await fireEvent.press(screen.getByTestId('capture-save'));
     expect(await screen.findByTestId('home-saved')).toHaveTextContent(
@@ -377,7 +377,7 @@ describe('after the save', () => {
 
     // Skipped: it needs a name, and Home says so.
     pages();
-    await fireEvent.press(screen.getByTestId('home-scan'));
+    await add();
     await fireEvent.press(await screen.findByTestId('capture-skip'));
     expect(await screen.findByTestId('home-saved')).toHaveTextContent(
       /^Saved\. It's under Needs a name whenever you want to finish it\./,

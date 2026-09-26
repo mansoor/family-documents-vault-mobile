@@ -1,10 +1,10 @@
 # Iteration 4.17: the app at the phone's largest text (font_scale 2.0, set
 # by the workflow around this flow) with the app's own Large text on as
 # well. Everything that matters is still reached — by scrolling where it
-# must — on Home, in Settings and on the capture card; nothing is thrown
-# away but the scan made here. Home is known by its list, always at the top:
-# at this size the "all calm" line can sit below the fold, under the offer
-# to keep the Essentials.
+# must — on Home, in Settings, in the + menu and on the capture card;
+# nothing is thrown away but the scan made here. Home is known by its list,
+# always at the top: at this size the "all calm" line can sit below the
+# fold, under the offer to keep the Essentials.
 appId: io.github.mansoor.familyvault.e2e
 env:
   VAULT: 10.0.2.2:8099
@@ -61,9 +61,27 @@ env:
       id: home-list
     timeout: 15000
 
+# The + menu, at that size: each choice is reached (the list scrolls if it
+# must); Camera opens the card.
+- tapOn:
+    id: home-add
+- extendedWaitUntil:
+    visible:
+      id: add-menu
+    timeout: 10000
+- assertVisible:
+    id: add-file
+- scrollUntilVisible:
+    element:
+      id: add-picture
+- scrollUntilVisible:
+    element:
+      id: add-camera
+    direction: UP
+
 # The capture card, at that size: Save is reached, then the scan thrown away.
 - tapOn:
-    id: home-scan
+    id: add-camera
 - extendedWaitUntil:
     visible:
       id: capture-card

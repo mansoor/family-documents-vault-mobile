@@ -2,7 +2,7 @@ import type { ReminderView } from '@fdv/shared';
 import { act, fireEvent, screen, waitFor } from '@testing-library/react-native';
 import { AppState, type AppStateStatus } from 'react-native';
 import CaptureScreen from '../app/capture';
-import Home from '../test-support/home';
+import Home, { add } from '../test-support/home';
 import Settings from '../app/settings';
 import SignIn from '../app/sign-in';
 import { fixtureScanner, type ScanOutcome } from '../capture/scanner';
@@ -91,7 +91,7 @@ describe('the card with no connection', () => {
 
     // Airplane mode.
     t.reachable.delete(ORIGIN);
-    await fireEvent.press(screen.getByTestId('home-scan'));
+    await add();
     await fireEvent.press(await screen.findByRole('button', { name: 'Passport' }));
     await fireEvent.press(screen.getByRole('button', { name: /\(Yours\)$/ }));
     await fireEvent.press(screen.getByTestId('capture-save'));
@@ -120,7 +120,7 @@ describe('the card with no connection', () => {
       return withStatus(t)(url, init);
     };
     await renderApp(<App />, { fetch: noUpload, capture: phone });
-    await fireEvent.press(await screen.findByTestId('home-scan'));
+    await add();
     await fireEvent.press(await screen.findByRole('button', { name: 'Passport' }));
     await fireEvent.press(screen.getByTestId('capture-save'));
     await waitFor(() =>
@@ -148,7 +148,7 @@ describe('the card with no connection', () => {
     await screen.findByTestId('home-calm');
     // …and the connection goes while it is on its way; then the card opens.
     t.reachable.delete(ORIGIN);
-    await fireEvent.press(screen.getByTestId('home-scan'));
+    await add();
     await act(async () => release());
     expect(await screen.findByRole('button', { name: 'Passport' })).toBeTruthy();
     expect(screen.queryByText(/hasn't seen the vault's choices/)).toBeNull();
@@ -165,7 +165,7 @@ describe('the card with no connection', () => {
     phone.files.set('cache:/scan/1.jpg', jpeg('letter-with-exif.jpg'));
     phone.files.set('cache:/scan/2.jpg', jpeg('card.jpg'));
     await renderApp(<App />, { fetch: withStatus(t), capture: phone });
-    await fireEvent.press(await screen.findByTestId('home-scan'));
+    await add();
     expect(await screen.findByTestId('capture-offline')).toHaveTextContent(/you can name it when you're back online/);
     expect(screen.queryByTestId('capture-save')).toBeNull();
     await fireEvent.press(screen.getByTestId('capture-skip'));

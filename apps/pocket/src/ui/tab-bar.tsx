@@ -3,15 +3,19 @@ import { BellRing, House, Search, Users, type LucideIcon } from 'lucide-react-na
 import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ScanButton } from '../capture/scan-button';
+import { AddButton } from '../capture/add-button';
 import { useVault } from '../state/vault';
 import { Text } from './index';
 
-/** The tabs, in order; the camera sits between the second and the third. */
-const TABS: Record<string, { label: string; icon: LucideIcon; testID: string }> = {
+/**
+ * The tabs, in order; the + sits between the second and the third. Each
+ * label is one short word, so it fits its fifth of a 360 dp phone at Large
+ * text; `name` is what a screen reader says when the word alone is terse.
+ */
+const TABS: Record<string, { label: string; name?: string; icon: LucideIcon; testID: string }> = {
   index: { label: 'tabs.home', icon: House, testID: 'tab-home' },
   search: { label: 'tabs.search', icon: Search, testID: 'tab-search' },
-  attention: { label: 'tabs.attention', icon: BellRing, testID: 'tab-attention' },
+  attention: { label: 'tabs.attention', name: 'tabs.attentionName', icon: BellRing, testID: 'tab-attention' },
   people: { label: 'tabs.people', icon: Users, testID: 'tab-people' },
 };
 
@@ -21,8 +25,8 @@ export interface TabBarProps {
 }
 
 /**
- * The tab bar (4.12): Home, Search, the camera, Needs attention, People.
- * The camera is only for those who may add documents.
+ * The tab bar (4.12): Home, Search, the +, Needs attention, People.
+ * The + is only for those who may add documents.
  */
 export function TabBar(props: TabBarProps) {
   const { t } = useTranslation();
@@ -43,21 +47,21 @@ export function TabBar(props: TabBarProps) {
         testID={spec.testID}
         accessibilityRole="tab"
         accessibilityState={{ selected }}
-        accessibilityLabel={t(spec.label)}
+        accessibilityLabel={t(spec.name ?? spec.label)}
         onPress={() => props.navigation.navigate(route.name)}
         style={({ pressed }) => [styles.tab, pressed ? styles.pressed : null]}
       >
         <Icon color={ink} size={22} accessibilityElementsHidden importantForAccessibility="no" />
-        <Text variant="secondary" weight={selected ? '600' : '400'} style={{ color: ink }}>
+        <Text variant="small" weight={selected ? '600' : '500'} style={[styles.label, { color: ink }]}>
           {t(spec.label)}
         </Text>
       </Pressable>
     );
   };
   return (
-    <View style={[styles.bar, { paddingBottom: 6 + insets.bottom }]} accessibilityRole="tablist">
+    <View style={[styles.bar, { paddingBottom: 6 + insets.bottom }]} accessibilityRole="tablist" testID="tab-bar">
       {routes.slice(0, 2).map(tab)}
-      {canAdd ? <ScanButton /> : null}
+      {canAdd ? <AddButton /> : null}
       {routes.slice(2).map(tab)}
     </View>
   );
@@ -69,11 +73,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-around',
     paddingTop: 6,
-    paddingHorizontal: 4,
     backgroundColor: colours.surface,
     borderTopWidth: 1,
     borderTopColor: colours.border,
   },
-  tab: { flex: 1, minHeight: TAP_MIN + 8, alignItems: 'center', justifyContent: 'center', gap: 2 },
+  // An equal share each (flex: 1 grows from nothing), never more: a label
+  // wraps inside its own tab rather than reaching the +, whose slot is a
+  // fixed width (add-button.tsx).
+  tab: {
+    flex: 1,
+    minWidth: TAP_MIN,
+    minHeight: TAP_MIN + 8,
+    paddingHorizontal: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 2,
+  },
+  label: { textAlign: 'center' },
   pressed: { opacity: 0.7 },
 });

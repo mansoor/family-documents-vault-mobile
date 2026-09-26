@@ -48,7 +48,9 @@ test('saved with no connection, sent once when it is back', async ({ page, conte
   await page.waitForTimeout(1000);
   await context.setOffline(true);
   const chooser = page.waitForEvent('filechooser');
-  await page.getByRole('button', { name: 'Add a file' }).click();
+  // The tab bar's +, then Add a file.
+  await page.getByRole('button', { name: 'Add a document' }).click();
+  await page.getByRole('menuitem', { name: 'Add a file' }).click();
   await (await chooser).setFiles({ name: 'insurance.pdf', mimeType: 'application/pdf', buffer: PDF });
   await page.getByRole('button', { name: 'Insurance policy' }).click();
   await page.getByRole('button', { name: 'More details' }).click();

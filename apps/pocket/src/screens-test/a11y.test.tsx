@@ -1,6 +1,6 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react-native';
 import CaptureScreen from '../app/capture';
-import Home from '../test-support/home';
+import Home, { add } from '../test-support/home';
 import Connect from '../app/connect';
 import Settings from '../app/settings';
 import SignIn from '../app/sign-in';
@@ -91,7 +91,13 @@ describe('every screen can be used with a screen reader and a thumb', () => {
     await screen.findByTestId('home-calm');
     expect(audit()).toEqual([]);
 
-    await fireEvent.press(screen.getByTestId('home-scan'));
+    // The + menu, open.
+    await fireEvent.press(screen.getByTestId('home-add'));
+    await screen.findByTestId('add-menu');
+    expect(audit()).toEqual([]);
+    await fireEvent.press(screen.getByTestId('add-cancel'));
+
+    await add();
     await fireEvent.press(await screen.findByRole('button', { name: 'Passport' }));
     await fireEvent.press(screen.getByTestId('types-more'));
     await fireEvent.press(screen.getByTestId('more-details'));
