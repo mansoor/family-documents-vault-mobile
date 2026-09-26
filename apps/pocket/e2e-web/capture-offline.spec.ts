@@ -5,7 +5,9 @@ import { randomUUID } from 'node:crypto';
  * Iteration 4.5's proof on a real vault, through the web build: a file
  * saved from the card with no connection waits on the phone, and once the
  * connection is back it reaches the vault exactly once, with the card's
- * details.
+ * details. Since 0.2.1 (a vault of 0.5.11) the card knows, offline, what an
+ * insurance policy requires — its insurer and its expiry — and Save waits
+ * for them.
  */
 const VAULT = process.env.FDV_DEV_API ?? 'http://localhost:8099';
 const EMAIL = process.env.FDV_E2E_EMAIL ?? 'pocket-e2e@example.test';
@@ -56,6 +58,12 @@ test('saved with no connection, sent once when it is back', async ({ page, conte
   await page.getByRole('button', { name: 'More details' }).click();
   await page.getByLabel('Name', { exact: true }).fill(title);
   await page.getByRole('button', { name: 'Save' }).click();
+  // Save waits for what an insurance policy requires, says what, and goes to the first.
+  await expect(page.getByText('Still needed: Insurer and Expires. Fill them in, or skip for now.')).toBeVisible();
+  await expect(page.getByLabel('Insurer, required')).toBeFocused();
+  await page.getByLabel('Insurer, required').fill('Aviva');
+  await page.getByLabel('Expires, required').fill('14 Mar 2031');
+  await page.getByRole('button', { name: 'Save' }).click();
   await expect(
     page.getByText("Saved on this phone. It'll go to the vault as soon as there's a connection."),
   ).toBeVisible();
@@ -71,5 +79,12 @@ test('saved with no connection, sent once when it is back', async ({ page, conte
   const made = ((await r.json()) as { items: { title: string | null; type_key: string | null }[] }).items.filter(
     (d) => d.title === title,
   );
-  expect(made).toEqual([expect.objectContaining({ type_key: 'insurance_policy' })]);
+  // With what the card waited for.
+  expect(made).toEqual([
+    expect.objectContaining({
+      type_key: 'insurance_policy',
+      issued_by: 'Aviva',
+      expires: expect.objectContaining({ date: '2031-03-14' }),
+    }),
+  ]);
 });

@@ -9,7 +9,7 @@ import {
 import { useNavigation, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { AccessibilityInfo, ScrollView, StyleSheet, Switch, View, type TextInputProps } from 'react-native';
+import { AccessibilityInfo, ScrollView, StyleSheet, Switch, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   addPages,
@@ -38,7 +38,7 @@ import {
   type Household,
 } from '../capture/draft';
 import { matchTypes, rankTypes } from '../capture/types';
-import { Chip, ChipRow, FileRow, LeaveQuestion, PageStrip } from '../capture/ui';
+import { Chip, ChipRow, detailInput, FileRow, LeaveQuestion, PageStrip } from '../capture/ui';
 import type { CaptureSource } from '../queue/commit';
 import { useCapture, type CardData, type SaveProblem } from '../state/capture';
 import { useScreenGuard } from '../state/lock';
@@ -117,6 +117,17 @@ function Card(props: { initial: CaptureSource }) {
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [asking, setAsking] = useState(false);
+  const scroll = useRef<ScrollView>(null);
+  // Save waited: the first field it waits for is brought into view and
+  // typed in, as on the web (each input moves to itself: Field's goTo).
+  // One with no box to type in (a choice): the notice under the details,
+  // which says what is needed, is brought into view instead.
+  const [goTo, setGoTo] = useState<{ key: string; box: boolean } | null>(null);
+  useEffect(() => {
+    if (goTo && !goTo.box) scroll.current?.scrollToEnd();
+  }, [goTo]);
+  /** Given to the input for `key`: it moves to itself when Save waits for it first. */
+  const goToFor = (key: string) => (goTo?.key === key ? goTo : null);
   const leaving = useRef(false);
   const saving = useRef(false);
   const blocked = useRef<unknown>(null);
@@ -227,6 +238,7 @@ function Card(props: { initial: CaptureSource }) {
       reminder: null,
       noExpiry: false,
     };
+    let labels: Record<string, string> = {};
     if (!skip) {
       if (!household) return;
       const out = toMetadata(draft, household);
@@ -244,9 +256,15 @@ function Card(props: { initial: CaptureSource }) {
       if (out.missing.length > 0) {
         setDetails(true);
         fail(t('capture.stillNeeded', { fields: andList(out.missing.map(labelOf)), count: out.missing.length }));
+        const first = out.missing[0] as string;
+        const kind = own.find((f) => f.key === first)?.kind;
+        setGoTo({ key: first, box: kind !== 'choice' && kind !== 'yes_no' });
         return;
       }
       metadata = out.metadata;
+      // The names of the details sent, kept with the scan: what becomes of one is said by its name.
+      const sent = Object.keys(out.metadata.extra ?? {});
+      labels = Object.fromEntries(own.filter((f) => sent.includes(f.key)).map((f) => [f.key, f.label]));
       // Reminders only for what has the date they come from.
       const ty = typeOf(draft, household);
       note = {
@@ -258,7 +276,7 @@ function Card(props: { initial: CaptureSource }) {
     setBusy(true);
     let done = false;
     try {
-      const r = await capture.save(latest.current.source, metadata, note);
+      const r = await capture.save(latest.current.source, metadata, note, labels);
       done = r.kind === 'saved';
       if (done) leave();
       else if (r.kind === 'refused') fail(problemWords(r.problem));
@@ -358,7 +376,12 @@ function Card(props: { initial: CaptureSource }) {
 
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
-      <ScrollView contentContainerStyle={styles.page} keyboardShouldPersistTaps="handled" testID="capture-card">
+      <ScrollView
+        ref={scroll}
+        contentContainerStyle={styles.page}
+        keyboardShouldPersistTaps="handled"
+        testID="capture-card"
+      >
         <Text variant="title">{t('capture.title')}</Text>
 
         {draft.source.kind === 'pages' ? (
@@ -514,7 +537,11 @@ function Card(props: { initial: CaptureSource }) {
             <Button
               label={t('capture.moreDetails')}
               kind="quiet"
-              onPress={() => setDetails((d) => !d)}
+              onPress={() => {
+                setDetails((d) => !d);
+                // Opened again later, the card does not move by itself.
+                setGoTo(null);
+              }}
               testID="more-details"
             />
             {details ? (
@@ -535,6 +562,7 @@ function Card(props: { initial: CaptureSource }) {
                       value={draft.issuedBy}
                       onChangeText={(v) => set({ issuedBy: v })}
                       autoCapitalize="words"
+                      goTo={goToFor('issued_by')}
                       testID="field-issued-by"
                     />
                     {issuerOffers.length > 0 ? (
@@ -556,6 +584,7 @@ function Card(props: { initial: CaptureSource }) {
                     required={requiredWord(ask('identifier').required)}
                     value={draft.identifier}
                     onChangeText={(v) => set({ identifier: v })}
+                    goTo={goToFor('identifier')}
                     testID="field-number"
                   />
                 ) : null}
@@ -567,6 +596,7 @@ function Card(props: { initial: CaptureSource }) {
                     onChangeText={(v) => set({ issued: v })}
                     placeholder="14 Mar 2021"
                     error={fieldErrors.issued ?? null}
+                    goTo={goToFor('issued')}
                     testID="field-issued"
                   />
                 ) : null}
@@ -578,6 +608,7 @@ function Card(props: { initial: CaptureSource }) {
                     onChangeText={(v) => set({ expires: v })}
                     placeholder="14 Mar 2031"
                     error={fieldErrors.expires ?? null}
+                    goTo={goToFor('expires')}
                     testID="field-expires"
                   />
                 ) : null}
@@ -591,6 +622,7 @@ function Card(props: { initial: CaptureSource }) {
                     value={draft.location}
                     onChangeText={(v) => set({ location: v })}
                     autoCapitalize="sentences"
+                    goTo={goToFor('physical_location')}
                     testID="field-location"
                   />
                 ) : null}
@@ -647,8 +679,9 @@ function Card(props: { initial: CaptureSource }) {
                       value={typeof value === 'string' ? value : ''}
                       onChangeText={(v) => setDetail(f.key, v)}
                       error={error}
+                      goTo={goToFor(f.key)}
                       testID={`field-detail-${f.key}`}
-                      {...DETAIL_INPUT[f.kind]}
+                      {...detailInput(f.kind)}
                     />
                   );
                 })}
@@ -697,18 +730,6 @@ function Card(props: { initial: CaptureSource }) {
     </SafeAreaView>
   );
 }
-
-/** How each kind of detail is typed: the keyboard, and an example. */
-const DETAIL_INPUT: Partial<
-  Record<string, Pick<TextInputProps, 'autoCapitalize' | 'multiline' | 'keyboardType' | 'placeholder'>>
-> = {
-  text: { autoCapitalize: 'sentences' },
-  long_text: { autoCapitalize: 'sentences', multiline: true },
-  date: { placeholder: '14 Mar 2031' },
-  year: { keyboardType: 'number-pad', placeholder: '2026' },
-  number: { keyboardType: 'numbers-and-punctuation' },
-  money: { keyboardType: 'decimal-pad', placeholder: '12.50' },
-};
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colours.bg },

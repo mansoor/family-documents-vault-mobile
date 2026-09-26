@@ -1,8 +1,10 @@
 import { colours, type CaptureMetadata, type Member } from '@fdv/shared';
+import type { TFunction } from 'i18next';
 import { BUSY_CODES, wordsForCode } from '../errors/words';
 import { useTranslation } from 'react-i18next';
 import { StyleSheet, View } from 'react-native';
-import type { QueueItem } from '../queue/item';
+import { filedWithout, type FiledWithout, type QueueItem } from '../queue/item';
+import { andList } from './draft';
 import { Button, Card, Text } from '../ui';
 import { Chip, ChipRow, sizeWords } from './ui';
 
@@ -37,6 +39,18 @@ export function reassignChoices(
     return mine ? [{ id: mine.id, name: mine.display_name }] : [];
   }
   return [...members.map((m) => ({ id: m.id, name: m.display_name })), { id: null, name: null }];
+}
+
+/**
+ * A scan filed, or going, without details its kind no longer takes, in
+ * words: by the names the card gave them, never their keys.
+ */
+export function withoutWords(f: FiledWithout, t: TFunction, filed: boolean): string {
+  const names = f.names ? andList(f.names) : t('queue.someDetails');
+  const count = f.names?.length ?? 2;
+  return filed
+    ? t('queue.filedWithout', { title: f.title ?? t('queue.untitled'), names, count })
+    : t('queue.goesWithout', { names, count });
 }
 
 /** A capture on its way: what it is, where it stands, and what can be done — never "upload failed". */
@@ -83,6 +97,7 @@ export function QueueRow(props: {
               : null;
   const title = item.kind === 'version' ? t('queue.newVersion') : (item.metadata?.title ?? t('queue.untitled'));
   const choices = gone && props.members && props.me ? reassignChoices(item, props.members, props.me) : [];
+  const without = item.state === 'needs_you' ? null : filedWithout(item);
   return (
     <Card style={item.state === 'needs_you' ? styles.needsYou : styles.row}>
       <Text weight="600">{title}</Text>
@@ -92,6 +107,11 @@ export function QueueRow(props: {
       {detail ? (
         <Text variant="secondary" tone="soft" testID="queue-detail">
           {detail}
+        </Text>
+      ) : null}
+      {without ? (
+        <Text variant="secondary" tone="soft" testID="queue-without">
+          {withoutWords(without, t, false)}
         </Text>
       ) : null}
       {choices.length > 0 ? (

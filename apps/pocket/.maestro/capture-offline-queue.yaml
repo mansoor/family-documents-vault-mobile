@@ -59,13 +59,14 @@ env:
       id: capture-save
 - tapOn:
     id: capture-save
-# Save waits for what a passport requires, says what, and opens the details.
-- assertVisible: 'Still needed: Passport number and Expires.*'
+# Save waits for what a passport requires: it opens the details and goes to
+# the first one it waits for, which puts what it says — under the details,
+# above Save — below the fold. Found from wherever the card was left.
 - scrollUntilVisible:
-    element:
-      id: field-number
+    element: 'Still needed: Passport number and Expires.*'
+- scrollUntilVisible:
+    element: 'Passport number \* required'
     direction: UP
-- assertVisible: 'Passport number \* required'
 - tapOn:
     id: field-number
 - inputText: '123456789'

@@ -7,7 +7,7 @@ import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
 import { FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { QueueRow } from '../../capture/queue-row';
+import { QueueRow, withoutWords } from '../../capture/queue-row';
 import { useBeginCapture } from '../../capture/add-button';
 import { OnThisPhone } from '../../essentials/ui';
 import { useEssentials } from '../../state/essentials';
@@ -163,6 +163,9 @@ export default function Home() {
               </Notice>
             ) : null}
             {capture.saved ? <SavedLine text={savedWords(capture.saved, t)} onDismiss={capture.dismissSaved} /> : null}
+            {capture.filedWithout.length > 0 ? (
+              <FiledWithoutLine lines={capture.filedWithout.map((f) => withoutWords(f, t, true))} />
+            ) : null}
             {renewProblem ? (
               <Notice tone="danger" testID="home-renew-problem">
                 {renewProblem}
@@ -288,6 +291,25 @@ function SavedLine(props: { text: string; onDismiss: () => void }) {
     <Notice tone="ok" testID="home-saved" announce={props.text}>
       <Text>{props.text}</Text>
       <Button label={t('home.dismiss')} kind="quiet" onPress={props.onDismiss} testID="home-saved-dismiss" />
+    </Notice>
+  );
+}
+
+/** Scans the vault took without a detail their kind no longer asks for: said once they are in. */
+function FiledWithoutLine(props: { lines: string[] }) {
+  const { t } = useTranslation();
+  const capture = useCapture();
+  return (
+    <Notice tone="warn" testID="home-filed-without" announce={props.lines.join(' ')}>
+      {props.lines.map((line, i) => (
+        <Text key={i}>{line}</Text>
+      ))}
+      <Button
+        label={t('home.dismiss')}
+        kind="quiet"
+        onPress={capture.dismissFiledWithout}
+        testID="home-filed-without-dismiss"
+      />
     </Notice>
   );
 }

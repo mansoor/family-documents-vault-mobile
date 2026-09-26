@@ -1,6 +1,7 @@
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react-native';
 import { PDFDocument } from 'pdf-lib';
 import { useEffect, useRef, useState } from 'react';
+import { ScrollView, TextInput } from 'react-native';
 import CaptureScreen from '../app/capture';
 import Home, { add } from '../test-support/home';
 import { fixtureScanner, type ScanOutcome } from '../capture/scanner';
@@ -8,7 +9,7 @@ import { MemoryQueueStore } from '../queue/store';
 import type { QueueItem } from '../queue/item';
 import { jpeg, reply } from '../test-support/capture';
 import { audit } from '../test-support/a11y';
-import { addCar, fieldOf } from '../test-support/kinds';
+import { addCar, fieldOf, ownerApi } from '../test-support/kinds';
 import { installed, renderApp, signedIn, testCapture } from '../test-support/render';
 import { capabilities, testVault, type TestVault } from '../test-support/vault';
 import { useCapture } from '../state/capture';
@@ -356,6 +357,55 @@ describe('the page strip', () => {
 });
 
 describe('a type’s details (a vault of 0.5.11)', () => {
+  it('Save that waits goes to the first field it waits for, or to what it says when that has no box', async () => {
+    const focus = jest.spyOn(TextInput.prototype, 'focus');
+    const toEnd = jest.spyOn(ScrollView.prototype, 'scrollToEnd');
+    const focused = () => (focus.mock.contexts.at(-1) as { props: { testID?: string } } | undefined)?.props.testID;
+    try {
+      const { t } = await openCard({
+        kinds: true,
+        // A kind of the household's own that requires one of its answers.
+        before: async (v) => {
+          const { api, token } = await ownerApi(v.vault);
+          const cover = await api.createDocumentAttribute(token, {
+            label: 'Cover',
+            kind: 'choice',
+            choices: ['Basic', 'Full'],
+          });
+          await api.createDocumentType(token, {
+            label: 'Pet plan',
+            category: 'other',
+            fields: [{ key: cover.key, required: true }],
+          });
+        },
+      });
+      await fireEvent.press(chip('Passport'));
+      await fireEvent.press(chip('Fake Owner (Yours)'));
+      // The details are closed: Save opens them, and the place is in the first field it waits for.
+      await fireEvent.press(screen.getByTestId('capture-save'));
+      await screen.findByTestId('capture-error');
+      expect(focused()).toBe('field-number');
+      await fireEvent.changeText(screen.getByTestId('field-number'), '123456789');
+      await fireEvent.press(screen.getByTestId('capture-save'));
+      await screen.findByText('Still needed: Expires. Fill it in, or skip for now.');
+      expect(focused()).toBe('field-expires');
+      expect(toEnd).not.toHaveBeenCalled();
+      // A choice has no box to type in: the notice that says what is needed is brought into view.
+      focus.mockClear();
+      await fireEvent.press(screen.getByTestId('types-more'));
+      await fireEvent.changeText(screen.getByTestId('types-search'), 'pet plan');
+      await fireEvent.press(chip('Pet plan'));
+      await fireEvent.press(screen.getByTestId('capture-save'));
+      await screen.findByText('Still needed: Cover. Fill it in, or skip for now.');
+      expect(toEnd).toHaveBeenCalledTimes(1);
+      expect(focus).not.toHaveBeenCalled();
+      expect(captures(t)).toHaveLength(0);
+    } finally {
+      focus.mockRestore();
+      toEnd.mockRestore();
+    }
+  });
+
   it('a passport card asks for its number when the vault has the flag', async () => {
     const { t, rec } = await openCard({ kinds: true });
     await fireEvent.press(chip('Passport'));

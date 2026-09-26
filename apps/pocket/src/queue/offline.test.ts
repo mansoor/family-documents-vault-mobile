@@ -2,10 +2,10 @@ import { rmSync } from 'fs';
 import { tmpdir } from 'os';
 import { reassignChoices } from '../capture/queue-row';
 import { captureVault, jpeg } from '../test-support/capture';
-import { addCar, fieldOf } from '../test-support/kinds';
+import { addCar, fieldOf, ownerApi } from '../test-support/kinds';
 import { nodeSqlDb } from '../test-support/node-sqlite';
 import { commitCapture, type CommitDeps } from './commit';
-import type { QueueItem } from './item';
+import { filedWithout, type QueueItem } from './item';
 import { SqliteQueueStore } from './sqlite-store';
 import { MemoryQueueStore, type QueueStore } from './store';
 import { Uploader } from './uploader';
@@ -130,6 +130,79 @@ describe('the queue in airplane mode', () => {
     rmSync(path, { force: true });
   });
 
+  it('a detail its kind lost while the scan waited is left out: the scan is filed once, and says which', async () => {
+    const cv = await captureVault();
+    const car = await addCar(cv.vault);
+    const plate = fieldOf(car, 'Registration plate');
+    const fuel = fieldOf(car, 'Fuel');
+    const path = `${tmpdir()}/fdv-dropped-${Date.now()}.db`;
+    const db = nodeSqlDb(path);
+    const item = await commitCapture(
+      {
+        source: PAGES,
+        metadata: { type_key: car.key, title: 'The car', extra: { [plate]: 'AB12 CDE', [fuel]: 'Electric' } },
+        origin: ORIGIN,
+        account: 'fake-member',
+        labels: { [plate]: 'Registration plate', [fuel]: 'Fuel' },
+      },
+      phone(await SqliteQueueStore.over(db)),
+    );
+    // While it waits on the phone, somebody at a computer takes Fuel off the Car.
+    const { api, token } = await ownerApi(cv.vault);
+    await api.updateDocumentType(token, car.key, { fields: [{ key: plate, required: true }] });
+
+    const store = await SqliteQueueStore.over(db);
+    const sent: QueueItem[] = [];
+    const keys: string[] = [];
+    const base = cv.deps(store);
+    const uploader = new Uploader(
+      cv.deps(store, {
+        send: (i, b) => {
+          keys.push(i.key);
+          return base.send(i, b);
+        },
+        onEvent: (e) => void (e.kind === 'sent' && sent.push(e.item)),
+      }),
+    );
+    await uploader.kick();
+    // Filed, not left for a person: once, with what the kind still asks for, under the one key.
+    expect(cv.vault.state.documents).toEqual([
+      expect.objectContaining({ title: 'The car', type_key: car.key, extra: { [plate]: 'AB12 CDE' } }),
+    ]);
+    expect(keys).toEqual([item.key, item.key]);
+    expect(await store.list()).toEqual([]);
+    // What was left out is said by the card's name for it, never its key.
+    expect(sent).toEqual([expect.objectContaining({ dropped: [fuel] })]);
+    expect(filedWithout(sent[0] as QueueItem)).toEqual({ title: 'The car', names: ['Fuel'] });
+    // Nothing more goes: a later look sends nothing again.
+    await uploader.kick({ fresh: true });
+    expect(cv.calls.filter((c) => c === 'POST /api/v1/capture')).toHaveLength(2);
+    db.close();
+    rmSync(path, { force: true });
+  });
+
+  it('a refusal that names no detail leaves them all out, and still files the scan', async () => {
+    const store = new MemoryQueueStore();
+    await commitCapture(
+      {
+        source: PAGES,
+        metadata: { title: 'Kept anyway', extra: { a: 'x', b: 'y' } },
+        origin: ORIGIN,
+        account: 'fake-member',
+        labels: { a: 'Colour' },
+      },
+      phone(store),
+    );
+    const cv = await captureVault();
+    cv.turns.push({ status: 422, code: 'invalid_extra', message: 'No.' });
+    const sent: QueueItem[] = [];
+    await new Uploader(cv.deps(store, { onEvent: (e) => void (e.kind === 'sent' && sent.push(e.item)) })).kick();
+    expect(cv.vault.state.documents).toEqual([expect.objectContaining({ title: 'Kept anyway' })]);
+    expect(sent[0]?.metadata).not.toHaveProperty('extra');
+    // One of them had no name kept: "some of its details", never a key.
+    expect(filedWithout(sent[0] as QueueItem)).toEqual({ title: 'Kept anyway', names: null });
+  });
+
   it('session_ended pauses and keeps the scans', async () => {
     const store = new MemoryQueueStore();
     await commitCapture({ source: PAGES, metadata: null, origin: ORIGIN, account: 'fake-member' }, phone(store));
@@ -223,9 +296,12 @@ describe('queue.db from 0.1.2', () => {
     expect(await store.bytes('old')).toEqual(new Uint8Array([1, 2, 3]));
     await store.cache('card|x', { types: [1] });
     expect(await store.cached('card|x')).toEqual({ types: [1] });
+    // 0.2.1: it can say, later, which details it had to go without.
+    await store.update('old', { labels: { fuel: 'Fuel' }, dropped: ['fuel'] });
+    expect(await store.list()).toEqual([expect.objectContaining({ labels: { fuel: 'Fuel' }, dropped: ['fuel'] })]);
     // Opened again: nothing runs twice.
     await SqliteQueueStore.over(db);
-    expect((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version', []))?.user_version).toBe(2);
+    expect((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version', []))?.user_version).toBe(3);
   });
 
   it('an upgrade stopped halfway is simply run again', async () => {
@@ -245,6 +321,6 @@ describe('queue.db from 0.1.2', () => {
     await db.execAsync('drop table card_cache');
     const store = await SqliteQueueStore.over(db);
     expect(await store.list()).toEqual([]);
-    expect((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version', []))?.user_version).toBe(2);
+    expect((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version', []))?.user_version).toBe(3);
   });
 });

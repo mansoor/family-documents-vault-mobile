@@ -16,10 +16,19 @@ each version. And the tab bar's +, as on the web.
   does not use, and adds its own fields, each with the input its kind
   needs: text, a date, a year, a number, an amount, one of its answers, or
   yes/no. The fields it requires are marked "* required"; Save waits for
-  them and says which are still needed, and Skip never waits. The details
-  go with the scan, checked on the phone against the kinds it last saw —
-  offline too — so the vault refuses nothing when it arrives. With an
-  older vault the card is as in 0.2.0 and nothing new is sent.
+  them, says which are still needed and goes to the first, and Skip never
+  waits. A number or an amount is written with a point: "12,50" is
+  refused, never kept as 1250 (as on the web). Numbers open a keyboard of
+  numbers on Android too. The details go with the scan, checked on the
+  phone against the kinds it last saw — offline too — so the vault
+  refuses nothing when it arrives. With an older vault the card is as in
+  0.2.0 and nothing new is sent.
+- **A scan whose kind changed while it waited is still filed.** If the
+  kind lost a field, or an answer, while the scan waited on the phone,
+  the vault no longer takes that detail: the scan goes without it, once,
+  rather than waiting for a person, and Home says which by its name —
+  "The car is in the vault without Fuel: its kind of document no longer
+  asks for it."
 - **A document's page shows its kind's details**, under the kind's names
   for them. An Only me document's come only from the vault's own answer
   for that document, which opens them for its owner; never from a list or

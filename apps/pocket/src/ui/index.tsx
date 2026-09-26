@@ -1,6 +1,6 @@
 import { colours, radii, statusTone, TAP_MIN, type as typeScale, type Status } from '@fdv/shared';
 import { AlertTriangle, CheckCircle2, Clock, Info, XCircle, type LucideIcon } from 'lucide-react-native';
-import { useEffect, type ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import {
   AccessibilityInfo,
   Pressable,
@@ -185,16 +185,26 @@ export function Field(
     testID?: string;
     /** The word for a field Save waits for ("required"), shown after the label with a star. */
     required?: string | null;
+    /**
+     * Moves to this input — brought into view, the keyboard open — each
+     * time it is given a new value: Save waiting for it.
+     */
+    goTo?: object | null;
   } & Omit<TextInputProps, 'style'>,
 ) {
-  const { label, error, testID, required, ...input } = props;
+  const { label, error, testID, required, goTo, ...input } = props;
   const { scale } = useTextScale();
+  const box = useRef<TextInput>(null);
+  useEffect(() => {
+    if (goTo) box.current?.focus();
+  }, [goTo]);
   return (
     <View style={styles.field}>
       <Text variant="secondary" weight="600" tone="soft">
         {requiredLabel(label, required)}
       </Text>
       <TextInput
+        ref={box}
         testID={testID}
         accessibilityLabel={required ? `${label}, ${required}` : label}
         autoCapitalize="none"

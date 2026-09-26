@@ -11,7 +11,7 @@ import { MemoryQueueStore, type QueueStore } from '../queue/store';
 import { useCapture } from '../state/capture';
 import { useVault } from '../state/vault';
 import { jpeg, reply } from '../test-support/capture';
-import { addCar, fieldOf } from '../test-support/kinds';
+import { addCar, fieldOf, ownerApi } from '../test-support/kinds';
 import { installed, renderApp, signedIn, testCapture } from '../test-support/render';
 import { capabilities, testVault, type TestVault } from '../test-support/vault';
 
@@ -199,6 +199,8 @@ describe('the card with no connection', () => {
     await fireEvent.press(screen.getByTestId('capture-save'));
     expect(await screen.findByTestId('home-saved')).toHaveTextContent(/^Saved on this phone\./);
     expect(t.vault.state.documents).toHaveLength(0);
+    // Kept with the scan: the card's name for each detail it sends, to say it by if the kind changes.
+    expect((await store.list())[0]?.labels).toEqual({ [plate]: 'Registration plate' });
 
     // The connection comes back: filed under the household's own kind, with its plate.
     t.reachable.add(ORIGIN);
@@ -369,6 +371,38 @@ describe('Needs you, and renewals', () => {
     await fireEvent.press(await screen.findByRole('button', { name: 'For Fake Owner' }));
     await waitFor(() => expect(t.vault.state.documents).toHaveLength(1));
     expect(t.vault.state.documents[0]).toMatchObject({ title: 'Gym membership', owner_member_id: 'fake-member' });
+  });
+
+  it('a detail its kind lost while the scan waited: filed without it, and Home says which by its name', async () => {
+    const t = testVault([ORIGIN]);
+    t.caps = capabilities({ server_version: '0.5.11', features: { ...capabilities().features, custom_types: true } });
+    const car = await addCar(t.vault);
+    const plate = fieldOf(car, 'Registration plate');
+    const fuel = fieldOf(car, 'Fuel');
+    await signedIn(t);
+    // Saved with no connection, with its fuel…
+    const store = new MemoryQueueStore();
+    await store.add(
+      item({
+        metadata: { type_key: car.key, title: 'The car', extra: { [plate]: 'AB12 CDE', [fuel]: 'Electric' } },
+        labels: { [plate]: 'Registration plate', [fuel]: 'Fuel' },
+      }),
+      new TextEncoder().encode('%PDF-1.4\n%%EOF\n'),
+    );
+    // …and meanwhile, at a computer, Fuel is taken off the Car.
+    const { api, token } = await ownerApi(t.vault);
+    await api.updateDocumentType(token, car.key, { fields: [{ key: plate, required: true }] });
+    await renderApp(<App />, { fetch: withStatus(t), capture: testCapture({ openStore: async () => store }) });
+    await waitFor(() => expect(t.vault.state.documents).toHaveLength(1));
+    expect(t.vault.state.documents[0]).toMatchObject({ type_key: car.key, extra: { [plate]: 'AB12 CDE' } });
+    expect(await screen.findByTestId('home-filed-without')).toHaveTextContent(
+      /^The car is in the vault without Fuel: its kind of document no longer asks for it\./,
+    );
+    // Never the field's key, and nothing waits for a person.
+    expect(screen.queryByText(new RegExp(fuel))).toBeNull();
+    expect(screen.queryByText('Needs you')).toBeNull();
+    await fireEvent.press(screen.getByTestId('home-filed-without-dismiss'));
+    expect(screen.queryByTestId('home-filed-without')).toBeNull();
   });
 
   it('Scan the new one: the renewal goes in as the next version of the same document', async () => {

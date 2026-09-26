@@ -17,7 +17,7 @@ import {
   type CommitProblem,
   type PageRef,
 } from '../queue/commit';
-import type { QueueItem } from '../queue/item';
+import { filedWithout as leftOut, type FiledWithout, type QueueItem } from '../queue/item';
 import { openQueue } from '../queue/open';
 import type { QueueStore } from '../queue/store';
 import { NotThisAccountError, Uploader } from '../queue/uploader';
@@ -110,6 +110,8 @@ interface CaptureValue {
     source: CaptureSource,
     metadata: CaptureMetadata | null,
     note: Omit<SavedNote, 'unnamed'>,
+    /** The card's names for the type's own details it sends, by field key. */
+    labels?: Record<string, string>,
   ) => Promise<SaveOutcome>;
   throwAway: (source: CaptureSource) => Promise<void>;
   discard: (uri: string) => Promise<void>;
@@ -119,6 +121,9 @@ interface CaptureValue {
   delivered: number;
   saved: SavedNote | null;
   dismissSaved: () => void;
+  /** Scans the vault took without some of their details, since this person last dismissed them. */
+  filedWithout: FiledWithout[];
+  dismissFiledWithout: () => void;
   remove: (id: string) => Promise<void>;
   timings: TimingRecorder;
 }
@@ -169,6 +174,7 @@ export function CaptureProvider(props: { children: ReactNode; deps?: Partial<Cap
   const [waitingHere, setWaitingHere] = useState(0);
   const [delivered, setDelivered] = useState(0);
   const [saved, setSaved] = useState<SavedNote | null>(null);
+  const [filedWithout, setFiledWithout] = useState<FiledWithout[]>([]);
   const timings = useMemo(() => new TimingRecorder(deps.now), [deps.now]);
   const storeRef = useRef<QueueStore | null>(null);
 
@@ -296,6 +302,9 @@ export function CaptureProvider(props: { children: ReactNode; deps?: Partial<Cap
         if (e.kind === 'sent') {
           timings.created(e.item.id);
           setDelivered((n) => n + 1);
+          // Filed without a detail its kind no longer takes: said, by the detail's name.
+          const without = leftOut(e.item);
+          if (without) setFiledWithout((l) => [...l, without]);
         }
         void refresh();
       },
@@ -312,6 +321,7 @@ export function CaptureProvider(props: { children: ReactNode; deps?: Partial<Cap
     // Only when the account changes: the Saved line was the last person's.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setSaved(null);
+    setFiledWithout([]);
     setPending((p) => {
       if (p && pendingFor.current !== whoKey) {
         for (const uri of sourceFiles(p)) void deps.discard(uri);
@@ -482,6 +492,7 @@ export function CaptureProvider(props: { children: ReactNode; deps?: Partial<Cap
       source: CaptureSource,
       metadata: CaptureMetadata | null,
       note: Omit<SavedNote, 'unnamed'>,
+      labels?: Record<string, string>,
     ): Promise<SaveOutcome> => {
       if (saving.current) return saving.current;
       const run = (async (): Promise<SaveOutcome> => {
@@ -497,7 +508,7 @@ export function CaptureProvider(props: { children: ReactNode; deps?: Partial<Cap
         timings.mark('save');
         try {
           const item = await commitCapture(
-            { source, metadata, origin: w.origin, account: w.member_id },
+            { source, metadata, origin: w.origin, account: w.member_id, labels: labels ?? null },
             {
               store: s,
               read: deps.read,
@@ -644,6 +655,8 @@ export function CaptureProvider(props: { children: ReactNode; deps?: Partial<Cap
       delivered,
       saved,
       dismissSaved: () => setSaved(null),
+      filedWithout,
+      dismissFiledWithout: () => setFiledWithout([]),
       remove,
       timings,
     }),
@@ -667,6 +680,7 @@ export function CaptureProvider(props: { children: ReactNode; deps?: Partial<Cap
       queue,
       delivered,
       saved,
+      filedWithout,
       remove,
       timings,
     ],

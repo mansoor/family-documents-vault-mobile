@@ -244,6 +244,14 @@ export function ownFields(type: DocumentTypeView | undefined, h: Pick<Household,
 }
 
 /**
+ * A comma is read only where it groups thousands: 1,234 and 1,234.50. Any
+ * other (12,50, 3,5) may be a decimal comma, and is never guessed at: read
+ * as thousands it would keep an amount 100 times too big. The web card's
+ * rule (apps/web/src/details.tsx, 0.5.11); @fdv/shared has no reader to share.
+ */
+const THOUSANDS = /^[-+]?\d{1,3}(,\d{3})+(\.\d*)?$/;
+
+/**
  * One of the type's own details as the vault keeps it, from what the card
  * holds: null for no value, or why it cannot be read. A required yes/no
  * left alone says no, as its switch shows, and is sent so.
@@ -263,12 +271,19 @@ export function readDetail(
     case 'year':
       return /^\d{4}$/.test(text) ? { value: Number(text) } : { message: 'That should be a year, such as 2026.' };
     case 'number': {
-      const n = Number(text.replace(/[,\s]/g, ''));
-      return Number.isFinite(n) ? { value: n } : { message: 'That should be a number, such as 42.' };
+      const typed = text.replace(/\s/g, '');
+      if (typed.includes(',') && !THOUSANDS.test(typed)) return { message: 'Use a point for a decimal, such as 3.5.' };
+      // Written out in figures, as the web card takes it: never 0x10 or 1e3.
+      const n = typed.replace(/,/g, '');
+      return /^[-+]?(\d+\.?\d*|\.\d+)$/.test(n)
+        ? { value: Number(n) }
+        : { message: 'That should be a number, such as 42.' };
     }
     case 'money': {
-      const amount = text.replace(/[£$€,\s]/g, '');
-      return /^-?\d+(\.\d{1,2})?$/.test(amount)
+      const typed = text.replace(/[£$€\s]/g, '');
+      if (typed.includes(',') && !THOUSANDS.test(typed)) return { message: 'Use a point for pence, such as 12.50.' };
+      const amount = typed.replace(/,/g, '');
+      return /^-?(\d+(\.\d{1,2})?|\.\d{1,2})$/.test(amount)
         ? { value: Number(amount) }
         : { message: 'That should be an amount, such as 12.50.' };
     }

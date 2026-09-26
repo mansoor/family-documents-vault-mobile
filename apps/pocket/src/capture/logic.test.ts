@@ -3,6 +3,7 @@ import {
   chooseOwner,
   chooseType,
   newDraft,
+  readDetail,
   toMetadata,
   visibilityChoices,
   visibilityOf,
@@ -10,6 +11,7 @@ import {
 } from './draft';
 import { exportRuns, split, TimingRecorder, loadRuns } from './timings';
 import { matchTypes, rankTypes } from './types';
+import { detailInput } from './ui';
 
 const type = (key: string, label: string, over: Partial<DocumentTypeView> = {}): DocumentTypeView => ({
   key,
@@ -115,6 +117,25 @@ describe('a type’s details on the card (custom_types)', () => {
     });
   });
 
+  it('a decimal comma is never read as thousands: 12,50 is refused, not kept as 1250', () => {
+    const money = { kind: 'money', required: false } as const;
+    const number = { kind: 'number', required: false } as const;
+    expect(readDetail(money, '12,50')).toEqual({ message: 'Use a point for pence, such as 12.50.' });
+    expect(readDetail(money, '£125,00')).toEqual({ message: 'Use a point for pence, such as 12.50.' });
+    expect(readDetail(number, '3,5')).toEqual({ message: 'Use a point for a decimal, such as 3.5.' });
+    // A comma that groups thousands is read so, as the web card reads it.
+    expect(readDetail(money, '£1,234.50')).toEqual({ value: 1234.5 });
+    expect(readDetail(money, '12.50')).toEqual({ value: 12.5 });
+    expect(readDetail(number, '1,234')).toEqual({ value: 1234 });
+    expect(readDetail(number, '-3.5')).toEqual({ value: -3.5 });
+    // Written out in figures only: not hexadecimal, not an exponent.
+    expect(readDetail(number, '0x10')).toEqual({ message: 'That should be a number, such as 42.' });
+    expect(readDetail(number, '1e3')).toEqual({ message: 'That should be a number, such as 42.' });
+    // On the card: said on the detail, and nothing is sent.
+    const d = { ...chooseType(newDraft(source, h.me), 'h_car0000000'), details: { plate: 'AB12 CDE', seats: '3,5' } };
+    expect(toMetadata(d, h).fields).toEqual({ 'detail:seats': 'Use a point for a decimal, such as 3.5.' });
+  });
+
   it('a fixed field the type hides is neither asked for nor sent; one the card has no box for is not waited for', () => {
     const d = { ...chooseType(newDraft(source, h.me), 'passport'), location: 'The safe', identifier: '' };
     const out = toMetadata(d, h);
@@ -125,6 +146,29 @@ describe('a type’s details on the card (custom_types)', () => {
     expect(old.missing).toEqual([]);
     expect(old.metadata).toMatchObject({ physical_location: 'The safe' });
     expect(old.metadata).not.toHaveProperty('extra');
+  });
+});
+
+describe('the keyboard for a detail', () => {
+  // The keyboards React Native's Android text input knows (ReactTextInputManager's
+  // setKeyboardType); any other opens the letters.
+  const ANDROID = [
+    ...['default', 'numeric', 'number-pad', 'decimal-pad'],
+    ...['email-address', 'phone-pad', 'visible-password', 'url'],
+  ];
+
+  it('a number, an amount and a year open the numbers on Android, the first shipped', () => {
+    for (const kind of ['number', 'money', 'year']) {
+      const keyboard = detailInput(kind, 'android')?.keyboardType;
+      expect([kind, ANDROID.includes(keyboard ?? '') && keyboard !== 'default']).toEqual([kind, true]);
+    }
+    // A number may have a sign and a point.
+    expect(detailInput('number', 'android')?.keyboardType).toBe('numeric');
+    // iOS: numbers and punctuation, which always has the point a decimal is written with.
+    expect(detailInput('number', 'ios')?.keyboardType).toBe('numbers-and-punctuation');
+    expect(detailInput('money', 'ios')?.keyboardType).toBe('numbers-and-punctuation');
+    expect(detailInput('year', 'ios')?.keyboardType).toBe('number-pad');
+    expect(detailInput('text', 'android')).toEqual({ autoCapitalize: 'sentences' });
   });
 });
 

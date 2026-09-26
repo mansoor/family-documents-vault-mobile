@@ -75,10 +75,12 @@ export async function commitCapture(
     account: string;
     /** A new version of this document (a renewal), rather than a new document. */
     renews?: string | null;
+    /** The card's names for the type's own details it sends, by field key. */
+    labels?: Record<string, string> | null;
   },
   deps: CommitDeps,
 ): Promise<QueueItem> {
-  const { source, metadata } = input;
+  const { source, metadata, labels } = input;
   let bytes: Uint8Array;
   let filename: string;
   let mime: string;
@@ -128,6 +130,7 @@ export async function commitCapture(
     askFirst: false,
     problem: null,
     lastCode: null,
+    ...(labels && Object.keys(labels).length > 0 ? { labels } : {}),
   };
   try {
     await deps.store.add(item, bytes);
