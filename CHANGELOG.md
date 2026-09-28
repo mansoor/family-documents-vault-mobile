@@ -58,9 +58,17 @@ each version. And the tab bar's +, as on the web.
 - Kinds of document the household has hidden are no longer offered on the
   card, not even among the usual first ones. The vault still lists them
   while a document uses them, so those documents keep their kind.
-- Built against the vault's shared code of v0.5.11 (was v0.5.0-rc.1).
+- Built against the vault's shared code of v0.5.19 (was v0.5.11; before
+  that v0.5.0-rc.1).
 
 ### Fixed
+- **A teen's scan of a kind kept for the adults is their own Only me**
+  (the owner's decision A71, vault 0.5.19). A teen cannot file Adults
+  only, so the card started such a kind — a social security card, a bank
+  statement — at Everyone, and the phone sent that, viewers included. It
+  starts at their Only me now, as on the web; Everyone is still theirs to
+  choose. An adult's is Adults only, as before. A scan already waiting on
+  the phone goes as it was saved.
 - **An Essential's status with no connection agrees with the vault's.**
   The phone worked it out from the expiry date alone, so a kept passport
   with no number said "Valid for 3 years" where the vault said "Needs a

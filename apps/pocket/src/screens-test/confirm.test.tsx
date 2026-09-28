@@ -12,6 +12,7 @@ import { audit } from '../test-support/a11y';
 import { addCar, fieldOf, ownerApi } from '../test-support/kinds';
 import { installed, renderApp, signedIn, testCapture } from '../test-support/render';
 import { capabilities, testVault, type TestVault } from '../test-support/vault';
+import { SecureTokenStore } from '../session/store';
 import { useCapture } from '../state/capture';
 import { useVault } from '../state/vault';
 
@@ -94,12 +95,15 @@ async function openCard(
     kinds?: boolean;
     /** The vault set up first, as the family left it. */
     before?: (t: TestVault) => Promise<void>;
+    /** After the sign-in, before the card opens: who is signed in, say. */
+    after?: (t: TestVault) => Promise<void>;
   } = {},
 ) {
   const t = testVault();
   if (opts.kinds) t.caps = kindsCaps();
   await opts.before?.(t);
   await withMembers(t);
+  await opts.after?.(t);
   const rec = recording(t);
   const phone = testCapture({ scanner: fixtureScanner(opts.outcomes ?? [TWO_PAGES]) });
   phone.files.set('cache:/scan/1.jpg', jpeg('letter-with-exif.jpg'));
@@ -113,6 +117,21 @@ async function openCard(
 /** A vault of 0.5.11: it keeps each type's details, and says which fields each requires. */
 const kindsCaps = () =>
   capabilities({ server_version: '0.5.11', features: { ...capabilities().features, custom_types: true } });
+
+/**
+ * Signed in as somebody of this role: the fake files everything as its one
+ * person, and the phone reads that person's role from GET /members, as it
+ * does a role changed since sign-in.
+ */
+const signedInAs = (role: 'teen' | 'adult', name: string) => async (t: TestVault) => {
+  t.vault.state.members = [
+    { id: 'fake-member', display_name: name, role, is_me: true },
+    { id: 'member-aisha', display_name: 'Aisha Khan', role: 'adult', is_me: false },
+  ];
+  const store = new SecureTokenStore();
+  const kept = await store.load();
+  await store.save({ ...(kept as NonNullable<typeof kept>), role });
+};
 
 const captures = (t: TestVault) => t.calls.filter((c) => c.startsWith('POST') && c.endsWith('/api/v1/capture'));
 const chip = (name: string | RegExp) => screen.getByRole('button', { name });
@@ -270,6 +289,46 @@ describe('the confirm card', () => {
     expect(screen.queryByTestId('page-strip')).toBeNull();
     await fireEvent.press(screen.getByTestId('capture-skip'));
     await waitFor(() => expect(t.vault.state.documents).toHaveLength(1));
+  });
+});
+
+describe('who can see it when nobody chooses (A71, vault 0.5.19)', () => {
+  const selected = (v: string) => screen.getByTestId(`visibility-${v}`).props.accessibilityState;
+
+  it('a teen capturing their own document of an Adults-only kind sends Only me by default', async () => {
+    const { t, rec } = await openCard({ after: signedInAs('teen', 'Sam') });
+    // Theirs, and only theirs to choose.
+    expect(chip('Sam (Yours)')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Aisha Khan' })).toBeNull();
+    await fireEvent.press(chip('Bank statement'));
+    // Their Only me, not Everyone: Adults only, which would hide it from them too, is not offered.
+    expect(selected('private')).toMatchObject({ selected: true });
+    expect(selected('household')).toMatchObject({ selected: false });
+    expect(screen.queryByTestId('visibility-adults')).toBeNull();
+    await fireEvent.press(screen.getByTestId('capture-save'));
+    await waitFor(() => expect(captures(t)).toHaveLength(1));
+    expect(rec.metadata()[0]).toMatchObject({
+      type_key: 'bank_statement',
+      owner_member_id: 'fake-member',
+      visibility: 'private',
+    });
+    expect(t.vault.state.documents[0]).toMatchObject({ visibility: 'private' });
+  });
+
+  it('an adult capturing their own document of an Adults-only kind sends Adults only by default', async () => {
+    const { t, rec } = await openCard({ after: signedInAs('adult', 'Omar') });
+    await fireEvent.press(chip('Omar (Yours)'));
+    await fireEvent.press(chip('Bank statement'));
+    expect(selected('adults')).toMatchObject({ selected: true });
+    expect(selected('private')).toMatchObject({ selected: false, disabled: false });
+    await fireEvent.press(screen.getByTestId('capture-save'));
+    await waitFor(() => expect(captures(t)).toHaveLength(1));
+    expect(rec.metadata()[0]).toMatchObject({
+      type_key: 'bank_statement',
+      owner_member_id: 'fake-member',
+      visibility: 'adults',
+    });
+    expect(t.vault.state.documents[0]).toMatchObject({ visibility: 'adults' });
   });
 });
 

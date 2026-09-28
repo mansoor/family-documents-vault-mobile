@@ -191,15 +191,23 @@ describe('a teen’s card', () => {
     expect(chooseOwner(d, 'mum', h).ownerId).toBe('sam');
   });
 
-  it('never files Adults only, even for a type that usually is', () => {
+  it('never files Adults only: a kind that usually is starts at their Only me (A71), and Everyone is still theirs to choose', () => {
     const d = chooseType(newDraft(source, h.me), 'bank_statement');
-    expect(visibilityOf(d, h)).toBe('household');
+    expect(visibilityOf(d, h)).toBe('private');
     expect(visibilityChoices(d, h)).toEqual({
       household: true,
       adults: false,
       private: true,
     });
-    expect(toMetadata(d, h).problem).toBeNull();
+    expect(toMetadata(d, h)).toMatchObject({ problem: null, metadata: { visibility: 'private', owner_member_id: 'sam' } });
+    expect(toMetadata({ ...d, visibility: 'household' }, h).metadata.visibility).toBe('household');
+  });
+
+  it('an adult’s own document of an Adults only kind stays Adults only', () => {
+    const adult: Household = { ...h, me: { member_id: 'mum', role: 'adult' } };
+    const d = chooseOwner(chooseType(newDraft(source, adult.me), 'bank_statement'), 'mum', adult);
+    expect(visibilityOf(d, adult)).toBe('adults');
+    expect(toMetadata(d, adult)).toMatchObject({ problem: null, metadata: { visibility: 'adults' } });
   });
 
   it('says who issued it only to a vault that takes it', () => {
