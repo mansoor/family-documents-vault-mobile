@@ -440,14 +440,20 @@ describe('a type’s details (a vault of 0.5.11)', () => {
       });
       await fireEvent.press(chip('Passport'));
       await fireEvent.press(chip('Fake Owner (Yours)'));
-      // The details are closed: Save opens them, and the place is in the first field it waits for.
+      // The details are closed: Save opens them, and the place is in the first field it waits for —
+      // once it has been laid out: focused before, Android opens no keyboard (the 5.31 Maestro runs).
       await fireEvent.press(screen.getByTestId('capture-save'));
       await screen.findByTestId('capture-error');
-      expect(focused()).toBe('field-number');
+      expect(focus).not.toHaveBeenCalled();
+      const laidOut = { nativeEvent: { layout: { x: 0, y: 0, width: 320, height: 44 } } };
+      await fireEvent(screen.getByTestId('field-number'), 'layout', laidOut);
+      await fireEvent(screen.getByTestId('field-expires'), 'layout', laidOut);
+      await waitFor(() => expect(focused()).toBe('field-number'));
+      // Laid out already: the next Save moves to its field straight away.
       await fireEvent.changeText(screen.getByTestId('field-number'), '123456789');
       await fireEvent.press(screen.getByTestId('capture-save'));
       await screen.findByText('Still needed: Expires. Fill it in, or skip for now.');
-      expect(focused()).toBe('field-expires');
+      await waitFor(() => expect(focused()).toBe('field-expires'));
       expect(toEnd).not.toHaveBeenCalled();
       // A choice has no box to type in: the notice that says what is needed is brought into view.
       focus.mockClear();

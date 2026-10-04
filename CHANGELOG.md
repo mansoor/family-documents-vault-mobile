@@ -84,6 +84,14 @@ Each of these appears only with a vault that has it; with an older vault
   expo-document-picker 57.0.3, expo-navigation-bar 57.0.3 and expo-router
   57.0.24.
 
+### Fixed
+- **Save that waits opens the keyboard on the first field it waits for.**
+  When Save opened More details, the field took the focus before it was
+  laid out, and Android ignored the keyboard for it: the person saw no
+  keyboard, and a Back meant for it asked to leave the scan (the Maestro
+  capture flow since 0.2.1). The field now moves to itself once it is laid
+  out.
+
 ## [0.2.1] — iteration 5.13: a kind's details on the phone
 
 (The app's version stayed 0.2.0 in 5.13; 0.2.2 is the first build to say
