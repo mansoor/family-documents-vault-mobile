@@ -3,6 +3,7 @@ import {
   can,
   colours,
   formatDate,
+  localToday,
   radii,
   shareEndWords,
   type DocumentView,
@@ -323,8 +324,16 @@ export default function Home() {
   );
 }
 
-/** A day in words: "3 Oct 2026". */
-const dayOf = (at: string) => formatDate({ date: at.slice(0, 10), precision: 'day' });
+/** The zone this phone keeps its clock in. */
+const phoneZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+
+/**
+ * The day a moment fell on, on this phone's calendar, in words: "3 Oct
+ * 2026" — as the web says it on the browser's (toLocaleDateString), never
+ * the UTC day, which is tomorrow's for an evening in California.
+ */
+const dayOf = (at: string, zone = phoneZone()) =>
+  formatDate({ date: localToday(zone, new Date(at)), precision: 'day' });
 
 /**
  * An owner was given a one-time link to set this person's password (5.29),

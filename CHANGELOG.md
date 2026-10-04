@@ -12,31 +12,43 @@ Each of these appears only with a vault that has it; with an older vault
 (0.4.10 or later, as before) the app is as in 0.2.1.
 
 ### Added
-- **The Identity card on a person's screen**, with a vault of 0.5.24 or
+- **The Identity card on a person's screen**, with a vault of 0.5.29 or
   later (`member_identity`): their details in sections, every ID number
-  and hidden field masked. **Show** asks who is holding the phone: for your
-  own numbers your password or a code; for another person's, a code from an
-  authenticator app — the vault takes no password for that, so the sheet
-  offers none. Without two-step sign-in the vault's own words say to turn
-  it on, in the browser. **Copy** asks the same; the copy is marked
-  sensitive (Android 13 and later show dots, not the number, in the
-  clipboard's preview and a keyboard's suggestions) and cleared after a
-  minute, unless something else was copied since — also while the app is
-  at the back, where the number is pasted. Screenshots are refused while
-  the card is on the screen, and allowed again after. Nothing of it is
-  kept: not in a store, a cache or the log; with no connection there is no
-  card (A36), and the lock hides every number shown. Another person's Only
-  me fields are never shown, even if an answer carried them. Read only:
-  details are added and changed in the browser.
+  and hidden field masked; two IDs of the same kind are told apart by who
+  issued them, or a number ("Show passport number, issued by Ireland").
+  **Show** asks who is holding the phone: for your own numbers your
+  password or a code; for another person's, a code from an authenticator
+  app — the vault takes no password for that, so the sheet offers none.
+  Somebody whose only second factor is a passkey, which the phone cannot
+  use yet, is told to add an authenticator app or to do it in the browser,
+  not asked for a code they cannot give. Without two-step sign-in the
+  vault's own words say to turn it on, in the browser, and are said aloud.
+  **Copy** asks the same; the copy is marked sensitive (Android 13 and
+  later show dots, not the number, in the clipboard's preview and a
+  keyboard's suggestions) and cleared after a minute, unless the app can
+  see something else was copied since. An alarm clears it, so it goes even
+  if the app is swiped away, killed or frozen within the minute, or the
+  phone sleeps; and when the app starts or comes back, a copy of its own
+  left past its minute goes then. Screenshots are refused while the card
+  is on the screen — also under a document opened from it, which stays the
+  safer side — and allowed again once it is left; two cards at once each
+  keep their own shield. Nothing of it is kept: not in a store, a cache or
+  the log; with no connection there is no card (A36), and the lock hides
+  every number shown. Another person's Only me fields are never shown,
+  even if an answer carried them. Read only: details are added and changed
+  in the browser.
 - **Paused access.** When an owner locks a person's sign-in, or a restore
-  pauses it (a vault of 0.5.26 or later), the phone says "An owner has
+  pauses it (a vault of 0.5.31 or later), the phone says "An owner has
   paused your access. Ask them if you think this is a mistake." — when the
-  vault ends the session, and at sign-in; after a restore, "Your access is
-  paused after the vault was restored. Ask an owner to turn it back on."
-  Not "wrong password", and not the words for a session that simply went.
-  The kept Essentials go with the session, as for every end but an expiry.
+  vault ends the session (told by push too: the phone asks the vault why),
+  and at sign-in; after a restore, "Your access is paused after the vault
+  was restored. Ask an owner to turn it back on." Not "wrong password",
+  and not the words for a session that simply went; a request still under
+  way leaves them in place. The kept Essentials go with the session, as for
+  every end but an expiry, and a sign-in refused for a lock takes those
+  kept after an expiry: the phone has learned of the lock.
 - **Two notifications.** "3 documents arrived for you to look at", when
-  files sent through a request wait for you to look at (a vault of 0.5.21
+  files sent through a request wait for you to look at (a vault of 0.5.27
   or later; they are looked at in the browser); a message without a count
   shows nothing. And "Something about your details is changing. Open the
   app to see what." for when more people are to see your identity
@@ -45,7 +57,8 @@ Each of these appears only with a vault that has it; with an older vault
   wider audience in the app and by mail, and sends no such push yet: the
   phone is ready for it.)
 - **Home says what a person must be told.** That an owner was given a
-  link to reset their password (a vault of 0.5.27 or later), when, and
+  link to reset their password (a vault of 0.5.32 or later), on which day
+  by this phone's calendar, and
   what was added to their sign-in since the link was used — passkeys,
   two-step sign-in, share links — until they say "I've seen this"; the
   password is changed in the browser. And that more people will see their
@@ -59,7 +72,8 @@ Each of these appears only with a vault that has it; with an older vault
   Due date — "We'll remind you 7 days and 1 day before its due date." —
   with "We remind you once for this date…", and on an Only me document,
   that the vault can read that one date. Saved, the card's note makes the
-  same promise. A reminder on Home and in Needs attention reads the date
+  same promise — or, for a due date already gone, says that no reminder is
+  set, since the vault makes none. A reminder on Home and in Needs attention reads the date
   it is about ("Due date: 10 Oct, in 7 days"), never "Overdue by 3 days"
   above a bill still ahead; Coming up says under it when it falls due, or
   until when it is put off — so a month's snooze the vault stopped at a

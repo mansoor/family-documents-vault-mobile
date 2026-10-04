@@ -279,6 +279,39 @@ describe('Essentials in airplane mode', () => {
     await fireEvent.press(screen.getByTestId('sign-in-go'));
   }
 
+  it('a sign-in refused because an owner locked it takes the copies kept after an expiry, and says access is paused', async () => {
+    const t = testVault([ORIGIN]);
+    t.vault.state.offlineEssentials.items = [passport()];
+    const parts = await start(t);
+    await keep();
+    await screen.findByTestId('essential-passport');
+    // The session expired: the copies stay readable…
+    for (const s of t.vault.state.sessions) {
+      s.revoked = true;
+      s.endedBecause = 'expired' as never;
+    }
+    await pullToRefresh();
+    await screen.findByTestId('essentials-signed-out');
+    expect(parts.mem.removed).toEqual([]);
+    // …until the phone learns of a lock, at the next sign-in (403 membership_suspended).
+    t.vault.state.suspensions.set('fake-member', {
+      reason: 'locked',
+      since: new Date(Date.now() - 60_000).toISOString(),
+      until: null,
+      note: null,
+      by: 'Mansoor',
+    });
+    await fireEvent.changeText(screen.getByTestId('sign-in-email'), 'owner@example.test');
+    await fireEvent.changeText(screen.getByTestId('sign-in-password'), PASSWORD);
+    await fireEvent.press(screen.getByTestId('sign-in-go'));
+    expect(await screen.findByTestId('sign-in-paused')).toHaveTextContent(
+      'An owner has paused your access. Ask them if you think this is a mistake.',
+    );
+    await waitFor(() => expect(parts.mem.removed).toEqual(expect.arrayContaining(['everyday', 'private'])));
+    expect(parts.mem.stores.size).toBe(0);
+    expect(screen.queryByTestId('essentials-signed-out')).toBeNull();
+  });
+
   it('signing in again after expiry renews the grant with that password, and keeps them up to date', async () => {
     const t = testVault([ORIGIN]);
     t.vault.state.offlineEssentials.items = [passport()];

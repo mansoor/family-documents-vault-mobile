@@ -1,6 +1,7 @@
 import { REMIND_ONCE, type ReminderView } from '@fdv/shared';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react-native';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactElement } from 'react';
+import { Text } from 'react-native';
 import AttentionScreen from '../app/(tabs)/attention';
 import Home from '../app/(tabs)/index';
 import CaptureScreen from '../app/capture';
@@ -64,12 +65,24 @@ function Scanned() {
   return open ? <CaptureScreen /> : null;
 }
 
-async function cardFor(t: TestVault) {
+/** What Home will say once the scan is safe: the note the card left. */
+function SavedNote() {
+  const { saved } = useCapture();
+  return <Text testID="saved-note">{saved ? (saved.reminder ?? '(none)') : ''}</Text>;
+}
+
+async function cardFor(t: TestVault, beside?: ReactElement) {
   await councilTax(t);
   await signedIn(t);
   const phone = testCapture({ scanner: fixtureScanner([{ kind: 'pages', pages: [{ uri: 'cache:/scan/1.jpg' }] }]) });
   phone.files.set('cache:/scan/1.jpg', jpeg('card.jpg'));
-  await renderApp(<Scanned />, { fetch: t.fetch, capture: phone });
+  await renderApp(
+    <>
+      <Scanned />
+      {beside}
+    </>,
+    { fetch: t.fetch, capture: phone },
+  );
   await screen.findByText('What it is');
   // Council tax is the household's own: found under More.
   await fireEvent.press(screen.getByTestId('types-more'));
@@ -138,6 +151,18 @@ describe('reminders from any date (5.31)', () => {
     await fireEvent.press(screen.getByTestId('more-details'));
     expect(screen.getByTestId('capture-reminder')).toHaveTextContent(PROMISE);
     expect(screen.queryByText(REMIND_ONCE)).toBeNull();
+  });
+
+  it.each([
+    ['ahead', '01/09/2099', PROMISE],
+    // A paid bill filed afterwards: the vault makes no reminder for a date gone (0.5.15).
+    ['gone', '01/09/2020', 'Its due date has passed, so no reminder is set.'],
+  ])('saved, the note promises reminders only for a due date still %s', async (_when, typed, words) => {
+    const t = vaultOf(true);
+    await cardFor(t, <SavedNote />);
+    await fireEvent.changeText(screen.getByTestId('field-detail-due_date'), typed);
+    await fireEvent.press(screen.getByTestId('capture-save'));
+    await waitFor(() => expect(screen.getByTestId('saved-note')).toHaveTextContent(words));
   });
 
   it('a reminder about a due date reads its line and offers no Scan the new one', async () => {

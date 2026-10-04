@@ -102,6 +102,7 @@ Written by `node apps/pocket/scripts/failure-states.mjs`; CI fails if it is out 
 |  |  | `show.noPreview` | This document can't be shown on the phone. |
 | Confirm it is you | The step-up sheet | `stepUp.failed` | That didn't match. Try again. |
 |  |  | `stepUp.codeOnly` | This needs the code from your authenticator app: your password won't do here. |
+|  |  | `stepUp.noCode` | This needs a code from an authenticator app, and this phone can't use your passkey. Add an authenticator app in Settings in the browser, or do this in the browser with your passkey. |
 | Identity details | A person, the Identity card | `identity.needsConnection` | Identity details need a connection. They are never kept on this phone. |
 |  |  | `identity.failed` | Identity details couldn't be read. Try again in a moment. |
 |  |  | `identity.copyFailed` | This phone would not copy it. Show it instead. |

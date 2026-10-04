@@ -3,6 +3,7 @@ import {
   dateReminderSentence,
   issuedByLabel,
   issuerFromFilename,
+  localToday,
   rankKnownIssuers,
   REMIND_ONCE,
   reminderOf,
@@ -61,6 +62,20 @@ function remindingOf(type: DocumentTypeView | undefined, datesOn: boolean): { fr
   if (!datesOn || !type) return null;
   const r = reminderOf(type);
   return r.from ? { from: r.from, leads: r.leads } : null;
+}
+
+/** A date field's name in a sentence, as the promise says it: "due date", but "MOT". */
+function dateName(label: string): string {
+  const trimmed = label.trim().replace(/\s+/g, ' ');
+  return /^[A-Z0-9]{2,}\b/.test(trimmed) ? trimmed : trimmed.charAt(0).toLowerCase() + trimmed.slice(1);
+}
+
+/** Whether a date the card read (a DateValue) is before today, on this phone's calendar. */
+function datePassed(value: unknown): boolean {
+  const date = (value as { date?: unknown } | null)?.date;
+  if (typeof date !== 'string' || date === '') return false;
+  const today = localToday(Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC');
+  return date < today.slice(0, date.length);
 }
 
 /** The promise for a date field a kind reminds from: "We'll remind you 7 days and 1 day before its due date." */
@@ -295,8 +310,16 @@ function Card(props: { initial: CaptureSource }) {
       if (from && from.from !== 'expires') {
         // A bill: its due date reminds, not its expiry.
         const field = ownFields(ty, household).find((f) => f.key === from.from);
-        const dated = out.metadata.extra?.[from.from] !== undefined;
-        note = { reminder: dated ? fieldPromise(field, from.leads) : null, noExpiry: false };
+        const dated = out.metadata.extra?.[from.from];
+        note = {
+          // A date already gone makes no reminder (the vault's 0.5.15): said so, never promised.
+          reminder: !dated
+            ? null
+            : datePassed(dated) && field
+              ? t('capture.datePassed', { name: dateName(field.label) })
+              : fieldPromise(field, from.leads),
+          noExpiry: false,
+        };
       } else {
         note = {
           reminder: out.metadata.expires ? reminderSentence(ty) : null,

@@ -1,4 +1,4 @@
-import { ApiRequestError, StepUpCoordinator, type Api } from '@fdv/client';
+import { ApiRequestError, StepUpCoordinator, type Api, type StepUpRequest } from '@fdv/client';
 import { wordsFor } from '../errors/words';
 import { colours, FACTOR_STEP_UPS, radii } from '@fdv/shared';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
@@ -21,7 +21,9 @@ import { useVault } from './vault';
  * Some things take a code and never the password (`FACTOR_STEP_UPS`, A54):
  * another person's identity numbers (`open_identity`, 5.26). For those the
  * sheet asks for the code alone — the phone has no passkeys — and offers
- * no password, which the vault would not take.
+ * no password, which the vault would not take. Somebody whose only second
+ * factor is a passkey (GET /me: no authenticator app) has no code to give:
+ * the sheet says so, and where it can be done, rather than asking for one.
  */
 
 interface StepUpValue {
@@ -31,11 +33,18 @@ interface StepUpValue {
 
 const Ctx = createContext<StepUpValue | null>(null);
 
+/** What is asked, and for a code alone, whether this sign-in has none to give. */
+interface Request extends StepUpRequest {
+  codeless: boolean;
+}
+
 /** One prompt: settled once, and it clears only itself. */
 interface Asking {
   message: string;
   /** What asked (the vault's `action`): one of FACTOR_STEP_UPS takes a code alone. */
   action: string;
+  /** For a code alone: this sign-in has no authenticator app (a passkey only), so no code can be given. */
+  codeless: boolean;
   settle: (ok: boolean) => void;
 }
 
@@ -53,6 +62,7 @@ export function StepUpProvider(props: { children: ReactNode }) {
             const self: Asking = {
               message: req.message,
               action: req.action,
+              codeless: (req as Request).codeless === true,
               settle: (ok) => {
                 if (done) return;
                 done = true;
@@ -79,7 +89,17 @@ export function StepUpProvider(props: { children: ReactNode }) {
         return await withToken(fn);
       } catch (err) {
         if (!(err instanceof ApiRequestError) || err.code !== 'step_up_required') throw err;
-        const confirmed = await coordinator.confirm({ action: err.action ?? '', message: err.message });
+        const action = err.action ?? '';
+        // A code alone: whether this sign-in has an authenticator app to give
+        // one. Not known (no answer, an older vault): the code is asked for.
+        const codeless = FACTOR_STEP_UPS.includes(action)
+          ? await withToken((a, token) => a.me(token)).then(
+              (me) => me.totp_enabled === false,
+              () => false,
+            )
+          : false;
+        const request: Request = { action, message: err.message, codeless };
+        const confirmed = await coordinator.confirm(request);
         if (!confirmed) return null;
         return withToken(fn);
       }
@@ -152,12 +172,14 @@ function StepUpSheet(props: { asking: Asking | null }) {
         >
           <Text variant="screen">{t('stepUp.title')}</Text>
           {asking?.message ? <Text tone="soft">{asking.message}</Text> : null}
-          {codeOnly ? (
+          {codeOnly && asking?.codeless ? (
+            <Text testID="step-up-no-code">{t('stepUp.noCode')}</Text>
+          ) : codeOnly ? (
             <Text tone="soft" testID="step-up-code-only">
               {t('stepUp.codeOnly')}
             </Text>
           ) : null}
-          {how === 'password' ? (
+          {codeOnly && asking?.codeless ? null : how === 'password' ? (
             <Field
               testID="step-up-password"
               label={t('stepUp.password')}
@@ -185,13 +207,15 @@ function StepUpSheet(props: { asking: Asking | null }) {
               error={error}
             />
           )}
-          <Button
-            testID="step-up-go"
-            label={t('stepUp.confirm')}
-            busy={busy}
-            disabled={!value.trim()}
-            onPress={() => void confirm()}
-          />
+          {codeOnly && asking?.codeless ? null : (
+            <Button
+              testID="step-up-go"
+              label={t('stepUp.confirm')}
+              busy={busy}
+              disabled={!value.trim()}
+              onPress={() => void confirm()}
+            />
+          )}
           {codeOnly ? null : (
             <Button
               testID="step-up-switch"

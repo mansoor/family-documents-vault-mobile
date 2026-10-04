@@ -69,6 +69,33 @@ export function idNumberLabel(e: { kind: IdentityIdKind; label?: string | null }
   return /number$/.test(word) ? word : `${word} number`;
 }
 
+/**
+ * What tells two IDs apart that would be called the same — two passports
+ * with no name of their own, a dual national's (the web's 5.27 review,
+ * vendor apps/web/src/identity.tsx `idSuffixes`): who issued each, where
+ * that differs, or else a number. By `<part>:<id>`; '' where one is alone.
+ * So "Show passport number, issued by Ireland" is never mistaken for the
+ * other one by somebody listening.
+ */
+export function idSuffixes(
+  ids: readonly { key: string; kind: string; label?: string | null | undefined; issuer?: string | null | undefined }[],
+): Map<string, string> {
+  const groups = new Map<string, (typeof ids)[number][]>();
+  for (const i of ids) {
+    const name = `${i.kind}|${(i.label ?? '').trim().toLowerCase()}`;
+    groups.set(name, [...(groups.get(name) ?? []), i]);
+  }
+  const out = new Map<string, string>();
+  for (const group of groups.values()) {
+    const issuers = group.map((i) => (i.issuer ?? '').trim());
+    const byIssuer = issuers.every(Boolean) && new Set(issuers.map((x) => x.toLowerCase())).size === group.length;
+    group.forEach((i, n) => {
+      out.set(i.key, group.length < 2 ? '' : byIssuer ? `, issued by ${issuers[n] as string}` : ` ${n + 1}`);
+    });
+  }
+  return out;
+}
+
 /** "Home email", "Work phone", "Address": what it is, with what it is for. */
 function contactLabel(label: string, noun: string): string {
   if (!label) return capitalised(noun);
@@ -81,6 +108,8 @@ function entryRow(
   e: Record<string, unknown>,
   isMasked: boolean,
   t: TFunction,
+  /** What tells this ID from another called the same (idSuffixes). */
+  suffix = '',
 ): Omit<IdentityRow, 'part' | 'order'> | null {
   const key = `${list}.${String(e.id)}`;
   switch (list) {
@@ -114,9 +143,9 @@ function entryRow(
       const kindWord = IDENTITY_ID_LABELS[kind] ?? IDENTITY_ID_LABELS.other;
       return {
         key,
-        label: named ? `${kindWord}: ${named}` : kindWord,
+        label: (named ? `${kindWord}: ${named}` : kindWord) + suffix,
         value: isMasked ? null : number || t('identity.noNumber'),
-        ...(isMasked ? { secretLabel: idNumberLabel({ kind, label: named || null }) } : {}),
+        ...(isMasked ? { secretLabel: idNumberLabel({ kind, label: named || null }) + suffix } : {}),
         more,
       };
     }
@@ -135,7 +164,13 @@ function entryRow(
 }
 
 /** A part's rows for one section, in the catalogue's order. */
-function rowsOf(pv: IdentityPartView, part: IdentityPart, section: string, t: TFunction): IdentityRow[] {
+function rowsOf(
+  pv: IdentityPartView,
+  part: IdentityPart,
+  section: string,
+  t: TFunction,
+  suffixes: Map<string, string>,
+): IdentityRow[] {
   const f = pv.fields;
   const masked = new Set(pv.masked);
   const rows: IdentityRow[] = [];
@@ -152,7 +187,13 @@ function rowsOf(pv: IdentityPartView, part: IdentityPart, section: string, t: TF
     if ((IDENTITY_LISTS as readonly string[]).includes(key)) {
       const list = key as IdentityList;
       for (const e of (f[list] ?? []) as unknown as Record<string, unknown>[]) {
-        const row = entryRow(list, e, masked.has(`${list}.${String(e.id)}`), t);
+        const row = entryRow(
+          list,
+          e,
+          masked.has(`${list}.${String(e.id)}`),
+          t,
+          suffixes.get(`${part}:${String(e.id)}`) ?? '',
+        );
         if (row) rows.push({ ...row, part, order });
       }
       return;
@@ -176,10 +217,18 @@ export function identitySections(view: IdentityView, self: boolean, t: TFunction
     ['shared', view.shared],
     ['only_me', self ? view.only_me : null],
   ];
+  // Two IDs called the same are told apart, across both parts.
+  const suffixes = idSuffixes(
+    parts.flatMap(([part, pv]) =>
+      (pv?.fields.ids ?? []).map((i) => ({ key: `${part}:${i.id}`, kind: i.kind, label: i.label, issuer: i.issuer })),
+    ),
+  );
   return SECTIONS.map((key) => ({
     key,
     title: t(`identity.section_${key}`),
-    rows: parts.flatMap(([part, pv]) => (pv ? rowsOf(pv, part, key, t) : [])).sort((a, b) => a.order - b.order),
+    rows: parts
+      .flatMap(([part, pv]) => (pv ? rowsOf(pv, part, key, t, suffixes) : []))
+      .sort((a, b) => a.order - b.order),
   })).filter((s) => s.rows.length > 0);
 }
 

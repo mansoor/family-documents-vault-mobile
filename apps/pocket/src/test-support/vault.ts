@@ -79,6 +79,11 @@ export interface TestVault {
   push: PushSide;
   /** Signed-in devices (4.15): this phone, and a laptop. */
   sessions: SessionRow[];
+  /**
+   * The second factors of the account signed in, as GET /me says them
+   * (`totp_enabled`, `has_passkey`): the client's fake says none.
+   */
+  factors: { totp: boolean; passkey: boolean };
 }
 
 export interface PushSide {
@@ -145,6 +150,7 @@ export function testVault(origins: string[] = ['https://vault.test']): TestVault
     caps: capabilities(),
     impostor: new Map(),
     calls: [],
+    factors: { totp: false, passkey: false },
     reminders: [],
     upcoming: [],
     sessions: [
@@ -204,6 +210,12 @@ export function testVault(origins: string[] = ['https://vault.test']): TestVault
       if (lib) return lib;
       if (url.endsWith('/api/v1/capabilities')) {
         return json(t.impostor.get(origin) ?? t.caps);
+      }
+      if (path === '/api/v1/me' && init.method === 'GET') {
+        const res = await vault.fetch(url, init);
+        if (!res.ok) return res;
+        const me = (await res.json()) as Record<string, unknown>;
+        return json({ ...me, totp_enabled: t.factors.totp, has_passkey: t.factors.passkey });
       }
       return (await captured(t, url, path, init)) ?? vault.fetch(url, init);
     },

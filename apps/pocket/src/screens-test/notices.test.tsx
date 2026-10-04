@@ -67,6 +67,34 @@ describe('Home tells the person (5.31)', () => {
     expect(within(notice).queryByTestId('home-reset-added')).toBeNull();
   });
 
+  it("the notice's days are this phone's calendar days, as the browser says them, never the UTC day", async () => {
+    const t = testVault([ORIGIN]);
+    newer(t);
+    // 18:00 and 19:00 on 3 October in California: already the 4th in UTC.
+    t.vault.state.resetNotices.set('fake-member', {
+      by: 'Mansoor',
+      at: '2026-10-04T01:00:00Z',
+      spent_at: '2026-10-04T01:30:00Z',
+      passkeys_since: [{ label: 'Pixel 9', added_at: '2026-10-04T02:00:00Z' }],
+      two_step_since: null,
+      links_since: [],
+    });
+    const original = Intl.DateTimeFormat.prototype.resolvedOptions;
+    const zone = jest.spyOn(Intl.DateTimeFormat.prototype, 'resolvedOptions').mockImplementation(function (
+      this: Intl.DateTimeFormat,
+    ) {
+      return { ...original.call(this), timeZone: 'America/Los_Angeles' };
+    });
+    try {
+      await unlocked(t, <Home />);
+      const notice = await screen.findByTestId('home-reset-notice');
+      expect(notice).toHaveTextContent(/On 3 Oct 2026, Mansoor was given a one-time link/);
+      expect(within(notice).getByTestId('home-reset-added')).toHaveTextContent('• A passkey called “Pixel 9”, on 3 Oct 2026');
+    } finally {
+      zone.mockRestore();
+    }
+  });
+
   it('a wider audience for identity details waiting its notice: when, who, and the way to yours', async () => {
     const t = testVault([ORIGIN]);
     newer(t);

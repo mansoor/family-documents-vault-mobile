@@ -276,6 +276,39 @@ describe('notifications on this phone (4.14)', () => {
     await waitFor(() => expect(parts.stores.size).toBe(0));
   });
 
+  it('a session_ended for a lock says access is paused: the vault is asked why, once', async () => {
+    const t = pushVault();
+    const fake = new FakePushNative();
+    const parts = phoneParts();
+    parts.stores.set('everyday', new MemoryEssentialsStore());
+    const seen: string[] = [];
+    function Probe() {
+      const { phase, notice } = useVault();
+      seen.push(`${phase}|${notice ?? 'none'}`);
+      return null;
+    }
+    await signedIn(t);
+    await renderApp(<Probe />, {
+      fetch: t.fetch,
+      lock: parts.lock,
+      essentials: parts.essentials,
+      push: { native: fake },
+      deps: { push: fake },
+    });
+    await waitFor(() => expect(seen).toContain('ready|none'));
+    // An owner locks the sign-in: the vault ends the session (suspended) and pushes a word with no reason.
+    t.vault.state.suspensions.set('fake-member', {
+      reason: 'locked',
+      since: new Date(Date.now() - 60_000).toISOString(),
+      until: null,
+      note: null,
+      by: 'Mansoor',
+    });
+    await act(async () => fake.emit({ kind: 'message', type: 'session_ended' }));
+    await waitFor(() => expect(seen.at(-1)).toBe('sign_in|paused'));
+    await waitFor(() => expect(parts.stores.size).toBe(0));
+  });
+
   it('a session_ended with the app open signs out at once', async () => {
     const t = pushVault();
     const fake = new FakePushNative();

@@ -88,7 +88,14 @@ export function IdentityCard(props: { memberId: string; name: string; clipboard?
   );
 }
 
-/** The card with the record in it: never captured while it is on the screen. */
+/**
+ * The card with the record in it: never captured while it is on the screen.
+ * The shield holds while the card is mounted — also under a document opened
+ * from this screen, since a stack keeps the screen below mounted. That is
+ * the safer side: revealed numbers stay in this card's memory until Back
+ * (or the lock), and the cost is that a document reached from here cannot
+ * be captured either, even with screenshots allowed in Settings.
+ */
 function Shown(props: {
   view: IdentityView;
   memberId: string;
@@ -258,7 +265,7 @@ function Shown(props: {
           ))
         )}
         {twoStep ? (
-          <Notice tone="warn" testID="identity-two-step">
+          <Notice tone="warn" testID="identity-two-step" announce={`${twoStep} ${t('identity.twoStepHint')}`}>
             <Text>{twoStep}</Text>
             <Text tone="soft" variant="secondary">
               {t('identity.twoStepHint')}

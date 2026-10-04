@@ -48,7 +48,7 @@ const AREAS = [
     'wrongPassword noConnection failed connectBy renew signInToSync removedAge removedSignedOut shortOfSpace offlineBanner notKept noPreview pending privateChanged privateUnavailable',
   ],
   ['Show mode', 'Show', 'show', 'notKept pending noPreview'],
-  ['Confirm it is you', 'The step-up sheet', 'stepUp', 'failed codeOnly'],
+  ['Confirm it is you', 'The step-up sheet', 'stepUp', 'failed codeOnly noCode'],
   ['Identity details', 'A person, the Identity card', 'identity', 'needsConnection failed copyFailed gone twoStepHint'],
   [
     'A document',

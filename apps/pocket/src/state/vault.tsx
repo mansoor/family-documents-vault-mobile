@@ -260,6 +260,10 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
   // for the connection (kept Essentials, 4.10) carries on when it answers.
   const offlineRef = useRef(false);
   const recheckRef = useRef<() => Promise<void>>(async () => undefined);
+  // For the push's "you were signed out", which is made before withToken is.
+  const withTokenRef = useRef<VaultValue['withToken']>(async () => {
+    throw new NetworkError('offline');
+  });
   useEffect(
     () =>
       deps.onNetworkChange(() => {
@@ -432,21 +436,34 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
    * here too, and the phone's copies go (sessionEnded, as when the vault
    * refuses a token). The native side already deleted the offline
    * databases when the message came.
+   *
+   * The push says no reason. A lock (5.28) is the person's to know, so the
+   * vault is asked once, with the session's own tokens: it answers
+   * session_ended with the reason, and withToken says it — paused, for a
+   * lock or a restore. With no answer, or one that says the session lives,
+   * the phone says it was signed out, as before.
    */
   const endedByPush = useCallback(async () => {
     // Not the vault's session core yet: the launch looks at the flag itself.
     if (!api) return;
     // Until the core has read the store, "signed out" means nothing.
     await hydrated(session);
+    // The copies go first, whether or not anybody is signed in here (kept
+    // after an expiry, say): a failure to remove them is retried at the next start.
+    emit('sessionEnded', 'revoked');
+    if (session.signedIn) {
+      try {
+        await withTokenRef.current((a, token) => a.me(token));
+      } catch {
+        // Said by withToken when the vault answered; nothing to add when it did not.
+      }
+    }
     if (session.signedIn) {
       await session.clear();
       setNotice('signed_out_here');
       setPhase('sign_in');
-      log.info('session.ended_by_push', {});
     }
-    // The copies go whether or not anybody is signed in here (kept after an
-    // expiry, say): a failure to remove them is retried at the next start.
-    emit('sessionEnded', 'revoked');
+    log.info('session.ended_by_push', {});
     deps.push?.clearSessionEnded();
   }, [api, session, hydrated, deps.push]);
 
@@ -533,8 +550,13 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
       }
       if (t.kind === 'ended' || t.kind === 'signed_out') {
         await session.clear();
-        if (t.kind === 'ended') emit('sessionEnded', t.reason);
-        setNotice(t.kind === 'ended' ? endedNotice(t.reason) : null);
+        // Ended now: why. Already signed out (a request still under way when
+        // the session ended): nothing new to say, and the reason given then
+        // stays — "paused" is not wiped by the next request in line.
+        if (t.kind === 'ended') {
+          emit('sessionEnded', t.reason);
+          setNotice(endedNotice(t.reason));
+        }
         setPhase('sign_in');
         throw new ApiRequestError(401, 'session_ended', 'Sign in again to carry on.');
       }
@@ -555,6 +577,9 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
     },
     [api, gate, session, hydrated],
   );
+  useEffect(() => {
+    withTokenRef.current = withToken;
+  }, [withToken]);
 
   const chooseVault = useCallback(
     async (outcome: Extract<ConnectOutcome, { kind: 'ok' | 'reinstalled' }>) => {
@@ -604,8 +629,11 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
     if (err instanceof StrangerError) return { kind: 'stranger' };
     if (err instanceof WifiOnlyError) return { kind: 'wifi_only' };
     if (err instanceof NetworkError) return { kind: 'unreachable' };
-    // Proven, and paused by an owner or a restore: said in the phone's own words (5.28).
+    // Proven, and paused by an owner or a restore: said in the phone's own
+    // words (5.28). The phone has learned of the lock, so the Essentials kept
+    // here go, as when the vault ends a session for it.
     if (err instanceof ApiRequestError && err.code === 'membership_suspended') {
+      emit('sessionEnded', 'suspended');
       return { kind: 'paused', reason: err.reason === 'restored' ? 'restored' : 'locked' };
     }
     // The vault's words for a wrong password; the catalogue's for anything else (4.17).

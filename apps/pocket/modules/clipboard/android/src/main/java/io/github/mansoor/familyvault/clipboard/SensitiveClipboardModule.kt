@@ -1,68 +1,51 @@
 package io.github.mansoor.familyvault.clipboard
 
-import android.content.ClipData
-import android.content.ClipboardManager
 import android.content.Context
 import android.os.Handler
 import android.os.Looper
-import android.os.PersistableBundle
-import expo.modules.kotlin.exception.Exceptions
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
 
 /**
  * Copying an identity number for the app's JavaScript (5.31): on the
- * clipboard marked sensitive, and cleared after a minute — on the main
- * thread's clock, which keeps running while the app is at the back, where
- * the number is pasted. The number is handed to the clipboard and kept
- * nowhere here.
+ * clipboard marked sensitive, and cleared after a minute. ClipClearing sets
+ * an alarm that clears it even if the app is swiped away, killed or frozen
+ * within the minute; while the app runs, the main thread's clock clears it
+ * on the dot too. Whenever the app starts or comes back to the front, a
+ * copy of its own whose minute is over goes. The number is handed to the
+ * clipboard and kept nowhere here.
  */
 class SensitiveClipboardModule : Module() {
-  private val context: Context
-    get() = appContext.reactContext ?: throw Exceptions.ReactContextLost()
+  private val context: Context?
+    get() = appContext.reactContext?.applicationContext
 
   private val handler = Handler(Looper.getMainLooper())
 
-  /** The clear still to come, if any: one at a time, the latest copy's (set from JavaScript's thread, run on the main one). */
+  /** The in-process clear still to come, if any: the latest copy's (set from JavaScript's thread, run on the main one). */
   @Volatile private var pending: Runnable? = null
 
-  private fun manager(): ClipboardManager? =
-    context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
-
-  /** Clears the clipboard, unless what is on it is something else the app can see. */
-  private fun clearIfOurs(cm: ClipboardManager): Boolean {
-    val description =
-      try {
-        cm.primaryClipDescription
-      } catch (e: Exception) {
-        null
-      }
-    if (!ClipRules.shouldClear(description != null, description?.label)) return false
-    return try {
-      cm.clearPrimaryClip()
-      true
-    } catch (e: Exception) {
-      false
-    }
-  }
+  /** A moment after coming to the front: the window has its focus by then, so the clipboard can be read. */
+  private val sweep = Runnable { context?.let { ClipClearing.sweep(it) } }
 
   override fun definition() = ModuleDefinition {
     Name("FdvClipboard")
 
+    OnCreate { handler.postDelayed(sweep, SWEEP_DELAY_MS) }
+
+    OnActivityEntersForeground {
+      handler.removeCallbacks(sweep)
+      handler.postDelayed(sweep, SWEEP_DELAY_MS)
+    }
+
     Function("copySensitive") { text: String, clearAfterMs: Int ->
-      val cm = manager()
-      if (cm == null) {
+      val c = context
+      if (c == null || !ClipClearing.copy(c, text, clearAfterMs)) {
         false
       } else {
-        val clip = ClipData.newPlainText(ClipRules.LABEL, text)
-        val extras = PersistableBundle()
-        extras.putBoolean(ClipRules.EXTRA_IS_SENSITIVE, true)
-        clip.description.setExtras(extras)
-        cm.setPrimaryClip(clip)
         pending?.let { handler.removeCallbacks(it) }
         val clear = Runnable {
           pending = null
-          clearIfOurs(cm)
+          ClipClearing.clearIfOurs(c)
         }
         pending = clear
         handler.postDelayed(clear, ClipRules.delay(clearAfterMs))
@@ -71,17 +54,19 @@ class SensitiveClipboardModule : Module() {
     }
 
     Function("clearIfOurs") {
-      val cm = manager()
-      if (cm == null) false else clearIfOurs(cm)
+      val c = context
+      if (c == null) false else ClipClearing.clearIfOurs(c)
     }
 
-    // The JavaScript going away (a reload) would take nothing with it: a
-    // clear still to come is done now instead.
+    // The alarm clears it on time, whatever becomes of this module.
     OnDestroy {
-      pending?.let {
-        handler.removeCallbacks(it)
-        it.run()
-      }
+      pending?.let { handler.removeCallbacks(it) }
+      pending = null
+      handler.removeCallbacks(sweep)
     }
+  }
+
+  private companion object {
+    const val SWEEP_DELAY_MS = 1_000L
   }
 }

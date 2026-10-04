@@ -1,8 +1,11 @@
 import type { IdentityFields } from '@fdv/shared';
-import { fireEvent, screen, waitFor, within } from '@testing-library/react-native';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react-native';
+import { useState } from 'react';
+import { AccessibilityInfo, Text } from 'react-native';
 import PersonScreen from '../app/person/[id]';
 import { MemoryEssentialsStore } from '../essentials/store';
 import type { Tier } from '../essentials/open';
+import { IdentityCard } from '../identity/card';
 import { copyForAMinute, CLEAR_AFTER_MS, type ClipboardPort } from '../identity/clipboard';
 import { setSink } from '../log';
 import { writePrefs } from '../platform/prefs';
@@ -10,7 +13,8 @@ import { MemoryQueueStore } from '../queue/store';
 import { reply } from '../test-support/capture';
 import { libraryDoc, phoneParts, unlocked } from '../test-support/lookup';
 import { installed, testCapture } from '../test-support/render';
-import { push, resetRoutes } from '../test-support/router';
+import { back, push, resetRoutes, useTopRoute } from '../test-support/router';
+import { Button } from '../ui';
 import { capabilities, caps0519, testVault, type TestVault } from '../test-support/vault';
 
 jest.mock(
@@ -132,6 +136,7 @@ describe('the Identity card (5.31)', () => {
     const t = testVault([ORIGIN]);
     withIdentity(t);
     t.vault.state.ownerTwoStep = true;
+    t.factors.totp = true;
     await openPerson(t, 'member-sara', 'Sara');
     await screen.findByTestId('identity-card');
     await fireEvent.press(screen.getByTestId('identity-show-ids.s1'));
@@ -146,15 +151,21 @@ describe('the Identity card (5.31)', () => {
     expect(t.library.stepUps).toEqual(['123456']);
   });
 
-  it('without two-step sign-in, another person’s numbers are refused in the vault’s words, and nothing is asked', async () => {
+  it('without two-step sign-in, another person’s numbers are refused in the vault’s words, said aloud, and nothing is asked', async () => {
     const t = testVault([ORIGIN]);
     withIdentity(t);
     await openPerson(t, 'member-sara', 'Sara');
     await screen.findByTestId('identity-card');
+    const heard = jest.spyOn(AccessibilityInfo, 'announceForAccessibility');
     await fireEvent.press(screen.getByTestId('identity-show-ids.s1'));
     const said = await screen.findByTestId('identity-two-step');
     expect(said).toHaveTextContent(/Turn on two-step sign-in to see another person's identity numbers\./);
     expect(said).toHaveTextContent(/in the browser, in Settings/);
+    // A TalkBack user hears it: no sheet opens, so the button would otherwise seem dead.
+    expect(heard.mock.calls.map(([words]) => words)).toContainEqual(
+      expect.stringMatching(/^Turn on two-step sign-in to see another person's identity numbers\. You can turn it on/),
+    );
+    heard.mockRestore();
     expect(screen.queryByTestId('step-up-sheet')).toBeNull();
     expect(screen.queryByText(SARA_NUMBER)).toBeNull();
   });
@@ -178,6 +189,58 @@ describe('the Identity card (5.31)', () => {
     expect(within(card).getByText('Seen by the owners.')).toBeTruthy();
   });
 
+  it('a passkey and no authenticator app: told plainly where it can be done, not asked for a code it cannot give', async () => {
+    const t = testVault([ORIGIN]);
+    withIdentity(t);
+    // The vault lets a passkey through to its step-up, and the phone has no passkeys.
+    t.vault.state.ownerTwoStep = true;
+    t.factors = { totp: false, passkey: true };
+    await openPerson(t, 'member-sara', 'Sara');
+    await screen.findByTestId('identity-card');
+    await fireEvent.press(screen.getByTestId('identity-show-ids.s1'));
+    await screen.findByTestId('step-up-sheet');
+    expect(screen.getByTestId('step-up-no-code')).toHaveTextContent(
+      "This needs a code from an authenticator app, and this phone can't use your passkey. Add an authenticator app in Settings in the browser, or do this in the browser with your passkey.",
+    );
+    expect(screen.queryByTestId('step-up-code')).toBeNull();
+    expect(screen.queryByTestId('step-up-password')).toBeNull();
+    expect(screen.queryByTestId('step-up-go')).toBeNull();
+    await fireEvent.press(screen.getByTestId('step-up-cancel'));
+    await waitFor(() => expect(screen.queryByTestId('step-up-sheet')).toBeNull());
+    expect(screen.queryByText(SARA_NUMBER)).toBeNull();
+    expect(t.library.stepUps).toEqual([]);
+  });
+
+  it('two IDs of the same kind are told apart: by who issued them, or else a number', async () => {
+    const t = testVault([ORIGIN]);
+    withIdentity(t);
+    const twice: IdentityFields = {
+      ids: [
+        { id: 'p1', kind: 'passport', number: NUMBER, issuer: 'United Kingdom' },
+        { id: 'p2', kind: 'passport', number: 'IE5554443', issuer: 'Ireland' },
+        { id: 'd1', kind: 'driving_licence', number: 'DL1' },
+        { id: 'd2', kind: 'driving_licence', number: 'DL2' },
+      ],
+    };
+    t.vault.state.identities.set('fake-member', { shared: { fields: twice, version: 1, updated_at: AT } });
+    await openPerson(t, 'fake-member', 'Fake Owner');
+    await screen.findByTestId('identity-card');
+    expect(screen.getByLabelText('Show passport number, issued by United Kingdom')).toBeTruthy();
+    expect(screen.getByLabelText('Show passport number, issued by Ireland')).toBeTruthy();
+    expect(screen.getByLabelText('Copy passport number, issued by Ireland')).toBeTruthy();
+    expect(screen.getByLabelText('Show driving licence number 1')).toBeTruthy();
+    expect(screen.getByLabelText('Show driving licence number 2')).toBeTruthy();
+    expect(screen.getByText('Passport, issued by Ireland')).toBeTruthy();
+    // And the copied line says which one went.
+    await fireEvent.press(screen.getByTestId('identity-copy-ids.p2'));
+    await fireEvent.changeText(await screen.findByTestId('step-up-password'), 'correct horse battery staple');
+    await fireEvent.press(screen.getByTestId('step-up-go'));
+    expect(await screen.findByTestId('identity-said')).toHaveTextContent(
+      'Passport number, issued by Ireland copied. This phone clears it from the clipboard in a minute.',
+    );
+    expect(mockBoard.text).toBe('IE5554443');
+  });
+
   it('your own Only me fields are shown to you, marked', async () => {
     const t = testVault([ORIGIN]);
     withIdentity(t);
@@ -191,8 +254,8 @@ describe('the Identity card (5.31)', () => {
   it('screenshots are blocked while the card shows and allowed after', async () => {
     const t = testVault([ORIGIN]);
     withIdentity(t);
-    libraryDoc(t, { id: 'doc-1', title: 'Council tax' });
     const parts = phoneParts();
+    // As expo-screen-capture keeps it: a set of names, shielded while it is not empty.
     const shielded = new Set<string>();
     parts.lock.screen = {
       prevent: async (name) => void shielded.add(name),
@@ -200,13 +263,52 @@ describe('the Identity card (5.31)', () => {
     };
     // Screenshots allowed in Settings: only what is never captured stays shielded.
     writePrefs('lock', { timeout: '1m', screenshots: true });
-    await openPerson(t, 'fake-member', 'Fake Owner', { parts });
+    // People, then a person's screen over it. (The shield is held while the
+    // card is mounted: in the app's stack also under a document opened from
+    // it, which the safer side keeps shielded. This router keeps only the
+    // top screen, so the test leaves by Back.)
+    function People() {
+      const top = useTopRoute();
+      return top?.pathname === '/person/[id]' ? <PersonScreen /> : <Text>People</Text>;
+    }
+    push({ pathname: '/person/[id]', params: { id: 'fake-member', name: 'Fake Owner' } });
+    await unlocked(t, <People />, { parts });
     await screen.findByTestId('identity-card');
     await waitFor(() => expect([...shielded]).toEqual(['identity']));
-    // Away from the card, to a document: allowed again.
-    push({ pathname: '/document/[id]', params: { id: 'doc-1' } });
-    await screen.findAllByText('Council tax');
+    // Back, off the card: allowed again.
+    await act(async () => back());
+    await screen.findByText('People');
     await waitFor(() => expect([...shielded]).toEqual([]));
+  });
+
+  it('two cards at once: the one taken away never lifts the other’s shield', async () => {
+    const t = testVault([ORIGIN]);
+    withIdentity(t);
+    const parts = phoneParts();
+    const shielded = new Set<string>();
+    parts.lock.screen = {
+      prevent: async (name) => void shielded.add(name),
+      allow: async (name) => void shielded.delete(name),
+    };
+    writePrefs('lock', { timeout: '1m', screenshots: true });
+    // Two person screens on the stack (a double tap, say): each with its card.
+    function Two() {
+      const [both, setBoth] = useState(true);
+      return (
+        <>
+          <IdentityCard memberId="fake-member" name="Fake Owner" />
+          {both ? <IdentityCard memberId="member-sara" name="Sara" /> : null}
+          <Button label="Back" testID="drop-top" onPress={() => setBoth(false)} />
+        </>
+      );
+    }
+    await unlocked(t, <Two />, { parts });
+    await waitFor(() => expect(screen.getAllByTestId('identity-card')).toHaveLength(2));
+    expect([...shielded]).toEqual(['identity']);
+    await fireEvent.press(screen.getByTestId('drop-top'));
+    await waitFor(() => expect(screen.getAllByTestId('identity-card')).toHaveLength(1));
+    // The card still on the screen is still shielded.
+    expect([...shielded]).toEqual(['identity']);
   });
 
   it('with a vault that keeps no identity details the card is not there, and nothing is asked', async () => {
@@ -227,7 +329,8 @@ describe('the Identity card (5.31)', () => {
     libraryDoc(t, { id: 'doc-1', title: 'Council tax' });
     await openPerson(t, 'fake-member', 'Fake Owner');
     await screen.findByTestId('identity-card');
-    // Away, and back with no connection: the card says so and shows nothing of the record.
+    // Away (this router keeps only the top screen), and back with no
+    // connection: the card says so and shows nothing of the record.
     push({ pathname: '/document/[id]', params: { id: 'doc-1' } });
     await screen.findAllByText('Council tax');
     expect(screen.queryByTestId('identity-card')).toBeNull();
