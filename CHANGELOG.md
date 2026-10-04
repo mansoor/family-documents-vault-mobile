@@ -66,6 +66,9 @@ Each of these appears only with a vault that has it; with an older vault
   bill's due date says so. **Scan the new one** is offered only for an
   expiry: a bill is paid, not replaced.
 - Built against the vault's shared code of v0.5.32 (was v0.5.19).
+- Expo SDK 57's patch releases: expo 57.0.26, expo-constants 57.0.20,
+  expo-document-picker 57.0.3, expo-navigation-bar 57.0.3 and expo-router
+  57.0.24.
 
 ## [0.2.1] — iteration 5.13: a kind's details on the phone
 
