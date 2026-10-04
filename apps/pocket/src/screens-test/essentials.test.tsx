@@ -215,6 +215,30 @@ describe('Essentials in airplane mode', () => {
     expect(screen.queryByTestId('essentials-signed-out')).toBeNull();
   });
 
+  it('a sign-in an owner locks ends here: every copy goes, and the phone says access is paused (5.28)', async () => {
+    const t = testVault([ORIGIN]);
+    t.vault.state.offlineEssentials.items = [passport()];
+    const parts = await start(t);
+    await keep();
+    await screen.findByTestId('essential-passport');
+    // An owner locks this person's sign-in: the vault ends the session as `suspended`.
+    t.vault.state.suspensions.set('fake-member', {
+      reason: 'locked',
+      since: new Date(Date.now() - 60_000).toISOString(),
+      until: null,
+      note: null,
+      by: 'Mansoor',
+    });
+    await pullToRefresh();
+    await waitFor(() => expect(parts.mem.removed).toEqual(expect.arrayContaining(['everyday', 'private'])));
+    expect(parts.mem.stores.size).toBe(0);
+    expect(await screen.findByTestId('sign-in-paused')).toHaveTextContent(
+      'An owner has paused your access. Ask them if you think this is a mistake.',
+    );
+    // Not the words for a session that simply went.
+    expect(screen.queryByText("You've been signed out on this phone. Sign in again to carry on.")).toBeNull();
+  });
+
   it('an expired session keeps them readable, from sign-in and behind the lock', async () => {
     const t = testVault([ORIGIN]);
     t.vault.state.offlineEssentials.items = [passport()];

@@ -1,15 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
   Every word a push can show (4.14). Nothing in a push message is ever
-  shown: its type picks one of these, and a digest's count fills in the
-  number. Each ends up on a lock screen, so none names a document or a
-  person.
+  shown: its type picks one of these, and the count of a digest, or of the
+  files waiting to be looked at (5.31), fills in the number. Each ends up on
+  a lock screen, so none names a document or a person.
 -->
 <resources>
   <string name="fv_push_channel_reminders">Reminders</string>
-  <string name="fv_push_channel_reminders_about">What needs attention in your family vault today.</string>
+  <string name="fv_push_channel_reminders_about">What needs attention in your family vault today, and documents sent for you to look at.</string>
   <string name="fv_push_channel_security">Security</string>
-  <string name="fv_push_channel_security_about">A new sign-in, a change of owner, or this phone being signed out.</string>
+  <string name="fv_push_channel_security_about">A new sign-in, a change of owner or of who sees your details, or this phone being signed out.</string>
   <plurals name="fv_push_digest">
     <item quantity="one">%d thing needs attention</item>
     <item quantity="other">%d things need attention</item>
@@ -18,6 +18,11 @@
   <string name="fv_push_owner_change">Something changed about who owns your family vault</string>
   <string name="fv_push_session_ended">You were signed out on this phone</string>
   <string name="fv_push_test">Notifications are working.</string>
+  <plurals name="fv_push_incoming">
+    <item quantity="one">%d document arrived for you to look at</item>
+    <item quantity="other">%d documents arrived for you to look at</item>
+  </plurals>
+  <string name="fv_push_notice">Something about your details is changing. Open the app to see what.</string>
   <!-- What the distributor may show for this registration. -->
   <string name="fv_push_register_label">Family Vault reminders</string>
 </resources>

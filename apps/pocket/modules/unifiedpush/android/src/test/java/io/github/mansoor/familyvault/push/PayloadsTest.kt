@@ -69,6 +69,10 @@ class PayloadsTest {
           "Something changed about who owns your family vault",
         """{"v":1,"type":"session_ended"}""" to "You were signed out on this phone",
         """{"v":1,"type":"test"}""" to "Notifications are working.",
+        """{"v":1,"type":"incoming","count":3}""" to "3 documents arrived for you to look at",
+        """{"v":1,"type":"incoming","count":1}""" to "1 document arrived for you to look at",
+        """{"v":1,"type":"notice"}""" to
+          "Something about your details is changing. Open the app to see what.",
       )
     for ((payload, words) in cases) {
       val plain = Payloads.render(payload)
@@ -79,6 +83,48 @@ class PayloadsTest {
       assertEquals(payload, words, text)
       for (leak in leaks) assertFalse("$payload shows $leak", text.contains(leak))
     }
+  }
+
+  /** Files waiting to be looked at (vault 5.23): how many, or nothing at all. */
+  @Test
+  fun incomingWithACountRendersWithoutACountNothing() {
+    val three = Payloads.render("""{"v":1,"type":"incoming","count":3}""")
+    assertNotNull(three)
+    assertEquals(Rendered.Type.INCOMING, three!!.type)
+    assertEquals(3, three.count)
+    assertEquals("3 documents arrived for you to look at", shown(three))
+    // Who sent them, or what they are called, is never shown.
+    val loaded = Payloads.render("{" + extras + ""","v":1,"type":"incoming","count":2}""")
+    val text = shown(loaded!!)
+    assertEquals("2 documents arrived for you to look at", text)
+    for (leak in leaks) assertFalse("incoming shows $leak", text.contains(leak))
+    for (payload in
+      listOf(
+        """{"v":1,"type":"incoming"}""",
+        """{"v":1,"type":"incoming","count":0}""",
+        """{"v":1,"type":"incoming","count":"3"}""",
+        """{"v":1,"type":"incoming","count":2.5}""",
+        """{"v":1,"type":"incoming","count":100000}""",
+      )) {
+      assertNull(payload, Payloads.render(payload))
+    }
+    assertEquals(Channel.REMINDERS, Rendered.Type.INCOMING.channel)
+    assertEquals(Opens.APP, Rendered.Type.INCOMING.opens)
+  }
+
+  /** Who sees the person's details is changing (vault 5.26): the app's words, and nothing of the message. */
+  @Test
+  fun noticeRendersWithNoDetails() {
+    val plain = Payloads.render("""{"v":1,"type":"notice"}""")
+    assertNotNull(plain)
+    assertEquals(Rendered.Type.NOTICE, plain!!.type)
+    val loaded = Payloads.render("{" + extras + ""","v":1,"type":"notice","count":4,"to":"adults"}""")
+    assertEquals(plain, loaded)
+    val text = shown(loaded!!)
+    assertEquals("Something about your details is changing. Open the app to see what.", text)
+    for (leak in leaks + listOf("adults", "4")) assertFalse("notice shows $leak", text.contains(leak))
+    assertEquals(Channel.SECURITY, Rendered.Type.NOTICE.channel)
+    assertEquals(Opens.APP, Rendered.Type.NOTICE.opens)
   }
 
   @Test

@@ -10,7 +10,10 @@ import { Button, Card, Field, Notice, Text } from '../ui';
 
 /**
  * Sign in: email and password, then the six-digit code if the account has
- * two-step sign-in. A wrong password shows the vault's own words.
+ * two-step sign-in. A wrong password shows the vault's own words. A
+ * sign-in an owner paused — locked, or waiting after a restore (5.28) —
+ * says so plainly, whether the vault ended the session or refused the
+ * sign-in: nothing went wrong, and the person is told whom to ask.
  */
 export default function SignIn() {
   const { t } = useTranslation();
@@ -56,6 +59,11 @@ export default function SignIn() {
           <Text variant="hero">{t('signIn.title')}</Text>
           {name ? <Text tone="soft">{t('signIn.to', { name })}</Text> : null}
           {notice === 'signed_out_here' ? <Notice tone="warn">{t('signIn.signedOutHere')}</Notice> : null}
+          {notice === 'paused' && failure?.kind !== 'paused' ? (
+            <Notice tone="warn" testID="sign-in-paused">
+              {t('signIn.paused')}
+            </Notice>
+          ) : null}
           {waitingHere > 0 ? (
             <Notice tone="info" testID="sign-in-waiting">
               {t('signIn.waiting', { count: waitingHere })}
@@ -119,6 +127,11 @@ export default function SignIn() {
                   {t('signIn.passkeyOnly')}
                 </Text>
               ) : null}
+            </Notice>
+          ) : null}
+          {failure?.kind === 'paused' ? (
+            <Notice tone="warn" testID="sign-in-paused">
+              {failure.reason === 'restored' ? t('signIn.pausedRestored') : t('signIn.paused')}
             </Notice>
           ) : null}
           {failure?.kind === 'unreachable' ? (

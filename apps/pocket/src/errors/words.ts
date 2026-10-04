@@ -27,6 +27,11 @@ export const CATALOGUE: Readonly<Record<string, string>> = {
   rate_limited: 'errors.rateLimited',
   // Answers the app's screens act on.
   invalid_credentials: 'errors.invalidCredentials',
+  // An owner locked this sign-in, or a restore paused it (5.28): the sign-in screen says which.
+  membership_suspended: 'errors.paused',
+  // Another person's identity numbers take two-step sign-in (5.26): the vault's words say for what.
+  two_step_required: 'errors.twoStep',
+  totp_required_for_owner: 'errors.twoStep',
   not_found: 'errors.notFound',
   preview_pending: 'errors.previewPending',
   no_preview: 'errors.noPreview',
@@ -63,7 +68,12 @@ const PHONE_REFUSED: Readonly<Record<string, string>> = {
  * was not found — so its message is shown when it gives one, and the
  * catalogue's only when it does not.
  */
-const VAULT_SAYS: ReadonlySet<string> = new Set(['invalid_credentials', 'not_found']);
+const VAULT_SAYS: ReadonlySet<string> = new Set([
+  'invalid_credentials',
+  'not_found',
+  'two_step_required',
+  'totp_required_for_owner',
+]);
 
 /** The words for a failure, as the person should read them. */
 export function wordsFor(err: unknown, t: TFunction, general = 'errors.general'): string {

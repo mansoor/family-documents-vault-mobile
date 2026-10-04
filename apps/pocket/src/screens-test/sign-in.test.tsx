@@ -57,6 +57,36 @@ describe('Sign in', () => {
     expect(screen.getByTestId('phase')).toHaveTextContent('sign_in');
   });
 
+  it.each([
+    ['locked', 'An owner has paused your access. Ask them if you think this is a mistake.'],
+    ['restored', 'Your access is paused after the vault was restored. Ask an owner to turn it back on.'],
+  ] as const)('paused-access wording: a sign-in %s by an owner says so, not "wrong password"', async (reason, words) => {
+    const t = testVault();
+    // Proven, then refused (5.28): 403 membership_suspended, with the reason.
+    t.vault.state.suspensions.set('fake-member', {
+      reason,
+      since: new Date(Date.now() - 60_000).toISOString(),
+      until: null,
+      note: 'never shown to the person',
+      by: reason === 'locked' ? 'Mansoor' : null,
+    });
+    await renderApp(
+      <>
+        <Phase />
+        <SignIn />
+      </>,
+      { fetch: t.fetch },
+    );
+    await waitFor(() => expect(screen.getByTestId('phase')).toHaveTextContent('sign_in'));
+    await fireEvent.changeText(screen.getByTestId('sign-in-email'), 'owner@example.test');
+    await fireEvent.changeText(screen.getByTestId('sign-in-password'), 'correct horse battery staple');
+    await fireEvent.press(screen.getByTestId('sign-in-go'));
+    expect(await screen.findByTestId('sign-in-paused')).toHaveTextContent(words);
+    expect(screen.queryByTestId('sign-in-refused')).toBeNull();
+    expect(screen.queryByText(/never shown/)).toBeNull();
+    expect(screen.getByTestId('phase')).toHaveTextContent('sign_in');
+  });
+
   it('a wrong code says so and keeps the code step', async () => {
     const t = testVault();
     await renderApp(<SignIn />, { fetch: withTwoStep(t) });

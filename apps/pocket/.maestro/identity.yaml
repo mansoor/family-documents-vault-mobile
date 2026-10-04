@@ -1,0 +1,97 @@
+# Iteration 5.31: the Identity card on the owner's own person screen, with
+# the details .github/scripts/identity-seed.sh gave them (a passport
+# number). The number is masked; Show asks who is holding the phone — the
+# vault's step-up — and only then shows it.
+#
+# Signing in counts as confirming it is you for five minutes (the vault's
+# STEP_UP_WINDOW_MS), so the flow waits that out first: otherwise Show
+# would not need to ask.
+appId: io.github.mansoor.familyvault.e2e
+env:
+  VAULT: 10.0.2.2:8099
+---
+- launchApp:
+    clearState: true
+- tapOn:
+    id: connect-address
+- inputText: ${VAULT}
+- hideKeyboard
+- tapOn:
+    id: connect-go
+- extendedWaitUntil:
+    visible:
+      id: connect-approve-http
+    timeout: 30000
+- tapOn:
+    id: connect-approve-http
+- tapOn:
+    id: sign-in-email
+- inputText: ${EMAIL}
+- tapOn:
+    id: sign-in-password
+- inputText: ${PASSWORD}
+- hideKeyboard
+- tapOn:
+    id: sign-in-go
+- extendedWaitUntil:
+    visible:
+      id: home-list
+    timeout: 30000
+# The five minutes the sign-in confirmed it is you, and a little more. (The
+# workflow keeps the emulator's screen on meanwhile.)
+- extendedWaitUntil:
+    visible:
+      id: never-there
+    timeout: 320000
+    optional: true
+# Had the phone gone to sleep all the same, the app would be locked.
+- runFlow:
+    when:
+      visible:
+        id: lock-screen
+    commands:
+      - tapOn:
+          id: lock-unlock
+
+# People, then the owner's own screen.
+- tapOn:
+    id: tab-people
+- extendedWaitUntil:
+    visible:
+      text: Pocket Owner.*
+    timeout: 30000
+- tapOn:
+    text: Pocket Owner.*
+- extendedWaitUntil:
+    visible:
+      id: identity-card
+    timeout: 30000
+
+# Masked: dots, not the number.
+- scrollUntilVisible:
+    element:
+      id: identity-show-ids.p1
+- assertVisible:
+    id: identity-masked-ids.p1
+- assertNotVisible:
+    text: E2E123456
+
+# Show asks who is holding the phone; with the password, the number shows.
+- tapOn:
+    id: identity-show-ids.p1
+- extendedWaitUntil:
+    visible:
+      id: step-up-sheet
+    timeout: 15000
+- tapOn:
+    id: step-up-password
+- inputText: ${PASSWORD}
+- hideKeyboard
+- tapOn:
+    id: step-up-go
+- extendedWaitUntil:
+    visible:
+      id: identity-value-ids.p1
+    timeout: 15000
+- assertVisible:
+    text: E2E123456

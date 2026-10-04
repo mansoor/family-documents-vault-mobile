@@ -4,24 +4,33 @@ import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FlatList, RefreshControl, StyleSheet } from 'react-native';
 import { DocumentRow } from '../../documents/row';
+import { IdentityCard } from '../../identity/card';
 import { useVault } from '../../state/vault';
 import { Notice, Text } from '../../ui';
 
-/** One person's documents (4.12), from People. */
+/** One person's documents (4.12), from People; and their identity details, where the vault keeps them (5.31). */
 export default function PersonScreen() {
-  const { id, name } = useLocalSearchParams<{ id: string; name?: string }>();
+  const params = useLocalSearchParams<{ id: string; name?: string }>();
+  const { id } = params;
   const { t } = useTranslation();
   const { withToken, offline } = useVault();
   const [docs, setDocs] = useState<DocumentView[] | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  // Opened without a name (Home's "Look at yours"): the vault's.
+  const [found, setFound] = useState<string | null>(null);
+  const name = params.name ?? found ?? undefined;
 
   const load = useCallback(async () => {
     try {
       setDocs((await withToken((a, token) => a.documents(token, { member_id: id, limit: 200 }))).items);
+      if (params.name === undefined) {
+        const people = (await withToken((a, token) => a.members(token))).items;
+        setFound(people.find((m) => m.id === id)?.display_name ?? null);
+      }
     } catch {
       // Offline: the banner says so.
     }
-  }, [withToken, id]);
+  }, [withToken, id, params.name]);
 
   useEffect(() => {
     // Loaded on arrival; the state is set after the request answers.
@@ -49,6 +58,7 @@ export default function PersonScreen() {
       ListHeaderComponent={
         <>
           <Text variant="hero">{name ?? ''}</Text>
+          {id ? <IdentityCard memberId={id} name={name ?? ''} /> : null}
           {offline && !docs ? <Notice tone="warn">{t('people.needsConnection')}</Notice> : null}
           {docs && docs.length === 0 ? <Text tone="soft">{t('people.none', { name: name ?? '' })}</Text> : null}
         </>

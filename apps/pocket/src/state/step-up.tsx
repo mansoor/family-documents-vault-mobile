@@ -1,6 +1,6 @@
 import { ApiRequestError, StepUpCoordinator, type Api } from '@fdv/client';
 import { wordsFor } from '../errors/words';
-import { colours, radii } from '@fdv/shared';
+import { colours, FACTOR_STEP_UPS, radii } from '@fdv/shared';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AccessibilityInfo, KeyboardAvoidingView, Modal, Platform, StyleSheet, View } from 'react-native';
@@ -17,6 +17,11 @@ import { useVault } from './vault';
  * the request goes again by itself. However many ask at once, one sheet
  * answers them all (the client's StepUpCoordinator). Cancelling is an
  * answer: nothing is done, and nothing lost.
+ *
+ * Some things take a code and never the password (`FACTOR_STEP_UPS`, A54):
+ * another person's identity numbers (`open_identity`, 5.26). For those the
+ * sheet asks for the code alone — the phone has no passkeys — and offers
+ * no password, which the vault would not take.
  */
 
 interface StepUpValue {
@@ -29,6 +34,8 @@ const Ctx = createContext<StepUpValue | null>(null);
 /** One prompt: settled once, and it clears only itself. */
 interface Asking {
   message: string;
+  /** What asked (the vault's `action`): one of FACTOR_STEP_UPS takes a code alone. */
+  action: string;
   settle: (ok: boolean) => void;
 }
 
@@ -45,6 +52,7 @@ export function StepUpProvider(props: { children: ReactNode }) {
             let done = false;
             const self: Asking = {
               message: req.message,
+              action: req.action,
               settle: (ok) => {
                 if (done) return;
                 done = true;
@@ -98,11 +106,14 @@ function StepUpSheet(props: { asking: Asking | null }) {
   const { t } = useTranslation();
   const { withToken } = useVault();
   const insets = useSafeAreaInsets();
-  const [how, setHow] = useState<'password' | 'code'>('password');
+  const [chosen, setHow] = useState<'password' | 'code'>('password');
   const [value, setValue] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const { asking } = props;
+  // A code alone, for what the vault takes no password for.
+  const codeOnly = asking !== null && FACTOR_STEP_UPS.includes(asking.action);
+  const how = codeOnly ? 'code' : chosen;
 
   const done = (ok: boolean) => {
     setValue('');
@@ -141,6 +152,11 @@ function StepUpSheet(props: { asking: Asking | null }) {
         >
           <Text variant="screen">{t('stepUp.title')}</Text>
           {asking?.message ? <Text tone="soft">{asking.message}</Text> : null}
+          {codeOnly ? (
+            <Text tone="soft" testID="step-up-code-only">
+              {t('stepUp.codeOnly')}
+            </Text>
+          ) : null}
           {how === 'password' ? (
             <Field
               testID="step-up-password"
@@ -176,16 +192,18 @@ function StepUpSheet(props: { asking: Asking | null }) {
             disabled={!value.trim()}
             onPress={() => void confirm()}
           />
-          <Button
-            testID="step-up-switch"
-            kind="quiet"
-            label={how === 'password' ? t('stepUp.useCode') : t('stepUp.usePassword')}
-            onPress={() => {
-              setValue('');
-              setError(null);
-              setHow(how === 'password' ? 'code' : 'password');
-            }}
-          />
+          {codeOnly ? null : (
+            <Button
+              testID="step-up-switch"
+              kind="quiet"
+              label={how === 'password' ? t('stepUp.useCode') : t('stepUp.usePassword')}
+              onPress={() => {
+                setValue('');
+                setError(null);
+                setHow(how === 'password' ? 'code' : 'password');
+              }}
+            />
+          )}
           <Button testID="step-up-cancel" kind="quiet" label={t('stepUp.cancel')} onPress={() => done(false)} />
         </View>
       </KeyboardAvoidingView>

@@ -20,12 +20,12 @@ const AREAS = [
     'connect',
     'invalid notAVault unreachable setupRequired serverTooOld clientTooOld apiVersion askHttp refusePublicHttp refuseMobileData stranger reinstalled certificateUntrusted certificateWrongName certificateExpired captivePortal linkJoin linkReset linkShared',
   ],
-  ['Signing in', 'Sign in', 'signIn', 'signedOutHere passkeyOnly startAgain'],
+  ['Signing in', 'Sign in', 'signIn', 'signedOutHere passkeyOnly startAgain paused pausedRestored'],
   [
     'Any request that fails (wordsFor)',
     'Every screen',
     'errors',
-    'offline timeout rateLimited unavailable internal storageUnreachable sessionEnded stepUp setupRequired unexpected stranger wifiOnly invalidCredentials notFound previewPending noPreview uploadInProgress invalidExtra general',
+    'offline timeout rateLimited unavailable internal storageUnreachable sessionEnded paused stepUp twoStep setupRequired unexpected stranger wifiOnly invalidCredentials notFound previewPending noPreview uploadInProgress invalidExtra general',
   ],
   ['The lock', 'Lock screen, Settings', 'lock', 'tooMany noScreenLock weakBiometrics enrolmentChanged'],
   [
@@ -48,7 +48,8 @@ const AREAS = [
     'wrongPassword noConnection failed connectBy renew signInToSync removedAge removedSignedOut shortOfSpace offlineBanner notKept noPreview pending privateChanged privateUnavailable',
   ],
   ['Show mode', 'Show', 'show', 'notKept pending noPreview'],
-  ['Confirm it is you', 'The step-up sheet', 'stepUp', 'failed'],
+  ['Confirm it is you', 'The step-up sheet', 'stepUp', 'failed codeOnly'],
+  ['Identity details', 'A person, the Identity card', 'identity', 'needsConnection failed copyFailed gone twoStepHint'],
   [
     'A document',
     'Document',

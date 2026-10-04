@@ -1,4 +1,16 @@
-import { can, colours, radii, type DocumentView, type Member, type ReminderView } from '@fdv/shared';
+import { ApiRequestError, isSessionOver } from '@fdv/client';
+import {
+  can,
+  colours,
+  formatDate,
+  radii,
+  shareEndWords,
+  type DocumentView,
+  type IdentityAudienceView,
+  type Member,
+  type ReminderView,
+  type ResetNotice,
+} from '@fdv/shared';
 import { Image } from 'expo-image';
 import { Link, useRouter } from 'expo-router';
 import { Settings as SettingsIcon } from 'lucide-react-native';
@@ -9,11 +21,14 @@ import { FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-nat
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { QueueRow, withoutWords } from '../../capture/queue-row';
 import { useBeginCapture } from '../../capture/add-button';
+import { offersNewScan, reminderHeadline } from '../../documents/reminders';
+import { wordsFor } from '../../errors/words';
 import { OnThisPhone } from '../../essentials/ui';
 import { useEssentials } from '../../state/essentials';
 import { extra } from '../../config';
 import { useCapture, type SavedNote } from '../../state/capture';
 import { on } from '../../state/events';
+import { useStepUp } from '../../state/step-up';
 import { useVault } from '../../state/vault';
 import { Button, Card, Notice, StatusLine, Text } from '../../ui';
 
@@ -23,11 +38,29 @@ interface HomeData {
   /** Documents filed without saying what they are. */
   unnamed: number;
   token: string;
+  /** An owner made a link to reset this person's password (5.29), until they say they saw it. */
+  resetNotice: ResetNotice | null;
+  /** A wider audience for identity details, waiting its notice (5.26, A34): everybody is told. */
+  widening: IdentityAudienceView['pending'];
 }
 
 /**
+ * What the vault may not answer without the request being wrong: an older
+ * vault, or one busy for a moment, leaves that part of Home out. A session
+ * that is over, or no connection, is still everybody's business.
+ */
+const optional = <T,>(p: Promise<T>): Promise<T | null> =>
+  p.catch((err: unknown) => {
+    if (err instanceof ApiRequestError && !isSessionOver(err)) return null;
+    throw err;
+  });
+
+/**
  * Home: what needs attention, and what came in lately. It shows what it
- * last had when the vault cannot be reached, under a plain banner.
+ * last had when the vault cannot be reached, under a plain banner. Above
+ * them, what the person must be told (5.31): that an owner made a link to
+ * reset their password, and what was added to their sign-in since; and
+ * that more people will soon see their identity details.
  */
 export default function Home() {
   const { t } = useTranslation();
@@ -41,6 +74,7 @@ export default function Home() {
   const [othersKept, setOthersKept] = useState(false);
   const [members, setMembers] = useState<Member[] | null>(null);
   const canAdd = who ? can(who.role, 'document.add') : false;
+  const identityOn = caps?.features.member_identity === true;
   const needsYou = capture.queue.some((i) => i.state === 'needs_you');
 
   // The family as last seen, for putting a refused scan right.
@@ -71,18 +105,27 @@ export default function Home() {
           }
           return n;
         };
-        const [due, recent, unnamed] = await Promise.all([
+        const [due, recent, unnamed, me, audience] = await Promise.all([
           a.reminders(token, 'due'),
           a.documents(token, { limit: 20 }),
           unnamedCount(),
+          optional(a.me(token)),
+          identityOn ? optional(a.identityAudience(token)) : Promise.resolve(null),
         ]);
-        return { due: due.items, recent: recent.items, unnamed, token };
+        return {
+          due: due.items,
+          recent: recent.items,
+          unnamed,
+          token,
+          resetNotice: me?.reset_notice ?? null,
+          widening: audience?.pending ?? null,
+        };
       });
       setData(next);
     } catch {
       // Offline or signed out: the banner or the sign-in screen says so.
     }
-  }, [withToken]);
+  }, [withToken, identityOn]);
 
   useEffect(() => {
     // Loading on arrival, and again each time the vault takes a capture:
@@ -93,6 +136,8 @@ export default function Home() {
   }, [load, capture.delivered]);
   // Put off or done on Needs attention: Home's list looks again.
   useEffect(() => on('remindersChanged', () => void load()), [load]);
+  // The vault pushed that something about the person's details is changing.
+  useEffect(() => on('noticesChanged', () => void load()), [load]);
 
   const [renewProblem, setRenewProblem] = useState<string | null>(null);
   const renew = async (documentId: string) => {
@@ -108,11 +153,12 @@ export default function Home() {
   // only their own, which Home cannot tell), and not while a new version of
   // it is already waiting to go.
   const renewing = new Set(capture.queue.filter((i) => i.kind === 'version').map((i) => i.target));
-  const canRenew = (documentId: string, index: number, due: ReminderView[]) =>
+  const canRenew = (r: ReminderView, index: number, due: ReminderView[]) =>
     canAdd &&
     who?.role !== 'teen' &&
-    !renewing.has(documentId) &&
-    due.findIndex((r) => r.document_id === documentId) === index;
+    !renewing.has(r.document_id) &&
+    offersNewScan(r) &&
+    due.findIndex((x) => x.document_id === r.document_id && offersNewScan(x)) === index;
 
   const essentials = useEssentials();
   const refresh = async () => {
@@ -209,6 +255,8 @@ export default function Home() {
                 ))}
               </View>
             ) : null}
+            {data?.resetNotice ? <ResetNoticeCard notice={data.resetNotice} onSeen={() => void load()} /> : null}
+            {data?.widening ? <WideningNotice pending={data.widening} memberId={who?.member_id ?? null} /> : null}
             <OnThisPhone />
             <Text variant="screen">{t('home.attentionTitle')}</Text>
             {data && data.unnamed > 0 ? (
@@ -225,9 +273,9 @@ export default function Home() {
               <Card key={r.id} style={styles.dueCard}>
                 <Text weight="600">{r.document_title ?? t('home.untitled')}</Text>
                 <Text variant="secondary" tone="warn" weight="600">
-                  {r.label}
+                  {reminderHeadline(r)}
                 </Text>
-                {canRenew(r.document_id, i, due) ? (
+                {canRenew(r, i, due) ? (
                   <Button
                     label={t('home.renew')}
                     kind="quiet"
@@ -272,6 +320,115 @@ export default function Home() {
         </View>
       ) : null}
     </SafeAreaView>
+  );
+}
+
+/** A day in words: "3 Oct 2026". */
+const dayOf = (at: string) => formatDate({ date: at.slice(0, 10), precision: 'day' });
+
+/**
+ * An owner was given a one-time link to set this person's password (5.29),
+ * and what was added to their sign-in since it was used — by whoever used
+ * it, perhaps. Said until the person says they saw it. The password is
+ * changed in the browser: the phone has no way to.
+ */
+function ResetNoticeCard(props: { notice: ResetNotice; onSeen: () => void }) {
+  const { t } = useTranslation();
+  const { guarded } = useStepUp();
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+  const n = props.notice;
+  const added = [
+    ...(n.passkeys_since ?? []).map((k) =>
+      k.label
+        ? t('home.resetPasskey', { label: k.label, day: dayOf(k.added_at) })
+        : t('home.resetPasskeyUnnamed', { day: dayOf(k.added_at) }),
+    ),
+    ...(n.two_step_since ? [t('home.resetTwoStep', { day: dayOf(n.two_step_since) })] : []),
+    ...(n.links_since ?? []).map((l) =>
+      l.title
+        ? t('home.resetLink', { title: l.title, day: dayOf(l.made_at) })
+        : t('home.resetLinkUntitled', { day: dayOf(l.made_at) }),
+    ),
+  ];
+  const seen = async () => {
+    if (busy) return;
+    setBusy(true);
+    setProblem(null);
+    try {
+      const done = await guarded((a, token) => a.dismissResetNotice(token));
+      if (done !== null) props.onSeen();
+    } catch (err) {
+      setProblem(wordsFor(err, t));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const title = t('home.resetTitle');
+  return (
+    <Notice tone="warn" testID="home-reset-notice" announce={title}>
+      <Text weight="700" role="header">
+        {title}
+      </Text>
+      <Text>{t('home.resetBody', { day: dayOf(n.at), by: n.by ?? t('home.resetSomeone') })}</Text>
+      {added.length > 0 ? (
+        <>
+          <Text>{t('home.resetAdded')}</Text>
+          {added.map((a, i) => (
+            <Text key={i} testID="home-reset-added">{`• ${a}`}</Text>
+          ))}
+          <Text>{t('home.resetAddedAfter')}</Text>
+        </>
+      ) : null}
+      {problem ? (
+        <Text tone="danger" role="alert">
+          {problem}
+        </Text>
+      ) : null}
+      <Button
+        label={t('home.resetSeen')}
+        kind="quiet"
+        busy={busy}
+        onPress={() => void seen()}
+        testID="home-reset-seen"
+      />
+    </Notice>
+  );
+}
+
+/**
+ * More people will see the person's identity details once a widening's
+ * notice runs out (5.26, A34): when, on this phone's clock, and who. Marking
+ * fields Only me is done in the browser; a viewer, who marks nothing, is
+ * told to ask an owner.
+ */
+function WideningNotice(props: { pending: NonNullable<IdentityAudienceView['pending']>; memberId: string | null }) {
+  const { t } = useTranslation();
+  const router = useRouter();
+  const { who } = useVault();
+  const at = new Date(props.pending.notice_until);
+  let when: string;
+  try {
+    when = shareEndWords(at, Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC', { weekday: false });
+  } catch {
+    when = shareEndWords(at, 'UTC', { weekday: false });
+  }
+  const whom = props.pending.to === 'family' ? t('home.wideningFamily') : t('home.wideningAdults');
+  const words = t('home.widening', { when, who: whom });
+  const memberId = props.memberId;
+  return (
+    <Notice tone="info" testID="home-widening" announce={words}>
+      <Text weight="600">{words}</Text>
+      <Text tone="soft">{who?.role === 'viewer' ? t('home.wideningViewer') : t('home.wideningMark')}</Text>
+      {memberId ? (
+        <Button
+          label={t('home.wideningLook')}
+          kind="quiet"
+          onPress={() => router.push({ pathname: '/person/[id]', params: { id: memberId } })}
+          testID="home-widening-look"
+        />
+      ) : null}
+    </Notice>
   );
 }
 

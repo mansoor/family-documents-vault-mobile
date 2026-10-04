@@ -10,6 +10,8 @@ interface Events {
   sessionEnded: [reason: string];
   /** A reminder put off or done (4.12): lists showing it look again. */
   remindersChanged: [];
+  /** The vault pushed `notice` (5.31): something about the person's details is changing; Home looks again. */
+  noticesChanged: [];
 }
 
 type Listener<K extends keyof Events> = (...args: Events[K]) => void;
@@ -19,6 +21,7 @@ const listeners: { [K in keyof Events]: Set<Listener<K>> } = {
   signedOut: new Set(),
   sessionEnded: new Set(),
   remindersChanged: new Set(),
+  noticesChanged: new Set(),
 };
 
 export function on<K extends keyof Events>(event: K, fn: Listener<K>): () => void {
