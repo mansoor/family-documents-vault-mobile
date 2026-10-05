@@ -28,6 +28,9 @@ internal object Notifier {
       Rendered.Type.OWNER_CHANGE -> context.getString(R.string.fv_push_owner_change)
       Rendered.Type.SESSION_ENDED -> context.getString(R.string.fv_push_session_ended)
       Rendered.Type.TEST -> context.getString(R.string.fv_push_test)
+      Rendered.Type.INCOMING ->
+        context.resources.getQuantityString(R.plurals.fv_push_incoming, r.count, r.count)
+      Rendered.Type.NOTICE -> context.getString(R.string.fv_push_notice)
     }
 
   private fun channels(context: Context) {

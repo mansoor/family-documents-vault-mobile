@@ -361,6 +361,9 @@ export function PushProvider(props: { children: ReactNode; deps?: Partial<PushDe
         asked.current = false;
       } else if (e.kind === 'message' && e.type === 'digest') {
         emit('remindersChanged');
+      } else if (e.kind === 'message' && e.type === 'notice') {
+        // Who sees the person's details is changing (5.26): Home says what.
+        emit('noticesChanged');
       } else if (e.kind === 'open') {
         setOpened((n) => n + 1);
       }

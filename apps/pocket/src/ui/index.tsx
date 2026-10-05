@@ -1,6 +1,6 @@
 import { colours, radii, statusTone, TAP_MIN, type as typeScale, type Status } from '@fdv/shared';
 import { AlertTriangle, CheckCircle2, Clock, Info, XCircle, type LucideIcon } from 'lucide-react-native';
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, type ReactNode } from 'react';
 import {
   AccessibilityInfo,
   Pressable,
@@ -192,12 +192,24 @@ export function Field(
     goTo?: object | null;
   } & Omit<TextInputProps, 'style'>,
 ) {
-  const { label, error, testID, required, goTo, ...input } = props;
+  const { label, error, testID, required, goTo, onLayout, ...input } = props;
   const { scale } = useTextScale();
   const box = useRef<TextInput>(null);
+  // Focused before it is laid out — Save opening More details mounts the
+  // field and asks for it in the same moment — Android takes the focus but
+  // ignores the keyboard ("showSoftInput … is not served", a view of 0×0:
+  // the 5.31 Maestro runs). So the field moves to itself once it has been
+  // laid out, a frame later.
+  const laidOut = useRef(false);
+  const waiting = useRef(false);
+  const focusSoon = useCallback(() => {
+    requestAnimationFrame(() => box.current?.focus());
+  }, []);
   useEffect(() => {
-    if (goTo) box.current?.focus();
-  }, [goTo]);
+    if (!goTo) return;
+    if (laidOut.current) focusSoon();
+    else waiting.current = true;
+  }, [goTo, focusSoon]);
   return (
     <View style={styles.field}>
       <Text variant="secondary" weight="600" tone="soft">
@@ -212,6 +224,14 @@ export function Field(
         placeholderTextColor={colours.inkMuted}
         style={[styles.input, { fontSize: typeScale.body * scale }, error ? styles.inputError : null]}
         {...input}
+        onLayout={(e) => {
+          laidOut.current = true;
+          if (waiting.current) {
+            waiting.current = false;
+            focusSoon();
+          }
+          onLayout?.(e);
+        }}
       />
       {error ? (
         <Text variant="secondary" tone="danger" role="alert">

@@ -258,6 +258,9 @@ describe('what was opened, told once', () => {
 describe('when a session ends', () => {
   it('only an expiry keeps the copies', () => {
     expect(endWipes('expired')).toBe(false);
-    for (const reason of ['revoked', 'reused', 'removed', 'malformed']) expect(endWipes(reason)).toBe(true);
+    // `suspended` (vault 5.28): an owner locked the sign-in, or a restore paused it.
+    for (const reason of ['revoked', 'reused', 'removed', 'malformed', 'suspended']) {
+      expect(endWipes(reason)).toBe(true);
+    }
   });
 });

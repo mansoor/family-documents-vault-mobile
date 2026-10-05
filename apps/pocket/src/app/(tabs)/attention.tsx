@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next';
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { renewWords } from '../../capture/renew-words';
+import { offersNewScan, reminderHeadline } from '../../documents/reminders';
 import { useCapture } from '../../state/capture';
 import { emit } from '../../state/events';
 import { useVault } from '../../state/vault';
@@ -20,7 +21,11 @@ function today(): string {
 /**
  * Needs attention (4.12): what is due, and what is coming up. Each can be
  * put off a week or a month, or marked done (REM-07); a document running
- * out can have its new one scanned straight in.
+ * out can have its new one scanned straight in — not a bill, which is paid,
+ * not replaced (5.31). A row says the date it is about, in its kind's
+ * words, where the vault says it ("Due date: 10 Oct, in 7 days"); what is
+ * coming up says when it falls due under that. Put off, a row says what the
+ * vault made of it: it stops a due date's snooze at the date.
  */
 export default function AttentionScreen() {
   const { t } = useTranslation();
@@ -57,7 +62,13 @@ export default function AttentionScreen() {
   const act = async (fn: Parameters<typeof withToken>[0]) => {
     setProblem(null);
     try {
-      await withToken(fn);
+      const answer = await withToken(fn);
+      // Put off: the row moves to what is coming up as the vault answered it
+      // (its label says until when), before the lists are read again.
+      if (isReminder(answer) && answer.status === 'snoozed') {
+        setDue((d) => d?.filter((x) => x.id !== answer.id) ?? d);
+        setUpcoming((u) => [answer, ...u.filter((x) => x.id !== answer.id)]);
+      }
       await load();
       emit('remindersChanged');
     } catch (err) {
@@ -80,14 +91,21 @@ export default function AttentionScreen() {
   };
   // Not while its new version is already waiting to go; not for a teen or a viewer.
   const renewing = new Set(capture.queue.filter((i) => i.kind === 'version').map((i) => i.target));
-  const canRenew = (r: ReminderView) => canAdd && who?.role !== 'teen' && !renewing.has(r.document_id);
+  const canRenew = (r: ReminderView) =>
+    canAdd && who?.role !== 'teen' && !renewing.has(r.document_id) && offersNewScan(r);
 
   const row = (r: ReminderView, isDue: boolean) => (
     <Card key={r.id} style={isDue ? styles.due : undefined}>
       <Text weight="600">{r.document_title ?? t('document.untitled')}</Text>
       <Text variant="secondary" tone={isDue ? 'warn' : 'soft'} weight="600">
-        {r.label}
+        {reminderHeadline(r)}
       </Text>
+      {/* Coming up: when it falls due, or until when it is put off, under the date it is about. */}
+      {!isDue && r.about ? (
+        <Text variant="secondary" tone="muted" testID={`when-${r.id}`}>
+          {r.label}
+        </Text>
+      ) : null}
       {canManage ? (
         <View style={styles.actions}>
           <Button
@@ -170,6 +188,11 @@ export default function AttentionScreen() {
       </ScrollView>
     </SafeAreaView>
   );
+}
+
+/** A snooze's answer is the reminder as it now is; Done's may be the next one, or nothing. */
+function isReminder(x: unknown): x is ReminderView {
+  return typeof x === 'object' && x !== null && 'id' in x && 'status' in x && 'label' in x;
 }
 
 const styles = StyleSheet.create({

@@ -1,10 +1,16 @@
 import {
   colours,
+  dateReminderSentence,
   issuedByLabel,
   issuerFromFilename,
+  localToday,
   rankKnownIssuers,
+  REMIND_ONCE,
+  reminderOf,
   reminderSentence,
   shortTypeLabel,
+  type DocumentTypeView,
+  type TypeField,
 } from '@fdv/shared';
 import { useNavigation, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -46,6 +52,36 @@ import { useVault } from '../state/vault';
 import { Button, Field, Notice, requiredLabel, Text } from '../ui';
 
 type Loaded = CardData;
+
+/**
+ * The date a kind reminds from, when the vault says (`features.reminder_dates`,
+ * 0.5.16): Expires, or one of its own date fields — a bill's Due date — and
+ * how long before. Null with no flag, or for a kind that reminds nobody.
+ */
+function remindingOf(type: DocumentTypeView | undefined, datesOn: boolean): { from: string; leads: number[] } | null {
+  if (!datesOn || !type) return null;
+  const r = reminderOf(type);
+  return r.from ? { from: r.from, leads: r.leads } : null;
+}
+
+/** A date field's name in a sentence, as the promise says it: "due date", but "MOT". */
+function dateName(label: string): string {
+  const trimmed = label.trim().replace(/\s+/g, ' ');
+  return /^[A-Z0-9]{2,}\b/.test(trimmed) ? trimmed : trimmed.charAt(0).toLowerCase() + trimmed.slice(1);
+}
+
+/** Whether a date the card read (a DateValue) is before today, on this phone's calendar. */
+function datePassed(value: unknown): boolean {
+  const date = (value as { date?: unknown } | null)?.date;
+  if (typeof date !== 'string' || date === '') return false;
+  const today = localToday(Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC');
+  return date < today.slice(0, date.length);
+}
+
+/** The promise for a date field a kind reminds from: "We'll remind you 7 days and 1 day before its due date." */
+function fieldPromise(field: Pick<TypeField, 'label'> | undefined, leads: number[]): string | null {
+  return field ? dateReminderSentence(field.label, leads) : null;
+}
 
 /**
  * The confirm card: straight after the scanner's Done, no second review.
@@ -132,6 +168,9 @@ function Card(props: { initial: CaptureSource }) {
   const saving = useRef(false);
   const blocked = useRef<unknown>(null);
   const issuedByOn = caps?.features.issued_by === true;
+  // Which date a kind reminds from (0.5.16): the sentence sits under that date.
+  // With no flag — an older vault, or no connection — the card is as before.
+  const datesOn = caps?.features.reminder_dates === true;
   // A type's own details, and what it requires (0.5.11): as the vault says
   // now, or — with no connection — as it said when the card's choices were kept.
   const detailsOn = caps ? caps.features.custom_types === true : data?.customTypes === true;
@@ -267,10 +306,26 @@ function Card(props: { initial: CaptureSource }) {
       labels = Object.fromEntries(own.filter((f) => sent.includes(f.key)).map((f) => [f.key, f.label]));
       // Reminders only for what has the date they come from.
       const ty = typeOf(draft, household);
-      note = {
-        reminder: out.metadata.expires ? reminderSentence(ty) : null,
-        noExpiry: Boolean(ty?.expiry_driver) && !out.metadata.expires,
-      };
+      const from = remindingOf(ty, datesOn);
+      if (from && from.from !== 'expires') {
+        // A bill: its due date reminds, not its expiry.
+        const field = ownFields(ty, household).find((f) => f.key === from.from);
+        const dated = out.metadata.extra?.[from.from];
+        note = {
+          // A date already gone makes no reminder (the vault's 0.5.15): said so, never promised.
+          reminder: !dated
+            ? null
+            : datePassed(dated) && field
+              ? t('capture.datePassed', { name: dateName(field.label) })
+              : fieldPromise(field, from.leads),
+          noExpiry: false,
+        };
+      } else {
+        note = {
+          reminder: out.metadata.expires ? reminderSentence(ty) : null,
+          noExpiry: Boolean(ty?.expiry_driver) && !out.metadata.expires && (!datesOn || from !== null),
+        };
+      }
     }
     saving.current = true;
     setBusy(true);
@@ -341,7 +396,9 @@ function Card(props: { initial: CaptureSource }) {
   const choices = household ? visibilityChoices(draft, household) : { household: true, adults: false, private: false };
   const people = data?.members ?? [];
   const teen = me?.role === 'teen';
-  const reminder = reminderSentence(type);
+  const reminding = remindingOf(type, datesOn);
+  // Expires's promise, in its own words as always; a date field's, with the 'once' line.
+  const reminder = reminding && reminding.from !== 'expires' ? null : reminderSentence(type);
   const titleHint = household ? suggestedTitle(draft, household) : null;
   const pagesShown = draft.source.kind === 'pages' ? draft.source.pages : [];
   const issuerOffers = useMemo(() => {
@@ -373,6 +430,38 @@ function Card(props: { initial: CaptureSource }) {
   function labelOf(key: string): string {
     return isCardCore(key) ? coreLabel(key) : (own.find((f) => f.key === key)?.label ?? key);
   }
+  // The field reminders come from, when the card shows it: its promise goes
+  // under it once More details is open (0.5.16), and stays at the foot of the
+  // card while it is closed, as before.
+  const remindingField = reminding && reminding.from !== 'expires' ? own.find((f) => f.key === reminding.from) : undefined;
+  const dateShown =
+    reminding !== null &&
+    (reminding.from === 'expires' ? ask('expires').shown : remindingField !== undefined && remindingField.kind === 'date');
+  const underDate = details && dateShown;
+  const promise = reminding && reminding.from !== 'expires' ? fieldPromise(remindingField, reminding.leads) : reminder;
+  /** Said under the date reminders come from: the promise, and for a date field, that it is once. */
+  const dateNote = (key: string) => {
+    if (!underDate || !reminding || reminding.from !== key || !promise) return null;
+    return (
+      <View style={styles.dateNote} testID={`reminder-under-${key}`}>
+        <Text tone="soft" testID="capture-reminder">
+          {promise}
+        </Text>
+        {key !== 'expires' ? (
+          <>
+            <Text variant="secondary" tone="muted">
+              {REMIND_ONCE}
+            </Text>
+            {visibility === 'private' ? (
+              <Text variant="secondary" tone="muted" testID="capture-reminder-only-me">
+                {t('capture.onlyMeReminding')}
+              </Text>
+            ) : null}
+          </>
+        ) : null}
+      </View>
+    );
+  };
 
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
@@ -601,16 +690,19 @@ function Card(props: { initial: CaptureSource }) {
                   />
                 ) : null}
                 {ask('expires').shown ? (
-                  <Field
-                    label={coreLabel('expires')}
-                    required={requiredWord(ask('expires').required)}
-                    value={draft.expires}
-                    onChangeText={(v) => set({ expires: v })}
-                    placeholder="14 Mar 2031"
-                    error={fieldErrors.expires ?? null}
-                    goTo={goToFor('expires')}
-                    testID="field-expires"
-                  />
+                  <>
+                    <Field
+                      label={coreLabel('expires')}
+                      required={requiredWord(ask('expires').required)}
+                      value={draft.expires}
+                      onChangeText={(v) => set({ expires: v })}
+                      placeholder="14 Mar 2031"
+                      error={fieldErrors.expires ?? null}
+                      goTo={goToFor('expires')}
+                      testID="field-expires"
+                    />
+                    {dateNote('expires')}
+                  </>
                 ) : null}
                 <Text variant="secondary" tone="muted">
                   {t('capture.dateHint')}
@@ -671,7 +763,7 @@ function Card(props: { initial: CaptureSource }) {
                       </View>
                     );
                   }
-                  return (
+                  const input = (
                     <Field
                       key={f.key}
                       label={f.label}
@@ -684,13 +776,23 @@ function Card(props: { initial: CaptureSource }) {
                       {...detailInput(f.kind)}
                     />
                   );
+                  // The date reminders come from: its promise directly under it (0.5.16).
+                  const note = f.kind === 'date' ? dateNote(f.key) : null;
+                  return note ? (
+                    <View key={f.key} style={styles.section} testID={`date-${f.key}`}>
+                      {input}
+                      {note}
+                    </View>
+                  ) : (
+                    input
+                  );
                 })}
               </View>
             ) : null}
 
-            {reminder ? (
+            {(datesOn ? promise : reminder) && !underDate ? (
               <Text tone="soft" testID="capture-reminder">
-                {reminder}
+                {datesOn ? promise : reminder}
               </Text>
             ) : null}
           </>
@@ -743,4 +845,5 @@ const styles = StyleSheet.create({
   },
   row: { flexDirection: 'row' },
   flex: { flex: 1 },
+  dateNote: { gap: 4 },
 });

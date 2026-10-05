@@ -1,7 +1,7 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react-native';
 import { Text } from 'react-native';
 import { useVault } from '../state/vault';
-import { installed, knownVault, renderApp, testVault, withTwoStep } from '../test-support/render';
+import { installed, knownVault, renderApp, signedIn, testVault, withTwoStep } from '../test-support/render';
 import SignIn from '../app/sign-in';
 
 // Kept Essentials on the sign-in screen open with the router (4.10).
@@ -55,6 +55,82 @@ describe('Sign in', () => {
     await screen.findByText("That email and password don't match.");
     expect(screen.getByText(/You sign in with a passkey/)).toBeTruthy();
     expect(screen.getByTestId('phase')).toHaveTextContent('sign_in');
+  });
+
+  it.each([
+    ['locked', 'An owner has paused your access. Ask them if you think this is a mistake.'],
+    ['restored', 'Your access is paused after the vault was restored. Ask an owner to turn it back on.'],
+  ] as const)('paused-access wording: a sign-in %s by an owner says so, not "wrong password"', async (reason, words) => {
+    const t = testVault();
+    // Proven, then refused (5.28): 403 membership_suspended, with the reason.
+    t.vault.state.suspensions.set('fake-member', {
+      reason,
+      since: new Date(Date.now() - 60_000).toISOString(),
+      until: null,
+      note: 'never shown to the person',
+      by: reason === 'locked' ? 'Mansoor' : null,
+    });
+    await renderApp(
+      <>
+        <Phase />
+        <SignIn />
+      </>,
+      { fetch: t.fetch },
+    );
+    await waitFor(() => expect(screen.getByTestId('phase')).toHaveTextContent('sign_in'));
+    await fireEvent.changeText(screen.getByTestId('sign-in-email'), 'owner@example.test');
+    await fireEvent.changeText(screen.getByTestId('sign-in-password'), 'correct horse battery staple');
+    await fireEvent.press(screen.getByTestId('sign-in-go'));
+    expect(await screen.findByTestId('sign-in-paused')).toHaveTextContent(words);
+    expect(screen.queryByTestId('sign-in-refused')).toBeNull();
+    expect(screen.queryByText(/never shown/)).toBeNull();
+    expect(screen.getByTestId('phase')).toHaveTextContent('sign_in');
+  });
+
+  it('a request still under way when a lock ends the session leaves the paused words in place', async () => {
+    const t = testVault();
+    await signedIn(t);
+    // Two requests in a row, as a sync makes them: the first meets the lock,
+    // the second finds nobody signed in any more.
+    function Two() {
+      const { withToken } = useVault();
+      return (
+        <Text
+          testID="two"
+          onPress={() =>
+            void (async () => {
+              for (let i = 0; i < 2; i += 1) {
+                await withToken((a, token) => a.me(token)).catch(() => undefined);
+              }
+            })()
+          }
+        >
+          two
+        </Text>
+      );
+    }
+    await renderApp(
+      <>
+        <Phase />
+        <Two />
+        <SignIn />
+      </>,
+      { fetch: t.fetch },
+    );
+    await waitFor(() => expect(screen.getByTestId('phase')).toHaveTextContent('ready'));
+    t.vault.state.suspensions.set('fake-member', {
+      reason: 'locked',
+      since: new Date(Date.now() - 60_000).toISOString(),
+      until: null,
+      note: null,
+      by: 'Mansoor',
+    });
+    await fireEvent.press(screen.getByTestId('two'));
+    await waitFor(() => expect(screen.getByTestId('phase')).toHaveTextContent('sign_in'));
+    await waitFor(() => expect(t.calls.filter((c) => c.endsWith('/api/v1/me')).length).toBeGreaterThan(0));
+    expect(await screen.findByTestId('sign-in-paused')).toHaveTextContent(
+      'An owner has paused your access. Ask them if you think this is a mistake.',
+    );
   });
 
   it('a wrong code says so and keeps the code step', async () => {

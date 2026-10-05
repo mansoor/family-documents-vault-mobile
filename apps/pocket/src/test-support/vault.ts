@@ -40,6 +40,26 @@ export function capabilities(over: Partial<Capabilities> = {}): Capabilities {
   };
 }
 
+/**
+ * The capability document of a vault of 0.5.19 (the pin before 5.31), as
+ * its features said: kinds' details, collections, reminder dates, photos —
+ * and no identity details, locks or files sent to look at.
+ */
+export function caps0519(): Capabilities {
+  return capabilities({
+    server_version: '0.5.19',
+    features: {
+      ...capabilities().features,
+      push: true,
+      unified_push: true,
+      custom_types: true,
+      collections: true,
+      reminder_dates: true,
+      member_photos: true,
+    },
+  });
+}
+
 export interface TestVault {
   fetch: FetchLike;
   vault: ReturnType<typeof createFakeVault>;
@@ -59,6 +79,11 @@ export interface TestVault {
   push: PushSide;
   /** Signed-in devices (4.15): this phone, and a laptop. */
   sessions: SessionRow[];
+  /**
+   * The second factors of the account signed in, as GET /me says them
+   * (`totp_enabled`, `has_passkey`): the client's fake says none.
+   */
+  factors: { totp: boolean; passkey: boolean };
 }
 
 export interface PushSide {
@@ -88,6 +113,11 @@ export interface Library {
   sensitive: Set<string>;
   /** Confirmed: the step-up window is open. */
   verified: boolean;
+  /**
+   * Confirmed with a code, not the password: what the vault asks for
+   * another person's identity numbers (`open_identity`, 5.26).
+   */
+  factorVerified: boolean;
   /** What a step-up accepted (the password, or a code). */
   stepUps: string[];
   /** Bytes served as a version's content. */
@@ -120,6 +150,7 @@ export function testVault(origins: string[] = ['https://vault.test']): TestVault
     caps: capabilities(),
     impostor: new Map(),
     calls: [],
+    factors: { totp: false, passkey: false },
     reminders: [],
     upcoming: [],
     sessions: [
@@ -158,6 +189,7 @@ export function testVault(origins: string[] = ['https://vault.test']): TestVault
       versions: new Map(),
       sensitive: new Set(),
       verified: false,
+      factorVerified: false,
       stepUps: [],
       content: new Map(),
       search: () => ({ items: [], sealed: 0 }),
@@ -178,6 +210,12 @@ export function testVault(origins: string[] = ['https://vault.test']): TestVault
       if (lib) return lib;
       if (url.endsWith('/api/v1/capabilities')) {
         return json(t.impostor.get(origin) ?? t.caps);
+      }
+      if (path === '/api/v1/me' && init.method === 'GET') {
+        const res = await vault.fetch(url, init);
+        if (!res.ok) return res;
+        const me = (await res.json()) as Record<string, unknown>;
+        return json({ ...me, totp_enabled: t.factors.totp, has_passkey: t.factors.passkey });
       }
       return (await captured(t, url, path, init)) ?? vault.fetch(url, init);
     },
@@ -218,8 +256,8 @@ async function captured(
 
 type Reply = Awaited<ReturnType<FetchLike>>;
 
-function failure(status: number, code: string, message: string): Reply {
-  const body = { error: { code, message } };
+function failure(status: number, code: string, message: string, action?: string): Reply {
+  const body = { error: { code, message, ...(action ? { action } : {}) } };
   return {
     ok: false,
     status,
@@ -307,6 +345,7 @@ async function library(t: TestVault, path: string, init: Parameters<FetchLike>[1
     const ok = body.password === t.vault.state.password || body.code === '123456';
     if (!ok) return failure(401, 'invalid_credentials', "That password isn't right.");
     lib.verified = true;
+    if (body.code !== undefined) lib.factorVerified = true;
     lib.stepUps.push(String(body.password ?? body.code));
     return json({ verified_at: new Date().toISOString(), expires_in: 300 });
   }
@@ -350,6 +389,26 @@ async function library(t: TestVault, path: string, init: Parameters<FetchLike>[1
   }
   if (q === '/api/v1/search/sealed' && init.method === 'GET') {
     return json({ items: lib.sealed, searched: Math.max(lib.sealed.length, 2) });
+  }
+  // Identity numbers (5.26), asked for as the vault asks: one's own with any
+  // credential (`reveal_identity`); another person's with a code, never the
+  // password (`open_identity`), once two-step sign-in is there to ask with —
+  // without it the client's fake refuses outright.
+  m = /^\/api\/v1\/members\/([^/]+)\/identity\/reveal$/.exec(q);
+  if (m?.[1] && init.method === 'POST') {
+    const self = decodeURIComponent(m[1]) === 'fake-member';
+    if (self && !lib.verified) {
+      return failure(403, 'step_up_required', 'Please confirm it is you to see your identity numbers.', 'reveal_identity');
+    }
+    if (!self && t.vault.state.ownerTwoStep && !lib.factorVerified) {
+      return failure(
+        403,
+        'step_up_required',
+        "Please confirm it is you to see another person's identity numbers.",
+        'open_identity',
+      );
+    }
+    return null;
   }
   m = /^\/api\/v1\/reminders\/([^/]+)\/(snooze|acknowledge)$/.exec(q);
   if (m?.[1] && init.method === 'POST') {

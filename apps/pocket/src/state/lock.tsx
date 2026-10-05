@@ -269,10 +269,28 @@ export function LockProvider(props: { children: ReactNode; deps?: Partial<LockDe
     void (shielded ? d.screen.prevent('app') : d.screen.allow('app'));
   }, [d, shielded]);
 
+  // How many parts of the app hold each name: the screen is shielded under
+  // a name while any of them does. Two identity cards, one under the other on
+  // the stack, share a name, and the one taken away must not lift the
+  // other's shield (the screen guard below counts nothing: it keeps a set).
+  const claims = useRef(new Map<string, number>());
   const guard = useCallback(
     (name: string) => {
-      void d.screen.prevent(name);
-      return () => void d.screen.allow(name);
+      const held = claims.current.get(name) ?? 0;
+      claims.current.set(name, held + 1);
+      if (held === 0) void d.screen.prevent(name);
+      let released = false;
+      return () => {
+        if (released) return;
+        released = true;
+        const left = (claims.current.get(name) ?? 1) - 1;
+        if (left > 0) {
+          claims.current.set(name, left);
+          return;
+        }
+        claims.current.delete(name);
+        void d.screen.allow(name);
+      };
     },
     [d],
   );

@@ -31,6 +31,8 @@ Written by `node apps/pocket/scripts/failure-states.mjs`; CI fails if it is out 
 | Signing in | Sign in | `signIn.signedOutHere` | You've been signed out on this phone. Sign in again to carry on. |
 |  |  | `signIn.passkeyOnly` | You sign in with a passkey. The app can't use passkeys yet, so set a password in the browser (Settings → Password), then sign in here with it. |
 |  |  | `signIn.startAgain` | Start again from your password. |
+|  |  | `signIn.paused` | An owner has paused your access. Ask them if you think this is a mistake. |
+|  |  | `signIn.pausedRestored` | Your access is paused after the vault was restored. Ask an owner to turn it back on. |
 | Any request that fails (wordsFor) | Every screen | `errors.offline` | Can't reach your vault right now. Check this phone's connection, then try again. |
 |  |  | `errors.timeout` | Your vault took too long to answer. Try again in a moment. |
 |  |  | `errors.rateLimited` | Too many tries. Wait a minute, then try again. / Too many tries. Wait {{count}} minutes, then try again. |
@@ -38,7 +40,9 @@ Written by `node apps/pocket/scripts/failure-states.mjs`; CI fails if it is out 
 |  |  | `errors.internal` | Something went wrong on your vault. Try again in a moment; if it keeps happening, whoever looks after the vault can have a look. |
 |  |  | `errors.storageUnreachable` | Your vault can't reach the place it keeps its files right now. Anything waiting on this phone is kept, and sent when it can. |
 |  |  | `errors.sessionEnded` | You were signed out. Sign in again to carry on. |
+|  |  | `errors.paused` | An owner has paused your access. Ask them if you think this is a mistake. |
 |  |  | `errors.stepUp` | Confirm it's you to carry on. |
+|  |  | `errors.twoStep` | Turn on two-step sign-in in the browser to see this. |
 |  |  | `errors.setupRequired` | This vault hasn't been set up yet. Open it in the browser first. |
 |  |  | `errors.unexpected` | Something went wrong between this phone and your vault. Try again in a moment; if it keeps happening, whoever looks after the vault can have a look. |
 |  |  | `errors.stranger` | Nothing was sent: something other than your vault is answering at its address on this network. |
@@ -97,6 +101,13 @@ Written by `node apps/pocket/scripts/failure-states.mjs`; CI fails if it is out 
 |  |  | `show.pending` | The vault is still preparing this document's pages. Try again in a minute. |
 |  |  | `show.noPreview` | This document can't be shown on the phone. |
 | Confirm it is you | The step-up sheet | `stepUp.failed` | That didn't match. Try again. |
+|  |  | `stepUp.codeOnly` | This needs the code from your authenticator app: your password won't do here. |
+|  |  | `stepUp.noCode` | This needs a code from an authenticator app, and this phone can't use your passkey. Add an authenticator app in Settings in the browser, or do this in the browser with your passkey. |
+| Identity details | A person, the Identity card | `identity.needsConnection` | Identity details need a connection. They are never kept on this phone. |
+|  |  | `identity.failed` | Identity details couldn't be read. Try again in a moment. |
+|  |  | `identity.copyFailed` | This phone would not copy it. Show it instead. |
+|  |  | `identity.gone` | There is no {{label}} to show any more. |
+|  |  | `identity.twoStepHint` | You can turn it on in the browser, in Settings, then try again here. |
 | A document | Document | `document.conflict` | Someone changed this while you were looking. Here's the latest. |
 |  |  | `document.needsConnection` | Changes need a connection. |
 |  |  | `document.notFound` | This document isn't there any more, or it isn't yours to see. |
