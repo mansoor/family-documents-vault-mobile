@@ -309,6 +309,49 @@ describe('notifications on this phone (4.14)', () => {
     await waitFor(() => expect(parts.stores.size).toBe(0));
   });
 
+  it('a session_ended read at launch reaches sign-in without waiting for the vault, and says paused once it answers', async () => {
+    const t = pushVault();
+    const fake = new FakePushNative();
+    fake.ended = true;
+    const parts = phoneParts();
+    // A vault slow to answer why (its link down, say): nothing is waited for.
+    let answer: () => void = () => undefined;
+    const held = new Promise<void>((resolve) => {
+      answer = resolve;
+    });
+    const fetch: typeof t.fetch = async (url, init) => {
+      if (url.endsWith('/api/v1/me') || url.endsWith('/api/v1/auth/refresh')) await held;
+      return t.fetch(url, init);
+    };
+    const seen: string[] = [];
+    function Probe() {
+      const { phase, notice } = useVault();
+      seen.push(`${phase}|${notice ?? 'none'}`);
+      return null;
+    }
+    await signedIn(t);
+    // An owner locked the sign-in while the app was closed.
+    t.vault.state.suspensions.set('fake-member', {
+      reason: 'locked',
+      since: new Date(Date.now() - 60_000).toISOString(),
+      until: null,
+      note: null,
+      by: 'Mansoor',
+    });
+    await renderApp(<Probe />, {
+      fetch,
+      lock: parts.lock,
+      essentials: parts.essentials,
+      push: { native: fake },
+      deps: { push: fake },
+    });
+    await waitFor(() => expect(seen.at(-1)).toBe('sign_in|signed_out_here'));
+    expect(seen).not.toContain('ready|none');
+    // The vault answers: a lock.
+    await act(async () => answer());
+    await waitFor(() => expect(seen.at(-1)).toBe('sign_in|paused'));
+  });
+
   it('a session_ended with the app open signs out at once', async () => {
     const t = pushVault();
     const fake = new FakePushNative();

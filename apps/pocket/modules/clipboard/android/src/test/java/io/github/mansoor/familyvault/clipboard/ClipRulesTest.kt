@@ -47,22 +47,36 @@ class ClipRulesTest {
   @Test
   fun aCopyLeftBehindGoesOnceItsMinuteIsOver() {
     val due = 2_000_000L
-    // Its minute not yet over: the alarm will do it.
-    assertFalse(ClipRules.sweepClears(true, ClipRules.LABEL, due, due - 1))
     // Over: now.
-    assertTrue(ClipRules.sweepClears(true, ClipRules.LABEL, due, due))
-    assertTrue(ClipRules.sweepClears(true, ClipRules.LABEL, due, due + 3_600_000L))
-    // No clear waits for it any more (a restart, a force stop): now.
-    assertTrue(ClipRules.sweepClears(true, ClipRules.LABEL, null, due))
+    assertEquals(ClipRules.Sweep.Clear, ClipRules.sweep(true, ClipRules.LABEL, due, due))
+    assertEquals(ClipRules.Sweep.Clear, ClipRules.sweep(true, ClipRules.LABEL, due, due + 3_600_000L))
+    // No time kept for it: now.
+    assertEquals(ClipRules.Sweep.Clear, ClipRules.sweep(true, ClipRules.LABEL, null, due))
     // The clock turned back past the copy: now, not in a year.
-    assertTrue(ClipRules.sweepClears(true, ClipRules.LABEL, due, due - ClipRules.MAX_MS - 1))
+    assertEquals(ClipRules.Sweep.Clear, ClipRules.sweep(true, ClipRules.LABEL, due, due - ClipRules.MAX_MS - 1))
+  }
+
+  /**
+   * Not yet due: its clear is set again for what is left — a force stop drops
+   * the app's alarms but keeps the time, so "the alarm will do it" is not
+   * enough (N531-01).
+   */
+  @Test
+  fun aCopyNotYetDueHasItsClearSetAgainForWhatIsLeft() {
+    val due = 2_000_000L
+    assertEquals(ClipRules.Sweep.Rearm(30_000L), ClipRules.sweep(true, ClipRules.LABEL, due, due - 30_000L))
+    assertEquals(ClipRules.Sweep.Rearm(1L), ClipRules.sweep(true, ClipRules.LABEL, due, due - 1))
+    assertEquals(
+      ClipRules.Sweep.Rearm(ClipRules.MAX_MS),
+      ClipRules.sweep(true, ClipRules.LABEL, due, due - ClipRules.MAX_MS),
+    )
   }
 
   @Test
   fun somebodyElsesCopyOrOneItCannotSeeIsNotSweptAway() {
-    assertFalse(ClipRules.sweepClears(true, "Notes", null, 0L))
-    assertFalse(ClipRules.sweepClears(true, null, null, 0L))
+    assertEquals(ClipRules.Sweep.Leave, ClipRules.sweep(true, "Notes", null, 0L))
+    assertEquals(ClipRules.Sweep.Leave, ClipRules.sweep(true, null, 2_000_000L, 0L))
     // Not in focus yet: nothing can be read, so nothing is swept (the alarm still clears it).
-    assertFalse(ClipRules.sweepClears(false, null, null, 0L))
+    assertEquals(ClipRules.Sweep.Leave, ClipRules.sweep(false, null, null, 0L))
   }
 }

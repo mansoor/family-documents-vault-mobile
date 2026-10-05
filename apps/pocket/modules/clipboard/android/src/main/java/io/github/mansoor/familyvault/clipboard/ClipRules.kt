@@ -38,17 +38,33 @@ object ClipRules {
   fun shouldClear(readable: Boolean, label: CharSequence?): Boolean =
     !readable || label?.toString() == LABEL
 
+  /** What a sweep does with what is on the clipboard. */
+  sealed class Sweep {
+    /** Not the app's to touch: somebody else's copy, or nothing it can see. */
+    object Leave : Sweep()
+
+    /** The app's own copy, past its minute (or with no time kept): cleared now. */
+    object Clear : Sweep()
+
+    /**
+     * The app's own copy, not yet due: its clear is set again for what is
+     * left of the minute — an alarm a force stop took away comes back, and
+     * one still set is only replaced.
+     */
+    data class Rearm(val inMs: Long) : Sweep()
+  }
+
   /**
-   * At a start, or back in front: whether a copy of the app's own still on
-   * the clipboard goes now. It does once its minute is over by the wall
-   * clock (`dueAtMs`), or when no clear waits for it at all (`dueAtMs` null:
-   * the alarm was lost with a restart or a force stop), or when the clock
-   * was turned back past the copy. What the app cannot see, or somebody
-   * else's copy, is left: the alarm, or nobody, deals with it.
+   * At a start, or back in front: what becomes of a copy of the app's own
+   * still on the clipboard. It goes once its minute is over by the wall
+   * clock (`dueAtMs`), when no time is kept for it, or when the clock was
+   * turned back past the copy; before then its clear is set again, since a
+   * force stop drops the app's alarms but not the time. What the app cannot
+   * see, or somebody else's copy, is left.
    */
-  fun sweepClears(readable: Boolean, label: CharSequence?, dueAtMs: Long?, nowMs: Long): Boolean {
-    if (!readable || label?.toString() != LABEL) return false
-    if (dueAtMs == null) return true
-    return nowMs >= dueAtMs || dueAtMs - nowMs > MAX_MS
+  fun sweep(readable: Boolean, label: CharSequence?, dueAtMs: Long?, nowMs: Long): Sweep {
+    if (!readable || label?.toString() != LABEL) return Sweep.Leave
+    if (dueAtMs == null || nowMs >= dueAtMs || dueAtMs - nowMs > MAX_MS) return Sweep.Clear
+    return Sweep.Rearm(dueAtMs - nowMs)
   }
 }

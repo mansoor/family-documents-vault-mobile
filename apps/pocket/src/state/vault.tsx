@@ -260,10 +260,6 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
   // for the connection (kept Essentials, 4.10) carries on when it answers.
   const offlineRef = useRef(false);
   const recheckRef = useRef<() => Promise<void>>(async () => undefined);
-  // For the push's "you were signed out", which is made before withToken is.
-  const withTokenRef = useRef<VaultValue['withToken']>(async () => {
-    throw new NetworkError('offline');
-  });
   useEffect(
     () =>
       deps.onNetworkChange(() => {
@@ -438,10 +434,12 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
    * databases when the message came.
    *
    * The push says no reason. A lock (5.28) is the person's to know, so the
-   * vault is asked once, with the session's own tokens: it answers
-   * session_ended with the reason, and withToken says it — paused, for a
-   * lock or a restore. With no answer, or one that says the session lives,
-   * the phone says it was signed out, as before.
+   * vault is asked once why, with the session's own refresh token — in the
+   * background: signing out never waits for the vault (a launch would sit on
+   * its spinner while a vault that does not answer timed out). It answers
+   * session_ended with the reason, and a lock or a restore turns "signed
+   * out" into "paused". No answer, or one that says the session lives,
+   * leaves "signed out", as before.
    */
   const endedByPush = useCallback(async () => {
     // Not the vault's session core yet: the launch looks at the flag itself.
@@ -451,13 +449,8 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
     // The copies go first, whether or not anybody is signed in here (kept
     // after an expiry, say): a failure to remove them is retried at the next start.
     emit('sessionEnded', 'revoked');
-    if (session.signedIn) {
-      try {
-        await withTokenRef.current((a, token) => a.me(token));
-      } catch {
-        // Said by withToken when the vault answered; nothing to add when it did not.
-      }
-    }
+    // The session's refresh token, kept only to ask why, then forgotten.
+    const ask = session.signedIn ? ((await deps.store.load())?.refresh_token ?? null) : null;
     if (session.signedIn) {
       await session.clear();
       setNotice('signed_out_here');
@@ -465,7 +458,20 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
     }
     log.info('session.ended_by_push', {});
     deps.push?.clearSessionEnded();
-  }, [api, session, hydrated, deps.push]);
+    if (ask) {
+      void (async () => {
+        try {
+          await gate();
+          await api.refresh(ask);
+        } catch (err) {
+          // Said only while nothing newer was: a sign-in since clears the notice.
+          if (isSessionOver(err) && (err as ApiRequestError).reason === 'suspended') {
+            setNotice((n) => (n === 'signed_out_here' ? endedNotice('suspended') : n));
+          }
+        }
+      })();
+    }
+  }, [api, session, hydrated, gate, deps.push, deps.store]);
 
   // Once the vault and its session core exist: signed in or not.
   useEffect(() => {
@@ -577,9 +583,6 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
     },
     [api, gate, session, hydrated],
   );
-  useEffect(() => {
-    withTokenRef.current = withToken;
-  }, [withToken]);
 
   const chooseVault = useCallback(
     async (outcome: Extract<ConnectOutcome, { kind: 'ok' | 'reinstalled' }>) => {

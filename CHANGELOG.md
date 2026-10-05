@@ -29,7 +29,8 @@ Each of these appears only with a vault that has it; with an older vault
   see something else was copied since. An alarm clears it, so it goes even
   if the app is swiped away, killed or frozen within the minute, or the
   phone sleeps; and when the app starts or comes back, a copy of its own
-  left past its minute goes then. Screenshots are refused while the card
+  left past its minute goes then, and one not yet due has its clear set
+  again (a force stop takes the alarm away). Screenshots are refused while the card
   is on the screen — also under a document opened from it, which stays the
   safer side — and allowed again once it is left; two cards at once each
   keep their own shield. Nothing of it is kept: not in a store, a cache or
@@ -40,7 +41,8 @@ Each of these appears only with a vault that has it; with an older vault
 - **Paused access.** When an owner locks a person's sign-in, or a restore
   pauses it (a vault of 0.5.31 or later), the phone says "An owner has
   paused your access. Ask them if you think this is a mistake." — when the
-  vault ends the session (told by push too: the phone asks the vault why),
+  vault ends the session (told by push too: the phone signs out at once and
+  asks the vault why in the background),
   and at sign-in; after a restore, "Your access is paused after the vault
   was restored. Ask an owner to turn it back on." Not "wrong password",
   and not the words for a session that simply went; a request still under

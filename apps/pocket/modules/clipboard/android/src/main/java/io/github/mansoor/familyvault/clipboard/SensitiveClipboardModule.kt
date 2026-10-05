@@ -24,8 +24,29 @@ class SensitiveClipboardModule : Module() {
   /** The in-process clear still to come, if any: the latest copy's (set from JavaScript's thread, run on the main one). */
   @Volatile private var pending: Runnable? = null
 
-  /** A moment after coming to the front: the window has its focus by then, so the clipboard can be read. */
-  private val sweep = Runnable { context?.let { ClipClearing.sweep(it) } }
+  /** Clears on the main thread's clock in `inMs`, replacing the clear still to come. */
+  private fun clearOnTheDot(c: Context, inMs: Long) {
+    pending?.let { handler.removeCallbacks(it) }
+    val clear = Runnable {
+      pending = null
+      ClipClearing.clearIfOurs(c)
+    }
+    pending = clear
+    handler.postDelayed(clear, inMs)
+  }
+
+  /**
+   * A moment after coming to the front (the window has its focus by then, so
+   * the clipboard can be read): a copy left past its minute goes; one not yet
+   * due has its alarm set again, and is cleared on the dot while the app runs.
+   */
+  private val sweep = Runnable {
+    val c = context
+    if (c != null) {
+      val left = ClipClearing.sweep(c)
+      if (left != null) clearOnTheDot(c, left)
+    }
+  }
 
   override fun definition() = ModuleDefinition {
     Name("FdvClipboard")
@@ -42,13 +63,7 @@ class SensitiveClipboardModule : Module() {
       if (c == null || !ClipClearing.copy(c, text, clearAfterMs)) {
         false
       } else {
-        pending?.let { handler.removeCallbacks(it) }
-        val clear = Runnable {
-          pending = null
-          ClipClearing.clearIfOurs(c)
-        }
-        pending = clear
-        handler.postDelayed(clear, ClipRules.delay(clearAfterMs))
+        clearOnTheDot(c, ClipRules.delay(clearAfterMs))
         true
       }
     }

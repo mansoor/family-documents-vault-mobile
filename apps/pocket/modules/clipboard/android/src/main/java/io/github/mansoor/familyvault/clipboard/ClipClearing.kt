@@ -90,9 +90,15 @@ internal object ClipClearing {
     return clear(c, cm)
   }
 
-  /** At a start or back in front: a copy of the app's whose minute is over, or that nothing waits to clear, goes now. */
-  fun sweep(c: Context): Boolean {
-    val cm = clipboard(c) ?: return false
+  /**
+   * At a start or back in front: a copy of the app's whose minute is over,
+   * or that has no time kept, goes now; one not yet due has its alarm set
+   * again for what is left (a force stop drops the app's alarms, not the
+   * time). Returns that time in ms when it re-armed, so the caller can
+   * clear it on the dot while it runs; null otherwise.
+   */
+  fun sweep(c: Context): Long? {
+    val cm = clipboard(c) ?: return null
     val description =
       try {
         cm.primaryClipDescription
@@ -101,9 +107,21 @@ internal object ClipClearing {
       }
     val p = prefs(c)
     val due = if (p.contains(DUE_AT)) p.getLong(DUE_AT, 0L) else null
-    if (!ClipRules.sweepClears(description != null, description?.label, due, System.currentTimeMillis())) {
-      return false
+    return when (val next = ClipRules.sweep(description != null, description?.label, due, System.currentTimeMillis())) {
+      is ClipRules.Sweep.Leave -> null
+      is ClipRules.Sweep.Clear -> {
+        clear(c, cm)
+        null
+      }
+      is ClipRules.Sweep.Rearm -> {
+        // The same request code: a live alarm is replaced, a dropped one comes back.
+        alarms(c)?.setAndAllowWhileIdle(
+          AlarmManager.ELAPSED_REALTIME_WAKEUP,
+          SystemClock.elapsedRealtime() + next.inMs,
+          alarm(c),
+        )
+        next.inMs
+      }
     }
-    return clear(c, cm)
   }
 }
