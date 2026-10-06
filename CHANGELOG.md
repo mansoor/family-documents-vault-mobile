@@ -6,6 +6,67 @@ app's own, tagged `vX.Y.Z` in this repository.
 
 ## [Unreleased]
 
+## [0.2.3] — iteration 5.36: a menu on every row, what you may see, and notes
+
+Each of these appears only with a vault that has it; with an older vault
+(0.4.10 or later, as before) the app is as in 0.2.2, but for the menu on
+every row, which offers what that vault allows.
+
+### Added
+- **A menu on every row.** A document's ⋯ in a list — Home, Search, a
+  person's documents — and a long press on its row open what its page
+  offers, without going there first: **Open**, **Show** (an Essential),
+  **Save a copy**, **Add a new version**, **Make it Essential** or **Stop
+  it being Essential** (an Essential is what a phone keeps for when there
+  is no signal), and **Add to a collection** with a vault that has
+  collections (0.5.12 or later). Only what would not be refused is
+  offered: somebody who changes nothing — a viewer, and so a guest — has
+  Open and Save a copy, as on the web; a teen changes only their own. A
+  search result's sheet asks the vault for the document as it opens, and
+  opened again starts from what it last had, not the list's older copy;
+  Essential is changed only once the vault has answered. Add to a
+  collection lists the collections you made, says where one is shared
+  outside the family — a screen reader hears it with the Add button too —
+  and after adding, who else will now see it ("Jane Smith (guest) will be
+  able to see this."): the sheet stays open until the vault has answered.
+  Collections you made for people you are no longer one of are said to be
+  so. A screen reader hears "Actions for “Passport”", starts on the first
+  choice, and is taken back to the ⋯ when the sheet closes.
+- **What you may see.** When an owner has limited what you can see (a
+  vault of 0.5.33 or later), Home and Settings say so in the vault's words:
+  "You can see: Tax return documents for Ahmed and your own." A guest — a
+  sign-in for somebody outside the family, a vault of 0.5.34 or later — is
+  told when their access ends, on the family's clock, named ("… ends Friday
+  4 December 2026 at 23:59 (Europe/London, the family's clock)"), or, when
+  the phone cannot learn the family's clock, on this phone's, named so.
+- **When a guest's access has ended**, the phone says "Your access to this
+  family's vault has ended. Ask them to renew it if you still need it." —
+  when the vault ends the session (told by push too, once the vault says
+  why), and at sign-in once the password is right; not "wrong password",
+  and not the words for a session that simply went. Anything kept on the
+  phone goes, as for every end but an expiry.
+- **Notes on a document**, read only, with a vault of 0.5.35 or later:
+  bold, italic, bulleted and numbered lists, checklists (shown, not
+  ticked) and headings, drawn from the vault's shared reading of the note
+  as the phone's own text — never as HTML, so a `<script>` in a note is
+  just those characters. A link goes only to https, http or mailto, shows
+  the address it goes to, and asks before it opens ("Open
+  https://council.example/pay in your browser?"). An address that could
+  pass for somewhere it does not go stays text: one with a hidden or
+  direction-changing character, a name before its host, or a host not in
+  plain ASCII — the phone's URL parser, unlike a browser's, does not turn
+  a host such as a Cyrillic look-alike into punycode, so such a link is
+  never one here. Who last changed the note, and when, is said under it.
+
+### Changed
+- **The capture card's choices — the family's kinds of document and people —
+  are fetched and kept only for someone who may add documents.** A viewer,
+  a guest from outside the family among them, keeps nothing of the family
+  on their phone; and when the vault ends a session because the person's
+  access ended, they were taken out or it was revoked, what the phone kept
+  for that person's card goes with it.
+- Built against the vault's shared code of v0.5.37 (was v0.5.32).
+
 ## [0.2.2] — iteration 5.31: identity, paused access, incoming files and notices
 
 Each of these appears only with a vault that has it; with an older vault

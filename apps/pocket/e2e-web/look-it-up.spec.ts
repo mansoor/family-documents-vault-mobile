@@ -120,7 +120,8 @@ test("search, open, confirm it's you, snooze", async ({ page, baseURL, request }
   // Search: found by its name, opened.
   await page.getByRole('tab', { name: 'Search' }).click();
   await page.getByLabel('Search your documents').fill(word);
-  await page.getByRole('button', { name: title }).click();
+  // The row itself, not its ⋯ ("Actions for “…”", 5.36), which names it too.
+  await page.getByRole('button', { name: new RegExp(`^${title}`) }).click();
   await expect(page.getByRole('button', { name: 'Show', exact: true })).toBeVisible();
 
   // Its pages, once the vault has drawn them (an Essential's are drawn at once).

@@ -1,5 +1,4 @@
 import { ApiRequestError, NetworkError } from '@fdv/client';
-import { wordsFor } from '../errors/words';
 import {
   can,
   colours,
@@ -18,16 +17,17 @@ import { useTranslation } from 'react-i18next';
 import { RefreshControl, ScrollView, StyleSheet, Switch, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { renewWords } from '../capture/renew-words';
-import { holdForShow } from '../show/handoff';
 import { useCapture } from '../state/capture';
 import { useEssentials } from '../state/essentials';
 import { useLock } from '../state/lock';
 import { useStepUp } from '../state/step-up';
 import { useVault } from '../state/vault';
 import { Button, Notice, StatusLine, Text } from '../ui';
+import { keptIsCurrent, saveVersion, setEssential as changeEssential, showDocument, type ActionDeps } from './actions';
 import { detailFacts } from './details';
-import { latestOf, openOnline } from './online';
-import { markWarnedAboutCopies, saveCopy, warnedAboutCopies } from './save-copy';
+import { NoteText } from './notes';
+import { latestOf } from './online';
+import { warnedAboutCopies } from './save-copy';
 
 type Problem = 'offline' | 'not_found' | null;
 
@@ -102,64 +102,46 @@ export function DocumentDetail(props: { id: string }) {
   }, [load, offline, capture.delivered]);
 
   const latest = latestOf(versions);
-  /**
-   * The copy kept on the phone, when it is the current one (or there is no
-   * way to know better, offline): from there, asking nothing. The store
-   * itself is asked, as it may still be opening.
-   */
-  const keptIsCurrent = async () => {
-    const kept = await essentials.keptVersion(id);
-    return !!kept && (offline || !latest || latest.id === kept);
+  // What this page and a row's ⋯ do alike (5.36). The store itself is asked
+  // which copy it keeps, as it may still be opening.
+  const deps: ActionDeps = {
+    withToken,
+    guarded,
+    offline,
+    keptVersion: essentials.keptVersion,
+    push: (to) => router.push(to),
+    away: lock.away,
   };
 
-  // Show mode never asks anybody to confirm it is them: for a copy not kept
-  // here, the pages are confirmed and fetched first, and handed over.
   const showIt = async () => {
     setNotice(null);
-    if (await keptIsCurrent()) {
-      router.push({ pathname: '/show/[id]', params: { id } });
-      return;
-    }
-    if (offline) return warn(t('document.needsConnection'));
     setPreparing(true);
     try {
-      const copy = await openOnline(withToken, guarded, id);
-      if (copy === null) return warn(t('document.pageFailed'));
-      if (copy === 'unconfirmed') return warn(t('document.notConfirmed'));
-      const uris: string[] = [];
-      for (let n = 1; n <= copy.pages; n += 1) {
-        const uri = await copy.page(n);
-        if (uri === null) return warn(t('document.notConfirmed'));
-        uris.push(uri);
-      }
-      holdForShow(id, { ...copy, page: async (n) => uris[n - 1] ?? null });
-      router.push({ pathname: '/show/[id]', params: { id, online: '1' } });
-    } catch (err) {
-      warn(err instanceof NetworkError ? t('document.needsConnection') : t('document.pageFailed'));
+      const problem = await showDocument(deps, id, latest?.id ?? null);
+      if (problem) warn(t(problem));
     } finally {
       setPreparing(false);
     }
   };
   const pages = async () =>
-    router.push({ pathname: '/essential/[id]', params: (await keptIsCurrent()) ? { id } : { id, online: '1' } });
+    router.push({
+      pathname: '/essential/[id]',
+      params: (await keptIsCurrent(deps, id, latest?.id ?? null)) ? { id } : { id, online: '1' },
+    });
 
   const setEssential = async (value: boolean) => {
     if (!doc || toggling) return;
     setNotice(null);
-    if (offline) return warn(t('document.needsConnection'));
     setToggling(true);
     try {
-      // Turning Essential off takes a check away, so a vault of 0.5.3 or
-      // later asks who it is first; not confirmed, nothing changes.
-      const saved = await guarded((a, token) => a.updateDocument(token, id, { is_essential: value }, doc.etag));
-      if (saved) setDoc(saved);
-    } catch (err) {
-      if (err instanceof ApiRequestError && err.status === 409) {
+      // Not confirmed, nothing changes.
+      const outcome = await changeEssential(deps, doc, value, t);
+      if (outcome.kind === 'saved') setDoc(outcome.doc);
+      else if (outcome.kind === 'conflict') {
         // Changed meanwhile by somebody else: theirs is shown, not overwritten.
         warn(t('document.conflict'));
         await load();
-      } else if (err instanceof NetworkError) warn(t('document.needsConnection'));
-      else warn(wordsFor(err, t, 'document.failed'));
+      } else if (outcome.kind === 'failed') warn(outcome.words);
     } finally {
       setToggling(false);
     }
@@ -171,13 +153,8 @@ export function DocumentDetail(props: { id: string }) {
     setSaving(true);
     setNotice(null);
     try {
-      const res = await guarded((a, token) => a.content(token, latest.id));
-      if (!res) return; // not confirmed: nothing done
-      await saveCopy(new Uint8Array(await res.arrayBuffer()), latest.filename, latest.mime, { away: lock.away });
-      // Warned once a copy has really gone out, not before.
-      markWarnedAboutCopies();
-    } catch (err) {
-      warn(err instanceof NetworkError ? t('document.needsConnection') : t('document.saveFailed'));
+      const outcome = await saveVersion(deps, latest);
+      if (typeof outcome === 'object') warn(t(outcome.failed));
     } finally {
       setSaving(false);
     }
@@ -279,6 +256,25 @@ export function DocumentDetail(props: { id: string }) {
           </View>
         ))}
 
+      {/* Its note (5.35), read only, from a vault that has notes you can
+          write: an older one says nothing of when a note last changed. */}
+      {shown.notes_updated_at !== undefined && shown.notes ? (
+        <View style={styles.notes} testID="document-notes">
+          <Text variant="screen">{type?.core?.notes?.label?.trim() || t('document.notes')}</Text>
+          <NoteText source={shown.notes} />
+          {shown.notes_updated_at ? (
+            <Text tone="soft" variant="secondary" testID="document-notes-edited">
+              {shown.notes_updated_by_name
+                ? t('document.notesEditedBy', {
+                    when: whenExactly(shown.notes_updated_at),
+                    name: shown.notes_updated_by_name,
+                  })
+                : t('document.notesEdited', { when: whenExactly(shown.notes_updated_at) })}
+            </Text>
+          ) : null}
+        </View>
+      ) : null}
+
       {mayChange && doc ? (
         <View style={styles.switchRow}>
           <View style={styles.flex}>
@@ -354,6 +350,7 @@ const styles = StyleSheet.create({
     backgroundColor: colours.accentSoft,
   },
   fact: { gap: 2 },
+  notes: { gap: 8 },
   switchRow: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 56 },
   flex: { flex: 1 },
 });

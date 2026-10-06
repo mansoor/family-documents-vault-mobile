@@ -33,6 +33,7 @@ Written by `node apps/pocket/scripts/failure-states.mjs`; CI fails if it is out 
 |  |  | `signIn.startAgain` | Start again from your password. |
 |  |  | `signIn.paused` | An owner has paused your access. Ask them if you think this is a mistake. |
 |  |  | `signIn.pausedRestored` | Your access is paused after the vault was restored. Ask an owner to turn it back on. |
+|  |  | `signIn.accessEnded` | Your access to this family's vault has ended. Ask them to renew it if you still need it. |
 | Any request that fails (wordsFor) | Every screen | `errors.offline` | Can't reach your vault right now. Check this phone's connection, then try again. |
 |  |  | `errors.timeout` | Your vault took too long to answer. Try again in a moment. |
 |  |  | `errors.rateLimited` | Too many tries. Wait a minute, then try again. / Too many tries. Wait {{count}} minutes, then try again. |
@@ -41,6 +42,7 @@ Written by `node apps/pocket/scripts/failure-states.mjs`; CI fails if it is out 
 |  |  | `errors.storageUnreachable` | Your vault can't reach the place it keeps its files right now. Anything waiting on this phone is kept, and sent when it can. |
 |  |  | `errors.sessionEnded` | You were signed out. Sign in again to carry on. |
 |  |  | `errors.paused` | An owner has paused your access. Ask them if you think this is a mistake. |
+|  |  | `errors.accessEnded` | Your access to this family's vault has ended. Ask them to renew it if you still need it. |
 |  |  | `errors.stepUp` | Confirm it's you to carry on. |
 |  |  | `errors.twoStep` | Turn on two-step sign-in in the browser to see this. |
 |  |  | `errors.setupRequired` | This vault hasn't been set up yet. Open it in the browser first. |
@@ -118,6 +120,8 @@ Written by `node apps/pocket/scripts/failure-states.mjs`; CI fails if it is out 
 |  |  | `document.pending` | The vault is still preparing this document's pages. Try again in a minute. |
 |  |  | `document.noPreview` | This document's pages can't be shown on the phone. Save a copy to open it. |
 |  |  | `document.failed` | That didn't work. Try again. |
+| A row’s ⋯ | Home, Search, a person | `row.collectionGone` | “{{name}}” is not there any more, so nothing went into it. |
+| A note’s link | Document | `notes.openFailed` | This phone couldn't open that link. |
 | Search, Needs attention, People | Tabs | `search.needsConnection` | Search needs a connection. Your Essentials are under On this phone. |
 |  |  | `search.sealedNone` | Nothing in your private document matched. / Nothing in your {{count}} private documents matched. |
 |  |  | `attention.needsConnection` | Changes need a connection. |

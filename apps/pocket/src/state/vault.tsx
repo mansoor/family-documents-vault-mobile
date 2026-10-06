@@ -49,11 +49,17 @@ export type Phase = 'loading' | 'connect' | 'sign_in' | 'ready';
  * Why the sign-in screen is shown, or what Home should say. `paused`: the
  * vault ended the session because an owner locked this person's sign-in,
  * or a restore paused it (5.28: the end reason `suspended`).
+ * `access_ended`: a guest's sign-in reached the end an owner gave it (5.34,
+ * the reason `access_ended`).
  */
-export type Notice = 'signed_out_here' | 'paused' | 'reinstalled' | 'stranger' | 'wifi_only' | null;
+export type Notice = 'signed_out_here' | 'paused' | 'access_ended' | 'reinstalled' | 'stranger' | 'wifi_only' | null;
 
 /** What the sign-in screen says after the vault ended the session, by its reason. */
-const endedNotice = (reason: string | undefined): Notice => (reason === 'suspended' ? 'paused' : 'signed_out_here');
+const endedNotice = (reason: string | undefined): Notice =>
+  reason === 'suspended' ? 'paused' : reason === 'access_ended' ? 'access_ended' : 'signed_out_here';
+
+/** The reasons the person is told in words of their own, not "signed out". */
+const toldWhy = (reason: string | undefined) => reason === 'suspended' || reason === 'access_ended';
 
 export type SignInResult =
   | { kind: 'ok' }
@@ -65,6 +71,11 @@ export type SignInResult =
    * `403 membership_suspended`). A reason never heard of is a lock.
    */
   | { kind: 'paused'; reason: 'locked' | 'restored' }
+  /**
+   * The password (and code) were right, but this is a guest whose access
+   * has ended (5.34, `403 access_ended`): an owner renews it.
+   */
+  | { kind: 'access_ended' }
   | { kind: 'unreachable' }
   | { kind: 'stranger' }
   | { kind: 'wifi_only' };
@@ -438,8 +449,8 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
    * background: signing out never waits for the vault (a launch would sit on
    * its spinner while a vault that does not answer timed out). It answers
    * session_ended with the reason, and a lock or a restore turns "signed
-   * out" into "paused". No answer, or one that says the session lives,
-   * leaves "signed out", as before.
+   * out" into "paused", a guest's end into its own words (5.36). No answer,
+   * or one that says the session lives, leaves "signed out", as before.
    */
   const endedByPush = useCallback(async () => {
     // Not the vault's session core yet: the launch looks at the flag itself.
@@ -465,8 +476,9 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
           await api.refresh(ask);
         } catch (err) {
           // Said only while nothing newer was: a sign-in since clears the notice.
-          if (isSessionOver(err) && (err as ApiRequestError).reason === 'suspended') {
-            setNotice((n) => (n === 'signed_out_here' ? endedNotice('suspended') : n));
+          const reason = (err as ApiRequestError).reason;
+          if (isSessionOver(err) && toldWhy(reason)) {
+            setNotice((n) => (n === 'signed_out_here' ? endedNotice(reason) : n));
           }
         }
       })();
@@ -638,6 +650,12 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
     if (err instanceof ApiRequestError && err.code === 'membership_suspended') {
       emit('sessionEnded', 'suspended');
       return { kind: 'paused', reason: err.reason === 'restored' ? 'restored' : 'locked' };
+    }
+    // Proven, and a guest whose access has ended (5.34): said in the phone's
+    // words, and whatever is kept here goes, as for every end but an expiry.
+    if (err instanceof ApiRequestError && err.code === 'access_ended') {
+      emit('sessionEnded', 'access_ended');
+      return { kind: 'access_ended' };
     }
     // The vault's words for a wrong password; the catalogue's for anything else (4.17).
     const words = wordsFor(err, i18n.t.bind(i18n));

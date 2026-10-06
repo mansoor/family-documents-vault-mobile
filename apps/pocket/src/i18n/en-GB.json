@@ -56,6 +56,7 @@
     "signedOutHere": "You've been signed out on this phone. Sign in again to carry on.",
     "paused": "An owner has paused your access. Ask them if you think this is a mistake.",
     "pausedRestored": "Your access is paused after the vault was restored. Ask an owner to turn it back on.",
+    "accessEnded": "Your access to this family's vault has ended. Ask them to renew it if you still need it.",
     "otherVault": "Use a different vault",
     "waiting_one": "A scan is waiting on this phone. It goes to the vault when the person who made it signs in.",
     "waiting_other": "{{count}} scans are waiting on this phone. Each goes to the vault when the person who made it signs in."
@@ -401,6 +402,9 @@
     "offline": "No connection. What you see may be out of date.",
     "notFound": "This document isn't there any more, or it isn't yours to see.",
     "untitled": "Untitled document",
+    "notes": "Notes",
+    "notesEdited": "Edited {{when}}",
+    "notesEditedBy": "Edited {{when}} by {{name}}",
     "visibility_household": "Everyone in the family",
     "visibility_adults": "Adults only",
     "visibility_private": "Only me",
@@ -543,6 +547,43 @@
     "wifiOnly": "Nothing was sent: this vault is only used on Wi-Fi. Join your Wi-Fi, then try again.",
     "unavailable": "Your vault is busy or starting up. Try again in a moment.",
     "internal": "Something went wrong on your vault. Try again in a moment; if it keeps happening, whoever looks after the vault can have a look.",
-    "storageUnreachable": "Your vault can't reach the place it keeps its files right now. Anything waiting on this phone is kept, and sent when it can."
+    "storageUnreachable": "Your vault can't reach the place it keeps its files right now. Anything waiting on this phone is kept, and sent when it can.",
+    "accessEnded": "Your access to this family's vault has ended. Ask them to renew it if you still need it."
+  },
+  "access": {
+    "title": "What you can see",
+    "endsFamily": "Your access to this vault ends {{when}} ({{zone}}, the family's clock).",
+    "endsPhone": "Your access to this vault ends {{when}} ({{zone}}, this phone's clock)."
+  },
+  "row": {
+    "menu": "Actions for “{{title}}”",
+    "open": "Open",
+    "essentialOn": "Make it Essential",
+    "essentialOff": "Stop it being Essential",
+    "essentialMade": "It's an Essential now. A phone that keeps Essentials keeps it for when there's no signal.",
+    "essentialTaken": "It's not an Essential any more.",
+    "collect": "Add to a collection",
+    "collectTitle": "Add “{{title}}” to a collection",
+    "collectLoading": "Finding your collections…",
+    "collectNone": "You haven't made a collection yet. Only the person who made a collection can put documents in it, and collections are made in the browser.",
+    "collectOutgrown_one": "The collection you made is for people you are no longer one of: you can still delete it, but not put documents in it.",
+    "collectOutgrown_other": "The {{count}} collections you made are for people you are no longer one of: you can still delete them, but not put documents in them.",
+    "collectAdd": "Add",
+    "collectAddTo": "Add to “{{name}}”",
+    "collectIn": "In this collection",
+    "collected": "“{{title}}” is in “{{name}}” now.",
+    "collectionGone": "“{{name}}” is not there any more, so nothing went into it.",
+    "documents_one": "1 document",
+    "documents_other": "{{count}} documents",
+    "done": "Done"
+  },
+  "notes": {
+    "done": "Done",
+    "toDo": "To do",
+    "linkHint": "Asks before it opens",
+    "openWeb": "Open {{address}} in your browser?",
+    "openMail": "Open {{address}} in your email app?",
+    "open": "Open it",
+    "openFailed": "This phone couldn't open that link."
   }
 }

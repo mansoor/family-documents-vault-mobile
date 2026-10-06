@@ -1,0 +1,90 @@
+# Iteration 5.36: a menu on every row, and a note on a document, against
+# the vault the app is pinned to. .github/scripts/notes-seed.sh gave the
+# one document (the passport the capture flow sent) a note in the vault's
+# small Markdown. On Home, the row's ⋯ opens what may be done with it, and
+# so does a long press on the row; Open goes to the document, where the
+# note is drawn: its heading, its words, its checklist and its link.
+appId: io.github.mansoor.familyvault.e2e
+env:
+  VAULT: 10.0.2.2:8099
+---
+- launchApp:
+    clearState: true
+# Last of the flows, on an emulator busy for a while by then: a cold start
+# after clearing the app's data can take longer than tapOn waits.
+- extendedWaitUntil:
+    visible:
+      id: connect-address
+    timeout: 30000
+- tapOn:
+    id: connect-address
+- inputText: ${VAULT}
+- hideKeyboard
+- tapOn:
+    id: connect-go
+- extendedWaitUntil:
+    visible:
+      id: connect-approve-http
+    timeout: 30000
+- tapOn:
+    id: connect-approve-http
+- tapOn:
+    id: sign-in-email
+- inputText: ${EMAIL}
+- tapOn:
+    id: sign-in-password
+- inputText: ${PASSWORD}
+- hideKeyboard
+- tapOn:
+    id: sign-in-go
+- extendedWaitUntil:
+    visible:
+      id: home-list
+    timeout: 30000
+
+# The row's ⋯: the sheet, Open first; Back closes it.
+- scrollUntilVisible:
+    element:
+      id: doc-menu-.*
+    timeout: 30000
+- tapOn:
+    id: doc-menu-.*
+- extendedWaitUntil:
+    visible:
+      id: row-sheet
+    timeout: 15000
+- assertVisible:
+    id: row-sheet-open
+- assertVisible:
+    id: row-sheet-save
+- back
+- assertNotVisible:
+    id: row-sheet
+
+# A long press on the row opens it too; Open goes to the document.
+- longPressOn:
+    id: doc-row-.*
+- extendedWaitUntil:
+    visible:
+      id: row-sheet
+    timeout: 15000
+- tapOn:
+    id: row-sheet-open
+- extendedWaitUntil:
+    visible:
+      id: document
+    timeout: 30000
+
+# The note, drawn from the vault's Markdown as the phone's own text.
+- scrollUntilVisible:
+    element:
+      id: document-notes
+    timeout: 30000
+- assertVisible:
+    text: Where it is
+- assertVisible:
+    text: The blue folder, top shelf.
+- assertVisible:
+    id: note-box-done
+- assertVisible:
+    text: .*Renew online.*
