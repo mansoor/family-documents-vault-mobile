@@ -63,7 +63,7 @@ export default function PersonScreen() {
           {docs && docs.length === 0 ? <Text tone="soft">{t('people.none', { name: name ?? '' })}</Text> : null}
         </>
       }
-      renderItem={({ item }) => <DocumentRow id={item.id} title={item.title} status={item.status} />}
+      renderItem={({ item }) => <DocumentRow id={item.id} title={item.title} status={item.status} doc={item} />}
     />
   );
 }

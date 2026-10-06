@@ -20,12 +20,12 @@ const AREAS = [
     'connect',
     'invalid notAVault unreachable setupRequired serverTooOld clientTooOld apiVersion askHttp refusePublicHttp refuseMobileData stranger reinstalled certificateUntrusted certificateWrongName certificateExpired captivePortal linkJoin linkReset linkShared',
   ],
-  ['Signing in', 'Sign in', 'signIn', 'signedOutHere passkeyOnly startAgain paused pausedRestored'],
+  ['Signing in', 'Sign in', 'signIn', 'signedOutHere passkeyOnly startAgain paused pausedRestored accessEnded'],
   [
     'Any request that fails (wordsFor)',
     'Every screen',
     'errors',
-    'offline timeout rateLimited unavailable internal storageUnreachable sessionEnded paused stepUp twoStep setupRequired unexpected stranger wifiOnly invalidCredentials notFound previewPending noPreview uploadInProgress invalidExtra general',
+    'offline timeout rateLimited unavailable internal storageUnreachable sessionEnded paused accessEnded stepUp twoStep setupRequired unexpected stranger wifiOnly invalidCredentials notFound previewPending noPreview uploadInProgress invalidExtra general',
   ],
   ['The lock', 'Lock screen, Settings', 'lock', 'tooMany noScreenLock weakBiometrics enrolmentChanged'],
   [
@@ -56,6 +56,8 @@ const AREAS = [
     'document',
     'conflict needsConnection notFound notConfirmed saveWarning saveFailed pageFailed pending noPreview failed',
   ],
+  ['A row’s ⋯', 'Home, Search, a person', 'row', 'collectionGone'],
+  ['A note’s link', 'Document', 'notes', 'openFailed'],
   ['Search, Needs attention, People', 'Tabs', 'search', 'needsConnection sealedNone'],
   ['', '', 'attention', 'needsConnection failed'],
   ['', '', 'people', 'needsConnection'],

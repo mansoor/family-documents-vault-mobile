@@ -5,6 +5,7 @@ import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Modal, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { AccessCard } from '../access/access';
 import { APP_VERSION, SPIKE } from '../config';
 import { NotificationsCard } from '../push/card';
 import { SignedInDevices } from '../settings/devices';
@@ -18,9 +19,10 @@ import { useTextScale } from '../ui/text-scale';
 
 /**
  * Settings, in full (4.15): which vault (and whether it is reached without
- * encryption), changing it, who is signed in and on which devices, the
- * lock, the offline copies, notifications, Large text, About — and the
- * browser for everything else.
+ * encryption), changing it, who is signed in — and what they can see, when
+ * an owner limited it (5.36) — and on which devices, the lock, the offline
+ * copies, notifications, Large text, About — and the browser for
+ * everything else.
  */
 export default function Settings() {
   const { t } = useTranslation();
@@ -112,6 +114,7 @@ export default function Settings() {
           onPress={() => setChanging(true)}
         />
       </Card>
+      <AccessCard />
       <SignedInDevices />
       <Card>
         <View style={styles.row}>

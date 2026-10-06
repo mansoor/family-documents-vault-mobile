@@ -13,7 +13,8 @@ import { Button, Card, Field, Notice, Text } from '../ui';
  * two-step sign-in. A wrong password shows the vault's own words. A
  * sign-in an owner paused — locked, or waiting after a restore (5.28) —
  * says so plainly, whether the vault ended the session or refused the
- * sign-in: nothing went wrong, and the person is told whom to ask.
+ * sign-in: nothing went wrong, and the person is told whom to ask. So does
+ * a guest's whose access has ended (5.34, 5.36).
  */
 export default function SignIn() {
   const { t } = useTranslation();
@@ -62,6 +63,11 @@ export default function SignIn() {
           {notice === 'paused' && failure?.kind !== 'paused' ? (
             <Notice tone="warn" testID="sign-in-paused">
               {t('signIn.paused')}
+            </Notice>
+          ) : null}
+          {notice === 'access_ended' || failure?.kind === 'access_ended' ? (
+            <Notice tone="warn" testID="sign-in-access-ended">
+              {t('signIn.accessEnded')}
             </Notice>
           ) : null}
           {waitingHere > 0 ? (

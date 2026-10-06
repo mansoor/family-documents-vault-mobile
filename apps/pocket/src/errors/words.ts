@@ -29,6 +29,8 @@ export const CATALOGUE: Readonly<Record<string, string>> = {
   invalid_credentials: 'errors.invalidCredentials',
   // An owner locked this sign-in, or a restore paused it (5.28): the sign-in screen says which.
   membership_suspended: 'errors.paused',
+  // A guest's access reached the end an owner gave it (5.34): the sign-in screen says so.
+  access_ended: 'errors.accessEnded',
   // Another person's identity numbers take two-step sign-in (5.26): the vault's words say for what.
   two_step_required: 'errors.twoStep',
   totp_required_for_owner: 'errors.twoStep',

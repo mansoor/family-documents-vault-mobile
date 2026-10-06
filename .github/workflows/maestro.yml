@@ -2,7 +2,8 @@ name: Maestro
 
 # The phone on an emulator, against a real vault (4.5; the lock, 4.8; kept
 # Essentials in airplane mode, and wiped by a revoked session, 4.10; Show
-# mode, 4.11; Back, 4.15; the largest text, 4.17; the Identity card, 5.31):
+# mode, 4.11; Back, 4.15; the largest text, 4.17; the Identity card, 5.31;
+# a row's menu and a note, 5.36):
 # the e2e build (x86_64, fixture scanner) runs .maestro/ flows while a vault
 # from the published images runs on the host, reached as 10.0.2.2. The push
 # and clipboard modules' JVM tests (4.14, 5.31) run with the build. A run costs about 40
@@ -159,7 +160,10 @@ jobs:
             sh .github/scripts/identity-seed.sh || touch identity-seed-failed
             adb shell svc power stayon true || true
             $HOME/.maestro/bin/maestro test -e EMAIL="$EMAIL" -e PASSWORD="$PASSWORD" --format junit --output maestro-identity.xml apps/pocket/.maestro/identity.yaml || sh .github/scripts/on-flow-failure.sh identity
-            sh -c 'for f in capture-failed lock-failed cache-check-failed essentials-seed-failed essentials-failed show-failed back-failed large-text-failed essentials-kept-failed essentials-revoke-failed revoked-failed essentials-gone-failed identity-seed-failed identity-failed; do if [ -f "$f" ]; then echo "failed: $f"; exit 1; fi; done'
+            # A row's menu, from its ⋯ and a long press, and a note drawn on the document (5.36).
+            sh .github/scripts/notes-seed.sh || touch notes-seed-failed
+            $HOME/.maestro/bin/maestro test -e EMAIL="$EMAIL" -e PASSWORD="$PASSWORD" --format junit --output maestro-row-menu.xml apps/pocket/.maestro/row-menu.yaml || sh .github/scripts/on-flow-failure.sh row-menu
+            sh -c 'for f in capture-failed lock-failed cache-check-failed essentials-seed-failed essentials-failed show-failed back-failed large-text-failed essentials-kept-failed essentials-revoke-failed revoked-failed essentials-gone-failed identity-seed-failed identity-failed notes-seed-failed row-menu-failed; do if [ -f "$f" ]; then echo "failed: $f"; exit 1; fi; done'
 
       - name: Exactly one document, carrying the card's fields
         run: |
@@ -193,6 +197,7 @@ jobs:
             maestro-show.xml
             maestro-revoked.xml
             maestro-identity.xml
+            maestro-row-menu.xml
             app-files.txt
             essentials-files.txt
             ui-*.xml

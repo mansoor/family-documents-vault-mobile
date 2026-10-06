@@ -20,8 +20,10 @@ import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
 import { FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { AccessNotice, myAccess, type MyAccess } from '../../access/access';
 import { QueueRow, withoutWords } from '../../capture/queue-row';
 import { useBeginCapture } from '../../capture/add-button';
+import { useDocumentMenu } from '../../documents/menu';
 import { offersNewScan, reminderHeadline } from '../../documents/reminders';
 import { wordsFor } from '../../errors/words';
 import { OnThisPhone } from '../../essentials/ui';
@@ -43,6 +45,8 @@ interface HomeData {
   resetNotice: ResetNotice | null;
   /** A wider audience for identity details, waiting its notice (5.26, A34): everybody is told. */
   widening: IdentityAudienceView['pending'];
+  /** What an owner limited this person to, and a guest's end (5.33, 5.34). */
+  access: MyAccess | null;
 }
 
 /**
@@ -61,7 +65,8 @@ const optional = <T,>(p: Promise<T>): Promise<T | null> =>
  * last had when the vault cannot be reached, under a plain banner. Above
  * them, what the person must be told (5.31): that an owner made a link to
  * reset their password, and what was added to their sign-in since; and
- * that more people will soon see their identity details.
+ * that more people will soon see their identity details. And what they can
+ * see, when an owner limited it, and a guest's end (5.36).
  */
 export default function Home() {
   const { t } = useTranslation();
@@ -120,6 +125,8 @@ export default function Home() {
           token,
           resetNotice: me?.reset_notice ?? null,
           widening: audience?.pending ?? null,
+          // A guest's end is said on the family's clock, which the profile knows.
+          access: await myAccess(me, async () => (await optional(a.profile(token)))?.timezone),
         };
       });
       setData(next);
@@ -258,6 +265,7 @@ export default function Home() {
             ) : null}
             {data?.resetNotice ? <ResetNoticeCard notice={data.resetNotice} onSeen={() => void load()} /> : null}
             {data?.widening ? <WideningNotice pending={data.widening} memberId={who?.member_id ?? null} /> : null}
+            {data?.access ? <AccessNotice access={data.access} /> : null}
             <OnThisPhone />
             <Text variant="screen">{t('home.attentionTitle')}</Text>
             {data && data.unnamed > 0 ? (
@@ -480,36 +488,44 @@ function FiledWithoutLine(props: { lines: string[] }) {
   );
 }
 
+/** One of what came in lately: its picture, name and status; its ⋯, or a long press, for what may be done (5.36). */
 function DocumentRow(props: { doc: DocumentView; token: string | null; thumb: string | null }) {
   const { t } = useTranslation();
   const router = useRouter();
   const { doc } = props;
+  const title = doc.title ?? t('home.needsAName');
+  const menu = useDocumentMenu({ id: doc.id, title, doc });
   return (
-    <Pressable
-      style={({ pressed }) => [styles.row, pressed ? styles.pressed : null]}
-      accessibilityRole="button"
-      accessibilityLabel={doc.title ?? t('home.needsAName')}
-      testID={`doc-row-${doc.id}`}
-      onPress={() => router.push({ pathname: '/document/[id]', params: { id: doc.id } })}
-    >
-      <View style={styles.thumb}>
-        {props.thumb && props.token ? (
-          <Image
-            source={{ uri: props.thumb, headers: { authorization: `Bearer ${props.token}` } }}
-            // Held in memory only: a document's picture never lands in the
-            // phone's disk cache.
-            cachePolicy="memory"
-            style={styles.thumbImage}
-            contentFit="cover"
-            accessibilityIgnoresInvertColors
-          />
-        ) : null}
-      </View>
-      <View style={styles.flex}>
-        <Text weight="600">{doc.title ?? t('home.needsAName')}</Text>
-        <StatusLine status={doc.status} />
-      </View>
-    </Pressable>
+    <View style={styles.row}>
+      <Pressable
+        style={({ pressed }) => [styles.rowMain, pressed ? styles.pressed : null]}
+        accessibilityRole="button"
+        accessibilityLabel={title}
+        testID={`doc-row-${doc.id}`}
+        onPress={() => router.push({ pathname: '/document/[id]', params: { id: doc.id } })}
+        onLongPress={menu.open}
+      >
+        <View style={styles.thumb}>
+          {props.thumb && props.token ? (
+            <Image
+              source={{ uri: props.thumb, headers: { authorization: `Bearer ${props.token}` } }}
+              // Held in memory only: a document's picture never lands in the
+              // phone's disk cache.
+              cachePolicy="memory"
+              style={styles.thumbImage}
+              contentFit="cover"
+              accessibilityIgnoresInvertColors
+            />
+          ) : null}
+        </View>
+        <View style={styles.flex}>
+          <Text weight="600">{title}</Text>
+          <StatusLine status={doc.status} />
+        </View>
+      </Pressable>
+      {menu.button}
+      {menu.sheet}
+    </View>
   );
 }
 
@@ -529,15 +545,14 @@ const styles = StyleSheet.create({
   recentTitle: { marginTop: 12 },
   row: {
     flexDirection: 'row',
-    gap: 12,
     alignItems: 'center',
     backgroundColor: colours.surface,
     borderRadius: radii.l,
     borderWidth: 1,
     borderColor: colours.border,
-    padding: 10,
-    minHeight: 72,
+    paddingRight: 4,
   },
+  rowMain: { flex: 1, flexDirection: 'row', gap: 12, alignItems: 'center', padding: 10, minHeight: 72 },
   thumb: { width: 48, height: 64, borderRadius: radii.s, backgroundColor: colours.accentSoft, overflow: 'hidden' },
   thumbImage: { width: 48, height: 64 },
 });

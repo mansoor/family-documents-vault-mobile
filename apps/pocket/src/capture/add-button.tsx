@@ -43,7 +43,7 @@ export function useBeginCapture() {
 }
 
 /** A screen reader's focus to this view; on the web, the browser's own focus. */
-function focusOn(view: RefObject<View | null>) {
+export function focusOn(view: RefObject<View | null>) {
   const v = view.current;
   if (!v) return;
   if (Platform.OS === 'web') (v as unknown as { focus?: () => void }).focus?.();

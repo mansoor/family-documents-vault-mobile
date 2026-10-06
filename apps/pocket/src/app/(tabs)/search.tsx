@@ -12,7 +12,7 @@ import { Field, Notice, Text } from '../../ui';
 export const SEARCH_DEBOUNCE_MS = 250;
 
 type Sealed = { state: 'idle' | 'searching' | 'done'; items: SearchHit[]; searched: number };
-type Row = { id: string; title: string | null; status: SearchHit['status']; snippet?: string };
+type Row = { id: string; title: string | null; status: SearchHit['status']; snippet?: string; doc?: DocumentView };
 
 /**
  * Search (4.12): one field, results as the person types (a quarter of a
@@ -105,7 +105,7 @@ export default function SearchScreen() {
     ? []
     : hits
       ? hits.map((h) => ({ id: h.document_id, title: h.title, status: h.status, snippet: h.snippet }))
-      : (browse ?? []).map((d) => ({ id: d.id, title: d.title, status: d.status }));
+      : (browse ?? []).map((d) => ({ id: d.id, title: d.title, status: d.status, doc: d }));
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
