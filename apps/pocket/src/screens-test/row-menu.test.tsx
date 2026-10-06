@@ -1,4 +1,4 @@
-import type { DocumentView, SearchHit } from '@fdv/shared';
+import { sharedOutsideWords, type DocumentView, type SearchHit } from '@fdv/shared';
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react-native';
 import Home from '../app/(tabs)/index';
 import SearchScreen from '../app/(tabs)/search';
@@ -55,6 +55,22 @@ function listed(t: TestVault, doc: DocumentView): DocumentView {
   return doc;
 }
 
+/** A collection as the client's fake keeps one: for everyone in the family, made by `owner`. */
+function made(id: string, name: string, owner: string) {
+  return {
+    id,
+    name,
+    description: null,
+    audience: 'everyone' as 'everyone' | 'adults',
+    owner_member_id: owner,
+    created_at: '2026-09-01T00:00:00Z',
+    updated_at: '2026-09-01T00:00:00Z',
+    revision: 1,
+    deleted: false,
+    items: [],
+  };
+}
+
 function hit(doc: DocumentView): SearchHit {
   return {
     document_id: doc.id,
@@ -74,6 +90,13 @@ async function fromSearch(t: TestVault, docs: DocumentView[], id: string) {
   await fireEvent.changeText(await screen.findByTestId('search-field'), 'any');
   await fireEvent.press(await screen.findByTestId(`doc-menu-${id}`));
   return screen.findByTestId('row-sheet');
+}
+
+/** A choice of the sheet's, once it may be pressed. */
+async function ready(testID: string) {
+  const choice = await screen.findByTestId(testID);
+  await waitFor(() => expect(screen.getByTestId(testID).props.accessibilityState.disabled).toBe(false));
+  return choice;
 }
 
 /** What the sheet offers, as a screen reader lists it. */
@@ -177,7 +200,7 @@ describe('a menu on every row (5.36)', () => {
     const bill = libraryDoc(t, { id: 'bill', title: 'Water bill' });
     await unlocked(t, <SearchScreen />);
     await fromSearch(t, [bill], 'bill');
-    await fireEvent.press(await screen.findByTestId('row-sheet-essential'));
+    await fireEvent.press(await ready('row-sheet-essential'));
     expect(await screen.findByTestId('row-sheet-said')).toHaveTextContent(
       "It's an Essential now. A phone that keeps Essentials keeps it for when there's no signal.",
     );
@@ -185,27 +208,68 @@ describe('a menu on every row (5.36)', () => {
     expect(offered()).toContain('Stop it being Essential');
   });
 
-  it('Add to a collection: only those one made, and who else will now see it', async () => {
+  it("opened again, the sheet starts from what it last had, not the list's stale copy", async () => {
     const t = vault();
     const bill = listed(t, libraryDoc(t, { id: 'bill', title: 'Water bill' }));
-    const made = (id: string, name: string, owner: string) => ({
-      id,
-      name,
-      description: null,
-      audience: 'everyone' as const,
-      owner_member_id: owner,
-      created_at: '2026-09-01T00:00:00Z',
-      updated_at: '2026-09-01T00:00:00Z',
-      revision: 1,
-      deleted: false,
-      items: [],
+    let hold: Promise<void> | null = null;
+    let answer: () => void = () => undefined;
+    const base = t.fetch;
+    t.fetch = async (url, init) => {
+      if (hold && url.endsWith('/api/v1/documents/bill') && init.method === 'GET') await hold;
+      return base(url, init);
+    };
+    await unlocked(t, <Home />);
+    // Made an Essential from Home's ⋯ — and Home's list is not loaded again.
+    await fireEvent.press(await screen.findByTestId(`doc-menu-${bill.id}`));
+    await fireEvent.press(await ready('row-sheet-essential'));
+    await screen.findByTestId('row-sheet-said');
+    await fireEvent.press(screen.getByTestId('row-sheet-cancel'));
+    await waitFor(() => expect(screen.queryByTestId('row-sheet')).toBeNull());
+    // Opened again while the vault is slow to answer: what the sheet last had, at once.
+    hold = new Promise<void>((resolve) => {
+      answer = resolve;
     });
+    await fireEvent.press(screen.getByTestId(`doc-menu-${bill.id}`));
+    await screen.findByTestId('row-sheet');
+    expect(offered()).toEqual([
+      'Open',
+      'Show',
+      'Save a copy',
+      'Add a new version',
+      'Stop it being Essential',
+      'Add to a collection',
+    ]);
+    // Nothing is changed from it until the vault has answered: no stale ETag, no "someone changed this".
+    expect(screen.getByTestId('row-sheet-essential').props.accessibilityState.disabled).toBe(true);
+    const patches = () => t.calls.filter((c) => c.startsWith('PATCH ')).length;
+    const before = patches();
+    await fireEvent.press(screen.getByTestId('row-sheet-essential'));
+    expect(patches()).toBe(before);
+    expect(screen.queryByText("Someone changed this while you were looking. Here's the latest.")).toBeNull();
+    await act(async () => answer());
+    await ready('row-sheet-essential');
+  });
+
+  it('Add to a collection: only those one made; the sheet waits for it, and says who else sees it', async () => {
+    const t = vault();
+    const bill = listed(t, libraryDoc(t, { id: 'bill', title: 'Water bill' }));
     t.vault.state.collections.push(made('acc', 'For the accountant', 'fake-member'), made('theirs', 'Holiday', 'x'));
-    // What the vault says of who will now see it (5.33).
+    // Shared outside the family (5.19), as the vault says it to the collection's maker…
+    const outside = { with: ['Jane Smith'], following: true };
+    // …and, once something is put in, who else will now see it (5.33) — after a slow connection.
+    let answer: () => void = () => undefined;
+    const held = new Promise<void>((resolve) => {
+      answer = resolve;
+    });
     const base = t.fetch;
     t.fetch = async (url, init) => {
       const res = await base(url, init);
+      if (url.endsWith('/api/v1/collections') && init.method === 'GET' && res.ok) {
+        const body = (await res.json()) as { items: { id: string }[] };
+        return respond(200, { items: body.items.map((c) => (c.id === 'acc' ? { ...c, shared_outside: outside } : c)) });
+      }
       if (!/\/collections\/[^/]+\/items$/.test(url) || init.method !== 'POST' || !res.ok) return res;
+      await held;
       const body = (await res.json()) as Record<string, unknown>;
       return respond(200, { ...body, warnings: ['Jane Smith (guest) will be able to see this.'] });
     };
@@ -214,13 +278,45 @@ describe('a menu on every row (5.36)', () => {
     await fireEvent.press(await screen.findByTestId('row-sheet-collect'));
     await screen.findByTestId('row-collection-acc');
     expect(screen.queryByTestId('row-collection-theirs')).toBeNull();
+    expect(screen.getByTestId('row-collection-acc')).toHaveTextContent(/0 documents/);
+    // The warning is heard with the Add button itself, not only read beside it (S536-02).
+    const add = screen.getByTestId('row-collection-add-acc');
+    expect(add.props.accessibilityLabel).toBe('Add to “For the accountant”');
+    expect(add.props.accessibilityHint).toBe(sharedOutsideWords(outside, 'owner'));
     expect(audit()).toEqual([]);
-    await fireEvent.press(screen.getByTestId('row-collection-add-acc'));
+    await fireEvent.press(add);
+    // On its way: Done, Back and a tap outside all wait for it (U536-01).
+    await waitFor(() => expect(screen.getByTestId('row-sheet-cancel').props.accessibilityState.disabled).toBe(true));
+    await fireEvent.press(screen.getByTestId('row-sheet-cancel'));
+    await fireEvent.press(screen.getByTestId('row-sheet-outside', { includeHiddenElements: true }));
+    await fireEvent(screen.getByTestId('row-sheet'), 'requestClose');
+    expect(screen.getByTestId('row-sheet')).toBeTruthy();
+    await act(async () => answer());
     expect(await screen.findByTestId('row-sheet-said')).toHaveTextContent(
       '“Water bill” is in “For the accountant” now. Jane Smith (guest) will be able to see this.',
     );
     expect(await screen.findByTestId('row-collection-in-acc')).toHaveTextContent('In this collection');
+    expect(screen.getByTestId('row-collection-acc')).toHaveTextContent(/1 document[^s]/);
     expect(t.vault.state.collections[0]?.items.map((i) => i.document_id)).toEqual(['bill']);
+    // Done now.
+    expect(screen.getByTestId('row-sheet-cancel').props.accessibilityState.disabled).toBe(false);
+    await fireEvent.press(screen.getByTestId('row-sheet-cancel'));
+    await waitFor(() => expect(screen.queryByTestId('row-sheet')).toBeNull());
+  });
+
+  it("collections one made for people one is no longer one of are said to be so, not that there are none", async () => {
+    const t = vault();
+    // An adult who made an Adults collection, since made a teen (A18).
+    t.vault.state.role = 'teen';
+    const mine = listed(t, libraryDoc(t, { id: 'mine', title: 'My passport', owner_member_id: 'fake-member' }));
+    t.vault.state.collections.push({ ...made('grown', 'Grown-up papers', 'fake-member'), audience: 'adults' });
+    await unlocked(t, <SearchScreen />);
+    await fromSearch(t, [mine], 'mine');
+    await fireEvent.press(await screen.findByTestId('row-sheet-collect'));
+    expect(await screen.findByTestId('row-collections-none')).toHaveTextContent(
+      'The collection you made is for people you are no longer one of: you can still delete it, but not put documents in it.',
+    );
+    expect(screen.queryByText(/haven't made a collection/)).toBeNull();
   });
 
   it('Save a copy, from the sheet: warned the first time, then handed over, and the sheet is done with', async () => {

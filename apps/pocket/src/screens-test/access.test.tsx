@@ -5,6 +5,7 @@ import Home from '../app/(tabs)/index';
 import Settings from '../app/settings';
 import SignIn from '../app/sign-in';
 import { MemoryEssentialsStore } from '../essentials/store';
+import { MemoryQueueStore } from '../queue/store';
 import { LockGate } from '../lock/gate';
 import { useLock } from '../state/lock';
 import { useVault } from '../state/vault';
@@ -12,7 +13,7 @@ import { audit } from '../test-support/a11y';
 import { addGuest, endGuest, grant, GUEST, signedInAs } from '../test-support/guest';
 import { phoneParts } from '../test-support/lookup';
 import { FakePushNative } from '../test-support/push';
-import { installed, knownVault, renderApp, respond, signedIn } from '../test-support/render';
+import { installed, knownVault, renderApp, respond, signedIn, testCapture } from '../test-support/render';
 import { resetRoutes } from '../test-support/router';
 import { capabilities, caps0519, testVault, type TestVault } from '../test-support/vault';
 
@@ -25,6 +26,9 @@ jest.mock('expo-linking', () => ({ openURL: jest.fn(async () => true) }));
 const ORIGIN = 'https://vault.test';
 const ENDED = "Your access to this family's vault has ended. Ask them to renew it if you still need it.";
 const SIGNED_OUT = "You've been signed out on this phone. Sign in again to carry on.";
+/** What the phone keeps for a person's capture card, by vault and member. */
+const CARD_GUEST = `card|${ORIGIN}|${GUEST.id}`;
+const CARD_OWNER = `card|${ORIGIN}|fake-member`;
 
 beforeEach(() => {
   installed();
@@ -53,13 +57,16 @@ function withProfile(t: TestVault, timezone: string | null) {
 
 /** The app's own gates, as _layout has them: Home once signed in and unlocked, else Sign in. */
 function App(props: { start?: 'home' | 'settings' }) {
-  const { phase, withToken } = useVault();
+  const { phase, withToken, signOut } = useVault();
   const { status } = useLock();
   return (
     <LockGate>
       {/* Something asks the vault, as any screen does. */}
       <Text testID="poke" onPress={() => void withToken((a, token) => a.me(token)).catch(() => undefined)}>
         poke
+      </Text>
+      <Text testID="sign-out" onPress={() => void signOut()}>
+        sign out
       </Text>
       {phase === 'sign_in' ? (
         <SignIn />
@@ -73,15 +80,20 @@ function App(props: { start?: 'home' | 'settings' }) {
 }
 
 /** Signed in as the guest, the app unlocked, with something kept on the phone. */
-async function guestApp(t: TestVault, opts: { start?: 'home' | 'settings'; fetch?: FetchLike } = {}) {
+async function guestApp(
+  t: TestVault,
+  opts: { start?: 'home' | 'settings'; fetch?: FetchLike; queue?: MemoryQueueStore } = {},
+) {
   const parts = phoneParts();
   parts.stores.set('everyday', new MemoryEssentialsStore());
   await signedIn(t);
   await signedInAs(t, GUEST.email, GUEST.password);
+  const queue = opts.queue;
   await renderApp(<App {...(opts.start ? { start: opts.start } : {})} />, {
     fetch: opts.fetch ?? t.fetch,
     lock: parts.lock,
     essentials: parts.essentials,
+    ...(queue ? { capture: testCapture({ openStore: async () => queue }) } : {}),
   });
   await fireEvent.press(await screen.findByTestId('lock-unlock'));
   return parts;
@@ -197,6 +209,85 @@ describe('what you may see (5.36)', () => {
     await act(async () => fake.emit({ kind: 'message', type: 'session_ended' }));
     await waitFor(() => expect(seen.at(-1)).toBe('sign_in|access_ended'));
   });
+
+  it("a guest's phone fetches and keeps nothing of the family for the capture card", async () => {
+    const t = vault();
+    addGuest(t, '2026-12-04T23:59:00Z');
+    withProfile(t, 'UTC');
+    const queue = new MemoryQueueStore();
+    await guestApp(t, { queue });
+    await screen.findByTestId('home-access');
+    await act(async () => undefined);
+    // Neither the kinds nor the people were asked for, and nothing is kept.
+    expect(t.calls.filter((c) => /\/api\/v1\/(document-types|members)(\?|$)/.test(c))).toEqual([]);
+    expect(await queue.cached(CARD_GUEST)).toBeNull();
+    expect(await queue.cached(`${CARD_GUEST}|kinds`)).toBeNull();
+  });
+
+  it("when a guest's access ends, what an older phone kept for their card goes, and only theirs", async () => {
+    const t = vault();
+    addGuest(t, '2026-12-04T23:59:00Z');
+    withProfile(t, 'UTC');
+    // As a phone before 0.2.3 kept it for a guest; and the owner's, who also signs in here.
+    const queue = new MemoryQueueStore();
+    await queue.cache(CARD_GUEST, {
+      types: [],
+      members: [{ id: 'fake-member', display_name: 'Fake Owner' }],
+      filed: [],
+    });
+    await queue.cache(`${CARD_GUEST}|kinds`, { customTypes: true });
+    await queue.cache(CARD_OWNER, { types: [], members: [], filed: [] });
+    await guestApp(t, { queue });
+    await screen.findByTestId('home-access');
+    endGuest(t);
+    await fireEvent.press(screen.getByTestId('poke'));
+    await screen.findByTestId('sign-in-access-ended');
+    await waitFor(async () => expect(await queue.cached(CARD_GUEST)).toBeNull());
+    expect(await queue.cached(`${CARD_GUEST}|kinds`)).toBeNull();
+    expect(await queue.cached(CARD_OWNER)).not.toBeNull();
+  });
+
+  it("a guest's sign-in refused for its end takes nothing kept for the one signed in before", async () => {
+    const t = vault();
+    addGuest(t, '2026-12-04T23:59:00Z');
+    endGuest(t);
+    const queue = new MemoryQueueStore();
+    await signedIn(t);
+    await renderApp(<App />, { fetch: t.fetch, capture: testCapture({ openStore: async () => queue }) });
+    await waitFor(async () => expect(await queue.cached(CARD_OWNER)).not.toBeNull());
+    // The owner signs out, keeping their card's choices; the guest tries the phone.
+    await fireEvent.press(screen.getByTestId('sign-out'));
+    await fireEvent.changeText(await screen.findByTestId('sign-in-email'), GUEST.email);
+    await fireEvent.changeText(screen.getByTestId('sign-in-password'), GUEST.password);
+    await fireEvent.press(screen.getByTestId('sign-in-go'));
+    await screen.findByTestId('sign-in-access-ended');
+    await act(async () => undefined);
+    expect(await queue.cached(CARD_OWNER)).not.toBeNull();
+  });
+
+  it.each(['revoked', 'removed'])(
+    "a session the vault ended as %s takes the card's kept choices with it; an expiry does not",
+    async (reason) => {
+      for (const why of [reason, 'expired']) {
+        const t = vault();
+        const queue = new MemoryQueueStore();
+        await signedIn(t);
+        await renderApp(<App />, { fetch: t.fetch, capture: testCapture({ openStore: async () => queue }) });
+        // Somebody who files has the card's choices kept, for a scan made with no connection.
+        await waitFor(async () => expect(await queue.cached(CARD_OWNER)).not.toBeNull());
+        for (const x of t.vault.state.sessions) {
+          x.revoked = true;
+          x.endedBecause = why as never;
+        }
+        await fireEvent.press(screen.getByTestId('poke'));
+        await screen.findByTestId('sign-in-email');
+        await act(async () => undefined);
+        if (why === 'expired') expect(await queue.cached(CARD_OWNER)).not.toBeNull();
+        else await waitFor(async () => expect(await queue.cached(CARD_OWNER)).toBeNull());
+        await screen.unmount();
+      }
+    },
+  );
 
   it('nothing new appears on an older vault: a v0.5.32 /me says nothing of limits or an end', async () => {
     const t = testVault([ORIGIN]);

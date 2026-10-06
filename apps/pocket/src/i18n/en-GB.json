@@ -566,6 +566,8 @@
     "collectTitle": "Add “{{title}}” to a collection",
     "collectLoading": "Finding your collections…",
     "collectNone": "You haven't made a collection yet. Only the person who made a collection can put documents in it, and collections are made in the browser.",
+    "collectOutgrown_one": "The collection you made is for people you are no longer one of: you can still delete it, but not put documents in it.",
+    "collectOutgrown_other": "The {{count}} collections you made are for people you are no longer one of: you can still delete them, but not put documents in them.",
     "collectAdd": "Add",
     "collectAddTo": "Add to “{{name}}”",
     "collectIn": "In this collection",

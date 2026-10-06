@@ -21,6 +21,7 @@ import { filedWithout as leftOut, type FiledWithout, type QueueItem } from '../q
 import { openQueue } from '../queue/open';
 import type { QueueStore } from '../queue/store';
 import { NotThisAccountError, Uploader } from '../queue/uploader';
+import { on } from './events';
 import { useLock } from './lock';
 import { useVault } from './vault';
 
@@ -343,7 +344,13 @@ export function CaptureProvider(props: { children: ReactNode; deps?: Partial<Cap
   // its way waits for it rather than racing it (and, offline, finding the
   // cache not yet written). What came back is held in memory too, and
   // written to the queue store as soon as the store is open.
-  const cardKey = whoKey ? `card|${whoKey}` : null;
+  //
+  // Only for somebody who may add documents: the card's choices are the
+  // family's kinds and people, and a viewer — a guest from outside the
+  // family among them — files nothing, so nothing of the family is fetched
+  // or kept for them (5.36).
+  const mayFile = who ? can(who.role, 'document.add') : false;
+  const cardKey = whoKey && mayFile ? `card|${whoKey}` : null;
   const cardFetch = useRef<{ key: string; promise: Promise<CardData | null> } | null>(null);
   const cardFresh = useRef<{ key: string; data: CardData } | null>(null);
   const [cardKept, setCardKept] = useState<string | null>(null);
@@ -404,6 +411,29 @@ export function CaptureProvider(props: { children: ReactNode; deps?: Partial<Cap
     if (store && cardKey && customTypes !== null)
       void store.cache(kindsKey(cardKey), { customTypes }).catch(() => undefined);
   }, [store, cardKey, customTypes]);
+
+  // A session the vault ended because the person is gone from it — their
+  // access ended (a guest's), they were taken out, or it was revoked — takes
+  // what the phone kept for their card with it (5.36). Whose is the one
+  // signed in until then; with nobody signed in (a sign-in refused), nobody's.
+  const lastCard = useRef<string | null>(null);
+  useEffect(() => {
+    lastCard.current = whoKey ? `card|${whoKey}` : null;
+  }, [whoKey]);
+  useEffect(
+    () =>
+      on('sessionEnded', (reason) => {
+        const key = lastCard.current;
+        if (!key || !['access_ended', 'removed', 'revoked'].includes(reason)) return;
+        cardFresh.current = null;
+        setCardKept(null);
+        // The key and its kinds beside it (`…|kinds`): member ids are all one length, so nobody else's.
+        void openOnce()
+          .then((s) => s.forgetCached(key))
+          .catch(() => undefined);
+      }),
+    [openOnce],
+  );
 
   // Foreground only: sending stops in the background and starts again in
   // front; a network change is worth a look only while in front.

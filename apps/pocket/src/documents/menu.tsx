@@ -81,14 +81,26 @@ export function rowActions(
   return actions;
 }
 
+/** The newer of two copies of a document, by when it last changed; the second when they tie. */
+function newer(a: DocumentView | null, b: DocumentView | null): DocumentView | null {
+  if (!a || !b) return b ?? a;
+  return Date.parse(a.updated_at) > Date.parse(b.updated_at) ? a : b;
+}
+
 /**
  * A row's ⋯ and its sheet: the button, a way for the row's long press to
  * open it, and the sheet while it is open. Closed, the focus goes back to
  * the ⋯ once the sheet's window has gone.
+ *
+ * The row keeps the newest copy of its document the sheet had — fetched,
+ * or saved by it — so that opened again, the sheet starts from that and
+ * not from the list's, which nobody reloaded: an Essential made a moment
+ * ago is offered as one (U536-02).
  */
 export function useDocumentMenu(props: { id: string; title: string; doc?: DocumentView | null }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
+  const [latest, setLatest] = useState<DocumentView | null>(null);
   const button = useRef<View>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(
@@ -122,7 +134,13 @@ export function useDocumentMenu(props: { id: string; title: string; doc?: Docume
     </Pressable>
   );
   const sheet = open ? (
-    <DocumentMenu id={props.id} title={props.title} doc={props.doc ?? null} onClose={close} />
+    <DocumentMenu
+      id={props.id}
+      title={props.title}
+      doc={newer(props.doc ?? null, latest)}
+      onDoc={setLatest}
+      onClose={close}
+    />
   ) : null;
   return { open: show, button: menuButton, sheet };
 }
@@ -141,13 +159,18 @@ type Said = { tone: 'ok' | 'warn'; text: string };
 /**
  * The sheet: the document's name, what may be done with it, and what came
  * of it. The document is asked of the vault as it opens — a search hit
- * has none, and an Essential is changed from the vault's own copy — and,
- * without a connection, it is the copy this phone keeps, if any.
+ * has none, and an Essential is changed from the vault's own copy, never
+ * from one that may be stale — and, without a connection, it is the newer
+ * of the copy this phone keeps and the one it was opened with. While
+ * something is on its way, the sheet stays open: what came of it is said
+ * here, the vault's warnings among them (U536-01).
  */
 function DocumentMenu(props: {
   id: string;
   title: string;
   doc: DocumentView | null;
+  /** The vault's newest copy, as the sheet fetched or saved it. */
+  onDoc: (doc: DocumentView) => void;
   /** `back`: the focus goes back to the ⋯ (nothing else took it). */
   onClose: (back: boolean) => void;
 }) {
@@ -161,20 +184,34 @@ function DocumentMenu(props: {
   const lock = useLock();
   const insets = useSafeAreaInsets();
   const kept = essentials.items.find((i) => i.id === id)?.document ?? null;
-  const [doc, setDoc] = useState<DocumentView | null>(props.doc ?? kept);
+  const [doc, setDoc] = useState<DocumentView | null>(() => newer(kept, props.doc));
+  // The vault has answered (or could not): until then, nothing is changed from a copy that may be stale.
+  const [fetched, setFetched] = useState(false);
   const [said, setSaid] = useState<Said | null>(null);
   const [busy, setBusy] = useState<RowAction | null>(null);
+  // An Add to a collection on its way (U536-01).
+  const [adding, setAdding] = useState(false);
   const [warning, setWarning] = useState(false);
   const [picking, setPicking] = useState(false);
   const first = useRef<View>(null);
+  const { onDoc } = props;
 
+  const fromVault = useCallback(
+    (d: DocumentView) => {
+      setDoc(d);
+      onDoc(d);
+    },
+    [onDoc],
+  );
   const fetchDoc = useCallback(async () => {
     try {
-      setDoc(await withToken((a, token) => a.document(token, id)));
+      fromVault(await withToken((a, token) => a.document(token, id)));
     } catch {
       // Not now: what the list knew stands.
+    } finally {
+      setFetched(true);
     }
-  }, [withToken, id]);
+  }, [withToken, id, fromVault]);
   useEffect(() => {
     if (offline) return;
     // Asked once it opens; the state is set when the vault answers.
@@ -193,6 +230,11 @@ function DocumentMenu(props: {
     away: lock.away,
   };
   const warn = (text: string) => setSaid({ tone: 'warn', text });
+  const working = busy !== null || adding;
+  // Back and a tap outside wait, as Done does, for what is on its way.
+  const leave = () => {
+    if (!working) props.onClose(true);
+  };
 
   const run = async (action: RowAction, task: () => Promise<void>) => {
     if (busy) return;
@@ -257,7 +299,7 @@ function DocumentMenu(props: {
           const value = !doc.is_essential;
           const outcome = await setEssential(deps, doc, value, t);
           if (outcome.kind === 'saved') {
-            setDoc(outcome.doc);
+            fromVault(outcome.doc);
             setSaid({ tone: 'ok', text: t(value ? 'row.essentialMade' : 'row.essentialTaken') });
           } else if (outcome.kind === 'conflict') {
             warn(t('document.conflict'));
@@ -295,7 +337,7 @@ function DocumentMenu(props: {
       visible
       transparent
       animationType="fade"
-      onRequestClose={() => props.onClose(true)}
+      onRequestClose={leave}
       onShow={() => focusOn(first)}
     >
       <View style={styles.scrim}>
@@ -304,7 +346,7 @@ function DocumentMenu(props: {
           testID="row-sheet-outside"
           accessible={false}
           importantForAccessibility="no"
-          onPress={() => props.onClose(true)}
+          onPress={leave}
           style={StyleSheet.absoluteFill}
         />
         <View style={[styles.sheet, { paddingBottom: 20 + insets.bottom }]} accessibilityViewIsModal testID="row-sheet">
@@ -317,7 +359,13 @@ function DocumentMenu(props: {
               </Notice>
             ) : null}
             {picking ? (
-              <CollectionPicker id={id} title={title} role={who?.role ?? null} onAdded={(s) => setSaid(s)} />
+              <CollectionPicker
+                id={id}
+                title={title}
+                role={who?.role ?? null}
+                onBusy={setAdding}
+                onAdded={(s) => setSaid(s)}
+              />
             ) : (
               <View accessibilityRole="menu" accessibilityLabel={title} style={styles.choices}>
                 {actions.map((action, i) => {
@@ -330,7 +378,8 @@ function DocumentMenu(props: {
                       label={label(action)}
                       detail={action === 'essential' ? t('document.essentialHint') : undefined}
                       busy={busy === action}
-                      disabled={busy !== null}
+                      // Essential is changed from the vault's copy, once it has come (U536-02).
+                      disabled={busy !== null || (action === 'essential' && !offline && !fetched)}
                       onPress={() => choose(action)}
                       icon={
                         <Icon
@@ -356,8 +405,8 @@ function DocumentMenu(props: {
           <Button
             kind="quiet"
             label={picking || said?.tone === 'ok' ? t('row.done') : t('common.cancel')}
-            disabled={busy !== null}
-            onPress={() => props.onClose(true)}
+            disabled={working}
+            onPress={leave}
             testID="row-sheet-cancel"
           />
         </View>
@@ -411,10 +460,20 @@ function Choice({
  * Add to a collection (5.15's, on the phone): the collections this person
  * made and may still change (A18) — only a collection's maker puts things
  * in it — each with how many of its documents they can see, and where one
- * is shared outside the family, that (5.19). The vault's answer says who
- * else will now see it (5.33): a viewer the collection is given to.
+ * is shared outside the family, that (5.19), heard with its Add button
+ * too (the web's W519-3). Those they made for people they are no longer
+ * one of are said to be so, not that there are none. The vault's answer
+ * says who else will now see it (5.33): a viewer the collection is given
+ * to; the sheet waits for it.
  */
-function CollectionPicker(props: { id: string; title: string; role: Role | null; onAdded: (said: Said) => void }) {
+function CollectionPicker(props: {
+  id: string;
+  title: string;
+  role: Role | null;
+  /** An add is on its way, or done with. */
+  onBusy: (busy: boolean) => void;
+  onAdded: (said: Said) => void;
+}) {
   const { t } = useTranslation();
   const { withToken } = useVault();
   const [data, setData] = useState<{ collections: CollectionView[]; on: Set<string> } | null>(null);
@@ -439,14 +498,24 @@ function CollectionPicker(props: { id: string; title: string; role: Role | null;
 
   const role = props.role;
   const mine = role ? (data?.collections ?? []).filter((c) => c.mine && inCollectionAudience(role, c.audience)) : [];
+  // Made by them, for people they are no longer one of (A18): theirs to delete, not to add to.
+  const outgrown = (data?.collections ?? []).filter((c) => c.mine).length - mine.length;
 
   const add = async (collection: CollectionView) => {
     if (adding) return;
     setAdding(collection.id);
+    props.onBusy(true);
     setProblem(null);
     try {
       const after = await withToken((a, token) => a.addToCollection(token, collection.id, [props.id]));
-      setData((d) => (d ? { collections: d.collections, on: new Set([...d.on, after.id]) } : d));
+      setData((d) =>
+        d
+          ? {
+              collections: d.collections.map((c) => (c.id === after.id ? { ...c, item_count: after.item_count } : c)),
+              on: new Set([...d.on, after.id]),
+            }
+          : d,
+      );
       props.onAdded({
         tone: 'ok',
         text: [t('row.collected', { title: props.title, name: after.name }), ...(after.warnings ?? [])].join(' '),
@@ -464,6 +533,7 @@ function CollectionPicker(props: { id: string; title: string; role: Role | null;
       setProblem(wordsFor(err, t));
     } finally {
       setAdding(null);
+      props.onBusy(false);
     }
   };
 
@@ -478,7 +548,7 @@ function CollectionPicker(props: { id: string; title: string; role: Role | null;
       {data === null && !problem ? <Text tone="soft">{t('row.collectLoading')}</Text> : null}
       {data !== null && mine.length === 0 ? (
         <Text tone="soft" testID="row-collections-none">
-          {t('row.collectNone')}
+          {outgrown > 0 ? t('row.collectOutgrown', { count: outgrown }) : t('row.collectNone')}
         </Text>
       ) : null}
       {mine.map((c) => (
@@ -503,6 +573,8 @@ function CollectionPicker(props: { id: string; title: string; role: Role | null;
               kind="quiet"
               label={t('row.collectAdd')}
               accessibilityLabel={t('row.collectAddTo', { name: c.name })}
+              // Shared outside the family: said with the button, before anything goes (S536-02).
+              {...(c.shared_outside ? { hint: sharedOutsideWords(c.shared_outside, role) } : {})}
               busy={adding === c.id}
               disabled={adding !== null}
               onPress={() => void add(c)}

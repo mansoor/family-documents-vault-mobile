@@ -22,12 +22,16 @@ every row, which offers what that vault allows.
   collections (0.5.12 or later). Only what would not be refused is
   offered: somebody who changes nothing — a viewer, and so a guest — has
   Open and Save a copy, as on the web; a teen changes only their own. A
-  search result's sheet asks the vault for the document as it opens. Add
-  to a collection lists the collections you made, says where one is shared
-  outside the family, and after adding, who else will now see it ("Jane
-  Smith (guest) will be able to see this."). A screen reader hears
-  "Actions for “Passport”", starts on the first choice, and is taken back
-  to the ⋯ when the sheet closes.
+  search result's sheet asks the vault for the document as it opens, and
+  opened again starts from what it last had, not the list's older copy;
+  Essential is changed only once the vault has answered. Add to a
+  collection lists the collections you made, says where one is shared
+  outside the family — a screen reader hears it with the Add button too —
+  and after adding, who else will now see it ("Jane Smith (guest) will be
+  able to see this."): the sheet stays open until the vault has answered.
+  Collections you made for people you are no longer one of are said to be
+  so. A screen reader hears "Actions for “Passport”", starts on the first
+  choice, and is taken back to the ⋯ when the sheet closes.
 - **What you may see.** When an owner has limited what you can see (a
   vault of 0.5.33 or later), Home and Settings say so in the vault's words:
   "You can see: Tax return documents for Ahmed and your own." A guest — a
@@ -55,6 +59,12 @@ every row, which offers what that vault allows.
   never one here. Who last changed the note, and when, is said under it.
 
 ### Changed
+- **The capture card's choices — the family's kinds of document and people —
+  are fetched and kept only for someone who may add documents.** A viewer,
+  a guest from outside the family among them, keeps nothing of the family
+  on their phone; and when the vault ends a session because the person's
+  access ended, they were taken out or it was revoked, what the phone kept
+  for that person's card goes with it.
 - Built against the vault's shared code of v0.5.37 (was v0.5.32).
 
 ## [0.2.2] — iteration 5.31: identity, paused access, incoming files and notices
