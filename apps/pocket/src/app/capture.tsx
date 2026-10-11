@@ -1,4 +1,5 @@
 import {
+  can,
   colours,
   dateReminderSentence,
   issuedByLabel,
@@ -174,6 +175,11 @@ function Card(props: { initial: CaptureSource }) {
   // A type's own details, and what it requires (0.5.11): as the vault says
   // now, or — with no connection — as it said when the card's choices were kept.
   const detailsOn = caps ? caps.features.custom_types === true : data?.customTypes === true;
+  // Skip becomes "Send to my Inbox" (I5) where the vault has batches — as it
+  // says now, or as it said when the card was kept — for whoever may add
+  // documents (an owner, an adult, a teen). Older vaults keep Skip.
+  const inboxOn =
+    (caps ? caps.features.batches === true : data?.batches === true) && me !== null && can(me.role, 'document.add');
 
   // The vault's choices — or, with no connection, the ones this phone last saw.
   useEffect(() => {
@@ -294,7 +300,12 @@ function Card(props: { initial: CaptureSource }) {
       // Save waits for what the type requires, and says what; Skip never waits.
       if (out.missing.length > 0) {
         setDetails(true);
-        fail(t('capture.stillNeeded', { fields: andList(out.missing.map(labelOf)), count: out.missing.length }));
+        fail(
+          t(inboxOn ? 'capture.stillNeededInbox' : 'capture.stillNeeded', {
+            fields: andList(out.missing.map(labelOf)),
+            count: out.missing.length,
+          }),
+        );
         const first = out.missing[0] as string;
         const kind = own.find((f) => f.key === first)?.kind;
         setGoTo({ key: first, box: kind !== 'choice' && kind !== 'yes_no' });
@@ -331,7 +342,7 @@ function Card(props: { initial: CaptureSource }) {
     setBusy(true);
     let done = false;
     try {
-      const r = await capture.save(latest.current.source, metadata, note, labels);
+      const r = await capture.save(latest.current.source, metadata, note, labels, skip && inboxOn);
       done = r.kind === 'saved';
       if (done) leave();
       else if (r.kind === 'refused') fail(problemWords(r.problem));
@@ -496,7 +507,7 @@ function Card(props: { initial: CaptureSource }) {
 
         {offline ? (
           <Notice tone="warn" testID="capture-offline">
-            {t('capture.offlineSkip')}
+            {t(inboxOn ? 'capture.offlineInbox' : 'capture.offlineSkip')}
           </Notice>
         ) : null}
 
@@ -808,16 +819,17 @@ function Card(props: { initial: CaptureSource }) {
           <Button label={t('capture.save')} onPress={() => void save(false)} busy={busy} testID="capture-save" />
         ) : null}
         <Button
-          label={t('capture.skip')}
+          label={t(inboxOn ? 'capture.toInbox' : 'capture.skip')}
           kind="quiet"
-          hint={t('capture.skipHint')}
+          hint={t(inboxOn ? 'capture.toInboxHint' : 'capture.skipHint')}
           onPress={() => void save(true)}
           disabled={busy}
-          testID="capture-skip"
+          testID={inboxOn ? 'capture-inbox' : 'capture-skip'}
         />
       </ScrollView>
       <LeaveQuestion
         visible={asking}
+        inbox={inboxOn}
         onSaveWithout={() => {
           setAsking(false);
           void save(true);

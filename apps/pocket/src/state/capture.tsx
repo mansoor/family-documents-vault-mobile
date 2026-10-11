@@ -17,6 +17,8 @@ import {
   type CommitProblem,
   type PageRef,
 } from '../queue/commit';
+import i18n from '../i18n';
+import { sendToInbox, shortDay } from '../queue/inbox';
 import { filedWithout as leftOut, type FiledWithout, type QueueItem } from '../queue/item';
 import { openQueue } from '../queue/open';
 import type { QueueStore } from '../queue/store';
@@ -53,6 +55,12 @@ export type SaveOutcome = { kind: 'saved' } | { kind: 'refused'; problem: SavePr
 export interface SavedNote {
   /** Skipped, or saved without saying what it is: it needs a name. */
   unnamed: boolean;
+  /**
+   * Sent to the person's Inbox (I5): on its way until the vault has it,
+   * then `inboxSent`, said once it is there.
+   */
+  inbox?: boolean;
+  inboxSent?: boolean;
   /** Saved with no connection to the vault: it goes when there is one. */
   offline?: boolean;
   /** A new version of a document already in the vault. */
@@ -76,6 +84,8 @@ export interface CardData {
    * asks as it did then (0.2.1). Otherwise absent: the vault's word is at hand.
    */
   customTypes?: boolean;
+  /** Likewise, whether it had an Inbox for scans (`features.batches`, I5). */
+  batches?: boolean;
 }
 
 interface CaptureValue {
@@ -113,6 +123,8 @@ interface CaptureValue {
     note: Omit<SavedNote, 'unnamed'>,
     /** The card's names for the type's own details it sends, by field key. */
     labels?: Record<string, string>,
+    /** "Send to my Inbox" (I5): into the day's batch, with no details, rather than filed. */
+    inbox?: boolean,
   ) => Promise<SaveOutcome>;
   throwAway: (source: CaptureSource) => Promise<void>;
   discard: (uri: string) => Promise<void>;
@@ -223,10 +235,10 @@ export function CaptureProvider(props: { children: ReactNode; deps?: Partial<Cap
 
   // The uploader reads who is signed in, and how to reach the vault, when
   // it runs — through a ref, so one uploader lives as long as the store.
-  const current = useRef({ who, withToken, uploadApi, api, sessionOwner, origin, offline });
+  const current = useRef({ who, withToken, uploadApi, api, sessionOwner, origin, offline, caps });
   useEffect(() => {
-    current.current = { who, withToken, uploadApi, api, sessionOwner, origin, offline };
-  }, [who, withToken, uploadApi, api, sessionOwner, origin, offline]);
+    current.current = { who, withToken, uploadApi, api, sessionOwner, origin, offline, caps };
+  }, [who, withToken, uploadApi, api, sessionOwner, origin, offline, caps]);
 
   /** The capture the Saved line is about. */
   const savedItem = useRef<string | null>(null);
@@ -267,6 +279,20 @@ export function CaptureProvider(props: { children: ReactNode; deps?: Partial<Cap
         asOwner(item, async (token) => {
           const up = current.current.uploadApi;
           if (!up) throw new NotThisAccountError();
+          // Sent to the Inbox (I5): into the day's batch. A vault that says it
+          // has no batches (one rolled back since) takes it as Skip did. What
+          // it says is asked, when this start has not heard it yet.
+          const caps = item.kind === 'inbox' ? (current.current.caps ?? (await up.capabilities())) : null;
+          if (item.kind === 'inbox' && caps?.features.batches === true) {
+            await sendToInbox(item, bytes, {
+              api: up,
+              token,
+              store,
+              now: deps.now,
+              name: (at) => i18n.t('inbox.batchName', { date: shortDay(at) }),
+            });
+            return { document_id: null };
+          }
           if (item.kind === 'version' && item.target) {
             // A renewal: the new version of a document already there.
             const body = multipartBody([{ name: 'file', filename: item.filename, contentType: item.mime, bytes }]);
@@ -303,6 +329,10 @@ export function CaptureProvider(props: { children: ReactNode; deps?: Partial<Cap
         if (e.kind === 'sent') {
           timings.created(e.item.id);
           setDelivered((n) => n + 1);
+          // In the Inbox now: the Saved line says so (and is said aloud).
+          if (e.item.kind === 'inbox' && e.item.id === savedItem.current) {
+            setSaved((n) => (n?.inbox ? { ...n, offline: false, inboxSent: true } : n));
+          }
           // Filed without a detail its kind no longer takes: said, by the detail's name.
           const without = leftOut(e.item);
           if (without) setFiledWithout((l) => [...l, without]);
@@ -384,8 +414,8 @@ export function CaptureProvider(props: { children: ReactNode; deps?: Partial<Cap
         if (held && held.key === key) return held.data;
         const kept = (await storeRef.current?.cached<CardData>(key)) ?? null;
         // Started with no connection: whether the vault asked for details, as it last said.
-        const said = kept && (await storeRef.current?.cached<{ customTypes: boolean }>(kindsKey(key)));
-        return kept && said ? { ...kept, customTypes: said.customTypes } : kept;
+        const said = kept && (await storeRef.current?.cached<{ customTypes: boolean; batches?: boolean }>(kindsKey(key)));
+        return kept && said ? { ...kept, customTypes: said.customTypes, batches: said.batches === true } : kept;
       } finally {
         if (cardFetch.current === entry) cardFetch.current = null;
       }
@@ -405,12 +435,15 @@ export function CaptureProvider(props: { children: ReactNode; deps?: Partial<Cap
   }, [store, cardKey, cardKept, keepCard]);
   // Whether the vault asks for each type's details (custom_types), kept
   // beside the card's choices each time it says, for a card opened after a
-  // start with no connection (0.2.1).
+  // start with no connection (0.2.1). And whether it has an Inbox for scans
+  // (features.batches, I5): a card opened offline offers Send to my Inbox
+  // as the vault last said.
   const customTypes = caps ? caps.features.custom_types === true : null;
+  const batches = caps ? caps.features.batches === true : null;
   useEffect(() => {
     if (store && cardKey && customTypes !== null)
-      void store.cache(kindsKey(cardKey), { customTypes }).catch(() => undefined);
-  }, [store, cardKey, customTypes]);
+      void store.cache(kindsKey(cardKey), { customTypes, batches: batches === true }).catch(() => undefined);
+  }, [store, cardKey, customTypes, batches]);
 
   // A session the vault ended because the person is gone from it — their
   // access ended (a guest's), they were taken out, or it was revoked — takes
@@ -523,6 +556,7 @@ export function CaptureProvider(props: { children: ReactNode; deps?: Partial<Cap
       metadata: CaptureMetadata | null,
       note: Omit<SavedNote, 'unnamed'>,
       labels?: Record<string, string>,
+      inbox?: boolean,
     ): Promise<SaveOutcome> => {
       if (saving.current) return saving.current;
       const run = (async (): Promise<SaveOutcome> => {
@@ -538,7 +572,14 @@ export function CaptureProvider(props: { children: ReactNode; deps?: Partial<Cap
         timings.mark('save');
         try {
           const item = await commitCapture(
-            { source, metadata, origin: w.origin, account: w.member_id, labels: labels ?? null },
+            {
+              source,
+              metadata: inbox ? null : metadata,
+              origin: w.origin,
+              account: w.member_id,
+              labels: inbox ? null : (labels ?? null),
+              inbox: inbox === true,
+            },
             {
               store: s,
               read: deps.read,
@@ -554,12 +595,13 @@ export function CaptureProvider(props: { children: ReactNode; deps?: Partial<Cap
           throw err;
         }
         setPending(null);
-        const unnamed = metadata === null || !metadata.type_key;
+        const unnamed = !inbox && (metadata === null || !metadata.type_key);
         setSaved({
           unnamed,
-          reminder: unnamed ? null : note.reminder,
-          noExpiry: unnamed ? false : note.noExpiry,
+          reminder: unnamed || inbox ? null : note.reminder,
+          noExpiry: unnamed || inbox ? false : note.noExpiry,
           offline: current.current.offline,
+          ...(inbox ? { inbox: true } : {}),
         });
         await refresh();
         void uploader?.kick();

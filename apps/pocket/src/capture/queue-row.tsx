@@ -95,7 +95,12 @@ export function QueueRow(props: {
             : item.lastCode && BUSY_CODES.has(item.lastCode)
               ? t('queue.busy')
               : null;
-  const title = item.kind === 'version' ? t('queue.newVersion') : (item.metadata?.title ?? t('queue.untitled'));
+  const title =
+    item.kind === 'version'
+      ? t('queue.newVersion')
+      : item.kind === 'inbox'
+        ? t('queue.forInbox')
+        : (item.metadata?.title ?? t('queue.untitled'));
   const choices = gone && props.members && props.me ? reassignChoices(item, props.members, props.me) : [];
   const without = item.state === 'needs_you' ? null : filedWithout(item);
   return (

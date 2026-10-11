@@ -19,7 +19,7 @@ on:
         description: The release tag to build and attach to (v0.2.0-rc, v0.2.0)
         required: true
   push:
-    tags: ['v0.2.*']
+    tags: ['v0.2.*', 'v0.3.*']
 
 concurrency:
   group: release-${{ inputs.tag || github.ref }}

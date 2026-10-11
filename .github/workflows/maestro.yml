@@ -3,7 +3,7 @@ name: Maestro
 # The phone on an emulator, against a real vault (4.5; the lock, 4.8; kept
 # Essentials in airplane mode, and wiped by a revoked session, 4.10; Show
 # mode, 4.11; Back, 4.15; the largest text, 4.17; the Identity card, 5.31;
-# a row's menu and a note, 5.36):
+# a row's menu and a note, 5.36; a scan sent to the Inbox, I5):
 # the e2e build (x86_64, fixture scanner) runs .maestro/ flows while a vault
 # from the published images runs on the host, reached as 10.0.2.2. The push
 # and clipboard modules' JVM tests (4.14, 5.31) run with the build. A run costs about 40
@@ -13,7 +13,7 @@ on:
   workflow_dispatch:
   # The exit flows run on the release tags too (4.18).
   push:
-    tags: ['v0.2.*']
+    tags: ['v0.2.*', 'v0.3.*']
   pull_request:
     paths:
       - apps/pocket/.maestro/**
@@ -163,7 +163,9 @@ jobs:
             # A row's menu, from its ⋯ and a long press, and a note drawn on the document (5.36).
             sh .github/scripts/notes-seed.sh || touch notes-seed-failed
             $HOME/.maestro/bin/maestro test -e EMAIL="$EMAIL" -e PASSWORD="$PASSWORD" --format junit --output maestro-row-menu.xml apps/pocket/.maestro/row-menu.yaml || sh .github/scripts/on-flow-failure.sh row-menu
-            sh -c 'for f in capture-failed lock-failed cache-check-failed essentials-seed-failed essentials-failed show-failed back-failed large-text-failed essentials-kept-failed essentials-revoke-failed revoked-failed essentials-gone-failed identity-seed-failed identity-failed notes-seed-failed row-menu-failed; do if [ -f "$f" ]; then echo "failed: $f"; exit 1; fi; done'
+            # A scan sent to the Inbox (I5): into the day's batch, and counted on Home — with the vault pinned (v0.7.0-dev.12 or later, features.batches).
+            $HOME/.maestro/bin/maestro test -e EMAIL="$EMAIL" -e PASSWORD="$PASSWORD" --format junit --output maestro-inbox.xml apps/pocket/.maestro/send-to-inbox.yaml || sh .github/scripts/on-flow-failure.sh inbox
+            sh -c 'for f in capture-failed lock-failed cache-check-failed essentials-seed-failed essentials-failed show-failed back-failed large-text-failed essentials-kept-failed essentials-revoke-failed revoked-failed essentials-gone-failed identity-seed-failed identity-failed notes-seed-failed row-menu-failed inbox-failed; do if [ -f "$f" ]; then echo "failed: $f"; exit 1; fi; done'
 
       - name: Exactly one document, carrying the card's fields
         run: |
@@ -179,6 +181,17 @@ jobs:
           test "$(jq -r '.items[0].expires.date' docs.json)" = "2031-03-14"
           test "$(jq -r '.items[0].status.value' docs.json)" != "needs_info"
           echo "One document, a passport with its person, number and expiry: the scan saved offline arrived once." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: One scan in the Inbox, in the phone's batch of the day (I5)
+        run: |
+          TOKEN=$(curl -sf http://localhost:8099/api/v1/auth/password -H 'content-type: application/json' \
+            -d "{\"email\":\"$EMAIL\",\"password\":\"$PASSWORD\"}" | jq -r .access_token)
+          curl -sf http://localhost:8099/api/v1/batches -H "authorization: Bearer $TOKEN" > batches.json
+          jq '.items | map({name, counts})' batches.json
+          test "$(jq '.items | length' batches.json)" = "1"
+          jq -e '.items[0].name | startswith("From my phone, ")' batches.json > /dev/null
+          test "$(jq '.items[0].counts.waiting' batches.json)" = "1"
+          echo "One scan sent to the Inbox: one file waiting in the batch \"$(jq -r '.items[0].name' batches.json)\", and no document made of it." >> "$GITHUB_STEP_SUMMARY"
 
       - name: Vault logs on failure
         if: failure()
@@ -198,6 +211,7 @@ jobs:
             maestro-revoked.xml
             maestro-identity.xml
             maestro-row-menu.xml
+            maestro-inbox.xml
             app-files.txt
             essentials-files.txt
             ui-*.xml

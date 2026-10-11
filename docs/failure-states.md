@@ -55,6 +55,9 @@ Written by `node apps/pocket/scripts/failure-states.mjs`; CI fails if it is out 
 |  |  | `errors.noPreview` | The vault can't draw pages for this file. Save a copy to open it. |
 |  |  | `errors.uploadInProgress` | This is still on its way to the vault. Try again in a moment. |
 |  |  | `errors.invalidExtra` | One of its details isn't one its kind of document takes any more. |
+|  |  | `errors.batchEnded` | The batch it was going into has ended. Remove it here and scan it again. |
+|  |  | `errors.batchFull` | The batch it was going into is full. Remove it here and scan it again. |
+|  |  | `errors.alreadyDecided` | It's already been dealt with in your Inbox. |
 |  |  | `errors.general` | That didn't work. Try again in a moment. |
 | The lock | Lock screen, Settings | `lock.tooMany` | Too many tries. Unlock with your phone's PIN or pattern instead. |
 |  |  | `lock.noScreenLock` | To lock the app and keep documents on this phone, set a screen lock in your phone's settings first. Everything else works as it is. |
@@ -66,9 +69,11 @@ Written by `node apps/pocket/scripts/failure-states.mjs`; CI fails if it is out 
 |  |  | `capture.unreadable` | This scan couldn't be read. Try scanning it again. |
 |  |  | `capture.signedOut` | Sign in again to save this scan. |
 |  |  | `capture.offlineSkip` | No connection, and this phone hasn't seen the vault's choices yet. Skip keeps the scan: you can name it when you're back online. |
+|  |  | `capture.offlineInbox` | No connection, and this phone hasn't seen the vault's choices yet. Send to my Inbox keeps the scan: it goes when you're back online, and you finish it in the browser. |
 |  |  | `capture.queueUnavailable` | Couldn't keep it on this phone just now. Try Save again in a moment. |
 |  |  | `capture.notAllowed` | Your account can open documents but not add them. Ask whoever runs the vault. |
 |  |  | `capture.stillNeeded` | Still needed: {{fields}}. Fill it in, or skip for now. / Still needed: {{fields}}. Fill them in, or skip for now. |
+|  |  | `capture.stillNeededInbox` | Still needed: {{fields}}. Fill it in, or send it to your Inbox for now. / Still needed: {{fields}}. Fill them in, or send it to your Inbox for now. |
 | Scans on their way | Home, the queue | `queue.busy` | The vault is busy. Trying again in a moment. |
 |  |  | `queue.notYet` | Not sent yet. Your scan is safe on this phone and will go by itself. |
 |  |  | `queue.tooBigForVault` | This file is bigger than your vault accepts ({{limit}}). Try fewer pages, or a smaller file. |
@@ -83,6 +88,7 @@ Written by `node apps/pocket/scripts/failure-states.mjs`; CI fails if it is out 
 |  |  | `queue.filedWithout` | {{title}} is in the vault without {{names}}: its kind of document no longer asks for it. / {{title}} is in the vault without {{names}}: its kind of document no longer asks for them. |
 | The scanner | Home | `home.scannerFailed` | The scanner couldn't start on this phone. Add a photo or a file instead — the first scan also needs an internet connection to set the scanner up. |
 |  |  | `home.savedOffline` | Saved on this phone. It'll go to the vault as soon as there's a connection. |
+|  |  | `home.savedInboxOffline` | Saved on this phone. It'll go to your Inbox as soon as there's a connection. |
 |  |  | `home.offline` | No connection. What you see may be out of date. |
 | Essentials kept for no signal | Home, a kept Essential, Sign in | `essentials.wrongPassword` | That password isn't right. |
 |  |  | `essentials.noConnection` | No connection. Try again when the phone is online. |

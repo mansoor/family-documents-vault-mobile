@@ -107,7 +107,15 @@
     "wideningFamily": "everyone in the family but viewers",
     "wideningMark": "Mark anything Only me in the browser before then.",
     "wideningViewer": "Ask an owner if anything kept for you should change before then.",
-    "wideningLook": "Look at yours"
+    "wideningLook": "Look at yours",
+    "savedInboxSending": "On its way to your Inbox.",
+    "savedInbox": "Sent to your Inbox. Finish it on the web: it will suggest the details.",
+    "savedInboxOffline": "Saved on this phone. It'll go to your Inbox as soon as there's a connection.",
+    "inbox_one": "{{count}} waiting in your Inbox: review it in the browser",
+    "inbox_other": "{{count}} waiting in your Inbox: review them in the browser",
+    "inboxAt": "At {{address}}",
+    "inboxOpen": "Open your Inbox in the browser",
+    "inboxOpenHint": "Opens {{address}}"
   },
   "add": {
     "button": "Add a document",
@@ -202,7 +210,8 @@
     "filedWithout_other": "{{title}} is in the vault without {{names}}: its kind of document no longer asks for them.",
     "goesWithout_one": "It will go without {{names}}: its kind of document no longer asks for it.",
     "goesWithout_other": "It will go without {{names}}: its kind of document no longer asks for them.",
-    "someDetails": "some of its details"
+    "someDetails": "some of its details",
+    "forInbox": "A scan for your Inbox"
   },
   "capture": {
     "title": "New document",
@@ -259,7 +268,12 @@
     "signedOut": "Sign in again to save this scan.",
     "offlineSkip": "No connection, and this phone hasn't seen the vault's choices yet. Skip keeps the scan: you can name it when you're back online.",
     "queueUnavailable": "Couldn't keep it on this phone just now. Try Save again in a moment.",
-    "notAllowed": "Your account can open documents but not add them. Ask whoever runs the vault."
+    "notAllowed": "Your account can open documents but not add them. Ask whoever runs the vault.",
+    "toInbox": "Send to my Inbox",
+    "toInboxHint": "The vault reads it and suggests its details. You finish it in the browser.",
+    "stillNeededInbox_one": "Still needed: {{fields}}. Fill it in, or send it to your Inbox for now.",
+    "stillNeededInbox_other": "Still needed: {{fields}}. Fill them in, or send it to your Inbox for now.",
+    "offlineInbox": "No connection, and this phone hasn't seen the vault's choices yet. Send to my Inbox keeps the scan: it goes when you're back online, and you finish it in the browser."
   },
   "timings": {
     "title": "Timings",
@@ -548,7 +562,13 @@
     "unavailable": "Your vault is busy or starting up. Try again in a moment.",
     "internal": "Something went wrong on your vault. Try again in a moment; if it keeps happening, whoever looks after the vault can have a look.",
     "storageUnreachable": "Your vault can't reach the place it keeps its files right now. Anything waiting on this phone is kept, and sent when it can.",
-    "accessEnded": "Your access to this family's vault has ended. Ask them to renew it if you still need it."
+    "accessEnded": "Your access to this family's vault has ended. Ask them to renew it if you still need it.",
+    "batchEnded": "The batch it was going into has ended. Remove it here and scan it again.",
+    "batchFull": "The batch it was going into is full. Remove it here and scan it again.",
+    "alreadyDecided": "It's already been dealt with in your Inbox."
+  },
+  "inbox": {
+    "batchName": "From my phone, {{date}}"
   },
   "access": {
     "title": "What you can see",

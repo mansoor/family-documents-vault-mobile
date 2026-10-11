@@ -1,0 +1,75 @@
+# Phase 6, I5: the phone feeds the Inbox, against the vault the app is
+# pinned to (v0.7.0-dev.12 or later: features.batches). A scan from the e2e
+# build's fixture scanner is sent with "Send to my Inbox" instead of being
+# filed: it goes up as one file of the day's batch ("From my phone, …"), and
+# Home then counts it, with where it is reviewed — the vault's /inbox, in
+# the browser. The workflow then asks the vault's API that the batch holds
+# that one file, and that it made no document.
+appId: io.github.mansoor.familyvault.e2e
+env:
+  VAULT: 10.0.2.2:8099
+---
+- launchApp:
+    clearState: true
+# After the other flows, on an emulator busy for a while by then: a cold
+# start after clearing the app's data can take longer than tapOn waits.
+- extendedWaitUntil:
+    visible:
+      id: connect-address
+    timeout: 30000
+- tapOn:
+    id: connect-address
+- inputText: ${VAULT}
+- hideKeyboard
+- tapOn:
+    id: connect-go
+- extendedWaitUntil:
+    visible:
+      id: connect-approve-http
+    timeout: 30000
+- tapOn:
+    id: connect-approve-http
+- tapOn:
+    id: sign-in-email
+- inputText: ${EMAIL}
+- tapOn:
+    id: sign-in-password
+- inputText: ${PASSWORD}
+- hideKeyboard
+- tapOn:
+    id: sign-in-go
+- extendedWaitUntil:
+    visible:
+      id: home-list
+    timeout: 30000
+# Nothing waits in the Inbox yet: no count.
+- assertNotVisible:
+    id: home-inbox
+
+# The + in the tab bar, then Camera: the fixture scanner's two pages, on the card.
+- tapOn:
+    id: home-add
+- tapOn:
+    id: add-camera
+# The card's other button is "Send to my Inbox", not Skip, with this vault.
+- scrollUntilVisible:
+    element:
+      id: capture-inbox
+    timeout: 30000
+- assertVisible: Send to my Inbox
+- assertNotVisible:
+    id: capture-skip
+- tapOn:
+    id: capture-inbox
+
+# Home: said once the vault has it, then counted.
+- extendedWaitUntil:
+    visible: 'Sent to your Inbox\. Finish it on the web: it will suggest the details\..*'
+    timeout: 60000
+- extendedWaitUntil:
+    visible:
+      id: home-inbox
+    timeout: 30000
+- assertVisible: '1 waiting in your Inbox: review it in the browser'
+- assertVisible: 'At 10\.0\.2\.2:8099/inbox'
+- assertNotVisible: On its way

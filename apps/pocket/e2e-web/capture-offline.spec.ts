@@ -58,8 +58,9 @@ test('saved with no connection, sent once when it is back', async ({ page, conte
   await page.getByRole('button', { name: 'More details' }).click();
   await page.getByLabel('Name', { exact: true }).fill(title);
   await page.getByRole('button', { name: 'Save' }).click();
-  // Save waits for what an insurance policy requires, says what, and goes to the first.
-  await expect(page.getByText('Still needed: Insurer and Expires. Fill them in, or skip for now.')).toBeVisible();
+  // Save waits for what an insurance policy requires, says what, and goes to the first;
+  // with this vault (batches, I5) the other way is to send it to the Inbox.
+  await expect(page.getByText('Still needed: Insurer and Expires. Fill them in, or send it to your Inbox for now.')).toBeVisible();
   await expect(page.getByLabel('Insurer, required')).toBeFocused();
   await page.getByLabel('Insurer, required').fill('Aviva');
   await page.getByLabel('Expires, required').fill('14 Mar 2031');

@@ -25,14 +25,14 @@ const AREAS = [
     'Any request that fails (wordsFor)',
     'Every screen',
     'errors',
-    'offline timeout rateLimited unavailable internal storageUnreachable sessionEnded paused accessEnded stepUp twoStep setupRequired unexpected stranger wifiOnly invalidCredentials notFound previewPending noPreview uploadInProgress invalidExtra general',
+    'offline timeout rateLimited unavailable internal storageUnreachable sessionEnded paused accessEnded stepUp twoStep setupRequired unexpected stranger wifiOnly invalidCredentials notFound previewPending noPreview uploadInProgress invalidExtra batchEnded batchFull alreadyDecided general',
   ],
   ['The lock', 'Lock screen, Settings', 'lock', 'tooMany noScreenLock weakBiometrics enrolmentChanged'],
   [
     'Scanning and filing',
     'Capture, the card',
     'capture',
-    'pageLimit tooBig noSpace unreadable signedOut offlineSkip queueUnavailable notAllowed stillNeeded',
+    'pageLimit tooBig noSpace unreadable signedOut offlineSkip offlineInbox queueUnavailable notAllowed stillNeeded stillNeededInbox',
   ],
   [
     'Scans on their way',
@@ -40,7 +40,7 @@ const AREAS = [
     'queue',
     'busy notYet tooBigForVault wrongKind refused needsYou storage noLongerAdd ownerGone versionRefused goesWithout filedWithout',
   ],
-  ['The scanner', 'Home', 'home', 'scannerFailed savedOffline offline'],
+  ['The scanner', 'Home', 'home', 'scannerFailed savedOffline savedInboxOffline offline'],
   [
     'Essentials kept for no signal',
     'Home, a kept Essential, Sign in',
