@@ -60,6 +60,13 @@ export function scanFilename(title: string | null | undefined): string {
   return `${base || 'Scan'}.pdf`;
 }
 
+/** When a scan was made, on this phone's clock, as a file name may say it: "2026-10-10 14.32". */
+export function scanStamp(at: number): string {
+  const d = new Date(at);
+  const two = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.getDate())} ${two(d.getHours())}.${two(d.getMinutes())}`;
+}
+
 /**
  * Save (or Skip): the scan becomes one queue item — one PDF of its pages,
  * or the picked file as it is — with the card's details and an idempotency
@@ -75,6 +82,12 @@ export async function commitCapture(
     account: string;
     /** A new version of this document (a renewal), rather than a new document. */
     renews?: string | null;
+    /**
+     * Sent to the person's Inbox (I5) rather than filed: no details, and
+     * pages named by when they were scanned, so a day's scans are told
+     * apart in the batch.
+     */
+    inbox?: boolean;
     /** The card's names for the type's own details it sends, by field key. */
     labels?: Record<string, string> | null;
   },
@@ -98,7 +111,7 @@ export async function commitCapture(
       throw new CommitError('unreadable', err);
     }
     bytes = await buildPdf(pages);
-    filename = scanFilename(metadata?.title);
+    filename = scanFilename(input.inbox ? `Scan ${scanStamp(deps.now())}` : metadata?.title);
     mime = 'application/pdf';
   } else {
     if (source.file.size !== null && source.file.size > MAX_PHONE_FILE_BYTES) throw new CommitError('too_big');
@@ -114,14 +127,14 @@ export async function commitCapture(
 
   const item: QueueItem = {
     id: deps.uuid(),
-    kind: input.renews ? 'version' : 'capture',
-    target: input.renews ?? null,
+    kind: input.inbox ? 'inbox' : input.renews ? 'version' : 'capture',
+    target: input.inbox ? null : (input.renews ?? null),
     key: deps.uuid(),
     origin: input.origin,
     account: input.account,
     createdAt: deps.now(),
     state: 'waiting',
-    metadata,
+    metadata: input.inbox ? null : metadata,
     filename,
     mime,
     size: bytes.length,

@@ -25,14 +25,23 @@ export interface QueueProblem {
 /**
  * What an item makes: a new document (POST /capture), or a new version of
  * one already in the vault — a renewed passport, a new policy year (POST
- * /documents/{target}/versions), which also resolves its reminders.
+ * /documents/{target}/versions), which also resolves its reminders — or an
+ * item in the person's Inbox (I5, `features.batches`): a scan sent with
+ * "Send to my Inbox", one file of the day's batch (POST
+ * /batches/{target}/items), read by the vault and finished on the web.
  */
-export type QueueKind = 'capture' | 'version';
+export type QueueKind = 'capture' | 'version' | 'inbox';
 
 export interface QueueItem {
   id: string;
   kind: QueueKind;
-  /** For a version: the document it renews. */
+  /**
+   * For a version: the document it renews. For an Inbox item: the batch it
+   * was sent to, chosen at its first try — never when it was saved, so a
+   * scan kept offline goes into the batch of the day it is sent — and kept,
+   * so a try made again goes to the same batch under the same key (the
+   * vault's Idempotency-Key is a batch's own). Null until then.
+   */
   target: string | null;
   /**
    * The upload's idempotency key: made once, at Save, and sent with every
@@ -44,7 +53,7 @@ export interface QueueItem {
   account: string;
   createdAt: number;
   state: QueueState;
-  /** The card's answers; null after Skip. */
+  /** The card's answers; null after Skip, and for an Inbox item. */
   metadata: CaptureMetadata | null;
   filename: string;
   mime: string;

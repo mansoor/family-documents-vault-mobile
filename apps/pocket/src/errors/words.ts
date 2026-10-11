@@ -40,6 +40,12 @@ export const CATALOGUE: Readonly<Record<string, string>> = {
   upload_in_progress: 'errors.uploadInProgress',
   // The vault's own words name the detail by its key: never shown (the queue files the scan without it).
   invalid_extra: 'errors.invalidExtra',
+  // A scan for the Inbox (I5): a batch that takes no more gets a new one, and
+  // a file removed on the web since it arrived is done with — said only if
+  // a new batch is refused too.
+  batch_ended: 'errors.batchEnded',
+  batch_full: 'errors.batchFull',
+  already_decided: 'errors.alreadyDecided',
   // Busy for now: a scan waiting on these is tried again by itself.
   unavailable: 'errors.unavailable',
   request_timeout: 'errors.timeout',

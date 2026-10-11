@@ -13,12 +13,13 @@ import {
   type ResetNotice,
 } from '@fdv/shared';
 import { Image } from 'expo-image';
-import { Link, useRouter } from 'expo-router';
+import * as Linking from 'expo-linking';
+import { Link, useNavigation, useRouter } from 'expo-router';
 import { Settings as SettingsIcon } from 'lucide-react-native';
 import { useCallback, useEffect, useState } from 'react';
 import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
-import { FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
+import { AppState, FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AccessNotice, myAccess, type MyAccess } from '../../access/access';
 import { QueueRow, withoutWords } from '../../capture/queue-row';
@@ -27,6 +28,7 @@ import { useDocumentMenu } from '../../documents/menu';
 import { offersNewScan, reminderHeadline } from '../../documents/reminders';
 import { wordsFor } from '../../errors/words';
 import { OnThisPhone } from '../../essentials/ui';
+import { waitingInInbox } from '../../queue/inbox';
 import { useEssentials } from '../../state/essentials';
 import { extra } from '../../config';
 import { useCapture, type SavedNote } from '../../state/capture';
@@ -70,7 +72,7 @@ const optional = <T,>(p: Promise<T>): Promise<T | null> =>
  */
 export default function Home() {
   const { t } = useTranslation();
-  const { caps, vault, offline, notice, withToken, api, who } = useVault();
+  const { caps, vault, offline, waiting, notice, withTokenQuick, api, who } = useVault();
   const capture = useCapture();
   const [data, setData] = useState<HomeData | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -97,7 +99,9 @@ export default function Home() {
 
   const load = useCallback(async () => {
     try {
-      const next = await withToken(async (a, token) => {
+      // Never waits out a renewal turned away for too many tries (I5-4): what
+      // Home last had stays, under the banner.
+      const next = await withTokenQuick(async (a, token) => {
         // The vault filters by status after it takes a page, so every page
         // is read: a scan skipped long ago still needs its name.
         const unnamedCount = async () => {
@@ -133,7 +137,7 @@ export default function Home() {
     } catch {
       // Offline or signed out: the banner or the sign-in screen says so.
     }
-  }, [withToken, identityOn]);
+  }, [withTokenQuick, identityOn]);
 
   useEffect(() => {
     // Loading on arrival, and again each time the vault takes a capture:
@@ -146,6 +150,36 @@ export default function Home() {
   useEffect(() => on('remindersChanged', () => void load()), [load]);
   // The vault pushed that something about the person's details is changing.
   useEffect(() => on('noticesChanged', () => void load()), [load]);
+
+  // How many of the person's own files wait in their Inbox (I5), where the
+  // vault has batches and they may add documents: a viewer, and so a
+  // guest, is never asked, and sees nothing. Asked on arrival, after each
+  // send, each time Home is in view again, and when the app comes back to
+  // the front — on its own, so none of these reloads the rest of Home.
+  const inboxOn = caps?.features.batches === true && canAdd;
+  const [inbox, setInbox] = useState<number | null>(null);
+  const loadInbox = useCallback(async () => {
+    if (!inboxOn) return;
+    try {
+      setInbox(await withTokenQuick((a, token) => waitingInInbox(a, token)));
+    } catch (err) {
+      // Refused (no longer one who adds, say): nothing to show. No answer: what it last said.
+      if (err instanceof ApiRequestError) setInbox(null);
+    }
+  }, [inboxOn, withTokenQuick]);
+  useEffect(() => {
+    // Set when the vault answers, not synchronously.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void loadInbox();
+  }, [loadInbox, capture.delivered]);
+  const navigation = useNavigation();
+  useEffect(() => navigation.addListener('focus', () => void loadInbox()), [navigation, loadInbox]);
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') void loadInbox();
+    });
+    return () => sub.remove();
+  }, [loadInbox]);
 
   const [renewProblem, setRenewProblem] = useState<string | null>(null);
   const renew = async (documentId: string) => {
@@ -172,7 +206,7 @@ export default function Home() {
   const refresh = async () => {
     setRefreshing(true);
     // The Essentials kept on the phone are brought up to date too.
-    await Promise.all([load(), essentials.sync()]);
+    await Promise.all([load(), loadInbox(), essentials.sync()]);
     setRefreshing(false);
   };
 
@@ -214,6 +248,11 @@ export default function Home() {
             ) : offline ? (
               <Notice tone="warn" testID="home-offline">
                 {t('home.offline')}
+              </Notice>
+            ) : null}
+            {waiting !== null ? (
+              <Notice tone="info" testID="home-waiting">
+                {t('home.vaultWait', { count: waiting })}
               </Notice>
             ) : null}
             {capture.saved ? <SavedLine text={savedWords(capture.saved, t)} onDismiss={capture.dismissSaved} /> : null}
@@ -263,6 +302,7 @@ export default function Home() {
                 ))}
               </View>
             ) : null}
+            {inboxOn && inbox !== null && inbox > 0 && vault ? <InboxLine count={inbox} origin={vault.origin} /> : null}
             {data?.resetNotice ? <ResetNoticeCard notice={data.resetNotice} onSeen={() => void load()} /> : null}
             {data?.widening ? <WideningNotice pending={data.widening} memberId={who?.member_id ?? null} /> : null}
             {data?.access ? <AccessNotice access={data.access} /> : null}
@@ -451,6 +491,11 @@ function WideningNotice(props: { pending: NonNullable<IdentityAudienceView['pend
 
 /** What Home says once a capture is safe on the phone. */
 function savedWords(note: SavedNote, t: TFunction): string {
+  if (note.inbox) {
+    if (note.inboxSent) return t('home.savedInbox');
+    if (note.inboxFiled) return t('home.savedInboxFiled');
+    return t(note.offline ? 'home.savedInboxOffline' : 'home.savedInboxSending');
+  }
   if (note.offline) return t('home.savedOffline');
   if (note.renewal) return t('home.savedRenewal');
   if (note.unnamed) return t('home.savedSkipped');
@@ -466,6 +511,34 @@ function SavedLine(props: { text: string; onDismiss: () => void }) {
       <Text>{props.text}</Text>
       <Button label={t('home.dismiss')} kind="quiet" onPress={props.onDismiss} testID="home-saved-dismiss" />
     </Notice>
+  );
+}
+
+/**
+ * The person's own files waiting in their Inbox (I5): how many, and where
+ * they are reviewed — the vault's /inbox, in the browser. Its address is
+ * shown, as words a screen reader reads too, beside the button that opens it.
+ */
+function InboxLine(props: { count: number; origin: string }) {
+  const { t } = useTranslation();
+  const url = `${props.origin}/inbox`;
+  const address = url.replace(/^https?:\/\//, '');
+  return (
+    <Card style={styles.inbox}>
+      <View testID="home-inbox">
+        <Text weight="600">{t('home.inbox', { count: props.count })}</Text>
+        <Text tone="soft" testID="home-inbox-address">
+          {t('home.inboxAt', { address })}
+        </Text>
+      </View>
+      <Button
+        label={t('home.inboxOpen')}
+        kind="quiet"
+        hint={t('home.inboxOpenHint', { address })}
+        onPress={() => void Linking.openURL(url)}
+        testID="home-inbox-open"
+      />
+    </Card>
   );
 }
 
@@ -542,6 +615,7 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   iconButton: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
   dueCard: { gap: 4, borderColor: colours.warn },
+  inbox: { gap: 6 },
   recentTitle: { marginTop: 12 },
   row: {
     flexDirection: 'row',

@@ -174,7 +174,7 @@ describe('the card with no connection', () => {
     await screen.findByTestId('home-calm');
     const key = `card|${ORIGIN}|fake-member`;
     await waitFor(async () => expect(await store.cached(key)).not.toBeNull());
-    await waitFor(async () => expect(await store.cached(`${key}|kinds`)).toEqual({ customTypes: true }));
+    await waitFor(async () => expect(await store.cached(`${key}|kinds`)).toEqual({ customTypes: true, batches: false }));
     await first.unmount();
 
     // Opened again in airplane mode: nothing is asked of the vault this time.

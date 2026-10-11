@@ -6,6 +6,54 @@ app's own, tagged `vX.Y.Z` in this repository.
 
 ## [Unreleased]
 
+## [0.3.0] — Phase 6, I5: the phone feeds the Inbox
+
+A new minor version: what it adds needs a vault of 0.7 (0.7.0-dev.12 or
+later, with batches). With an older vault (0.4.10 or later, as before) the
+app is as in 0.2.3: Skip is still Skip, and Home shows no count.
+
+### Added
+- **Send to my Inbox.** On the capture card, Skip becomes **Send to my
+  Inbox** for anyone who may add documents (an owner, an adult, a teen): the
+  scan goes up to your Inbox instead of becoming a document with no name.
+  The vault reads it and suggests what it is, whose it is and its dates;
+  you finish it on the web. Home says "Sent to your Inbox. Finish it on the
+  web: it will suggest the details." once the vault has it, and a screen
+  reader hears it. Nothing of it is shown on the phone afterwards, and
+  nothing of it is kept on the phone once it has arrived. Scans sent the
+  same day go into one batch, "From my phone, 10 Oct": made by the first,
+  or found by its name if it is already there (from another of your
+  phones, or a try whose answer was lost). With no connection the scan
+  waits on the phone, as every scan does, and goes — into the batch of
+  the day it goes — once there is one; a card opened with no connection
+  since the app started offers it as the vault last said. Each scan keeps its own key, so one
+  sent again after its answer was lost is in the Inbox once. A batch that
+  has ended or is full gets a new one, and so does the day's batch removed
+  on the web before a scan went into it; a scan removed on the web — itself
+  or with its batch — before the phone heard it arrived is simply done,
+  never sent again. A vault put back to a version without batches files
+  the scan as a document only you can see — never anyone else — and Home
+  says "Saved as a document only you can see. Add its details on the web."
+  "Back" on the card offers Send to my Inbox too, instead of Save without
+  details.
+- **The Inbox count on Home**: "3 waiting in your Inbox: review them in
+  the browser", with the address it is reviewed at (your vault's /inbox)
+  and a button that opens it. Only your own waiting files are counted —
+  nobody else's are ever seen — and nothing is shown when none wait, or to
+  a viewer or a guest, who are never asked. It is asked again when Home is
+  in view again, when the app comes back to the front, and after a scan is
+  sent.
+
+### Changed
+- Built against the vault's shared code of v0.7.0-dev.12 (was v0.5.37). A
+  renewal of a session the vault turns away for too many tries, with a
+  short wait, is now waited out and asked again (at most twice) rather than
+  reported at once — and Home says "The vault asked us to wait 30 seconds.
+  Trying again then." meanwhile. Signing out never waits for it, nor do the
+  capture card's choices or Home's refreshes, which use what the phone has.
+  Signing out while a renewal is on its way gives it up to 3 seconds, so
+  this phone's notifications and its session are ended at the vault too.
+
 ## [0.2.3] — iteration 5.36: a menu on every row, what you may see, and notes
 
 Each of these appears only with a vault that has it; with an older vault

@@ -51,7 +51,7 @@ owner's key. Before the first one, add four repository secrets
 - `FV_RELEASE_KEYSTORE` — the keystore, base64 (`base64 -w0 release.jks`)
 - `FV_RELEASE_STORE_PASSWORD`, `FV_RELEASE_KEY_ALIAS`, `FV_RELEASE_KEY_PASSWORD`
 
-Then push a tag `v0.2.x` (or run the Release workflow by hand with the tag):
+Then push a tag `v0.3.x` (or run the Release workflow by hand with the tag):
 the signed APK is attached to that tag's release, and the Maestro flows run
 on it. Keep the keystore somewhere safe off GitHub too: an app signed with
 a different key cannot update this one.

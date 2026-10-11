@@ -239,6 +239,8 @@ export function FileRow(props: { file: PickedFile }) {
 /** Back with a scan on the card: keep it, lose it, or carry on. */
 export function LeaveQuestion(props: {
   visible: boolean;
+  /** Keeping it sends it to the person's Inbox (I5), as the card's own button does. */
+  inbox?: boolean;
   onSaveWithout: () => void;
   onThrowAway: () => void;
   onKeepEditing: () => void;
@@ -257,7 +259,7 @@ export function LeaveQuestion(props: {
         >
           <Text variant="screen">{t('capture.backTitle')}</Text>
           <Button
-            label={t('capture.saveWithout')}
+            label={t(props.inbox ? 'capture.toInbox' : 'capture.saveWithout')}
             onPress={props.onSaveWithout}
             disabled={props.disabled === true}
             testID="leave-save"

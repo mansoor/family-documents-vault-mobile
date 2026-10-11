@@ -102,6 +102,11 @@ interface VaultValue {
   vault: VaultRecord | null;
   caps: Capabilities | null;
   offline: boolean;
+  /**
+   * The vault turned a renewal away for too many tries and asked for a wait
+   * the client is waiting out: the seconds, while it does (I5-4); else null.
+   */
+  waiting: number | null;
   notice: Notice;
   api: Api | null;
   /** The same vault, for uploads (longer timeout, bytes-safe fetch). */
@@ -120,6 +125,18 @@ interface VaultValue {
   signOut: () => Promise<void>;
   chooseAnotherVault: () => Promise<void>;
   withToken: <T>(fn: (api: Api, token: string) => Promise<T>) => Promise<T>;
+  /**
+   * As withToken, for work done on the way out (signing out): a renewal the
+   * vault turned away for too many tries is not waited out, nor one on its
+   * way joined — what there is now, or no answer.
+   */
+  withTokenNow: <T>(fn: (api: Api, token: string) => Promise<T>) => Promise<T>;
+  /**
+   * As withToken, for reads with something to show meanwhile (the card's
+   * choices, Home): joins a renewal under way, but never waits out one the
+   * vault turned away for too many tries — no answer, then (I5-4).
+   */
+  withTokenQuick: <T>(fn: (api: Api, token: string) => Promise<T>) => Promise<T>;
   recheck: () => Promise<void>;
   /**
    * Work that must be done while the session still works, before signing
@@ -138,6 +155,8 @@ export const useVault = (): VaultValue => {
 };
 
 const IDENTITY_TTL = 5 * 60_000;
+/** How long signing out waits for a renewal already under way (I5-5). */
+const SIGN_OUT_WAIT_MS = 3_000;
 /** How long an https vault's capability document is believed before the front looks again. */
 const RECHECK_TTL = 5 * 60_000;
 
@@ -217,6 +236,26 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
   const [vault, setVault] = useState<VaultRecord | null>(null);
   const [caps, setCaps] = useState<Capabilities | null>(null);
   const [offline, setOffline] = useState(false);
+  const [waiting, setWaiting] = useState<number | null>(null);
+  const waitingRef = useRef<number | null>(null);
+  // Told when a wait begins: signing out stops waiting for that renewal then.
+  const waitBegun = useRef(new Set<() => void>());
+  const heardWait = useCallback((seconds: number | null) => {
+    waitingRef.current = seconds;
+    if (seconds !== null) for (const fn of [...waitBegun.current]) fn();
+    setWaiting(seconds);
+  }, []);
+  /** A renewal's answer — or no answer, as soon as one begins waiting out a refusal for too many tries. */
+  const untilWaitBegins = useCallback(<R,>(p: Promise<R>): Promise<R | { kind: 'offline' }> => {
+    let begun: (() => void) | undefined;
+    const stop = new Promise<{ kind: 'offline' }>((resolve) => {
+      begun = () => resolve({ kind: 'offline' });
+      waitBegun.current.add(begun);
+    });
+    return Promise.race([p, stop]).finally(() => {
+      if (begun) waitBegun.current.delete(begun);
+    });
+  }, []);
   const [notice, setNotice] = useState<Notice>(null);
   const [installation, setInstallation] = useState<string | null>(null);
   const verified = useRef<{ at: number; network: NetworkKind; epoch: number } | null>(null);
@@ -357,9 +396,11 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
           },
         },
         deps.store,
-        { now: deps.now },
+        // Called when a wait begins and ends, not while rendering.
+        // eslint-disable-next-line react-hooks/refs
+        { now: deps.now, onWait: heardWait },
       ),
-    [api, deps.store, deps.now],
+    [api, deps.store, deps.now, heardWait],
   );
 
   // Each session core reads the store once. Anything that wants a token
@@ -551,8 +592,18 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
     return () => sub.remove();
   }, [recheck, vault, deps]);
 
-  const withToken = useCallback(
-    async <T,>(fn: (a: Api, token: string) => Promise<T>): Promise<T> => {
+  /**
+   * The session's token, as soon as `how` allows. `wait`: as the client
+   * does, joining a renewal under way and waiting out one the vault turned
+   * away for too many tries (up to a minute, twice, since v0.7.0-dev.12) —
+   * the uploader, and anything with nothing else to show. `quick` (I5-4):
+   * joins a renewal under way, but gives up once one is waiting out a
+   * refusal — no answer, and what the phone has shows meanwhile (the card's
+   * choices, Home). `now` (signing out): what there is now, neither joining
+   * nor waiting; the vault ends the session when it can.
+   */
+  const tokenFor = useCallback(
+    async <T,>(fn: (a: Api, token: string) => Promise<T>, how: 'wait' | 'quick' | 'now'): Promise<T> => {
       if (!api) throw new NetworkError('offline');
       await hydrated(session);
       try {
@@ -561,7 +612,12 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
         if (unusable(err)) setOffline(true);
         throw err;
       }
-      const t = await session.token();
+      const t =
+        how === 'now' || (how === 'quick' && waitingRef.current !== null)
+          ? await session.token({ wait: false })
+          : how === 'quick'
+            ? await untilWaitBegins(session.token())
+            : await session.token();
       if (t.kind === 'offline') {
         setOffline(true);
         throw new NetworkError('offline');
@@ -593,7 +649,19 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
         throw err;
       }
     },
-    [api, gate, session, hydrated],
+    [api, gate, session, hydrated, untilWaitBegins],
+  );
+  const withToken = useCallback(
+    <T,>(fn: (a: Api, token: string) => Promise<T>): Promise<T> => tokenFor(fn, 'wait'),
+    [tokenFor],
+  );
+  const withTokenQuick = useCallback(
+    <T,>(fn: (a: Api, token: string) => Promise<T>): Promise<T> => tokenFor(fn, 'quick'),
+    [tokenFor],
+  );
+  const withTokenNow = useCallback(
+    <T,>(fn: (a: Api, token: string) => Promise<T>): Promise<T> => tokenFor(fn, 'now'),
+    [tokenFor],
   );
 
   const chooseVault = useCallback(
@@ -719,9 +787,24 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
   }, []);
 
   const signOut = useCallback(async () => {
+    // A renewal under way is given a moment (I5-5), so this phone's device and
+    // the session are ended at the vault too — but not one waiting out a
+    // refusal for too many tries: signing out never waits for that.
+    if (api && waitingRef.current === null) {
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      await Promise.race([
+        hydrated(session)
+          .then(() => untilWaitBegins(session.token()))
+          .catch(() => undefined),
+        new Promise<void>((resolve) => {
+          timer = setTimeout(resolve, SIGN_OUT_WAIT_MS);
+        }),
+      ]);
+      clearTimeout(timer);
+    }
     await runBeforeSignOut();
     try {
-      await withToken((a, token) => a.logout(token));
+      await withTokenNow((a, token) => a.logout(token));
     } catch {
       // Signed out here regardless; the vault ends the session when it can.
     }
@@ -729,7 +812,7 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
     emit('signedOut');
     setNotice(null);
     setPhase('sign_in');
-  }, [withToken, session, runBeforeSignOut]);
+  }, [api, hydrated, untilWaitBegins, withTokenNow, session, runBeforeSignOut]);
 
   const chooseAnotherVault = useCallback(async () => {
     await runBeforeSignOut();
@@ -762,6 +845,7 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
       vault,
       caps,
       offline,
+      waiting,
       notice,
       api,
       uploadApi,
@@ -773,6 +857,8 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
       signOut,
       chooseAnotherVault,
       withToken,
+      withTokenNow,
+      withTokenQuick,
       recheck,
       onBeforeSignOut,
     }),
@@ -781,6 +867,7 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
       vault,
       caps,
       offline,
+      waiting,
       notice,
       api,
       uploadApi,
@@ -792,6 +879,8 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
       signOut,
       chooseAnotherVault,
       withToken,
+      withTokenNow,
+      withTokenQuick,
       recheck,
       onBeforeSignOut,
     ],

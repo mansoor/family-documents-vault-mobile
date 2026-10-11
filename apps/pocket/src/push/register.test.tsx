@@ -6,6 +6,7 @@ import { readPrefs, writePrefs } from '../platform/prefs';
 import { useVault } from '../state/vault';
 import { audit } from '../test-support/a11y';
 import { phoneParts, unlocked } from '../test-support/lookup';
+import { reply } from '../test-support/capture';
 import { FakePushNative } from '../test-support/push';
 import { installed, knownVault, renderApp, respond, signedIn } from '../test-support/render';
 import { resetRoutes } from '../test-support/router';
@@ -113,6 +114,86 @@ describe('notifications on this phone (4.14)', () => {
     expect(removed).toBeGreaterThan(-1);
     expect(removed).toBeLessThan(t.calls.indexOf('POST https://vault.test/api/v1/auth/logout'));
     expect(fake.unregistered).toBe(1);
+    expect(t.push.devices).toEqual([]);
+  });
+
+  it('signing out does not wait out a renewal the vault turned away for too many tries', async () => {
+    // Since the vault's shared code of v0.7.0-dev.12 the client waits out a
+    // 429 with a short Retry-After, twice: never on the way out.
+    const t = pushVault();
+    const fake = new FakePushNative();
+    let clock = Date.now();
+    let tooMany = false;
+    const fetch: typeof t.fetch = async (url, init) =>
+      tooMany && url.endsWith('/api/v1/auth/refresh')
+        ? reply(
+            429,
+            { error: { code: 'rate_limited', message: 'Too many tries.', retriable: true } },
+            { 'Retry-After': '30' },
+          )
+        : t.fetch(url, init);
+    await unlocked(t, <Settings />, {
+      push: { native: fake, askPermission: async () => true },
+      deps: { push: fake, fetch, now: () => clock },
+    });
+    await fireEvent.press(await screen.findByTestId('push-turn-on'));
+    await screen.findByText('On, through ntfy.');
+    // An hour on, the access token has gone, and the vault turns its renewal away.
+    tooMany = true;
+    clock += 3600_000;
+    const started = Date.now();
+    await fireEvent.press(screen.getByTestId('settings-sign-out'));
+    await waitFor(() => expect(screen.queryByTestId('settings-sign-out')).toBeNull(), { timeout: 10_000 });
+    expect(Date.now() - started).toBeLessThan(10_000);
+    // Signed out here, and unregistered: the vault ends the session (and its device) when it can.
+    expect(fake.unregistered).toBe(1);
+  });
+
+  it('…and with no notifications on this phone, the sign-out itself does not wait either', async () => {
+    const t = pushVault('off');
+    let clock = Date.now();
+    let tooMany = false;
+    const fetch: typeof t.fetch = async (url, init) =>
+      tooMany && url.endsWith('/api/v1/auth/refresh')
+        ? reply(
+            429,
+            { error: { code: 'rate_limited', message: 'Too many tries.', retriable: true } },
+            { 'Retry-After': '30' },
+          )
+        : t.fetch(url, init);
+    await unlocked(t, <Settings />, { deps: { fetch, now: () => clock } });
+    await screen.findByTestId('settings-sign-out');
+    tooMany = true;
+    clock += 3600_000;
+    const started = Date.now();
+    await fireEvent.press(screen.getByTestId('settings-sign-out'));
+    await waitFor(() => expect(screen.queryByTestId('settings-sign-out')).toBeNull(), { timeout: 10_000 });
+    expect(Date.now() - started).toBeLessThan(10_000);
+  });
+
+  it('signing out while a renewal is on its way waits for it, and ends the device and the session at the vault (I5-5)', async () => {
+    const t = pushVault();
+    const fake = new FakePushNative();
+    let clock = Date.now();
+    let slow = false;
+    const fetch: typeof t.fetch = async (url, init) => {
+      if (slow && url.endsWith('/api/v1/auth/refresh')) await new Promise((r) => setTimeout(r, 1000));
+      return t.fetch(url, init);
+    };
+    await unlocked(t, <Settings />, {
+      push: { native: fake, askPermission: async () => true },
+      deps: { push: fake, fetch, now: () => clock },
+    });
+    await fireEvent.press(await screen.findByTestId('push-turn-on'));
+    await screen.findByText('On, through ntfy.');
+    // An hour on: the next request renews the session, slowly; signing out meanwhile.
+    slow = true;
+    clock += 3600_000;
+    await fireEvent.press(screen.getByTestId('push-test'));
+    await fireEvent.press(screen.getByTestId('settings-sign-out'));
+    await waitFor(() => expect(screen.queryByTestId('settings-sign-out')).toBeNull(), { timeout: 10_000 });
+    expect(t.calls).toContain('DELETE https://vault.test/api/v1/devices');
+    expect(t.calls).toContain('POST https://vault.test/api/v1/auth/logout');
     expect(t.push.devices).toEqual([]);
   });
 

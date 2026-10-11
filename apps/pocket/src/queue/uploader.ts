@@ -20,7 +20,8 @@ import type { QueueStore } from './store';
  * the person who made it, to the vault it was made for.
  */
 
-export type UploadEvent = { kind: 'sent'; item: QueueItem; documentId: string } | { kind: 'changed' };
+/** Sent: the document it made, or null for an Inbox item (I5), which is not a document yet. */
+export type UploadEvent = { kind: 'sent'; item: QueueItem; documentId: string | null } | { kind: 'changed' };
 
 export interface Owner {
   origin: string;
@@ -29,8 +30,11 @@ export interface Owner {
 
 export interface UploaderDeps {
   store: QueueStore;
-  /** Sends one capture as its owner; throws what the client throws, or NotThisAccountError. */
-  send(item: QueueItem, bytes: Uint8Array): Promise<CaptureResult>;
+  /**
+   * Sends one capture as its owner; throws what the client throws, or
+   * NotThisAccountError. An Inbox item makes no document: null.
+   */
+  send(item: QueueItem, bytes: Uint8Array): Promise<Pick<CaptureResult, 'document_id'> | { document_id: null }>;
   /** What became of an upload, asked as its owner; a 404 when the vault never finished one with this key. */
   status(item: QueueItem): Promise<UploadStatus>;
   /** The vault and account signed in now: only their items are sent. */
@@ -163,7 +167,9 @@ export class Uploader {
     const { store } = this.deps;
     const attempts = item.attempts + 1;
     try {
-      if (item.askFirst) {
+      // An Inbox item is not asked about: sent again to its batch under its
+      // key, the vault answers with the item the first try made (I1).
+      if (item.askFirst && item.kind !== 'inbox') {
         if (!sameOwner(this.deps.who(), item)) return;
         const status = await this.statusOf(item);
         if (status?.state === 'done') return await this.sent(item, status.document_id);
@@ -208,7 +214,7 @@ export class Uploader {
     }
   }
 
-  private async sent(item: QueueItem, documentId: string): Promise<void> {
+  private async sent(item: QueueItem, documentId: string | null): Promise<void> {
     this.phoneSide.delete(item.id);
     await this.deps.store.remove(item.id);
     this.deps.onEvent?.({ kind: 'sent', item, documentId });
