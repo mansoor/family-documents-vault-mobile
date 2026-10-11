@@ -92,7 +92,7 @@ export const usePush = (): PushValue => {
 export function PushProvider(props: { children: ReactNode; deps?: Partial<PushDeps> }) {
   const native = props.deps?.native !== undefined ? props.deps.native : pushNative();
   const ask = props.deps?.askPermission ?? askPermission;
-  const { phase, caps, withToken, who, onBeforeSignOut } = useVault();
+  const { phase, caps, withToken, withTokenNow, who, onBeforeSignOut } = useVault();
   const owner = who ? ownerKey(who.origin, who.member_id) : null;
   const [version, setVersion] = useState(0);
   const refresh = useCallback(() => setVersion((n) => n + 1), []);
@@ -250,15 +250,21 @@ export function PushProvider(props: { children: ReactNode; deps?: Partial<PushDe
     [native, owner, ask, write, vapid, sync],
   );
 
-  const removeHere = useCallback(async () => {
-    const p = read();
-    if (p.registered) {
-      const { endpoint } = p.registered;
-      await withToken((a, token) => a.removeDevice(token, endpoint)).catch(() => undefined);
-    }
-    native?.unregister();
-    asked.current = false;
-  }, [native, read, withToken]);
+  /** This phone's device removed at the vault; on the way out (signing out), with what token there is now. */
+  const removeHere = useCallback(
+    async (leaving = false) => {
+      const p = read();
+      if (p.registered) {
+        const { endpoint } = p.registered;
+        await (leaving ? withTokenNow : withToken)((a, token) => a.removeDevice(token, endpoint)).catch(
+          () => undefined,
+        );
+      }
+      native?.unregister();
+      asked.current = false;
+    },
+    [native, read, withToken, withTokenNow],
+  );
 
   const turnOff = useCallback(async () => {
     await removeHere();
@@ -297,7 +303,7 @@ export function PushProvider(props: { children: ReactNode; deps?: Partial<PushDe
     () =>
       onBeforeSignOut(async () => {
         if (!native) return;
-        await removeHere();
+        await removeHere(true);
         write({ registered: null });
       }),
     [native, onBeforeSignOut, removeHere, write],

@@ -120,6 +120,12 @@ interface VaultValue {
   signOut: () => Promise<void>;
   chooseAnotherVault: () => Promise<void>;
   withToken: <T>(fn: (api: Api, token: string) => Promise<T>) => Promise<T>;
+  /**
+   * As withToken, for work done on the way out (signing out): a renewal the
+   * vault turned away for too many tries is not waited out, nor one on its
+   * way joined — what there is now, or no answer.
+   */
+  withTokenNow: <T>(fn: (api: Api, token: string) => Promise<T>) => Promise<T>;
   recheck: () => Promise<void>;
   /**
    * Work that must be done while the session still works, before signing
@@ -551,8 +557,14 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
     return () => sub.remove();
   }, [recheck, vault, deps]);
 
-  const withToken = useCallback(
-    async <T,>(fn: (a: Api, token: string) => Promise<T>): Promise<T> => {
+  /**
+   * `wait: false` is for signing out: a renewal the vault turned away for
+   * too many tries is not waited out (the client waits up to a minute, twice,
+   * since v0.7.0-dev.12), nor one already on its way joined — the phone signs
+   * out at once, and the vault ends the session when it can.
+   */
+  const tokenFor = useCallback(
+    async <T,>(fn: (a: Api, token: string) => Promise<T>, wait: boolean): Promise<T> => {
       if (!api) throw new NetworkError('offline');
       await hydrated(session);
       try {
@@ -561,7 +573,7 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
         if (unusable(err)) setOffline(true);
         throw err;
       }
-      const t = await session.token();
+      const t = await session.token(wait ? {} : { wait: false });
       if (t.kind === 'offline') {
         setOffline(true);
         throw new NetworkError('offline');
@@ -594,6 +606,14 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
       }
     },
     [api, gate, session, hydrated],
+  );
+  const withToken = useCallback(
+    <T,>(fn: (a: Api, token: string) => Promise<T>): Promise<T> => tokenFor(fn, true),
+    [tokenFor],
+  );
+  const withTokenNow = useCallback(
+    <T,>(fn: (a: Api, token: string) => Promise<T>): Promise<T> => tokenFor(fn, false),
+    [tokenFor],
   );
 
   const chooseVault = useCallback(
@@ -721,7 +741,7 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
   const signOut = useCallback(async () => {
     await runBeforeSignOut();
     try {
-      await withToken((a, token) => a.logout(token));
+      await withTokenNow((a, token) => a.logout(token));
     } catch {
       // Signed out here regardless; the vault ends the session when it can.
     }
@@ -729,7 +749,7 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
     emit('signedOut');
     setNotice(null);
     setPhase('sign_in');
-  }, [withToken, session, runBeforeSignOut]);
+  }, [withTokenNow, session, runBeforeSignOut]);
 
   const chooseAnotherVault = useCallback(async () => {
     await runBeforeSignOut();
@@ -773,6 +793,7 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
       signOut,
       chooseAnotherVault,
       withToken,
+      withTokenNow,
       recheck,
       onBeforeSignOut,
     }),
@@ -792,6 +813,7 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
       signOut,
       chooseAnotherVault,
       withToken,
+      withTokenNow,
       recheck,
       onBeforeSignOut,
     ],
