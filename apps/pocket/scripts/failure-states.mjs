@@ -40,7 +40,7 @@ const AREAS = [
     'queue',
     'busy notYet tooBigForVault wrongKind refused needsYou storage noLongerAdd ownerGone versionRefused goesWithout filedWithout',
   ],
-  ['The scanner', 'Home', 'home', 'scannerFailed savedOffline savedInboxOffline offline'],
+  ['The scanner', 'Home', 'home', 'scannerFailed savedOffline savedInboxOffline savedInboxFiled vaultWait offline'],
   [
     'Essentials kept for no signal',
     'Home, a kept Essential, Sign in',

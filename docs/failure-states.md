@@ -89,6 +89,8 @@ Written by `node apps/pocket/scripts/failure-states.mjs`; CI fails if it is out 
 | The scanner | Home | `home.scannerFailed` | The scanner couldn't start on this phone. Add a photo or a file instead — the first scan also needs an internet connection to set the scanner up. |
 |  |  | `home.savedOffline` | Saved on this phone. It'll go to the vault as soon as there's a connection. |
 |  |  | `home.savedInboxOffline` | Saved on this phone. It'll go to your Inbox as soon as there's a connection. |
+|  |  | `home.savedInboxFiled` | Saved as a document only you can see. Add its details on the web. |
+|  |  | `home.vaultWait` | The vault asked us to wait {{count}} second. Trying again then. / The vault asked us to wait {{count}} seconds. Trying again then. |
 |  |  | `home.offline` | No connection. What you see may be out of date. |
 | Essentials kept for no signal | Home, a kept Essential, Sign in | `essentials.wrongPassword` | That password isn't right. |
 |  |  | `essentials.noConnection` | No connection. Try again when the phone is online. |

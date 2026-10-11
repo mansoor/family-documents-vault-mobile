@@ -72,7 +72,7 @@ const optional = <T,>(p: Promise<T>): Promise<T | null> =>
  */
 export default function Home() {
   const { t } = useTranslation();
-  const { caps, vault, offline, notice, withToken, api, who } = useVault();
+  const { caps, vault, offline, waiting, notice, withTokenQuick, api, who } = useVault();
   const capture = useCapture();
   const [data, setData] = useState<HomeData | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -99,7 +99,9 @@ export default function Home() {
 
   const load = useCallback(async () => {
     try {
-      const next = await withToken(async (a, token) => {
+      // Never waits out a renewal turned away for too many tries (I5-4): what
+      // Home last had stays, under the banner.
+      const next = await withTokenQuick(async (a, token) => {
         // The vault filters by status after it takes a page, so every page
         // is read: a scan skipped long ago still needs its name.
         const unnamedCount = async () => {
@@ -135,7 +137,7 @@ export default function Home() {
     } catch {
       // Offline or signed out: the banner or the sign-in screen says so.
     }
-  }, [withToken, identityOn]);
+  }, [withTokenQuick, identityOn]);
 
   useEffect(() => {
     // Loading on arrival, and again each time the vault takes a capture:
@@ -159,12 +161,12 @@ export default function Home() {
   const loadInbox = useCallback(async () => {
     if (!inboxOn) return;
     try {
-      setInbox(await withToken((a, token) => waitingInInbox(a, token)));
+      setInbox(await withTokenQuick((a, token) => waitingInInbox(a, token)));
     } catch (err) {
       // Refused (no longer one who adds, say): nothing to show. No answer: what it last said.
       if (err instanceof ApiRequestError) setInbox(null);
     }
-  }, [inboxOn, withToken]);
+  }, [inboxOn, withTokenQuick]);
   useEffect(() => {
     // Set when the vault answers, not synchronously.
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -246,6 +248,11 @@ export default function Home() {
             ) : offline ? (
               <Notice tone="warn" testID="home-offline">
                 {t('home.offline')}
+              </Notice>
+            ) : null}
+            {waiting !== null ? (
+              <Notice tone="info" testID="home-waiting">
+                {t('home.vaultWait', { count: waiting })}
               </Notice>
             ) : null}
             {capture.saved ? <SavedLine text={savedWords(capture.saved, t)} onDismiss={capture.dismissSaved} /> : null}
@@ -486,6 +493,7 @@ function WideningNotice(props: { pending: NonNullable<IdentityAudienceView['pend
 function savedWords(note: SavedNote, t: TFunction): string {
   if (note.inbox) {
     if (note.inboxSent) return t('home.savedInbox');
+    if (note.inboxFiled) return t('home.savedInboxFiled');
     return t(note.offline ? 'home.savedInboxOffline' : 'home.savedInboxSending');
   }
   if (note.offline) return t('home.savedOffline');

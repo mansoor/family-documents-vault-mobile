@@ -21,14 +21,19 @@ app is as in 0.2.3: Skip is still Skip, and Home shows no count.
   web: it will suggest the details." once the vault has it, and a screen
   reader hears it. Nothing of it is shown on the phone afterwards, and
   nothing of it is kept on the phone once it has arrived. Scans sent the
-  same day from the same phone go into one batch, "From my phone, 10 Oct",
-  made by the first. With no connection the scan waits on the phone, as
-  every scan does, and goes — into the batch of the day it goes — once
-  there is one; a card opened with no connection since the app started
-  offers it as the vault last said. Each scan keeps its own key, so one
+  same day go into one batch, "From my phone, 10 Oct": made by the first,
+  or found by its name if it is already there (from another of your
+  phones, or a try whose answer was lost). With no connection the scan
+  waits on the phone, as every scan does, and goes — into the batch of
+  the day it goes — once there is one; a card opened with no connection
+  since the app started offers it as the vault last said. Each scan keeps its own key, so one
   sent again after its answer was lost is in the Inbox once. A batch that
-  has ended, is full or was removed on the web gets a new one; a scan
-  removed on the web before the phone heard it arrived is simply done.
+  has ended or is full gets a new one, and so does the day's batch removed
+  on the web before a scan went into it; a scan removed on the web — itself
+  or with its batch — before the phone heard it arrived is simply done,
+  never sent again. A vault put back to a version without batches files
+  the scan as a document only you can see — never anyone else — and Home
+  says "Saved as a document only you can see. Add its details on the web."
   "Back" on the card offers Send to my Inbox too, instead of Save without
   details.
 - **The Inbox count on Home**: "3 waiting in your Inbox: review them in
@@ -43,8 +48,11 @@ app is as in 0.2.3: Skip is still Skip, and Home shows no count.
 - Built against the vault's shared code of v0.7.0-dev.12 (was v0.5.37). A
   renewal of a session the vault turns away for too many tries, with a
   short wait, is now waited out and asked again (at most twice) rather than
-  reported at once — but never when signing out, which still happens at
-  once.
+  reported at once — and Home says "The vault asked us to wait 30 seconds.
+  Trying again then." meanwhile. Signing out never waits for it, nor do the
+  capture card's choices or Home's refreshes, which use what the phone has.
+  Signing out while a renewal is on its way gives it up to 3 seconds, so
+  this phone's notifications and its session are ended at the vault too.
 
 ## [0.2.3] — iteration 5.36: a menu on every row, what you may see, and notes
 

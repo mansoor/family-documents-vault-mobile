@@ -171,6 +171,32 @@ describe('notifications on this phone (4.14)', () => {
     expect(Date.now() - started).toBeLessThan(10_000);
   });
 
+  it('signing out while a renewal is on its way waits for it, and ends the device and the session at the vault (I5-5)', async () => {
+    const t = pushVault();
+    const fake = new FakePushNative();
+    let clock = Date.now();
+    let slow = false;
+    const fetch: typeof t.fetch = async (url, init) => {
+      if (slow && url.endsWith('/api/v1/auth/refresh')) await new Promise((r) => setTimeout(r, 1000));
+      return t.fetch(url, init);
+    };
+    await unlocked(t, <Settings />, {
+      push: { native: fake, askPermission: async () => true },
+      deps: { push: fake, fetch, now: () => clock },
+    });
+    await fireEvent.press(await screen.findByTestId('push-turn-on'));
+    await screen.findByText('On, through ntfy.');
+    // An hour on: the next request renews the session, slowly; signing out meanwhile.
+    slow = true;
+    clock += 3600_000;
+    await fireEvent.press(screen.getByTestId('push-test'));
+    await fireEvent.press(screen.getByTestId('settings-sign-out'));
+    await waitFor(() => expect(screen.queryByTestId('settings-sign-out')).toBeNull(), { timeout: 10_000 });
+    expect(t.calls).toContain('DELETE https://vault.test/api/v1/devices');
+    expect(t.calls).toContain('POST https://vault.test/api/v1/auth/logout');
+    expect(t.push.devices).toEqual([]);
+  });
+
   it('turning them off removes the device and unregisters', async () => {
     const t = pushVault();
     const fake = new FakePushNative();

@@ -1,4 +1,5 @@
 import { ApiRequestError, type Api } from '@fdv/client';
+import { BATCH_MAX_FILES } from '@fdv/shared';
 import type { QueueItem } from './item';
 import type { QueueStore } from './store';
 
@@ -7,18 +8,27 @@ import type { QueueStore } from './store';
  * person's own (Phase 6, I1), to be read and suggested for by the vault and
  * finished on the web. Nothing of it is shown on the phone afterwards.
  *
- * One batch a day on each phone — "From my phone, 10 Oct" — made by the
- * first scan sent that day and used by the rest. Which one is kept beside
- * the card's choices (`card|origin|member|batch`), so it goes with them: a
+ * One batch a day — "From my phone, 10 Oct" — made by the first scan sent
+ * that day and used by the rest. Before one is made, the person's own
+ * batches are looked at, and an open one with that very name is used (the
+ * review round, I5-6): a lost answer to the POST that made it, or another
+ * of their phones, never makes a second. Which one is kept beside the
+ * card's choices (`card|origin|member|batch`), so it goes with them: a
  * vault left, or a session ended because the person is gone from it.
  *
  * Each scan keeps its own Idempotency-Key, and the batch it was first sent
- * to (`target`): a try made again after its answer was lost goes to that
- * batch under that key, and the vault answers with the item the first try
- * made. A batch that takes no more — it has ended (409 `batch_ended`), it
- * is full (422 `batch_full`) or it was removed (404) — is forgotten, and a
- * new one is made for the scan, once: the vault refuses those before it
- * keeps a byte, so nothing is in the old one twice.
+ * to (`target`, stored before the first try): a try made again after its
+ * answer was lost goes to that batch under that key, and the vault answers
+ * with the item the first try made.
+ *
+ * A batch that takes no more — it has ended (409 `batch_ended`) or is full
+ * (422 `batch_full`) — gets a new one for the scan, once: the vault refuses
+ * those before it looks at the bytes, and after it has answered a replay,
+ * so nothing is in the old one twice. A 404 is the batch gone: a new one
+ * only when the scan had never been sent anywhere (the day's kept batch was
+ * removed). Sent before, to its own batch, a 404 is the person's own doing
+ * on the web — they removed it, or filed it — and the scan is done with,
+ * quietly, as for 409 `already_decided` (I5-2).
  */
 
 /** The day's batch, as kept: its id, and the day on this phone's calendar it was made for. */
@@ -45,19 +55,38 @@ export function shortDay(at: number): string {
   return `${d.getDate()} ${MONTHS[d.getMonth()]}`;
 }
 
-/** A batch that takes no more files: a new one is made for the scan. */
-export const batchTakesNoMore = (err: unknown): boolean =>
-  err instanceof ApiRequestError &&
-  ((err.status === 409 && err.code === 'batch_ended') ||
-    (err.status === 422 && err.code === 'batch_full') ||
-    (err.status === 404 && err.code === 'not_found'));
+const isApi = (err: unknown, status: number, code?: string): err is ApiRequestError =>
+  err instanceof ApiRequestError && err.status === status && (code === undefined || err.code === code);
+
+/** A batch that takes no more files, whatever was sent before: a new one is made for the scan. */
+const takesNoMore = (err: unknown): boolean => isApi(err, 409, 'batch_ended') || isApi(err, 422, 'batch_full');
+
+/** The batch is not there (404). */
+const batchGone = (err: unknown): boolean => isApi(err, 404);
 
 /**
- * The file arrived before, and its person has removed it on the web since
- * (409 `already_decided`): there is nothing left to send.
+ * The file arrived before, and its person has removed or filed it on the
+ * web since (409 `already_decided`): there is nothing left to send.
  */
-const removedSince = (err: unknown): boolean =>
-  err instanceof ApiRequestError && err.status === 409 && err.code === 'already_decided';
+const removedSince = (err: unknown): boolean => isApi(err, 409, 'already_decided');
+
+/**
+ * GET or POST /batches answered 404: the vault has no batches (rolled back
+ * to before I1). Whoever sends asks what the vault can do, rather than
+ * leaving the scan for a person to remove (I5-3).
+ */
+export class NoBatchesError extends Error {
+  constructor() {
+    super('The vault has no batches.');
+    this.name = 'NoBatchesError';
+  }
+}
+
+/**
+ * What became of a scan sent to the Inbox: in a batch now (`sent`), or
+ * already dealt with on the web, so nothing was sent (`gone`).
+ */
+export type InboxOutcome = 'sent' | 'gone';
 
 export interface InboxDeps {
   api: Api;
@@ -68,21 +97,37 @@ export interface InboxDeps {
   name: (at: number) => string;
 }
 
-/** The scan, as one file into the day's batch; throws what the client throws. */
-export async function sendToInbox(item: QueueItem, bytes: Uint8Array, deps: InboxDeps): Promise<void> {
+/** The scan, as one file into the day's batch; throws what the client throws, or NoBatchesError. */
+export async function sendToInbox(item: QueueItem, bytes: Uint8Array, deps: InboxDeps): Promise<InboxOutcome> {
   const { api, token, store } = deps;
   const key = dayBatchKey(item);
   const file = { kind: 'bytes' as const, filename: item.filename, contentType: item.mime, bytes };
 
-  const made = async (): Promise<string> => {
-    const at = deps.now();
-    const batch = await api.createBatch(token, { name: deps.name(at) });
-    await store.cache(key, { id: batch.id, day: phoneDay(at) } satisfies DayBatch);
-    return batch.id;
+  /** The collection's own routes answering 404: no batches on this vault. */
+  const collection = async <T>(fn: () => Promise<T>): Promise<T> => {
+    try {
+      return await fn();
+    } catch (err) {
+      if (batchGone(err)) throw new NoBatchesError();
+      throw err;
+    }
   };
-  const today = async (): Promise<string> => {
-    const kept = await store.cached<DayBatch>(key);
-    return kept && kept.day === phoneDay(deps.now()) ? kept.id : made();
+  /** Today's batch: an open one of the person's with today's very name, or a new one. Never `not`. */
+  const today = async (not?: string): Promise<string> => {
+    const at = deps.now();
+    const name = deps.name(at);
+    const day = phoneDay(at);
+    if (!not) {
+      const kept = await store.cached<DayBatch>(key);
+      if (kept && kept.day === day) return kept.id;
+    }
+    const { items } = await collection(() => api.batches(token));
+    const open = items.find(
+      (b) => b.id !== not && b.name === name && Date.parse(b.ends_at) > deps.now() && b.counts.items < BATCH_MAX_FILES,
+    );
+    const id = open?.id ?? (await collection(() => api.createBatch(token, { name }))).id;
+    await store.cache(key, { id, day } satisfies DayBatch);
+    return id;
   };
   /** Chosen for this scan, and kept before anything is sent: its retries go there. */
   const choose = async (batch: string) => {
@@ -90,17 +135,22 @@ export async function sendToInbox(item: QueueItem, bytes: Uint8Array, deps: Inbo
     return batch;
   };
 
+  // Sent before (a try whose answer was lost, or that found no connection): to that batch.
+  const sentBefore = item.target !== null;
   const first = item.target ?? (await choose(await today()));
   try {
     await api.addBatchItem(token, first, file, item.key);
+    return 'sent';
   } catch (err) {
-    if (removedSince(err)) return;
-    if (!batchTakesNoMore(err)) throw err;
-    // That batch takes no more: forgotten, if it is still the day's, and a new one for this scan.
-    const kept = await store.cached<DayBatch>(key);
-    if (kept?.id === first) await store.forgetCached(key);
-    await api.addBatchItem(token, await choose(await made()), file, item.key);
+    if (removedSince(err)) return 'gone';
+    if (batchGone(err) && sentBefore) return 'gone';
+    if (!takesNoMore(err) && !batchGone(err)) throw err;
   }
+  // That batch takes no more, or the day's kept one has gone: forgotten, and another for this scan.
+  const kept = await store.cached<DayBatch>(key);
+  if (kept?.id === first) await store.forgetCached(key);
+  await api.addBatchItem(token, await choose(await today(first)), file, item.key);
+  return 'sent';
 }
 
 /**

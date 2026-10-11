@@ -18,6 +18,8 @@ import { ownerApi } from '../test-support/kinds';
 import { installed, knownVault, renderApp, signedIn, testCapture } from '../test-support/render';
 import { capabilities, testVault, type TestVault } from '../test-support/vault';
 import { LARGE } from '../ui/text-scale';
+import { SecureTokenStore } from '../session/store';
+import { Button } from '../ui';
 
 /** Home's listeners for being in view again, as the tab navigator calls them. */
 const mockListeners = new Map<string, Set<() => void>>();
@@ -279,7 +281,7 @@ describe('Send to my Inbox (I5)', () => {
     expect(screen.queryByText('Needs you')).toBeNull();
   });
 
-  it('saved for the Inbox, but the vault has no batches when it goes (rolled back): filed as Skip would', async () => {
+  it('saved for the Inbox, but the vault has no batches when it goes (rolled back): filed as Only me, its person’s', async () => {
     const t = testVault([ORIGIN]);
     await signedIn(t);
     const store = new MemoryQueueStore();
@@ -307,7 +309,8 @@ describe('Send to my Inbox (I5)', () => {
     );
     await renderApp(<App />, { fetch: t.fetch, capture: testCapture({ openStore: async () => store }) });
     await waitFor(() => expect(t.vault.state.documents).toHaveLength(1));
-    expect(t.vault.state.documents[0]).toMatchObject({ type_key: null });
+    // Never wider than what was chosen: an item only they would have seen (I5-1).
+    expect(t.vault.state.documents[0]).toMatchObject({ type_key: null, visibility: 'private', owner_member_id: 'fake-member' });
     expect(t.calls.filter((c) => c.includes('/api/v1/batches'))).toEqual([]);
     await waitFor(async () => expect(await store.list()).toEqual([]));
   });
@@ -593,5 +596,220 @@ describe("the Inbox count on Home (I5)", () => {
     await renderApp(<Home />, { fetch: t.fetch, large: true });
     await screen.findByTestId('home-inbox');
     expect(size()).toBeCloseTo(typeScale.body * LARGE, 5);
+  });
+});
+
+describe('the review round (I5)', () => {
+  /** The vault rolled back to before batches: /batches is not there, and it says it has none — or not yet (stale). */
+  function rolledBack(t: TestVault, says: { batches: boolean }) {
+    const fetch: TestVault['fetch'] = async (url, init) => {
+      if (url.includes('/api/v1/batches')) return reply(404, { error: { code: 'not_found', message: 'Not found.' } });
+      return t.fetch(url, init);
+    };
+    t.caps = says.batches ? withBatches() : capabilities({ server_version: '0.6.0' });
+    return fetch;
+  }
+
+  /** Signed in as a teen of the family: their own role on the session, and in the vault. */
+  async function asTeen(t: TestVault) {
+    t.vault.state.members = [
+      { id: 'fake-member', display_name: 'Sam', role: 'teen', is_me: true },
+      { id: 'member-aisha', display_name: 'Aisha Khan', role: 'adult', is_me: false },
+    ];
+    const store = new SecureTokenStore();
+    const kept = await store.load();
+    await store.save({ ...(kept as NonNullable<typeof kept>), role: 'teen' });
+  }
+
+  it.each([
+    ['an owner', false],
+    ['a teen', true],
+  ])(
+    'I5-1: %s sends to the Inbox of a vault rolled back since: filed as Only me, theirs, and Home says so',
+    async (_who, teen) => {
+      const t = testVault([ORIGIN]);
+      t.caps = withBatches();
+      await signedIn(t);
+      if (teen) await asTeen(t);
+      let fetch: TestVault['fetch'] = t.fetch;
+      const { p, store } = phone(1);
+      await renderApp(<App />, { fetch: (url, init) => fetch(url, init), capture: p });
+      await screen.findByTestId('home-calm');
+      await add();
+      const button = await screen.findByTestId('capture-inbox');
+      // Meanwhile the vault is put back to a version with no batches.
+      fetch = rolledBack(t, { batches: false });
+      await fireEvent.press(button);
+      await waitFor(async () => expect(await store.list()).toEqual([]));
+      expect(t.vault.state.documents).toHaveLength(1);
+      expect(t.vault.state.documents[0]).toMatchObject({ visibility: 'private', owner_member_id: 'fake-member' });
+      await waitFor(() =>
+        expect(screen.getByTestId('home-saved')).toHaveTextContent(
+          /^Saved as a document only you can see\. Add its details on the web\./,
+        ),
+      );
+      expect(screen.queryByText(/Sent to your Inbox/)).toBeNull();
+    },
+  );
+
+  it('I5-2: lost, then the person removes the batch on the web: done with, never back in a new batch', async () => {
+    const t = testVault([ORIGIN]);
+    t.caps = withBatches();
+    await signedIn(t);
+    const rec = recording(t);
+    rec.scripted.push({ turn: 'lost' });
+    const { p, store } = phone(1);
+    await renderApp(<App />, { fetch: rec.fetch, capture: p });
+    await screen.findByTestId('home-calm');
+    await sendOne();
+    await waitFor(() => expect(batches(t)).toEqual([{ name: 'From my phone, 10 Oct', waiting: 1 }]));
+    await waitFor(async () => expect((await store.list())[0]?.target).toBe(rec.sent[0]?.batch));
+    // At a computer: the whole batch removed, this scan with it.
+    t.vault.state.batches = [];
+    await networkChanged();
+    await waitFor(async () => expect(await store.list()).toEqual([]));
+    expect(batches(t)).toEqual([]);
+    expect(t.calls.filter((c) => c === `POST ${ORIGIN}/api/v1/batches`)).toHaveLength(1);
+    expect(screen.queryByText('Needs you')).toBeNull();
+  });
+
+  it('I5-3: batches answer 404 while the vault still says it has them: tried again later, never Needs you; filed once it says none', async () => {
+    const t = testVault([ORIGIN]);
+    t.caps = withBatches();
+    await signedIn(t);
+    let clock = TEN_OCT;
+    let fetch: TestVault['fetch'] = t.fetch;
+    const { p, store } = phone(1, () => clock);
+    await renderApp(<App />, { fetch: (url, init) => fetch(url, init), capture: p });
+    await screen.findByTestId('home-calm');
+    await add();
+    const button = await screen.findByTestId('capture-inbox');
+    fetch = rolledBack(t, { batches: true });
+    await fireEvent.press(button);
+    await waitFor(async () => expect((await store.list())[0]?.lastCode).toBe('unavailable'));
+    const [waiting] = await store.list();
+    expect(waiting?.state).toBe('waiting');
+    expect(screen.queryByText('Needs you')).toBeNull();
+    expect(t.vault.state.documents).toHaveLength(0);
+
+    // The vault now says what it is: no batches. The next try files it, Only me.
+    t.caps = capabilities({ server_version: '0.6.0' });
+    clock += 3600_000;
+    await networkChanged();
+    await waitFor(async () => expect(await store.list()).toEqual([]));
+    expect(t.vault.state.documents[0]).toMatchObject({ visibility: 'private', owner_member_id: 'fake-member' });
+  });
+
+  it('I5-6: the answer to the POST that made the day’s batch was lost: the next try finds it by its name', async () => {
+    const t = testVault([ORIGIN]);
+    t.caps = withBatches();
+    await signedIn(t);
+    let lose = true;
+    const fetch: TestVault['fetch'] = async (url, init) => {
+      if (lose && url === `${ORIGIN}/api/v1/batches` && init.method === 'POST') {
+        lose = false;
+        await t.fetch(url, init);
+        throw new TypeError('Network request failed');
+      }
+      return t.fetch(url, init);
+    };
+    const { p, store } = phone(1);
+    await renderApp(<App />, { fetch, capture: p });
+    await screen.findByTestId('home-calm');
+    await sendOne();
+    await waitFor(() => expect(lose).toBe(false));
+    await waitFor(async () => expect((await store.list())[0]?.lastCode).toBe('offline'));
+    expect(batches(t)).toEqual([{ name: 'From my phone, 10 Oct', waiting: 0 }]);
+
+    await networkChanged();
+    await waitFor(async () => expect(await store.list()).toEqual([]));
+    expect(batches(t)).toEqual([{ name: 'From my phone, 10 Oct', waiting: 1 }]);
+  });
+});
+
+describe('a renewal the vault turns away for too many tries (I5-4)', () => {
+  /** Signed in an hour ago: the access token has gone, and the vault turns its renewal away. */
+  function anHourOn(t: TestVault) {
+    let clock = Date.now();
+    let refusing = false;
+    const fetch: TestVault['fetch'] = (url, init) =>
+      refusing && url.endsWith('/api/v1/auth/refresh')
+        ? Promise.resolve(
+            reply(
+              429,
+              { error: { code: 'rate_limited', message: 'Too many tries.', retriable: true } },
+              { 'Retry-After': '30' },
+            ),
+          )
+        : t.fetch(url, init);
+    const later = () => {
+      refusing = true;
+      clock += 3600_000;
+    };
+    return { fetch, now: () => clock, later };
+  }
+
+  it('the card’s choices come from what the phone kept, at once', async () => {
+    const t = testVault([ORIGIN]);
+    t.caps = withBatches();
+    await signedIn(t);
+    const h = anHourOn(t);
+    const { p } = phone(1);
+    await renderApp(<App />, { fetch: h.fetch, deps: { now: h.now }, capture: p });
+    await screen.findByTestId('home-calm');
+    await waitFor(() => expect(t.calls.some((c) => c.includes('/api/v1/members'))).toBe(true));
+    h.later();
+    await add();
+    const started = Date.now();
+    expect(await screen.findByRole('button', { name: 'Passport' }, { timeout: 10_000 })).toBeTruthy();
+    expect(Date.now() - started).toBeLessThan(10_000);
+  });
+
+  it('Home’s pull to refresh ends at once, and a wait something else is in is said', async () => {
+    const t = testVault([ORIGIN]);
+    t.caps = withBatches();
+    await signedIn(t);
+    const h = anHourOn(t);
+    function WithAsker() {
+      const { withToken, signOut } = useVault();
+      return (
+        <>
+          <Home />
+          <Button
+            label="Ask"
+            testID="ask"
+            onPress={() => void withToken((a, token) => a.me(token)).catch(() => undefined)}
+          />
+          <Button label="Out" testID="out" onPress={() => void signOut()} />
+        </>
+      );
+    }
+    await renderApp(<WithAsker />, { fetch: h.fetch, deps: { now: h.now } });
+    await screen.findByTestId('home-calm');
+    h.later();
+
+    // Something that waits: Home says how long the vault asked for.
+    await fireEvent.press(screen.getByTestId('ask'));
+    expect(await screen.findByTestId('home-waiting')).toHaveTextContent(
+      'The vault asked us to wait 30 seconds. Trying again then.',
+    );
+
+    /** Home's list's pull to refresh, as the list was given it. */
+    const pull = () =>
+      (screen.root?.queryAll((n) => n.props.refreshControl !== undefined)[0]?.props.refreshControl as {
+        props: { refreshing: boolean; onRefresh: () => void };
+      }).props;
+    // Pull to refresh does not join it.
+    const started = Date.now();
+    await act(async () => {
+      pull().onRefresh();
+    });
+    await waitFor(() => expect(pull().refreshing).toBe(false), {
+      timeout: 10_000,
+    });
+    expect(Date.now() - started).toBeLessThan(10_000);
+    // Signing out ends the wait.
+    await fireEvent.press(screen.getByTestId('out'));
+    await waitFor(() => expect(screen.queryByTestId('home-waiting')).toBeNull());
   });
 });
