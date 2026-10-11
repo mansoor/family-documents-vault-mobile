@@ -37,7 +37,6 @@ jest.mock('expo-router', () => ({
 jest.mock('expo-linking', () => ({ openURL: jest.fn(async () => true) }));
 
 const ORIGIN = 'https://vault.test';
-const TWO_PAGES: ScanOutcome = { kind: 'pages', pages: [{ uri: 'cache:/scan/1.jpg' }, { uri: 'cache:/scan/2.jpg' }] };
 /** 10 Oct 2026, 09:30 on this phone's clock (the tests' clock is UTC). */
 const TEN_OCT = new Date(2026, 9, 10, 9, 30).getTime();
 
