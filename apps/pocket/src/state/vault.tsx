@@ -134,7 +134,8 @@ interface VaultValue {
   /**
    * As withToken, for reads with something to show meanwhile (the card's
    * choices, Home): joins a renewal under way, but never waits out one the
-   * vault turned away for too many tries — no answer, then (I5-4).
+   * vault turned away for too many tries — no answer, then (I5-4): the
+   * client's token({ wait: 'join' }).
    */
   withTokenQuick: <T>(fn: (api: Api, token: string) => Promise<T>) => Promise<T>;
   recheck: () => Promise<void>;
@@ -238,23 +239,9 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
   const [offline, setOffline] = useState(false);
   const [waiting, setWaiting] = useState<number | null>(null);
   const waitingRef = useRef<number | null>(null);
-  // Told when a wait begins: signing out stops waiting for that renewal then.
-  const waitBegun = useRef(new Set<() => void>());
   const heardWait = useCallback((seconds: number | null) => {
     waitingRef.current = seconds;
-    if (seconds !== null) for (const fn of [...waitBegun.current]) fn();
     setWaiting(seconds);
-  }, []);
-  /** A renewal's answer — or no answer, as soon as one begins waiting out a refusal for too many tries. */
-  const untilWaitBegins = useCallback(<R,>(p: Promise<R>): Promise<R | { kind: 'offline' }> => {
-    let begun: (() => void) | undefined;
-    const stop = new Promise<{ kind: 'offline' }>((resolve) => {
-      begun = () => resolve({ kind: 'offline' });
-      waitBegun.current.add(begun);
-    });
-    return Promise.race([p, stop]).finally(() => {
-      if (begun) waitBegun.current.delete(begun);
-    });
   }, []);
   const [notice, setNotice] = useState<Notice>(null);
   const [installation, setInstallation] = useState<string | null>(null);
@@ -593,17 +580,18 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
   }, [recheck, vault, deps]);
 
   /**
-   * The session's token, as soon as `how` allows. `wait`: as the client
-   * does, joining a renewal under way and waiting out one the vault turned
-   * away for too many tries (up to a minute, twice, since v0.7.0-dev.12) —
-   * the uploader, and anything with nothing else to show. `quick` (I5-4):
-   * joins a renewal under way, but gives up once one is waiting out a
-   * refusal — no answer, and what the phone has shows meanwhile (the card's
-   * choices, Home). `now` (signing out): what there is now, neither joining
-   * nor waiting; the vault ends the session when it can.
+   * The session's token, as the client's `wait` allows (SessionCore.token).
+   * `true`: joining a renewal under way and waiting out one the vault
+   * turned away for too many tries (up to a minute, twice, since
+   * v0.7.0-dev.12) — the uploader, and anything with nothing else to show.
+   * `'join'` (I5-4, the client's since v0.8.0-dev.2): joins a renewal under
+   * way, but is answered at once when one is waiting out a refusal — no
+   * answer, and what the phone has shows meanwhile (the card's choices,
+   * Home). `false` (signing out): what there is now, neither joining nor
+   * waiting; the vault ends the session when it can.
    */
   const tokenFor = useCallback(
-    async <T,>(fn: (a: Api, token: string) => Promise<T>, how: 'wait' | 'quick' | 'now'): Promise<T> => {
+    async <T,>(fn: (a: Api, token: string) => Promise<T>, wait: boolean | 'join'): Promise<T> => {
       if (!api) throw new NetworkError('offline');
       await hydrated(session);
       try {
@@ -612,12 +600,7 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
         if (unusable(err)) setOffline(true);
         throw err;
       }
-      const t =
-        how === 'now' || (how === 'quick' && waitingRef.current !== null)
-          ? await session.token({ wait: false })
-          : how === 'quick'
-            ? await untilWaitBegins(session.token())
-            : await session.token();
+      const t = await session.token({ wait });
       if (t.kind === 'offline') {
         setOffline(true);
         throw new NetworkError('offline');
@@ -649,18 +632,18 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
         throw err;
       }
     },
-    [api, gate, session, hydrated, untilWaitBegins],
+    [api, gate, session, hydrated],
   );
   const withToken = useCallback(
-    <T,>(fn: (a: Api, token: string) => Promise<T>): Promise<T> => tokenFor(fn, 'wait'),
+    <T,>(fn: (a: Api, token: string) => Promise<T>): Promise<T> => tokenFor(fn, true),
     [tokenFor],
   );
   const withTokenQuick = useCallback(
-    <T,>(fn: (a: Api, token: string) => Promise<T>): Promise<T> => tokenFor(fn, 'quick'),
+    <T,>(fn: (a: Api, token: string) => Promise<T>): Promise<T> => tokenFor(fn, 'join'),
     [tokenFor],
   );
   const withTokenNow = useCallback(
-    <T,>(fn: (a: Api, token: string) => Promise<T>): Promise<T> => tokenFor(fn, 'now'),
+    <T,>(fn: (a: Api, token: string) => Promise<T>): Promise<T> => tokenFor(fn, false),
     [tokenFor],
   );
 
@@ -794,7 +777,7 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
       let timer: ReturnType<typeof setTimeout> | undefined;
       await Promise.race([
         hydrated(session)
-          .then(() => untilWaitBegins(session.token()))
+          .then(() => session.token({ wait: 'join' }))
           .catch(() => undefined),
         new Promise<void>((resolve) => {
           timer = setTimeout(resolve, SIGN_OUT_WAIT_MS);
@@ -812,7 +795,7 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
     emit('signedOut');
     setNotice(null);
     setPhase('sign_in');
-  }, [api, hydrated, untilWaitBegins, withTokenNow, session, runBeforeSignOut]);
+  }, [api, hydrated, withTokenNow, session, runBeforeSignOut]);
 
   const chooseAnotherVault = useCallback(async () => {
     await runBeforeSignOut();

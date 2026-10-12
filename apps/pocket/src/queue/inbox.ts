@@ -154,11 +154,19 @@ export async function sendToInbox(item: QueueItem, bytes: Uint8Array, deps: Inbo
 }
 
 /**
- * The person's own files waiting in their Inbox, from GET /batches — the
- * light list, without levels: each batch counts what is still undecided.
- * Nobody else's batch is ever listed.
+ * The person's own files waiting in their Inbox: GET /batches/counts, one
+ * count of every batch of theirs together (after 0.7.0). A vault without
+ * it answers 404, or 422 (a 0.7.0 candidate, rc.2 or before, takes
+ * `counts` for a batch's id): then the light list, GET /batches without
+ * levels, each batch counting what is still undecided — as before. Nobody
+ * else's batch is ever counted or listed.
  */
 export async function waitingInInbox(api: Api, token: string): Promise<number> {
+  try {
+    return (await api.batchCounts(token)).waiting;
+  } catch (err) {
+    if (!isApi(err, 404) && !isApi(err, 422)) throw err;
+  }
   const { items } = await api.batches(token);
   return items.reduce((n, b) => n + b.counts.waiting, 0);
 }
