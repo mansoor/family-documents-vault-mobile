@@ -465,22 +465,22 @@ describe('Send to my Inbox (I5)', () => {
   });
 });
 
-describe("the Inbox count on Home (I5)", () => {
-  /** Files already waiting in the person's Inbox, sent from a computer. */
-  async function waitingFromComputer(t: TestVault, n: number) {
-    const { api, token } = await ownerApi(t.vault);
-    const b = await api.createBatch(token, { name: 'Scanner folder' });
-    for (let i = 0; i < n; i += 1) {
-      await api.addBatchItem(token, b.id, {
-        kind: 'bytes',
-        filename: `scan-${i}.pdf`,
-        contentType: 'application/pdf',
-        bytes: new TextEncoder().encode(`%PDF-1.4\n${i}\n%%EOF\n`),
-      });
-    }
-    return { api, token, batch: b.id };
+/** Files already waiting in the person's Inbox, sent from a computer. */
+async function waitingFromComputer(t: TestVault, n: number) {
+  const { api, token } = await ownerApi(t.vault);
+  const b = await api.createBatch(token, { name: 'Scanner folder' });
+  for (let i = 0; i < n; i += 1) {
+    await api.addBatchItem(token, b.id, {
+      kind: 'bytes',
+      filename: `scan-${i}.pdf`,
+      contentType: 'application/pdf',
+      bytes: new TextEncoder().encode(`%PDF-1.4\n${i}\n%%EOF\n`),
+    });
   }
+  return { api, token, batch: b.id };
+}
 
+describe("the Inbox count on Home (I5)", () => {
   it('says how many wait, and where: the vault’s /inbox in the browser', async () => {
     const t = testVault([ORIGIN]);
     t.caps = withBatches();
@@ -495,9 +495,55 @@ describe("the Inbox count on Home (I5)", () => {
     expect(open.props.accessibilityHint).toBe('Opens vault.test/inbox');
     await fireEvent.press(open);
     expect(Linking.openURL).toHaveBeenCalledWith('https://vault.test/inbox');
+  });
+
+  it('Home’s inbox count uses the light count: GET /batches/counts, and no list', async () => {
+    const t = testVault([ORIGIN]);
+    t.caps = withBatches();
+    await signedIn(t);
+    await waitingFromComputer(t, 3);
+    await renderApp(<Home />, { fetch: t.fetch });
+    expect(await screen.findByTestId('home-inbox')).toHaveTextContent(/^3 waiting/);
+    expect(t.calls).toContain(`GET ${ORIGIN}/api/v1/batches/counts`);
+    expect(t.calls).not.toContain(`GET ${ORIGIN}/api/v1/batches`);
+    expect(t.calls.some((c) => c.includes('with=levels'))).toBe(false);
+  });
+
+  it.each([
+    [404, 'not_found', 'a vault before it'],
+    [422, 'validation_failed', 'a 0.7.0 candidate, rc.2 or before'],
+  ])('an older vault (%i, %s: %s) falls back to listing, light, as before', async (status, code) => {
+    const t = testVault([ORIGIN]);
+    t.caps = withBatches();
+    await signedIn(t);
+    await waitingFromComputer(t, 2);
+    const fetch: TestVault['fetch'] = (url, init) =>
+      url === `${ORIGIN}/api/v1/batches/counts`
+        ? Promise.resolve(reply(status, { error: { code, message: 'Refused.', retriable: false } }))
+        : t.fetch(url, init);
+    await renderApp(<Home />, { fetch });
+    expect(await screen.findByTestId('home-inbox')).toHaveTextContent(/^2 waiting/);
     // The light list: no levels asked for.
     expect(t.calls).toContain(`GET ${ORIGIN}/api/v1/batches`);
     expect(t.calls.some((c) => c.includes('with=levels'))).toBe(false);
+  });
+
+  it('any other refusal of the count is not taken for an older vault: no count, and no list', async () => {
+    const t = testVault([ORIGIN]);
+    t.caps = withBatches();
+    await signedIn(t);
+    await waitingFromComputer(t, 2);
+    let asked = 0;
+    const fetch: TestVault['fetch'] = (url, init) => {
+      if (url !== `${ORIGIN}/api/v1/batches/counts`) return t.fetch(url, init);
+      asked += 1;
+      return Promise.resolve(reply(403, { error: { code: 'forbidden', message: 'Refused.', retriable: false } }));
+    };
+    await renderApp(<Home />, { fetch });
+    await screen.findByTestId('home-calm');
+    await waitFor(() => expect(asked).toBeGreaterThan(0));
+    expect(screen.queryByTestId('home-inbox')).toBeNull();
+    expect(t.calls).not.toContain(`GET ${ORIGIN}/api/v1/batches`);
   });
 
   it('is hidden when nothing waits', async () => {
@@ -507,7 +553,7 @@ describe("the Inbox count on Home (I5)", () => {
     await waitingFromComputer(t, 0);
     await renderApp(<Home />, { fetch: t.fetch });
     await screen.findByTestId('home-calm');
-    await waitFor(() => expect(t.calls).toContain(`GET ${ORIGIN}/api/v1/batches`));
+    await waitFor(() => expect(t.calls).toContain(`GET ${ORIGIN}/api/v1/batches/counts`));
     expect(screen.queryByTestId('home-inbox')).toBeNull();
   });
 
@@ -763,6 +809,38 @@ describe('a renewal the vault turns away for too many tries (I5-4)', () => {
     const started = Date.now();
     expect(await screen.findByRole('button', { name: 'Passport' }, { timeout: 10_000 })).toBeTruthy();
     expect(Date.now() - started).toBeLessThan(10_000);
+  });
+
+  it('a 429 on renewal doesn’t hold Home: its Inbox count is asked once, and keeps what it last said', async () => {
+    const t = testVault([ORIGIN]);
+    t.caps = withBatches();
+    await signedIn(t);
+    await waitingFromComputer(t, 1);
+    const h = anHourOn(t);
+    let renewals = 0;
+    const fetch: TestVault['fetch'] = (url, init) => {
+      if (url.endsWith('/api/v1/auth/refresh')) renewals += 1;
+      return h.fetch(url, init);
+    };
+    await renderApp(<Home />, { fetch, deps: { now: h.now } });
+    expect(await screen.findByTestId('home-inbox')).toHaveTextContent(/^1 waiting/);
+    // The renewals so far were the start's, before the vault refused.
+    renewals = 0;
+    h.later();
+    const started = Date.now();
+    await focused();
+    await waitFor(() => expect(renewals).toBe(1));
+    // Answered at once, with no connection said: the count stays as it was,
+    // and Home never waits out the refusal, nor says it is waiting.
+    await waitFor(() => expect(screen.getByTestId('home-offline')).toBeTruthy());
+    expect(Date.now() - started).toBeLessThan(10_000);
+    expect(screen.getByTestId('home-inbox')).toHaveTextContent(/^1 waiting/);
+    expect(screen.queryByTestId('home-waiting')).toBeNull();
+    // In view again while the vault's wait lasts: told at once, the vault not asked again.
+    await focused();
+    await waitFor(() => expect(screen.getByTestId('home-inbox')).toHaveTextContent(/^1 waiting/));
+    expect(screen.queryByTestId('home-waiting')).toBeNull();
+    expect(renewals).toBe(1);
   });
 
   it('Home’s pull to refresh ends at once, and a wait something else is in is said', async () => {

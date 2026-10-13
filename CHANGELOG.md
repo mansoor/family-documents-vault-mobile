@@ -6,6 +6,32 @@ app's own, tagged `vX.Y.Z` in this repository.
 
 ## [Unreleased]
 
+## [0.3.1] — the vault's shared code of v0.8.0-dev.2
+
+A patch: nothing new to see, and the app still works with a vault of 0.7.0
+(and, as before, 0.4.10 or later).
+
+### Changed
+- Built against the vault's shared code of v0.8.0-dev.2 (was
+  v0.7.0-dev.12), and Expo SDK 57's latest patches (expo 57.0.28, with
+  expo-crypto, expo-dev-client, expo-router, expo-screen-orientation,
+  expo-sharing and jest-expo), as expo-doctor asks.
+- **The Inbox count on Home is one light count.** Home asks the vault how
+  many of your files wait (`GET /api/v1/batches/counts`, after 0.7.0)
+  rather than listing every batch to add them up. A vault without it — one
+  that answers 404, or 422 as a 0.7.0 candidate up to rc.2 does — is asked
+  for the list, as before. Only your own files are counted, as before.
+- Home and the capture card's choices use the client's own way of not
+  waiting (`token({ wait: 'join' })`) in place of the phone's: they join a
+  renewal of the session already on its way, but are answered at once when
+  the vault has turned one away for too many tries, and show what the
+  phone has meanwhile. Signing out gives a renewal on its way its moment
+  the same way. Unlike before, a read of Home's on its own no longer
+  starts a renewal that waits out the refusal in the background: Home says
+  there is no connection, and asks again the next time it looks, once the
+  vault's wait is over. Anything else that waits (the uploader) still says
+  "The vault asked us to wait 30 seconds." while it does.
+
 ## [0.3.0] — Phase 6, I5: the phone feeds the Inbox
 
 A new minor version: what it adds needs a vault of 0.7 (0.7.0-dev.12 or
