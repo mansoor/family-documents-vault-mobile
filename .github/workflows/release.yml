@@ -116,6 +116,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           case "$TAG" in *-rc*) PRE=--prerelease ;; *) PRE= ;; esac
+          # While the repository is public, a release would be public too:
+          # make it a draft, which only the owner sees, until it goes private.
+          if [ "$(gh repo view "$GITHUB_REPOSITORY" --json visibility -q .visibility)" != PRIVATE ]; then
+            PRE="$PRE --draft"
+          fi
           if ! gh release view "$TAG" > /dev/null 2>&1; then
             gh release create "$TAG" $PRE --verify-tag --title "Family Vault $TAG" \
               --notes "The owner's signed build of $TAG. See CHANGELOG.md."

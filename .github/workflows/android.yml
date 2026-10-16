@@ -12,6 +12,10 @@ on:
         type: choice
         options: [preview, dev, kvm-probe]
         default: preview
+      publish:
+        description: Publish to the rolling pre-release (off keeps the APK a private run artifact)
+        type: boolean
+        default: true
   push:
     tags: ['v*']
     branches: [develop]
@@ -90,8 +94,11 @@ jobs:
         with:
           name: ${{ env.APK }}
           path: ${{ env.APK }}
-          retention-days: 2
+          retention-days: 7
       - name: Publish as the rolling pre-release
+        # A manual run may keep the APK a private artifact: while this repo
+        # is public, a pre-release is public too.
+        if: github.event_name != 'workflow_dispatch' || inputs.publish
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
