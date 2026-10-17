@@ -6,6 +6,33 @@ app's own, tagged `vX.Y.Z` in this repository.
 
 ## [Unreleased]
 
+## [0.3.2] — the vault's shared code of v0.8.0-dev.8
+
+A patch for a vault of 0.8.0: nothing new to see, and the app still works
+with a vault of 0.7.0 (and, as before, 0.4.10 or later).
+
+### Changed
+- Built against the vault's shared code of v0.8.0-dev.8 (was
+  v0.8.0-dev.2), and Expo SDK 57's latest patches (expo 57.0.30, with
+  @expo/metro-runtime, expo-constants, expo-linking and expo-router), as
+  expo-doctor asks.
+- **A will, a vehicle's logbook, an employment contract and a property
+  deed no longer need an expiry.** The card still offers Expires for them,
+  but no longer marks it required, and Save no longer waits for it; on the
+  phone, with no connection, one without an expiry reads Valid, not "Needs
+  an expiry date", as a vault of 0.8.0 says. One with an expiry given is
+  Expiring or Expired as before. Every other kind that expires, and every
+  kind of the household's own, still asks for its expiry. The rule is the
+  vault's shared code's (`expiryOptional`): the vault still says these
+  kinds' expiry is required, as it says of every kind that expires. A
+  vault older than 0.8.0 still asks for it: there, such a document stays
+  Needs info in the vault while a kept copy reads Valid on the phone.
+- **Two new kinds, as a vault of 0.8.0 lists them:** a credit card
+  statement (its expiry is the payment's due date, "Payment due", and it is
+  asked for) and a school report (no expiry). The phone knows kinds only as
+  the vault lists them, so both show by their own names and with their own
+  words for their fields, with nothing of the phone's own to change.
+
 ## [0.3.1] — the vault's shared code of v0.8.0-dev.2
 
 A patch: nothing new to see, and the app still works with a vault of 0.7.0

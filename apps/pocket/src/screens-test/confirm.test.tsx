@@ -9,7 +9,7 @@ import { MemoryQueueStore } from '../queue/store';
 import type { QueueItem } from '../queue/item';
 import { jpeg, reply } from '../test-support/capture';
 import { audit } from '../test-support/a11y';
-import { addCar, fieldOf, ownerApi } from '../test-support/kinds';
+import { addCar, addVaultKind, fieldOf, ownerApi } from '../test-support/kinds';
 import { installed, renderApp, signedIn, testCapture } from '../test-support/render';
 import { capabilities, testVault, type TestVault } from '../test-support/vault';
 import { SecureTokenStore } from '../session/store';
@@ -556,6 +556,64 @@ describe('a type’s details (a vault of 0.5.11)', () => {
     await waitFor(() => expect(t.vault.state.documents).toHaveLength(1));
     expect(rec.metadata()[0]).toMatchObject({ type_key: car.key });
     expect(rec.metadata()[0]).not.toHaveProperty('extra');
+  });
+});
+
+describe('an expiry the family adds (a vault of 0.8.0)', () => {
+  it.each([
+    ['will', 'will', 'will', 'Will / trust / power of attorney'],
+    ['logbook', 'vehicle_registration', 'vehicle', 'Vehicle title / registration'],
+  ] as const)('a %s is saved without an expiry: Expires is offered, not waited for', async (_name, key, search, label) => {
+    const { t, rec } = await openCard({ kinds: true, before: async (v) => void addVaultKind(v.vault, key) });
+    await fireEvent.press(screen.getByTestId('types-more'));
+    await fireEvent.changeText(screen.getByTestId('types-search'), search);
+    await fireEvent.press(chip(label));
+    await fireEvent.press(chip('Fake Owner (Yours)'));
+    await fireEvent.press(screen.getByTestId('more-details'));
+    // Still there to fill in, and still `required` on the wire: shared's rule says it is not asked for.
+    expect(screen.getByTestId('field-expires')).toBeTruthy();
+    expect(screen.queryByLabelText(/^Expires, required/)).toBeNull();
+    await fireEvent.press(screen.getByTestId('capture-save'));
+    await waitFor(() => expect(t.vault.state.documents).toHaveLength(1));
+    expect(screen.queryByTestId('capture-error')).toBeNull();
+    expect(rec.metadata()[0]).toMatchObject({ type_key: key });
+    expect(rec.metadata()[0]).not.toHaveProperty('expires');
+  });
+
+  it('a passport still asks for its expiry', async () => {
+    const { t } = await openCard({ kinds: true, before: async (v) => void addVaultKind(v.vault, 'will') });
+    await fireEvent.press(chip('Passport'));
+    await fireEvent.press(chip('Fake Owner (Yours)'));
+    await fireEvent.press(screen.getByTestId('more-details'));
+    expect(screen.getByLabelText('Expires, required').props.testID).toBe('field-expires');
+    await fireEvent.changeText(screen.getByTestId('field-number'), '123456789');
+    await fireEvent.press(screen.getByTestId('capture-save'));
+    expect(await screen.findByTestId('capture-error')).toHaveTextContent(
+      'Still needed: Expires. Fill it in, or skip for now.',
+    );
+    expect(captures(t)).toHaveLength(0);
+  });
+
+  it('the two new kinds are offered by their names, with their own words for their fields', async () => {
+    const { t, rec } = await openCard({ kinds: true });
+    await fireEvent.press(screen.getByTestId('types-more'));
+    await fireEvent.changeText(screen.getByTestId('types-search'), 'school');
+    expect(chip('School report')).toBeTruthy();
+    await fireEvent.changeText(screen.getByTestId('types-search'), 'credit');
+    await fireEvent.press(chip('Credit card statement'));
+    await fireEvent.press(chip('Fake Owner (Yours)'));
+    await fireEvent.press(screen.getByTestId('more-details'));
+    expect(screen.getByLabelText('Card issuer')).toBeTruthy();
+    // Its expiry is the payment's due date, and it is not one of the few left to the family.
+    expect(screen.getByLabelText('Payment due, required').props.testID).toBe('field-expires');
+    await fireEvent.press(screen.getByTestId('capture-save'));
+    expect(await screen.findByTestId('capture-error')).toHaveTextContent(
+      'Still needed: Payment due. Fill it in, or skip for now.',
+    );
+    await fireEvent.changeText(screen.getByTestId('field-expires'), '14 Nov 2026');
+    await fireEvent.press(screen.getByTestId('capture-save'));
+    await waitFor(() => expect(t.vault.state.documents).toHaveLength(1));
+    expect(rec.metadata()[0]).toMatchObject({ type_key: 'credit_card_statement' });
   });
 });
 
