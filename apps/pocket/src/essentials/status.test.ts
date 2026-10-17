@@ -1,6 +1,6 @@
 import { createFakeVault } from '@fdv/client/testing';
 import { deriveStatus, missingFields, type DateValue, type DocumentInput, type DocumentView } from '@fdv/shared';
-import { addCar, fieldOf, ownerApi } from '../test-support/kinds';
+import { addCar, addVaultKind, fieldOf, ownerApi } from '../test-support/kinds';
 import { keptType, statusToday } from './status';
 
 const DAY = 86_400_000;
@@ -85,5 +85,38 @@ describe("an Essential's status with no connection", () => {
         ]);
       }
     }
+  });
+});
+
+describe('an expiry the family adds (a vault of 0.8.0)', () => {
+  it('a will or a logbook without an expiry is Valid on the phone, as in the vault; a passport still needs one', async () => {
+    const vault = createFakeVault();
+    vault.state.setupRequired = false;
+    vault.state.email = 'owner@example.test';
+    vault.state.password = 'correct horse battery staple';
+    addVaultKind(vault, 'will');
+    addVaultKind(vault, 'vehicle_registration');
+    const { api, token } = await ownerApi(vault);
+    const mine = { owner_member_id: 'fake-member', is_essential: true };
+    for (const body of [
+      { ...mine, title: 'Will', type_key: 'will' },
+      { ...mine, title: 'Logbook', type_key: 'vehicle_registration' },
+      { ...mine, title: 'Logbook, renewed', type_key: 'vehicle_registration', expires: on('2026-01-31') },
+      { ...mine, title: 'Passport', type_key: 'passport', identifier: '123456789' },
+    ]) {
+      await api.createDocument(token, body);
+    }
+    const listed = (await api.documents(token)).items;
+    const types = (await api.documentTypes(token)).items;
+    const kept = types.map(keptType);
+    const today = '2026-10-16';
+    const status = (title: string) => statusToday(listed.find((d) => d.title === title) as DocumentView, kept, today);
+    expect(status('Will')).toEqual({ value: 'valid', label: '' });
+    expect(status('Logbook')).toEqual({ value: 'valid', label: '' });
+    // One given counts as before.
+    expect(status('Logbook, renewed')?.value).toBe('expired');
+    expect(status('Passport')).toEqual({ value: 'needs_info', label: 'Needs an expiry date' });
+    // And the phone's word is the vault's.
+    for (const doc of listed) expect([doc.title, statusToday(doc, kept, today)]).toEqual([doc.title, vaultSays(doc, types, today)]);
   });
 });
