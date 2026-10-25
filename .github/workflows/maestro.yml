@@ -8,7 +8,8 @@ name: Maestro
 # from the published images runs on the host, reached as 10.0.2.2. The push
 # and clipboard modules' JVM tests (4.14, 5.31) run with the build. A run costs about 40
 # runner minutes, so it runs on demand, and on a pull request that changes
-# the flows, the app's own native code or this workflow — not on every push.
+# the flows, the app's own native code, this workflow or the vault the app is
+# pinned to — not on every push.
 on:
   workflow_dispatch:
   # The exit flows run on the release tags too (4.18).
@@ -19,6 +20,9 @@ on:
       - apps/pocket/.maestro/**
       - apps/pocket/modules/**
       - .github/workflows/maestro.yml
+      # A new pin is new shared code in the app and a new vault to run against:
+      # 0.3.1 and 0.3.2 moved it with no run, and 0.3.2 sent no scan (PR #24).
+      - vendor/fdv
 
 concurrency:
   group: maestro-${{ github.ref }}
