@@ -30,7 +30,7 @@ permissions:
 jobs:
   flows:
     name: Capture in airplane mode, sent once
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 90
     env:
       APP_VARIANT: e2e

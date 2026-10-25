@@ -37,7 +37,7 @@ jobs:
   build:
     if: inputs.variant != 'kvm-probe'
     name: Build ${{ inputs.variant || (startsWith(github.ref, 'refs/tags/') && 'preview') || 'dev' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     env:
       VARIANT: ${{ inputs.variant || (startsWith(github.ref, 'refs/tags/') && 'preview') || 'dev' }}
@@ -116,7 +116,7 @@ jobs:
   kvm-probe:
     if: inputs.variant == 'kvm-probe'
     name: Emulator boot probe
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - name: Enable KVM
