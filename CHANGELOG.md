@@ -6,6 +6,18 @@ app's own, tagged `vX.Y.Z` in this repository.
 
 ## [Unreleased]
 
+### Fixed
+- **A scan is sent again.** Since 0.3.2 no scan, renewal or Inbox scan
+  left the phone: each one waited under "Not sent yet. Your scan is safe on
+  this phone and will go by itself", online or not. The vault's shared
+  code of v0.8.0-dev.7 and later draws each upload's multipart boundary
+  from Web Crypto's `crypto.getRandomValues`, which Hermes does not have,
+  so making the upload's body threw before anything was sent, and the
+  queue took that for no connection. The app now gives the shared code
+  the phone's own secure random numbers (expo-crypto's) as
+  `crypto.getRandomValues`, before anything else loads. The emulator flows
+  (Maestro), which had not run since 0.3.0, found it.
+
 ## [0.3.2] — the vault's shared code of v0.8.0-dev.8
 
 A patch for a vault of 0.8.0: nothing new to see, and the app still works
