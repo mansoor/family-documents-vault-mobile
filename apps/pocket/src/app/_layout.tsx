@@ -1,3 +1,5 @@
+// First: the shared client's uploads need Web Crypto's random numbers, which Hermes lacks.
+import '../platform/web-crypto';
 import '../i18n';
 import { colours } from '@fdv/shared';
 import { Stack } from 'expo-router';
