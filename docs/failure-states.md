@@ -76,6 +76,7 @@ Written by `node apps/pocket/scripts/failure-states.mjs`; CI fails if it is out 
 |  |  | `capture.stillNeededInbox` | Still needed: {{fields}}. Fill it in, or send it to your Inbox for now. / Still needed: {{fields}}. Fill them in, or send it to your Inbox for now. |
 | Scans on their way | Home, the queue | `queue.busy` | The vault is busy. Trying again in a moment. |
 |  |  | `queue.notYet` | Not sent yet. Your scan is safe on this phone and will go by itself. |
+|  |  | `queue.couldNotSend` | Couldn't send this scan. It's still on this phone. |
 |  |  | `queue.tooBigForVault` | This file is bigger than your vault accepts ({{limit}}). Try fewer pages, or a smaller file. |
 |  |  | `queue.wrongKind` | The vault can't keep this kind of file. It takes PDFs, photos (JPEG, PNG, HEIC, TIFF), Word and Excel files. |
 |  |  | `queue.refused` | The vault didn't take it: {{reason}} |

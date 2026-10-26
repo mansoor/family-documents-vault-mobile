@@ -38,7 +38,7 @@ const AREAS = [
     'Scans on their way',
     'Home, the queue',
     'queue',
-    'busy notYet tooBigForVault wrongKind refused needsYou storage noLongerAdd ownerGone versionRefused goesWithout filedWithout',
+    'busy notYet couldNotSend tooBigForVault wrongKind refused needsYou storage noLongerAdd ownerGone versionRefused goesWithout filedWithout',
   ],
   ['The scanner', 'Home', 'home', 'scannerFailed savedOffline savedInboxOffline savedInboxFiled vaultWait offline'],
   [
