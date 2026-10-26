@@ -1,5 +1,7 @@
 import { ApiRequestError, isSessionOver, retryDelay } from '@fdv/client';
 import type { CaptureResult, UploadStatus } from '@fdv/shared';
+import { log } from '../log';
+import { noConnection } from '../net/no-connection';
 import type { QueueItem } from './item';
 import type { QueueStore } from './store';
 
@@ -11,7 +13,9 @@ import type { QueueStore } from './store';
  * could not (too big, a kind of file the vault does not keep, a person no
  * longer in the family) waits for a person, with the vault's reason. A
  * detail the vault no longer takes is left out, and said, rather than
- * leaving the scan unfiled.
+ * leaving the scan unfiled. Only a missing connection is waited out
+ * quietly: a failure that is neither the vault's answer nor the network
+ * (net/no-connection.ts) is the app's own, and waits for a person too.
  *
  * Every try carries the item's one idempotency key, and a try whose
  * answer never arrived — the connection dropped, the app was closed —
@@ -269,10 +273,25 @@ export class Uploader {
       // 408, 429, 5xx and the like: the vault is there and will take it later.
       return this.wait(item, { attempts, nextAt: later(err), lastCode: err.code });
     }
-    // No answer at all, or nothing sent (not the approved vault, not on
-    // Wi-Fi): try again later, asking first — or as soon as that changes.
-    this.phoneSide.add(item.id);
-    return this.wait(item, { attempts, nextAt: later(err), lastCode: 'offline' });
+    if (noConnection(err)) {
+      // No answer at all, or nothing sent (not the approved vault, not on
+      // Wi-Fi): try again later, asking first — or as soon as that changes.
+      this.phoneSide.add(item.id);
+      return this.wait(item, { attempts, nextAt: later(err), lastCode: 'offline' });
+    }
+    // Neither the vault's answer nor the connection: the app's own fault
+    // (0.3.2's missing `crypto` was one). Trying again by itself would only
+    // fail the same way, forever and out of sight, so it waits for a
+    // person, said plainly, and what went wrong is logged — the error's
+    // kind, never the scan's details or the vault's words.
+    this.phoneSide.delete(item.id);
+    log.error('queue.send_failed', faultFields(err));
+    await this.deps.store.update(item.id, {
+      state: 'needs_you',
+      attempts,
+      problem: { status: 0, code: 'send_failed', message: null },
+    });
+    this.deps.onEvent?.({ kind: 'changed' });
   }
 
   /**
@@ -299,6 +318,17 @@ export class Uploader {
     this.again = true;
     this.deps.onEvent?.({ kind: 'changed' });
   }
+}
+
+/**
+ * What is logged of a fault: the error's kind, and a ReferenceError's own
+ * words, which name only the code's missing piece ("Property 'crypto'
+ * doesn't exist"). Any other error's words may quote what it was handling
+ * — a title, the vault's answer — so they are never logged.
+ */
+function faultFields(err: unknown): Record<string, unknown> {
+  if (!(err instanceof Error)) return { kind: typeof err };
+  return err.name === 'ReferenceError' ? { kind: err.name, missing: err.message } : { kind: err.name };
 }
 
 function defaultSchedule(ms: number, fn: () => void): () => void {

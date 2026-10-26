@@ -3,7 +3,7 @@ import type { TFunction } from 'i18next';
 import { BUSY_CODES, wordsForCode } from '../errors/words';
 import { useTranslation } from 'react-i18next';
 import { StyleSheet, View } from 'react-native';
-import { filedWithout, type FiledWithout, type QueueItem } from '../queue/item';
+import { filedWithout, sendFailed, type FiledWithout, type QueueItem } from '../queue/item';
 import { andList } from './draft';
 import { Button, Card, Text } from '../ui';
 import { Chip, ChipRow, sizeWords } from './ui';
@@ -61,11 +61,13 @@ export function QueueRow(props: {
   members: Member[] | null;
   me: string | null;
   onRemove: () => void;
-  onRetry: (metadata: CaptureMetadata) => void;
+  /** Sent again; with new details when a person put them right, or as it was. */
+  onRetry: (metadata?: CaptureMetadata) => void;
 }) {
   const { t } = useTranslation();
   const { item } = props;
   const p = item.problem;
+  const failed = item.state === 'needs_you' && sendFailed(p);
   const gone = ownerGone(item, props.members);
   const state =
     item.state === 'needs_you'
@@ -75,7 +77,9 @@ export function QueueRow(props: {
         : t('queue.waiting');
   const detail =
     item.state === 'needs_you'
-      ? p?.status === 413
+      ? failed
+        ? t('queue.couldNotSend')
+        : p?.status === 413
         ? t('queue.tooBigForVault', { limit: sizeWords(props.limit) })
         : p?.status === 415
           ? t('queue.wrongKind')
@@ -132,6 +136,7 @@ export function QueueRow(props: {
           </ChipRow>
         </View>
       ) : null}
+      {failed ? <Button label={t('queue.tryAgain')} onPress={() => props.onRetry()} testID="queue-try-again" /> : null}
       {item.state === 'needs_you' ? <Button label={t('queue.remove')} kind="quiet" onPress={props.onRemove} /> : null}
     </Card>
   );

@@ -100,8 +100,11 @@ interface CaptureValue {
   storeOpen: boolean;
   /** "Scan the new one": a new version of a document, straight into the queue. */
   renew: (documentId: string) => Promise<StartOutcome | 'saved' | SaveProblem>;
-  /** A Needs-you item, put right (another person, no person) and sent again. */
-  retry: (id: string, metadata: CaptureMetadata) => Promise<void>;
+  /**
+   * A Needs-you item sent again: put right (another person, no person), or
+   * as it was, after a send the phone itself could not make.
+   */
+  retry: (id: string, metadata?: CaptureMetadata) => Promise<void>;
   /** This vault's captures made by someone else who used this phone. */
   others: QueueItem[];
   /** Captures waiting on this phone for this vault: this account's, or anyone's when signed out. */
@@ -705,10 +708,19 @@ export function CaptureProvider(props: { children: ReactNode; deps?: Partial<Cap
   );
 
   // Put right and sent again, under the same key: the vault kept nothing of
-  // a refused try. The visibility is the card's, never less private.
+  // a refused try. The visibility is the card's, never less private. With
+  // no new details it goes as it was, asking the vault first if a try
+  // before may have reached it.
   const retry = useCallback(
-    async (id: string, metadata: CaptureMetadata) => {
-      await store?.update(id, { metadata, state: 'waiting', problem: null, attempts: 0, nextAt: 0, lastCode: null });
+    async (id: string, metadata?: CaptureMetadata) => {
+      await store?.update(id, {
+        ...(metadata ? { metadata } : {}),
+        state: 'waiting',
+        problem: null,
+        attempts: 0,
+        nextAt: 0,
+        lastCode: null,
+      });
       await refresh();
       if (inFront()) void uploader?.kick();
     },

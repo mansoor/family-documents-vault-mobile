@@ -51,6 +51,8 @@ export const CATALOGUE: Readonly<Record<string, string>> = {
   request_timeout: 'errors.timeout',
   internal_error: 'errors.internal',
   storage_unreachable: 'errors.storageUnreachable',
+  // The phone could not send a scan, for a reason that is not the connection: kept on it, and tried again by a person.
+  send_failed: 'queue.couldNotSend',
 };
 
 /** The vault's "not now" answers: a scan waiting on one of these is sent again later by itself. */

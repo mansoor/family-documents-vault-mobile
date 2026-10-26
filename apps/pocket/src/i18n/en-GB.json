@@ -196,6 +196,8 @@
     "tooBigForVault": "This file is bigger than your vault accepts ({{limit}}). Try fewer pages, or a smaller file.",
     "wrongKind": "The vault can't keep this kind of file. It takes PDFs, photos (JPEG, PNG, HEIC, TIFF), Word and Excel files.",
     "refused": "The vault didn't take it: {{reason}}",
+    "couldNotSend": "Couldn't send this scan. It's still on this phone.",
+    "tryAgain": "Try again",
     "remove": "Remove it",
     "untitled": "A scan",
     "waiting": "Waiting to send",

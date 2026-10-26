@@ -8,7 +8,9 @@ import type { CaptureMetadata } from '@fdv/shared';
  * - waiting: not sent yet, or to be tried again from `nextAt`.
  * - sending: a try is under way. One left over from a closed app is sent
  *   again, asking the vault first what became of it.
- * - needs_you: the vault refused it, for a reason trying again cannot fix.
+ * - needs_you: the vault refused it, for a reason trying again cannot fix;
+ *   or the phone could not send it, for a reason that is not the
+ *   connection (`send_failed`), and it waits for a person to try again.
  *
  * Once the vault has it (201), the item, its bytes and its key are gone.
  */
@@ -21,6 +23,14 @@ export interface QueueProblem {
   /** The vault's own words, when it gave any. */
   message: string | null;
 }
+
+/**
+ * The phone could not send it, and not for want of a connection: the
+ * app's own fault, which trying by itself again would only repeat. Never
+ * the vault's refusal — the vault said nothing.
+ */
+export const sendFailed = (problem: QueueProblem | null): boolean =>
+  problem !== null && problem.status === 0 && problem.code === 'send_failed';
 
 /**
  * What an item makes: a new document (POST /capture), or a new version of

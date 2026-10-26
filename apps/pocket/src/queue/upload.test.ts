@@ -1,3 +1,5 @@
+import { NetworkError } from '@fdv/client';
+import { setSink } from '../log';
 import { captureVault } from '../test-support/capture';
 import type { QueueItem } from './item';
 import { MemoryQueueStore } from './store';
@@ -280,5 +282,135 @@ describe('the uploader', () => {
     now = 500; // long before either backoff is up
     await uploader.kick({ fresh: true });
     expect((await store.list()).map((i) => i.id)).toEqual(['busy-one']);
+  });
+});
+
+describe('only a missing connection is waited out quietly', () => {
+  /** What the log is told from now on. */
+  function logged() {
+    const lines: { level: string; event: string; fields: Record<string, unknown> }[] = [];
+    setSink((level, event, fields) => lines.push({ level, event, fields }));
+    return lines;
+  }
+  const throwing = (err: unknown) => async (): Promise<never> => {
+    throw err;
+  };
+
+  it('a fetch that found no network waits, as offline, to go by itself', async () => {
+    const cv = await captureVault();
+    const lines = logged();
+    // Through the client, which says NetworkError…
+    cv.turns.push('offline');
+    const store = await queued();
+    await new Uploader(cv.deps(store)).kick();
+    expect(await store.list()).toEqual([
+      expect.objectContaining({ state: 'waiting', lastCode: 'offline', problem: null, attempts: 1 }),
+    ]);
+    // …and a fetch's own TypeError, straight from a send.
+    const raw = await queued();
+    await new Uploader(cv.deps(raw, { send: throwing(new TypeError('Network request failed')) })).kick();
+    expect(await raw.list()).toEqual([expect.objectContaining({ state: 'waiting', lastCode: 'offline', problem: null })]);
+    expect(lines).toEqual([]);
+  });
+
+  it('a timeout, and what the phone would not send (not the approved vault, not on Wi-Fi), wait the same way', async () => {
+    const cv = await captureVault();
+    const named = (name: string) => Object.assign(new Error('Nothing was sent.'), { name });
+    for (const err of [new NetworkError('timeout'), named('StrangerError'), named('WifiOnlyError'), named('AbortError')]) {
+      const store = await queued();
+      await new Uploader(cv.deps(store, { send: throwing(err) })).kick();
+      expect(await store.list()).toEqual([expect.objectContaining({ state: 'waiting', lastCode: 'offline' })]);
+    }
+  });
+
+  it('a ReferenceError (0.3.2: no `crypto` on Hermes) is a visible failure, logged, and never tried again by itself', async () => {
+    const cv = await captureVault();
+    const lines = logged();
+    const store = await queued();
+    let sends = 0;
+    const planned: number[] = [];
+    const uploader = new Uploader(
+      cv.deps(store, {
+        send: async () => {
+          sends += 1;
+          throw new ReferenceError("Property 'crypto' doesn't exist");
+        },
+        schedule: (ms) => {
+          planned.push(ms);
+          return () => undefined;
+        },
+      }),
+    );
+    await uploader.kick();
+    const [item] = await store.list();
+    expect(item).toMatchObject({
+      state: 'needs_you',
+      attempts: 1,
+      problem: { status: 0, code: 'send_failed', message: null },
+    });
+    // Not "no connection": the row will not say it will go by itself.
+    expect(item?.lastCode).not.toBe('offline');
+    // Recorded for whoever looks into it: what kind, and what was missing — nothing of the scan.
+    expect(lines).toEqual([
+      {
+        level: 'error',
+        event: 'queue.send_failed',
+        fields: { kind: 'ReferenceError', missing: "Property 'crypto' doesn't exist" },
+      },
+    ]);
+    // Not again by itself: not on the next look, not when the connection comes back, not on a timer.
+    await uploader.kick();
+    await uploader.kick({ fresh: true });
+    await new Promise((r) => setTimeout(r, 0));
+    expect(sends).toBe(1);
+    expect(planned).toEqual([]);
+  });
+
+  it('any other programming error is a failure too, and its words, which could quote the scan, are not logged', async () => {
+    const cv = await captureVault();
+    const lines = logged();
+    for (const err of [
+      new TypeError("Cannot read property 'title' of undefined"),
+      new SyntaxError("Unexpected token A in JSON: Aisha's passport"),
+      new Error("Aisha's passport"),
+    ]) {
+      const store = await queued();
+      await new Uploader(cv.deps(store, { send: throwing(err) })).kick();
+      expect(await store.list()).toEqual([
+        expect.objectContaining({ state: 'needs_you', problem: { status: 0, code: 'send_failed', message: null } }),
+      ]);
+    }
+    expect(lines.map((l) => l.fields)).toEqual([{ kind: 'TypeError' }, { kind: 'SyntaxError' }, { kind: 'Error' }]);
+    expect(JSON.stringify(lines)).not.toMatch(/Aisha|passport|title/);
+  });
+
+  it('a phone that cannot read its own queue is a failure, not "no connection"', async () => {
+    const cv = await captureVault();
+    logged();
+    const store = await queued();
+    store.bytes = throwing(new Error('file is not a database'));
+    await new Uploader(cv.deps(store)).kick();
+    expect(await store.list()).toEqual([
+      expect.objectContaining({ state: 'needs_you', problem: expect.objectContaining({ code: 'send_failed' }) }),
+    ]);
+    expect(cv.calls.filter((c) => c === 'POST /api/v1/capture')).toEqual([]);
+  });
+
+  it("an answer from the vault keeps its own handling: a refusal waits for a person in the vault's words, busy waits", async () => {
+    const cv = await captureVault();
+    const lines = logged();
+    cv.turns.push({ status: 413, code: 'payload_too_large', message: 'Too big.' }, { status: 503, code: 'unavailable' });
+    const refused = await queued();
+    await new Uploader(cv.deps(refused)).kick();
+    expect(await refused.list()).toEqual([
+      expect.objectContaining({
+        state: 'needs_you',
+        problem: { status: 413, code: 'payload_too_large', message: 'Too big.' },
+      }),
+    ]);
+    const busy = await queued();
+    await new Uploader(cv.deps(busy)).kick();
+    expect(await busy.list()).toEqual([expect.objectContaining({ state: 'waiting', lastCode: 'unavailable', problem: null })]);
+    expect(lines).toEqual([]);
   });
 });

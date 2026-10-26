@@ -17,6 +17,16 @@ app's own, tagged `vX.Y.Z` in this repository.
   the phone's own secure random numbers (expo-crypto's) as
   `crypto.getRandomValues`, before anything else loads. The emulator flows
   (Maestro), which had not run since 0.3.0, found it.
+- **A scan the phone can't send says so.** Only a missing connection —
+  no answer from the vault, a fetch that found no network, a timeout, or
+  a vault the phone may not send to here (not the approved one, or off
+  Wi-Fi) — still reads "Not sent yet… will go by itself" and goes once
+  the connection is back. Any other failure, such as the missing
+  `crypto` above, now reads "Couldn't send this scan. It's still on this
+  phone." under Needs you, with Try again and Remove it. It is not tried
+  again by itself, and the log records what kind of error it was, never
+  the scan's details. A refusal or a busy answer from the vault is handled
+  as before.
 
 ## [0.3.2] — the vault's shared code of v0.8.0-dev.8
 

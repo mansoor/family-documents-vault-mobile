@@ -354,6 +354,32 @@ describe('scans belong to the person who made them', () => {
 });
 
 describe('Needs you, and renewals', () => {
+  it('a scan the phone itself could not send (0.3.2: no `crypto`) says so, online, and goes on Try again', async () => {
+    const t = testVault([ORIGIN]);
+    await signedIn(t);
+    const store = new MemoryQueueStore();
+    await store.add(item({ metadata: { title: 'Gas bill' } }), new TextEncoder().encode('%PDF-1.4\n%%EOF\n'));
+    // As on Hermes in 0.3.2: the upload's multipart boundary wants Web Crypto, and there is none.
+    const crypto = Object.getOwnPropertyDescriptor(globalThis, 'crypto');
+    delete (globalThis as { crypto?: unknown }).crypto;
+    try {
+      await renderApp(<App />, { fetch: withStatus(t), capture: testCapture({ openStore: async () => store }) });
+      expect(await screen.findByText("Couldn't send this scan. It's still on this phone.")).toBeTruthy();
+      expect(screen.getByText('Needs you')).toBeTruthy();
+      expect(screen.queryByText(/will go by itself/)).toBeNull();
+      expect(await store.list()).toEqual([
+        expect.objectContaining({ state: 'needs_you', problem: { status: 0, code: 'send_failed', message: null } }),
+      ]);
+    } finally {
+      if (crypto) Object.defineProperty(globalThis, 'crypto', crypto);
+    }
+    // Put right (here: Web Crypto back; on a phone: the fixed app), a person sends it again.
+    await fireEvent.press(screen.getByTestId('queue-try-again'));
+    await waitFor(() => expect(t.vault.state.documents).toHaveLength(1));
+    expect(t.vault.state.documents[0]).toMatchObject({ title: 'Gas bill' });
+    expect(await store.list()).toEqual([]);
+  });
+
   it('a scan for someone who has left the family is given to someone else, and goes', async () => {
     const t = testVault([ORIGIN]);
     await signedIn(t);
