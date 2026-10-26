@@ -6,6 +6,11 @@ app's own, tagged `vX.Y.Z` in this repository.
 
 ## [Unreleased]
 
+## [0.3.3] — a scan is sent again, and a failure says so
+
+A patch for 0.3.2, which sent no scans. It works with the same vaults as
+0.3.2: 0.8.0 and 0.7.0 (and, as before, 0.4.10 or later).
+
 ### Fixed
 - **A scan is sent again.** Since 0.3.2 no scan, renewal or Inbox scan
   left the phone: each one waited under "Not sent yet. Your scan is safe on
