@@ -112,6 +112,7 @@
     "wideningViewer": "Ask an owner if anything kept for you should change before then.",
     "wideningLook": "Look at yours",
     "savedInboxSending": "On its way to your Inbox.",
+    "savedInboxReading": "Sent to your Inbox. What the vault reads of it is below.",
     "savedInbox": "Sent to your Inbox. Finish it on the web: it will suggest the details.",
     "savedInboxOffline": "Saved on this phone. It'll go to your Inbox as soon as there's a connection.",
     "savedInboxFiled": "Saved as a document only you can see. Add its details on the web.",
@@ -558,6 +559,22 @@
     "failedOther": "the notification app said no.",
     "tryAgain": "Try again",
     "unreachable": "Couldn't reach your vault. Try again when you're online."
+  },
+  "vaultRead": {
+    "title": "The vault read your scan:",
+    "reading": "The vault is reading your scan…",
+    "slow": "The vault hasn't finished reading it yet. It's safe in your Inbox, where you can finish it.",
+    "kind": "What it is",
+    "whose": "Whose it is",
+    "number": "Number",
+    "couldNotRead": "The vault couldn't read its pages.",
+    "duplicate": "The vault already has this very file.",
+    "newVersionOf": "It may be a new version of {{title}}.",
+    "confirm": "File it like this",
+    "finishThere": "Finish it in your Inbox in the browser, where you can change any of it.",
+    "inBrowser": "Finish in the browser",
+    "filed": "Filed as {{title}}.",
+    "open": "Open it"
   },
   "renewal": {
     "says": "The new version says:",

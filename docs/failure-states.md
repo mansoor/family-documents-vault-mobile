@@ -94,6 +94,10 @@ Written by `node apps/pocket/scripts/failure-states.mjs`; CI fails if it is out 
 |  |  | `queue.versionRefused` | The vault didn't let you add a new version of this document. Whoever it belongs to can. |
 |  |  | `queue.goesWithout` | It will go without {{names}}: its kind of document no longer asks for it. / It will go without {{names}}: its kind of document no longer asks for them. |
 |  |  | `queue.filedWithout` | {{title}} is in the vault without {{names}}: its kind of document no longer asks for it. / {{title}} is in the vault without {{names}}: its kind of document no longer asks for them. |
+| What the vault read | Home, after Send to my Inbox | `vaultRead.slow` | The vault hasn't finished reading it yet. It's safe in your Inbox, where you can finish it. |
+|  |  | `vaultRead.couldNotRead` | The vault couldn't read its pages. |
+|  |  | `vaultRead.duplicate` | The vault already has this very file. |
+|  |  | `vaultRead.finishThere` | Finish it in your Inbox in the browser, where you can change any of it. |
 | A new version's details | A document | `renewal.changed` | This document was changed somewhere else, so nothing was saved and it has been loaded again. Check what the new version says against it. |
 |  |  | `renewal.undoOpen` | The last change from a new version can still be undone. Try again in a few minutes. |
 |  |  | `renewal.kept` | That can't be undone now: the document has changed since. |

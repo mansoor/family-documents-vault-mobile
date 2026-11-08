@@ -88,6 +88,9 @@ export class NoBatchesError extends Error {
  */
 export type InboxOutcome = 'sent' | 'gone';
 
+/** And, once in a batch, which item it is there: what the vault read of it is asked by these (P3). */
+export type InboxSent = { outcome: 'sent'; batch: string; item: string } | { outcome: 'gone' };
+
 export interface InboxDeps {
   api: Api;
   token: string;
@@ -98,7 +101,7 @@ export interface InboxDeps {
 }
 
 /** The scan, as one file into the day's batch; throws what the client throws, or NoBatchesError. */
-export async function sendToInbox(item: QueueItem, bytes: Uint8Array, deps: InboxDeps): Promise<InboxOutcome> {
+export async function sendToInbox(item: QueueItem, bytes: Uint8Array, deps: InboxDeps): Promise<InboxSent> {
   const { api, token, store } = deps;
   const key = dayBatchKey(item);
   const file = { kind: 'bytes' as const, filename: item.filename, contentType: item.mime, bytes };
@@ -139,18 +142,19 @@ export async function sendToInbox(item: QueueItem, bytes: Uint8Array, deps: Inbo
   const sentBefore = item.target !== null;
   const first = item.target ?? (await choose(await today()));
   try {
-    await api.addBatchItem(token, first, file, item.key);
-    return 'sent';
+    const made = await api.addBatchItem(token, first, file, item.key);
+    return { outcome: 'sent', batch: first, item: made.id };
   } catch (err) {
-    if (removedSince(err)) return 'gone';
-    if (batchGone(err) && sentBefore) return 'gone';
+    if (removedSince(err)) return { outcome: 'gone' };
+    if (batchGone(err) && sentBefore) return { outcome: 'gone' };
     if (!takesNoMore(err) && !batchGone(err)) throw err;
   }
   // That batch takes no more, or the day's kept one has gone: forgotten, and another for this scan.
   const kept = await store.cached<DayBatch>(key);
   if (kept?.id === first) await store.forgetCached(key);
-  await api.addBatchItem(token, await choose(await today(first)), file, item.key);
-  return 'sent';
+  const again = await choose(await today(first));
+  const made = await api.addBatchItem(token, again, file, item.key);
+  return { outcome: 'sent', batch: again, item: made.id };
 }
 
 /**
