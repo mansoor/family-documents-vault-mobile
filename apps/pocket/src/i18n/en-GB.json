@@ -220,6 +220,12 @@
     "forInbox": "A scan for your Inbox"
   },
   "capture": {
+    "notADate": "That isn't a date we can read. A date, a month (March 2031) or a year.",
+    "notAYear": "That should be a year, such as 2026.",
+    "decimalPoint": "Use a point for a decimal, such as 3.5.",
+    "notANumber": "That should be a number, such as 42.",
+    "pencePoint": "Use a point for pence, such as 12.50.",
+    "notAnAmount": "That should be an amount, such as 12.50.",
     "title": "New document",
     "pages_one": "{{count}} page",
     "pages_other": "{{count}} pages",
