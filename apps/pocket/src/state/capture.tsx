@@ -65,8 +65,11 @@ export interface SavedNote {
   inboxFiled?: boolean;
   /** Saved with no connection to the vault: it goes when there is one. */
   offline?: boolean;
-  /** A new version of a document already in the vault. */
+  /** A new version of a document already in the vault: which document. */
   renewal?: boolean;
+  renews?: string;
+  /** The new version is in the vault: its pages are read there, for its details (P2). */
+  renewalSent?: boolean;
   /** The reminders it will get, when it has the date they come from. */
   reminder: string | null;
   /** A kind that expires, saved without its expiry date: no reminders yet. */
@@ -382,6 +385,11 @@ export function CaptureProvider(props: { children: ReactNode; deps?: Partial<Cap
                     ? { ...n, offline: false, inboxFiled: true }
                     : null,
             );
+          }
+          // A new version is in: its details are the version before's until
+          // somebody checks what its pages say, on the document's page (P2).
+          if (e.item.kind === 'version' && e.item.id === savedItem.current) {
+            setSaved((n) => (n?.renewal ? { ...n, offline: false, renewalSent: true } : n));
           }
           // Filed without a detail its kind no longer takes: said, by the detail's name.
           const without = leftOut(e.item);
@@ -757,7 +765,14 @@ export function CaptureProvider(props: { children: ReactNode; deps?: Partial<Cap
         await drop();
         return err instanceof CommitError ? err.problem : 'unreadable';
       }
-      setSaved({ unnamed: false, reminder: null, noExpiry: false, renewal: true, offline: current.current.offline });
+      setSaved({
+        unnamed: false,
+        reminder: null,
+        noExpiry: false,
+        renewal: true,
+        renews: documentId,
+        offline: current.current.offline,
+      });
       await refresh();
       if (inFront()) void uploader?.kick();
       return 'saved';

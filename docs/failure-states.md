@@ -58,6 +58,7 @@ Written by `node apps/pocket/scripts/failure-states.mjs`; CI fails if it is out 
 |  |  | `errors.batchEnded` | The batch it was going into has ended. Remove it here and scan it again. |
 |  |  | `errors.batchFull` | The batch it was going into is full. Remove it here and scan it again. |
 |  |  | `errors.alreadyDecided` | It's already been dealt with in your Inbox. |
+|  |  | `errors.changedElsewhere` | This was changed somewhere else, so nothing was saved. Look at it again, then try again. |
 |  |  | `errors.general` | That didn't work. Try again in a moment. |
 | The lock | Lock screen, Settings | `lock.tooMany` | Too many tries. Unlock with your phone's PIN or pattern instead. |
 |  |  | `lock.noScreenLock` | To lock the app and keep documents on this phone, set a screen lock in your phone's settings first. Everything else works as it is. |
@@ -93,6 +94,10 @@ Written by `node apps/pocket/scripts/failure-states.mjs`; CI fails if it is out 
 |  |  | `queue.versionRefused` | The vault didn't let you add a new version of this document. Whoever it belongs to can. |
 |  |  | `queue.goesWithout` | It will go without {{names}}: its kind of document no longer asks for it. / It will go without {{names}}: its kind of document no longer asks for them. |
 |  |  | `queue.filedWithout` | {{title}} is in the vault without {{names}}: its kind of document no longer asks for it. / {{title}} is in the vault without {{names}}: its kind of document no longer asks for them. |
+| A new version's details | A document | `renewal.changed` | This document was changed somewhere else, so nothing was saved and it has been loaded again. Check what the new version says against it. |
+|  |  | `renewal.undoOpen` | The last change from a new version can still be undone. Try again in a few minutes. |
+|  |  | `renewal.kept` | That can't be undone now: the document has changed since. |
+|  |  | `renewal.notUndoable` | That can't be undone any more. |
 | The scanner | Home | `home.scannerFailed` | The scanner couldn't start on this phone. Add a photo or a file instead — the first scan also needs an internet connection to set the scanner up. |
 |  |  | `home.savedOffline` | Saved on this phone. It'll go to the vault as soon as there's a connection. |
 |  |  | `home.savedInboxOffline` | Saved on this phone. It'll go to your Inbox as soon as there's a connection. |

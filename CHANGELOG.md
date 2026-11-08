@@ -6,6 +6,34 @@ app's own, tagged `vX.Y.Z` in this repository.
 
 ## [Unreleased]
 
+## [0.3.6] — new versions, confirmed (polish P2)
+
+With a vault of 0.9.0 (0.9.0-dev.25 or later), which keeps each version's
+own details. With an older vault nothing below appears, and the app works
+as before.
+
+### Added
+- **What a new version says.** A new version starts with the details of
+  the one before, unconfirmed, and the vault reads its pages. A document's
+  page now shows **The new version says:**, with each detail its pages
+  read differently and what it was. For example: "Expires 1 Mar 2035 (was
+  1 Mar 2025)". Sure readings are ticked. Weak ones are marked "check
+  this" and left for you to tick. **Use these** makes the ticked ones the
+  new version's own. The vault makes the reminders again from the new
+  date, and **Undo** takes it back for 5 minutes. **Not now** puts it
+  away for that version. Nothing changes until you choose. The card shows
+  only to someone who may change the document. While the vault is still
+  reading the pages, the page says so. If the document was changed
+  somewhere else meanwhile, nothing is saved, the page says why, and it
+  loads again.
+- **After Scan the new one**, Home says when the new version is in the
+  vault, with **See what it says**, which opens the document.
+- **Older versions in a document's history** show their own details
+  (issuer, dates and the kind's own fields, as they were when a newer
+  version replaced them), and **Its pages** opens that version's pages,
+  confirming it's you where the newest version's pages would ask.
+  A version replaced before 0.9.0 says its details weren't kept.
+
 ## [0.3.5] — the look (polish P1)
 
 The first step of the polish towards 0.4.0. Nothing new to do: the same

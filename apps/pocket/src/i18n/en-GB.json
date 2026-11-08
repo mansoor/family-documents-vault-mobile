@@ -82,6 +82,8 @@
     "queueTitle": "On its way",
     "savedNoExpiry": "Saved. Add the expiry date whenever you want reminders.",
     "savedOffline": "Saved on this phone. It'll go to the vault as soon as there's a connection.",
+    "renewalIn": "The new version is in the vault. Until you check what its pages say, its details are the version before's.",
+    "renewalLook": "See what it says",
     "savedRenewal": "Saved as the new version. Its reminder is done once it reaches the vault.",
     "renew": "Scan the new one",
     "renewHint": "Adds the renewed document as the new version of this one.",
@@ -424,6 +426,8 @@
     "yes": "Yes",
     "no": "No",
     "current": "Current",
+    "detailsNotKept": "Details weren't kept for versions replaced before 0.9.0.",
+    "itsPages": "Its pages",
     "addVersion": "Add a new version",
     "offline": "No connection. What you see may be out of date.",
     "notFound": "This document isn't there any more, or it isn't yours to see.",
@@ -555,6 +559,26 @@
     "tryAgain": "Try again",
     "unreachable": "Couldn't reach your vault. Try again when you're online."
   },
+  "renewal": {
+    "says": "The new version says:",
+    "lead": "Its details are still the version before's. Tick what's right, then Use these: nothing changes until you do.",
+    "issued": "Issued",
+    "expires": "Expires",
+    "identifier": "Number",
+    "was": "(was {{was}})",
+    "checkThis": "check this",
+    "use": "Use these",
+    "notNow": "Not now",
+    "reading": "Reading the new version's pages…",
+    "saved_one": "The new version's details are saved. You can undo this for {{count}} minute.",
+    "saved_other": "The new version's details are saved. You can undo this for {{count}} minutes.",
+    "undo": "Undo",
+    "undone": "Undone: the details are as they were.",
+    "changed": "This document was changed somewhere else, so nothing was saved and it has been loaded again. Check what the new version says against it.",
+    "undoOpen": "The last change from a new version can still be undone. Try again in a few minutes.",
+    "kept": "That can't be undone now: the document has changed since.",
+    "notUndoable": "That can't be undone any more."
+  },
   "errors": {
     "general": "That didn't work. Try again in a moment.",
     "offline": "Can't reach your vault right now. Check this phone's connection, then try again.",
@@ -581,6 +605,7 @@
     "accessEnded": "Your access to this family's vault has ended. Ask them to renew it if you still need it.",
     "batchEnded": "The batch it was going into has ended. Remove it here and scan it again.",
     "batchFull": "The batch it was going into is full. Remove it here and scan it again.",
+    "changedElsewhere": "This was changed somewhere else, so nothing was saved. Look at it again, then try again.",
     "alreadyDecided": "It's already been dealt with in your Inbox."
   },
   "inbox": {

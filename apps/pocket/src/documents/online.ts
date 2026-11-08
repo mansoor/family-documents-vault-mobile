@@ -17,16 +17,21 @@ export function latestOf(versions: VersionView[]): VersionView | null {
  * is fetched through the step-up (an Essential or an Only me document asks
  * to confirm it is you, once for a while); a page never touches the disk.
  * Pages the vault has not drawn yet are asked for, which starts them.
+ * An older version (P2: from its history) is opened the same way, by its
+ * id: the vault draws an older version's pages on demand too.
  */
 export async function openOnline(
   withToken: WithToken,
   guarded: Guarded,
   id: string,
+  versionId?: string,
 ): Promise<OpenCopy | 'unconfirmed' | null> {
   const [document, versions] = await withToken((a, token) =>
     Promise.all([a.document(token, id), a.versions(token, id)]),
   );
-  const latest = latestOf(versions.items);
+  const pick = (items: VersionView[]) =>
+    (versionId ? items.find((v) => v.id === versionId) : undefined) ?? latestOf(items);
+  const latest = pick(versions.items);
   const page = async (n: number): Promise<string | null> => {
     if (!latest) return null;
     const res = await guarded((a, token) => a.page(token, latest.id, n));
@@ -39,7 +44,7 @@ export async function openOnline(
     try {
       // Not confirmed: that is the answer, not asked again straight away.
       if ((await guarded((a, token) => a.page(token, latest.id, 1))) === null) return 'unconfirmed';
-      const again = latestOf((await withToken((a, token) => a.versions(token, id))).items);
+      const again = pick((await withToken((a, token) => a.versions(token, id))).items);
       pages = again?.preview_pages ?? 1;
       pending = false;
     } catch (err) {

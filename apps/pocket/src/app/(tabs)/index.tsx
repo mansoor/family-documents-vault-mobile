@@ -254,7 +254,15 @@ export default function Home() {
                 {t('home.vaultWait', { count: waiting })}
               </Notice>
             ) : null}
-            {capture.saved ? <SavedLine text={savedWords(capture.saved, t)} onDismiss={capture.dismissSaved} /> : null}
+            {capture.saved ? (
+              <SavedLine
+                text={savedWords(capture.saved, t, caps?.features.version_details === true)}
+                onDismiss={capture.dismissSaved}
+                {...(capture.saved.renewalSent && capture.saved.renews && caps?.features.version_details === true
+                  ? { renews: capture.saved.renews }
+                  : {})}
+              />
+            ) : null}
             {capture.filedWithout.length > 0 ? (
               <FiledWithoutLine lines={capture.filedWithout.map((f) => withoutWords(f, t, true))} />
             ) : null}
@@ -499,13 +507,15 @@ function WideningNotice(props: { pending: NonNullable<IdentityAudienceView['pend
 }
 
 /** What Home says once a capture is safe on the phone. */
-function savedWords(note: SavedNote, t: TFunction): string {
+function savedWords(note: SavedNote, t: TFunction, versionDetails: boolean): string {
   if (note.inbox) {
     if (note.inboxSent) return t('home.savedInbox');
     if (note.inboxFiled) return t('home.savedInboxFiled');
     return t(note.offline ? 'home.savedInboxOffline' : 'home.savedInboxSending');
   }
   if (note.offline) return t('home.savedOffline');
+  // In the vault, which reads its pages: what they say is on the document's page (P2).
+  if (note.renewal && note.renewalSent && versionDetails) return t('home.renewalIn');
   if (note.renewal) return t('home.savedRenewal');
   if (note.unnamed) return t('home.savedSkipped');
   if (note.reminder) return t('home.savedReminder', { reminder: note.reminder });
@@ -513,11 +523,20 @@ function savedWords(note: SavedNote, t: TFunction): string {
   return t('home.savedDetails');
 }
 
-function SavedLine(props: { text: string; onDismiss: () => void }) {
+function SavedLine(props: { text: string; onDismiss: () => void; renews?: string }) {
   const { t } = useTranslation();
+  const router = useRouter();
+  const { renews } = props;
   return (
     <Notice tone="ok" testID="home-saved" announce={props.text}>
       <Text>{props.text}</Text>
+      {renews ? (
+        <Button
+          label={t('home.renewalLook')}
+          onPress={() => router.push({ pathname: '/document/[id]', params: { id: renews } })}
+          testID="home-renewal-look"
+        />
+      ) : null}
       <Button label={t('home.dismiss')} kind="quiet" onPress={props.onDismiss} testID="home-saved-dismiss" />
     </Notice>
   );
