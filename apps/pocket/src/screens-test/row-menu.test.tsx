@@ -146,6 +146,29 @@ describe('a menu on every row (5.36)', () => {
     expect(audit()).toEqual([]);
   });
 
+  it('a note (a vault of 0.9.0) is found by its first words, and its sheet has no file, version or Essential', async () => {
+    const t = vault();
+    const note = libraryDoc(t, {
+      id: 'note',
+      title: null,
+      type_key: 'note',
+      note_name: 'Where the spare keys are',
+      notes: 'Where the spare keys are',
+      versions: 0,
+      latest_version_id: null,
+    });
+    t.library.versions.set('note', []);
+    await unlocked(t, <SearchScreen />);
+    t.library.search = () => ({ items: [{ ...hit(note), note_name: 'Where the spare keys are' }], sealed: 0 });
+    await fireEvent.changeText(await screen.findByTestId('search-field'), 'keys');
+    expect(await screen.findByTestId('doc-row-note')).toHaveTextContent(/Where the spare keys are/);
+    expect(screen.queryByText('Untitled document')).toBeNull();
+    await fireEvent.press(screen.getByTestId('doc-menu-note'));
+    await screen.findByTestId('row-sheet');
+    await waitFor(() => expect(offered()).toContain('Add to a collection'));
+    expect(offered()).toEqual(['Open', 'Add to a collection']);
+  });
+
   it("a teen's sheet for somebody else's document: nothing that changes it", async () => {
     const t = vault();
     t.vault.state.role = 'teen';

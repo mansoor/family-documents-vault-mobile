@@ -3,6 +3,7 @@ import {
   can,
   colours,
   inCollectionAudience,
+  NOTE_KIND,
   radii,
   sharedOutsideWords,
   TAP_MIN,
@@ -60,10 +61,16 @@ export type RowAction = 'open' | 'show' | 'save' | 'version' | 'essential' | 'co
  *    offline), for whoever may change it: a teen, their own.
  *  - Add to a collection when the vault has collections and the person
  *    makes them.
+ *  - A note (a vault of 0.9.0) has no file: no version, and nothing for
+ *    the phone to keep, so it is not made an Essential here either.
  */
 export function rowActions(
   who: { role: Role; member_id: string } | null,
-  doc: Pick<DocumentView, 'owner_member_id' | 'is_essential' | 'latest_version_id' | 'file_removed'> | null,
+  doc:
+    | (Pick<DocumentView, 'owner_member_id' | 'is_essential' | 'latest_version_id' | 'file_removed'> & {
+        type_key?: string | null;
+      })
+    | null,
   opts: { collections: boolean; renewing: boolean },
 ): RowAction[] {
   const actions: RowAction[] = ['open'];
@@ -75,8 +82,9 @@ export function rowActions(
   if (hasFile) actions.push('save');
   if (!changes) return actions;
   const mayChange = who.role !== 'teen' || doc.owner_member_id === who.member_id;
-  if (mayChange && can(who.role, 'document.add') && !opts.renewing) actions.push('version');
-  if (mayChange) actions.push('essential');
+  const note = doc.type_key === NOTE_KIND;
+  if (mayChange && can(who.role, 'document.add') && !opts.renewing && !note) actions.push('version');
+  if (mayChange && !note) actions.push('essential');
   if (opts.collections && can(who.role, 'collection.manage')) actions.push('collect');
   return actions;
 }

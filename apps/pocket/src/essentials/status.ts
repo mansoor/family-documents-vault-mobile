@@ -40,17 +40,23 @@ export function keptType(t: DocumentTypeView): StatusType {
  * for those the vault's Needs info stands, as it was worked out while the
  * details were open, unless the expiry has since made it Expired or
  * Expiring, which come first.
+ *
+ * A document marked no longer needed (a vault of 0.9.0) reads No longer
+ * needed whatever its expiry, as the vault says it: never Expired. A copy
+ * kept before the phone knew the mark has the vault's status for it.
  */
 export function statusToday(doc: DocumentView, types: readonly StatusType[], today: string): Status | null {
   const type = types.find((x) => x.key === doc.type_key) ?? null;
   if (doc.type_key && !type) return doc.status ?? null;
   const known = type === null || (type.fields != null && doc.visibility !== 'private');
   const missing = type && known ? missingFields(type, doc) : null;
+  const unneeded = !!doc.no_longer_needed || doc.status?.value === 'no_longer_needed';
   const now = deriveStatus(
     {
       type: type && { key: type.key, expiry_driver: type.expiry_driver, reminder_leads: type.reminder_leads },
       owner_member_id: doc.owner_member_id,
       expires: doc.expires,
+      ...(unneeded ? { no_longer_needed: true } : {}),
       ...(missing ? { missing } : {}),
     },
     today,

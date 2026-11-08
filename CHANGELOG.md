@@ -6,6 +6,39 @@ app's own, tagged `vX.Y.Z` in this repository.
 
 ## [Unreleased]
 
+## [0.3.4] — the vault's shared code of v0.9.0-dev.24
+
+A patch for a vault of 0.9.0. It still works with a vault of 0.8.0 and
+0.7.0 (and, as before, 0.4.10 or later), where nothing below appears.
+
+### Changed
+- Built against the vault's shared code of v0.9.0-dev.24 (was
+  v0.8.0-dev.8). No dependency of the phone's changed.
+- **A document no longer needed reads "No longer needed", never
+  Expired.** A vault of 0.9.0 can mark a document as kept but no longer
+  needed: its expiry then says nothing, and nothing reminds of it. The
+  phone shows the vault's word for it, plainly and not as a warning, in
+  every list and on its page. A kept Essential marked so reads the same
+  with no connection, however long ago its expiry passed (the phone works
+  out a kept copy's status itself, and now passes the mark on, as the
+  vault does). Its page also says when it was marked and by whom (where
+  the vault tells you), why, as written, and what replaced it, which opens
+  from there. A replacement you may not see is "another document", as the
+  vault names it. Marking a document, or needing it again, is done in the
+  browser.
+- **A note is shown as a note.** A vault of 0.9.0 keeps notes as
+  documents of their own, with no file. A note with no title is named by
+  its first words (or "Untitled note"), in search, on Home and on a
+  person's page. Its page shows its words, with no Save a copy, Show the
+  pages, versions, Add a new version or Essential, and neither does its ⋯.
+  Writing and changing a note is done in the browser.
+- **The capture card never offers Note as a kind.** The vault lists the
+  kind of a note once the family has notes, but a scan is never filed as
+  one (the vault refuses it).
+- The vault's two new kinds of 0.9.0, a pay statement and an investment
+  statement, show by their own names and words, as every kind the vault
+  lists does.
+
 ## [0.3.3] — a scan is sent again, and a failure says so
 
 A patch for 0.3.2, which sent no scans. It works with the same vaults as

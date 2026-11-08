@@ -1,4 +1,4 @@
-import type { DocumentTypeView } from '@fdv/shared';
+import { NOTE_KIND, type DocumentTypeView } from '@fdv/shared';
 
 /** What most families file first, for a vault with little in it yet. */
 const STARTERS = [
@@ -18,9 +18,11 @@ export const TYPE_CHIPS = 6;
 /**
  * Offered for a new document: every type but those the household has
  * hidden or archived (0.5.6), which the vault still lists while a document
- * uses them, so that document's type can be looked up.
+ * uses them, so that document's type can be looked up. Nor the kind of a
+ * note (a vault of 0.9.0), listed once the family has notes: a note is
+ * written, not scanned, and the vault files no paper as one.
  */
-export const offered = (t: Pick<DocumentTypeView, 'hidden'>) => t.hidden !== true;
+export const offered = (t: Pick<DocumentTypeView, 'key' | 'hidden'>) => t.hidden !== true && t.key !== NOTE_KIND;
 
 /**
  * The card's type chips: the kinds the household has filed most (from the
