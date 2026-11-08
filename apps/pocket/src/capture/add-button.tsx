@@ -7,6 +7,7 @@ import { AccessibilityInfo, Platform, Pressable, ScrollView, StyleSheet, View } 
 import { useCapture, type StartOutcome } from '../state/capture';
 import { Button, Notice, Text } from '../ui';
 import { Sheet } from '../ui/sheet';
+import { sp } from '../ui/space';
 
 type How = 'scan' | 'file' | 'photo';
 
@@ -232,14 +233,14 @@ const styles = StyleSheet.create({
   },
   pressed: { opacity: 0.8 },
   scroll: { flexGrow: 0, flexShrink: 1 },
-  choices: { gap: 8 },
+  choices: { gap: sp(8) },
   choice: {
     minHeight: TAP_MIN + 12,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+    gap: sp(14),
+    paddingHorizontal: sp(14),
+    paddingVertical: sp(8),
     borderRadius: radii.m,
     borderWidth: 1,
     borderColor: colours.border,
@@ -248,7 +249,7 @@ const styles = StyleSheet.create({
   icon: {
     width: 40,
     height: 40,
-    borderRadius: 20,
+    borderRadius: radii.pill,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colours.accentSoft,

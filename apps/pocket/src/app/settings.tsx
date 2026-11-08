@@ -1,4 +1,4 @@
-import { colours } from '@fdv/shared';
+import { colours, radii } from '@fdv/shared';
 import * as Linking from 'expo-linking';
 import { useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
@@ -17,6 +17,7 @@ import { forgetVault } from '../state/vaults';
 import { Button, Card, Notice, Text } from '../ui';
 import { useTextScale } from '../ui/text-scale';
 import { Sheet } from '../ui/sheet';
+import { sp } from '../ui/space';
 
 /**
  * Settings, in full (4.15): which vault (and whether it is reached without
@@ -231,12 +232,12 @@ export default function Settings() {
 }
 
 const styles = StyleSheet.create({
-  page: { padding: 20, gap: 16 },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  page: { padding: sp(20), gap: sp(16) },
+  row: { flexDirection: 'row', alignItems: 'center', gap: sp(12) },
   version: { minHeight: 44, justifyContent: 'center' },
   flex: { flex: 1 },
-  choices: { gap: 4 },
-  choice: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 12 },
-  dot: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: colours.borderInput },
+  choices: { gap: sp(4) },
+  choice: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: sp(12) },
+  dot: { width: 20, height: 20, borderRadius: radii.pill, borderWidth: 2, borderColor: colours.borderInput },
   dotOn: { borderWidth: 6, borderColor: colours.accent },
 });

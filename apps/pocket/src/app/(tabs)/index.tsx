@@ -34,6 +34,7 @@ import { useStepUp } from '../../state/step-up';
 import { useVault } from '../../state/vault';
 import { Button, Card, Notice, Text } from '../../ui';
 import { DocumentRow } from '../../documents/row';
+import { sp } from '../../ui/space';
 
 interface HomeData {
   due: ReminderView[];
@@ -573,15 +574,15 @@ const styles = StyleSheet.create({
   e2eMarkers: { position: 'absolute', left: 0, bottom: 0, flexDirection: 'row' },
   e2eMarker: { width: 1, height: 1 },
   safe: { flex: 1, backgroundColor: colours.bg },
-  page: { padding: 20, gap: 10 },
-  queue: { gap: 8 },
-  needsYou: { gap: 6, borderColor: colours.danger },
+  page: { padding: sp(20), gap: sp(10) },
+  queue: { gap: sp(8) },
+  needsYou: { gap: sp(6), borderColor: colours.danger },
   pressed: { opacity: 0.8 },
-  header: { gap: 12, marginBottom: 4 },
-  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  header: { gap: sp(12), marginBottom: sp(4) },
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: sp(12) },
   flex: { flex: 1 },
   iconButton: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
-  dueCard: { gap: 4, borderColor: colours.warn },
-  inbox: { gap: 6 },
-  recentTitle: { marginTop: 12 },
+  dueCard: { gap: sp(4), borderColor: colours.warn },
+  inbox: { gap: sp(6) },
+  recentTitle: { marginTop: sp(12) },
 });

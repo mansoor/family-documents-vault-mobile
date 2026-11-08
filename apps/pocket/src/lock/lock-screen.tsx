@@ -6,6 +6,7 @@ import { AppState, BackHandler, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLock } from '../state/lock';
 import { Button, Notice, Text } from '../ui';
+import { sp } from '../ui/space';
 
 /**
  * What the app shows while it is locked, and nothing else: no screen of the
@@ -67,5 +68,5 @@ export function LockScreen() {
 
 const styles = StyleSheet.create({
   page: { flex: 1, backgroundColor: colours.bg },
-  body: { flex: 1, justifyContent: 'center', padding: 24, gap: 20, alignItems: 'stretch' },
+  body: { flex: 1, justifyContent: 'center', padding: sp(24), gap: sp(20), alignItems: 'stretch' },
 });

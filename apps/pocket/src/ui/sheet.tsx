@@ -1,7 +1,8 @@
-import { colours, radii, space } from '@fdv/shared';
+import { colours, radii } from '@fdv/shared';
 import type { ReactNode } from 'react';
 import { KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { sp } from './space';
 
 /**
  * Every question and choice the app puts over a screen (P1): a sheet from
@@ -39,7 +40,7 @@ export function Sheet(props: {
         />
       ) : null}
       <View
-        style={[styles.sheet, props.tall ? styles.tall : null, { paddingBottom: space[9] + insets.bottom }]}
+        style={[styles.sheet, props.tall ? styles.tall : null, { paddingBottom: sp(20) + insets.bottom }]}
         accessibilityViewIsModal
         testID={props.testID}
       >
@@ -70,8 +71,8 @@ const styles = StyleSheet.create({
   shade: { flex: 1, backgroundColor: colours.scrim, justifyContent: 'flex-end' },
   sheet: {
     backgroundColor: colours.bg,
-    padding: space[9],
-    gap: space[5],
+    padding: sp(20),
+    gap: sp(12),
     borderTopLeftRadius: radii.xl,
     borderTopRightRadius: radii.xl,
     // Lifted off the page it covers, as the web's sheets are.

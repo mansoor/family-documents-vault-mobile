@@ -6,6 +6,7 @@ import { useEssentials } from '../state/essentials';
 import { useLock } from '../state/lock';
 import { Button, Card, Text } from '../ui';
 import { Sheet } from '../ui/sheet';
+import { sp } from '../ui/space';
 
 /** Bytes as people say them: "4.2 MB". */
 export function sizeWords(bytes: number): string {
@@ -121,6 +122,6 @@ export function OfflineCopies() {
 }
 
 const styles = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: sp(12) },
   flex: { flex: 1 },
 });

@@ -13,6 +13,7 @@ import { Text as RNText, StyleSheet, View } from 'react-native';
 import { Button, Text } from '../ui';
 import { font } from '../ui/fonts';
 import { Sheet } from '../ui/sheet';
+import { sp } from '../ui/space';
 
 /**
  * A document's note on the phone (5.36), read only. `@fdv/shared` reads it
@@ -205,11 +206,11 @@ function OpenLink(props: { address: string | null; onOpen: (address: string) => 
 }
 
 const styles = StyleSheet.create({
-  note: { gap: 8 },
+  note: { gap: sp(8) },
   strong: font('700'),
   em: { fontStyle: 'italic' },
   link: { color: colours.accent, textDecorationLine: 'underline' },
-  list: { gap: 4 },
-  item: { flexDirection: 'row', gap: 8, alignItems: 'flex-start' },
+  list: { gap: sp(4) },
+  item: { flexDirection: 'row', gap: sp(8), alignItems: 'flex-start' },
   flex: { flex: 1 },
 });

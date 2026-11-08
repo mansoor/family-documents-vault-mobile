@@ -1,4 +1,4 @@
-import { colours, whenWords } from '@fdv/shared';
+import { colours, radii, whenWords } from '@fdv/shared';
 import { Image } from 'expo-image';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -9,6 +9,7 @@ import { useScreenGuard } from '../state/lock';
 import { useStepUp } from '../state/step-up';
 import { useVault } from '../state/vault';
 import { Button, Notice, StatusLine, Text } from '../ui';
+import { sp } from '../ui/space';
 
 const ZOOMS = [1, 1.5, 2, 3];
 
@@ -221,9 +222,9 @@ export function EssentialPages(props: { id: string; mode?: string; online?: bool
 }
 
 const styles = StyleSheet.create({
-  page: { flex: 1, padding: 16, gap: 12, backgroundColor: colours.bg },
-  tools: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  page: { flex: 1, padding: sp(16), gap: sp(12), backgroundColor: colours.bg },
+  tools: { flexDirection: 'row', alignItems: 'center', gap: sp(8) },
   gap: { flex: 1 },
-  frame: { flex: 1, borderRadius: 12, backgroundColor: colours.surface, overflow: 'hidden' },
+  frame: { flex: 1, borderRadius: radii.m, backgroundColor: colours.surface, overflow: 'hidden' },
   center: { alignItems: 'center', justifyContent: 'center', flexGrow: 1 },
 });

@@ -2,6 +2,7 @@ import { colours, radii, TAP_MIN } from '@fdv/shared';
 import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Text } from './index';
+import { sp } from './space';
 
 /**
  * One choice among several: a chip that says whether it is chosen — or,
@@ -61,13 +62,13 @@ export function ChipRow(props: { children: ReactNode; label: string; role?: 'rad
 }
 
 const styles = StyleSheet.create({
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: sp(8) },
   chip: {
     minHeight: TAP_MIN,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 14,
+    gap: sp(8),
+    paddingHorizontal: sp(14),
     borderRadius: radii.pill,
     borderWidth: 1,
     borderColor: colours.borderInput,
@@ -78,7 +79,7 @@ const styles = StyleSheet.create({
   avatar: {
     width: 28,
     height: 28,
-    borderRadius: 14,
+    borderRadius: radii.pill,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colours.accentSoft,

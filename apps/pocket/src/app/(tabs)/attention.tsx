@@ -12,6 +12,7 @@ import { useCapture } from '../../state/capture';
 import { emit } from '../../state/events';
 import { useVault } from '../../state/vault';
 import { Button, Card, Notice, Text } from '../../ui';
+import { sp } from '../../ui/space';
 
 /** Today, as the phone's calendar has it: snoozes are whole days. */
 function today(): string {
@@ -197,7 +198,7 @@ function isReminder(x: unknown): x is ReminderView {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colours.bg },
-  page: { padding: 20, gap: 10 },
+  page: { padding: sp(20), gap: sp(10) },
   due: { borderColor: colours.warn },
-  actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
+  actions: { flexDirection: 'row', flexWrap: 'wrap', gap: sp(4) },
 });

@@ -10,6 +10,7 @@ import { useVault } from '../state/vault';
 import { Button, Card, Notice, Text } from '../ui';
 import { copyForAMinute, nativeClipboard, type ClipboardPort } from './clipboard';
 import { identitySections, seenByWords, type IdentityRow } from './rows';
+import { sp } from '../ui/space';
 
 /** Somebody with neither two-step sign-in nor a passkey, asking for another person's numbers (5.26). */
 const TWO_STEP: ReadonlySet<string> = new Set(['two_step_required', 'totp_required_for_owner']);
@@ -293,17 +294,17 @@ function Shown(props: {
 const capitalised = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 const styles = StyleSheet.create({
-  card: { marginTop: 4 },
-  stack: { gap: 8 },
-  row: { gap: 2 },
-  labelRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
+  card: { marginTop: sp(4) },
+  stack: { gap: sp(8) },
+  row: { gap: sp(4) },
+  labelRow: { flexDirection: 'row', alignItems: 'center', gap: sp(8), flexWrap: 'wrap' },
   badge: {
     color: colours.accent,
     backgroundColor: colours.accentSoft,
     borderRadius: radii.s,
-    paddingHorizontal: 6,
+    paddingHorizontal: sp(6),
     paddingVertical: 1,
   },
-  secret: { gap: 2 },
-  actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
+  secret: { gap: sp(4) },
+  actions: { flexDirection: 'row', flexWrap: 'wrap', gap: sp(4) },
 });

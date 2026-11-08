@@ -14,6 +14,7 @@ import {
 import type { PageRef, PickedFile } from '../queue/commit';
 import { Button, Text } from '../ui';
 import { Sheet } from '../ui/sheet';
+import { sp } from '../ui/space';
 
 /** The kit's chips, where the card has always found them. */
 export { Chip, ChipRow } from '../ui/chip';
@@ -215,15 +216,15 @@ export function LeaveQuestion(props: {
 const styles = StyleSheet.create({
   chipOff: { opacity: 0.45 },
   pressed: { opacity: 0.8 },
-  strip: { gap: 12, paddingVertical: 4 },
-  page: { gap: 6, alignItems: 'center' },
+  strip: { gap: sp(12), paddingVertical: sp(4) },
+  page: { gap: sp(6), alignItems: 'center' },
   thumb: {
     width: 96,
     height: 128,
     borderRadius: radii.s,
     backgroundColor: colours.accentSoft,
   },
-  pageButtons: { flexDirection: 'row', gap: 4 },
+  pageButtons: { flexDirection: 'row', gap: sp(4) },
   iconButton: {
     width: TAP_MIN,
     height: TAP_MIN,
@@ -243,13 +244,13 @@ const styles = StyleSheet.create({
     borderColor: colours.accent,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 4,
+    gap: sp(4),
   },
   fileRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    padding: 12,
+    gap: sp(12),
+    padding: sp(12),
     minHeight: TAP_MIN,
     borderRadius: radii.l,
     borderWidth: 1,

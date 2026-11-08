@@ -8,6 +8,7 @@ import { DocumentRow } from '../../documents/row';
 import { useVault } from '../../state/vault';
 import { Field, Notice, Text } from '../../ui';
 import { Chip } from '../../ui/chip';
+import { sp } from '../../ui/space';
 
 /** How long typing pauses before the vault is asked (FND). */
 export const SEARCH_DEBOUNCE_MS = 250;
@@ -231,7 +232,7 @@ export default function SearchScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colours.bg },
-  page: { padding: 20, gap: 10 },
-  header: { gap: 12 },
-  chips: { gap: 8, paddingVertical: 2 },
+  page: { padding: sp(20), gap: sp(10) },
+  header: { gap: sp(12) },
+  chips: { gap: sp(8), paddingVertical: sp(4) },
 });

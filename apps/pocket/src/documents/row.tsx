@@ -1,4 +1,4 @@
-import { colours, documentName, NOTE_KIND, radii, space, statusTone, type DocumentView, type Status } from '@fdv/shared';
+import { colours, documentName, NOTE_KIND, radii, statusTone, type DocumentView, type Status } from '@fdv/shared';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { FileText, NotebookText } from 'lucide-react-native';
@@ -8,6 +8,7 @@ import { StatusLine, Text } from '../ui';
 import { font } from '../ui/fonts';
 import { useDocumentMenu } from './menu';
 import { snippetParts } from './snippet';
+import { sp } from '../ui/space';
 
 /**
  * One document in a list (4.12), the same in every list (P1): its picture,
@@ -105,10 +106,10 @@ const styles = StyleSheet.create({
     borderRadius: radii.l,
     borderWidth: 1,
     borderColor: colours.border,
-    paddingRight: 4,
+    paddingRight: sp(4),
   },
-  main: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: space[5], padding: space[4], minHeight: 72 },
-  words: { flex: 1, gap: space[1] },
+  main: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: sp(12), padding: sp(10), minHeight: 72 },
+  words: { flex: 1, gap: sp(4) },
   thumb: {
     width: 48,
     height: 64,

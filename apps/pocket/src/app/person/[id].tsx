@@ -7,6 +7,7 @@ import { DocumentRow } from '../../documents/row';
 import { IdentityCard } from '../../identity/card';
 import { useVault } from '../../state/vault';
 import { Notice, Text } from '../../ui';
+import { sp } from '../../ui/space';
 
 /** One person's documents (4.12), from People; and their identity details, where the vault keeps them (5.31). */
 export default function PersonScreen() {
@@ -86,5 +87,5 @@ export default function PersonScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colours.bg },
-  page: { padding: 20, gap: 10 },
+  page: { padding: sp(20), gap: sp(10) },
 });

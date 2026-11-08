@@ -6,6 +6,7 @@ import { useEssentials, type EnrolOutcome } from '../state/essentials';
 import { useLock } from '../state/lock';
 import { Button, Card, Field, Notice, Text } from '../ui';
 import { Sheet } from '../ui/sheet';
+import { sp } from '../ui/space';
 
 export const day = (ms: number) =>
   new Date(ms).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
@@ -302,7 +303,7 @@ export function PasswordSheet(props: {
 }
 
 const styles = StyleSheet.create({
-  section: { gap: 12 },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 56 },
-  rowText: { flex: 1, gap: 2, minHeight: 44, justifyContent: 'center' },
+  section: { gap: sp(12) },
+  row: { flexDirection: 'row', alignItems: 'center', gap: sp(12), minHeight: 56 },
+  rowText: { flex: 1, gap: sp(4), minHeight: 44, justifyContent: 'center' },
 });

@@ -11,6 +11,7 @@ import { currentNetwork, internetReachable, whyFailed } from '../net/network';
 import { readVaults } from '../state/vaults';
 import { useVault } from '../state/vault';
 import { Button, Card, Field, Notice, Text } from '../ui';
+import { sp } from '../ui/space';
 
 /**
  * Connect: the address of the family's vault. Everything that can go wrong
@@ -185,6 +186,6 @@ function Outcome(props: { outcome: ConnectOutcome; busy: boolean; onApproveHttp:
 
 const styles = StyleSheet.create({
   safe: { flex: 1 },
-  page: { padding: 20, gap: 16 },
-  row: { flexDirection: 'row', gap: 12, flexWrap: 'wrap' },
+  page: { padding: sp(20), gap: sp(16) },
+  row: { flexDirection: 'row', gap: sp(12), flexWrap: 'wrap' },
 });

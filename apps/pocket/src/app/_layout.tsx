@@ -25,6 +25,7 @@ import { useVault, VaultProvider } from '../state/vault';
 import { font } from '../ui/fonts';
 import { TextScaleProvider } from '../ui/text-scale';
 import { WEB_FONTS } from '../ui/web-fonts';
+import { sp } from '../ui/space';
 
 /** Preview builds say so on every screen: they point at throwaway vaults only. */
 function TestBanner() {
@@ -164,7 +165,7 @@ const styles = StyleSheet.create({
     color: colours.onAccent,
     ...font('700'),
     textAlign: 'center',
-    paddingVertical: 4,
+    paddingVertical: sp(4),
     fontSize: 13,
   },
 });

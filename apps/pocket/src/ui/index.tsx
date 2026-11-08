@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { font, type Weight } from './fonts';
 import { useTextScale } from './text-scale';
+import { sp } from './space';
 
 /**
  * The app's building blocks, drawn from @fdv/shared's tokens so the phone
@@ -247,8 +248,8 @@ const styles = StyleSheet.create({
   button: {
     minHeight: TAP_MIN,
     borderRadius: radii.m,
-    paddingHorizontal: 18,
-    paddingVertical: 10,
+    paddingHorizontal: sp(18),
+    paddingVertical: sp(10),
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -262,19 +263,19 @@ const styles = StyleSheet.create({
     borderRadius: radii.l,
     borderWidth: 1,
     borderColor: colours.border,
-    padding: 16,
-    gap: 12,
+    padding: sp(16),
+    gap: sp(12),
   },
-  notice: { flexDirection: 'row', gap: 10, padding: 12, borderRadius: radii.m, alignItems: 'flex-start' },
-  noticeText: { flex: 1, gap: 8 },
-  status: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  field: { gap: 6 },
+  notice: { flexDirection: 'row', gap: sp(10), padding: sp(12), borderRadius: radii.m, alignItems: 'flex-start' },
+  noticeText: { flex: 1, gap: sp(8) },
+  status: { flexDirection: 'row', alignItems: 'center', gap: sp(6) },
+  field: { gap: sp(6) },
   input: {
     minHeight: TAP_MIN,
     borderWidth: 1,
     borderColor: colours.borderInput,
     borderRadius: radii.m,
-    paddingHorizontal: 14,
+    paddingHorizontal: sp(14),
     color: colours.ink,
     backgroundColor: colours.surface,
   },

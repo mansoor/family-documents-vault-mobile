@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Platform, StyleSheet, View } from 'react-native';
 import type { CertificateTrouble } from '../net/tls';
 import { Button, Notice, Text } from '../ui';
+import { sp } from '../ui/space';
 
 /**
  * A certificate this phone will not accept (4.15), in words, and — for a
@@ -62,5 +63,5 @@ export function CertificateTroubleNotice(props: { trouble: CertificateTrouble })
 }
 
 const styles = StyleSheet.create({
-  stack: { gap: 8 },
+  stack: { gap: sp(8) },
 });

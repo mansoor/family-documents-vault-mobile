@@ -7,6 +7,7 @@ import { filedWithout, sendFailed, type FiledWithout, type QueueItem } from '../
 import { andList } from './draft';
 import { Button, Card, Text } from '../ui';
 import { Chip, ChipRow, sizeWords } from './ui';
+import { sp } from '../ui/space';
 
 /** Codes that mean the vault is there but not taking it just now. */
 
@@ -143,7 +144,7 @@ export function QueueRow(props: {
 }
 
 const styles = StyleSheet.create({
-  row: { gap: 4 },
-  needsYou: { gap: 6, borderColor: colours.danger },
-  choices: { gap: 6 },
+  row: { gap: sp(4) },
+  needsYou: { gap: sp(6), borderColor: colours.danger },
+  choices: { gap: sp(6) },
 });

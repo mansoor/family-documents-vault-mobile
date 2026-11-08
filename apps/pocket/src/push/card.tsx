@@ -1,10 +1,11 @@
-import { colours } from '@fdv/shared';
+import { colours, radii } from '@fdv/shared';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Linking, Platform, Pressable, StyleSheet, Switch, View } from 'react-native';
 import { Button, Card, Notice, Text } from '../ui';
 import type { Distributor } from './native';
 import { usePush, type TurnOn } from './push';
+import { sp } from '../ui/space';
 
 /** Settings → Notifications (4.14): whether this phone hears from the vault, and how. */
 export function NotificationsCard() {
@@ -162,9 +163,9 @@ export function NotificationsCard() {
 }
 
 const styles = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: sp(12) },
   flex: { flex: 1 },
-  choices: { gap: 4 },
-  choice: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 12 },
-  dot: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: colours.borderInput },
+  choices: { gap: sp(4) },
+  choice: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: sp(12) },
+  dot: { width: 20, height: 20, borderRadius: radii.pill, borderWidth: 2, borderColor: colours.borderInput },
 });

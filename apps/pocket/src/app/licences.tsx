@@ -2,6 +2,7 @@ import { FlatList, StyleSheet, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import licences from '../about/licences.json';
 import { Text } from '../ui';
+import { sp } from '../ui/space';
 
 interface Licence {
   name: string;
@@ -39,6 +40,6 @@ export default function Licences() {
 }
 
 const styles = StyleSheet.create({
-  page: { padding: 20, gap: 12 },
-  row: { gap: 2 },
+  page: { padding: sp(20), gap: sp(12) },
+  row: { gap: sp(4) },
 });

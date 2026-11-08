@@ -51,6 +51,7 @@ import { useCapture, type CardData, type SaveProblem } from '../state/capture';
 import { useScreenGuard } from '../state/lock';
 import { useVault } from '../state/vault';
 import { Button, Field, Notice, requiredLabel, Text } from '../ui';
+import { sp } from '../ui/space';
 
 type Loaded = CardData;
 
@@ -847,15 +848,15 @@ function Card(props: { initial: CaptureSource }) {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colours.bg },
-  page: { padding: 20, gap: 16 },
-  section: { gap: 10 },
+  page: { padding: sp(20), gap: sp(16) },
+  section: { gap: sp(10) },
   switchRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: sp(12),
     minHeight: 44,
   },
   row: { flexDirection: 'row' },
   flex: { flex: 1 },
-  dateNote: { gap: 4 },
+  dateNote: { gap: sp(4) },
 });
