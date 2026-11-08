@@ -13,6 +13,7 @@ import { useTranslation } from 'react-i18next';
 import { Modal, Pressable, Text as RNText, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button, Text } from '../ui';
+import { font } from '../ui/fonts';
 
 /**
  * A document's note on the phone (5.36), read only. `@fdv/shared` reads it
@@ -221,7 +222,7 @@ function OpenLink(props: { address: string | null; onOpen: (address: string) => 
 
 const styles = StyleSheet.create({
   note: { gap: 8 },
-  strong: { fontWeight: '700' },
+  strong: font('700'),
   em: { fontStyle: 'italic' },
   link: { color: colours.accent, textDecorationLine: 'underline' },
   list: { gap: 4 },

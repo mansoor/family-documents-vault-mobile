@@ -2,6 +2,7 @@
 import '../platform/web-crypto';
 import '../i18n';
 import { colours } from '@fdv/shared';
+import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
@@ -21,14 +22,17 @@ import { EssentialsProvider, useEssentials } from '../state/essentials';
 import { LockProvider, useLock } from '../state/lock';
 import { StepUpProvider } from '../state/step-up';
 import { useVault, VaultProvider } from '../state/vault';
+import { font } from '../ui/fonts';
 import { TextScaleProvider } from '../ui/text-scale';
+import { WEB_FONTS } from '../ui/web-fonts';
 
 /** Preview builds say so on every screen: they point at throwaway vaults only. */
 function TestBanner() {
+  const { t } = useTranslation();
   return (
     <SafeAreaView edges={['top']} style={styles.banner}>
       <Text style={styles.bannerText} accessibilityRole="header">
-        TEST BUILD — for throwaway vaults only
+        {t('common.testBuild')}
       </Text>
     </SafeAreaView>
   );
@@ -58,7 +62,7 @@ function Gates() {
     <Stack
       screenOptions={{
         headerStyle: { backgroundColor: colours.bg },
-        headerTitleStyle: { color: colours.ink },
+        headerTitleStyle: { color: colours.ink, ...font('600') },
         headerShadowVisible: false,
         contentStyle: { backgroundColor: colours.bg },
       }}
@@ -115,6 +119,10 @@ function ShowRecovery() {
 }
 
 export default function RootLayout() {
+  // The web build draws nothing until its typefaces are in; a phone has
+  // them embedded, and asks for none.
+  const [fontsReady, fontsFailed] = useFonts(WEB_FONTS);
+  const drawn = fontsReady || fontsFailed !== null;
   return (
     <SafeAreaProvider>
       <StatusBar style="dark" />
@@ -126,13 +134,16 @@ export default function RootLayout() {
                 <PushProvider>
                   <StepUpProvider>
                     <View style={styles.root}>
+                      {drawn ? null : <View style={styles.loading} />}
                       <ForgetHttpCache />
                       <ShowRecovery />
                       <PushLinks />
                       {extra.testBanner ? <TestBanner /> : null}
-                      <LockGate>
-                        <Gates />
-                      </LockGate>
+                      {drawn ? (
+                        <LockGate>
+                          <Gates />
+                        </LockGate>
+                      ) : null}
                     </View>
                   </StepUpProvider>
                 </PushProvider>
@@ -151,7 +162,7 @@ const styles = StyleSheet.create({
   banner: { backgroundColor: colours.warn },
   bannerText: {
     color: colours.onAccent,
-    fontWeight: '700',
+    ...font('700'),
     textAlign: 'center',
     paddingVertical: 4,
     fontSize: 13,

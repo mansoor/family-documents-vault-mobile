@@ -1,5 +1,6 @@
 {
   "common": {
+    "testBuild": "TEST BUILD — for throwaway vaults only",
     "continue": "Continue",
     "cancel": "Cancel",
     "tryAgain": "Try again",

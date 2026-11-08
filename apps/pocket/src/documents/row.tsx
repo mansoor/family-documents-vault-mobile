@@ -3,6 +3,7 @@ import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, Text as RNText, View } from 'react-native';
 import { StatusLine, Text } from '../ui';
+import { font } from '../ui/fonts';
 import { useDocumentMenu } from './menu';
 import { snippetParts } from './snippet';
 
@@ -81,5 +82,5 @@ const styles = StyleSheet.create({
   },
   main: { flex: 1, gap: 4, padding: 12, minHeight: 56 },
   pressed: { opacity: 0.8 },
-  bold: { fontWeight: '700', color: colours.ink },
+  bold: { ...font('700'), color: colours.ink },
 });

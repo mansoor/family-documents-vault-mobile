@@ -13,6 +13,7 @@ import {
   type TextStyle,
   type ViewStyle,
 } from 'react-native';
+import { font, type Weight } from './fonts';
 import { useTextScale } from './text-scale';
 
 /**
@@ -36,7 +37,7 @@ export function Text(props: {
   children: ReactNode;
   variant?: Variant;
   tone?: 'ink' | 'soft' | 'muted' | 'accent' | 'warn' | 'danger' | 'onAccent';
-  weight?: '400' | '500' | '600' | '700';
+  weight?: Weight;
   style?: StyleProp<TextStyle>;
   role?: 'header' | 'text' | 'alert';
   testID?: string;
@@ -63,7 +64,7 @@ export function Text(props: {
           fontSize: size,
           lineHeight: Math.round(size * (display ? 1.2 : 1.45)),
           color,
-          fontWeight: props.weight ?? (display ? '600' : '400'),
+          ...font(props.weight ?? (display ? '600' : '400'), display),
         },
         props.style,
       ]}
@@ -222,7 +223,7 @@ export function Field(
         autoCapitalize="none"
         autoCorrect={false}
         placeholderTextColor={colours.inkMuted}
-        style={[styles.input, { fontSize: typeScale.body * scale }, error ? styles.inputError : null]}
+        style={[styles.input, font(), { fontSize: typeScale.body * scale }, error ? styles.inputError : null]}
         {...input}
         onLayout={(e) => {
           laidOut.current = true;
