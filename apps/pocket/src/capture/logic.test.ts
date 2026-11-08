@@ -60,6 +60,16 @@ describe('the type chips', () => {
     expect(rest.map((t) => t.key)).toEqual(['pet_record', 'other']);
     expect(matchTypes(hidden, 'pass')).toEqual([]);
   });
+
+  it('the kind of a note is never offered, however many notes the family keeps (a vault of 0.9.0)', () => {
+    // Listed once a note uses it, so a note's kind is known; a scan is never filed as one.
+    const withNotes = [...TYPES, type('note', 'Note')];
+    const { top, rest } = rankTypes(withNotes, ['note', 'note', 'note', 'warranty'], 4);
+    expect([...top, ...rest].map((t) => t.key)).not.toContain('note');
+    expect(top.map((t) => t.key)).toEqual(['warranty', 'passport', 'bank_statement', 'utility_bill']);
+    expect(matchTypes(withNotes, 'note')).toEqual([]);
+    expect(matchTypes(withNotes, '')).toHaveLength(TYPES.length);
+  });
 });
 
 describe('a type’s details on the card (custom_types)', () => {

@@ -12,7 +12,15 @@ import { Field, Notice, Text } from '../../ui';
 export const SEARCH_DEBOUNCE_MS = 250;
 
 type Sealed = { state: 'idle' | 'searching' | 'done'; items: SearchHit[]; searched: number };
-type Row = { id: string; title: string | null; status: SearchHit['status']; snippet?: string; doc?: DocumentView };
+type Row = {
+  id: string;
+  title: string | null;
+  type_key: string | null;
+  note_name: string | undefined;
+  status: SearchHit['status'];
+  snippet?: string;
+  doc?: DocumentView;
+};
 
 /**
  * Search (4.12): one field, results as the person types (a quarter of a
@@ -104,8 +112,22 @@ export default function SearchScreen() {
   const rows: Row[] = noConnection
     ? []
     : hits
-      ? hits.map((h) => ({ id: h.document_id, title: h.title, status: h.status, snippet: h.snippet }))
-      : (browse ?? []).map((d) => ({ id: d.id, title: d.title, status: d.status, doc: d }));
+      ? hits.map((h) => ({
+          id: h.document_id,
+          title: h.title,
+          type_key: h.type_key,
+          note_name: h.note_name,
+          status: h.status,
+          snippet: h.snippet,
+        }))
+      : (browse ?? []).map((d) => ({
+          id: d.id,
+          title: d.title,
+          type_key: d.type_key,
+          note_name: d.note_name,
+          status: d.status,
+          doc: d,
+        }));
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -187,6 +209,8 @@ export default function SearchScreen() {
                   key={h.document_id}
                   id={h.document_id}
                   title={h.title}
+                  type_key={h.type_key}
+                  note_name={h.note_name}
                   status={h.status}
                   snippet={h.snippet}
                 />

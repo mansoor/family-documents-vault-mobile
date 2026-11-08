@@ -375,6 +375,81 @@ describe('a document', () => {
     expect(screen.queryByText('NOT FROM HERE')).toBeNull();
   });
 
+  it('a note (a vault of 0.9.0) is its words: named by them, with no file to show, save, keep or renew', async () => {
+    const t = testVault([ORIGIN]);
+    libraryDoc(t, {
+      id: 'note',
+      title: null,
+      type_key: 'note',
+      category: 'other',
+      note_name: 'Where the spare keys are',
+      notes: 'Where the spare keys are\n\nIn the blue tin, top shelf.',
+      notes_updated_at: '2026-10-30T09:14:00Z',
+      versions: 0,
+      latest_version_id: null,
+    });
+    t.library.versions.set('note', []);
+    await unlocked(t, <DocumentDetail id="note" />);
+    // Its name, then its words, which start with it.
+    expect(await screen.findByRole('header', { name: 'Where the spare keys are' })).toBeTruthy();
+    expect(screen.getAllByText('Where the spare keys are')).toHaveLength(2);
+    expect(await screen.findByText('In the blue tin, top shelf.')).toBeTruthy();
+    expect(screen.getByTestId('document-notes-edited')).toBeTruthy();
+    for (const id of ['document-show', 'document-save', 'document-pages', 'document-essential', 'document-add-version']) {
+      expect([id, screen.queryByTestId(id)]).toEqual([id, null]);
+    }
+    expect(screen.queryByText('Versions')).toBeNull();
+    expect(screen.queryByText('Untitled document')).toBeNull();
+  });
+
+  it('a document no longer needed (a vault of 0.9.0) says so plainly, why, and opens what replaced it', async () => {
+    const t = testVault([ORIGIN]);
+    const at = '2026-10-30T09:14:00Z';
+    libraryDoc(t, {
+      id: 'old',
+      title: 'Old passport',
+      expires: { date: '2026-01-31', precision: 'day' },
+      status: { value: 'no_longer_needed', label: 'No longer needed' },
+      no_longer_needed: {
+        at,
+        by_name: 'Sam',
+        reason: 'Renewed this year',
+        has_reason: true,
+        replaced_by: { id: 'new', title: 'New passport' },
+      },
+    });
+    await unlocked(t, <DocumentDetail id="old" />);
+    expect(await screen.findByText('No longer needed')).toBeTruthy();
+    expect(screen.queryByText(/Expired/)).toBeNull();
+    expect(screen.getByText(`Marked no longer needed ${whenExactly(at)} by Sam`)).toBeTruthy();
+    expect(screen.getByTestId('document-unneeded-reason')).toHaveTextContent('Why: Renewed this year');
+    await fireEvent.press(screen.getByTestId('document-unneeded-replacement'));
+    await waitFor(() => expect(routes().at(-1)).toEqual({ pathname: '/document/[id]', params: { id: 'new' } }));
+  });
+
+  it('a replacement the reader may not see is "another document", never its title, and is not opened', async () => {
+    const t = testVault([ORIGIN]);
+    libraryDoc(t, {
+      id: 'gone',
+      title: 'Old card',
+      status: { value: 'no_longer_needed', label: 'No longer needed' },
+      no_longer_needed: {
+        at: '2026-10-30T09:14:00Z',
+        by_name: null,
+        reason: null,
+        has_reason: false,
+        replaced_by: { id: null, title: null },
+      },
+    });
+    await unlocked(t, <DocumentDetail id="gone" />);
+    expect(await screen.findByTestId('document-unneeded-replacement')).toHaveTextContent('Replaced by another document');
+    expect(screen.getByText(`Marked no longer needed ${whenExactly('2026-10-30T09:14:00Z')}`)).toBeTruthy();
+    expect(screen.queryByTestId('document-unneeded-reason')).toBeNull();
+    const before = routes().length;
+    await fireEvent.press(screen.getByTestId('document-unneeded-replacement'));
+    expect(routes()).toHaveLength(before);
+  });
+
   it('can be used with a screen reader and a thumb', async () => {
     const t = testVault([ORIGIN]);
     libraryDoc(t, { id: 'passport', title: 'Passport', is_essential: true });

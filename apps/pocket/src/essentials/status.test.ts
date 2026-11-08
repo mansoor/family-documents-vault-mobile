@@ -120,3 +120,36 @@ describe('an expiry the family adds (a vault of 0.8.0)', () => {
     for (const doc of listed) expect([doc.title, statusToday(doc, kept, today)]).toEqual([doc.title, vaultSays(doc, types, today)]);
   });
 });
+
+describe('a document no longer needed (a vault of 0.9.0)', () => {
+  it('reads No longer needed on the phone as the days pass, never Expired; needed again, it is Expired', async () => {
+    const vault = createFakeVault();
+    vault.state.setupRequired = false;
+    vault.state.email = 'owner@example.test';
+    vault.state.password = 'correct horse battery staple';
+    const { api, token } = await ownerApi(vault);
+    const mine = { owner_member_id: 'fake-member', is_essential: true };
+    const now = Date.now();
+    const old = await api.createDocument(token, {
+      ...mine,
+      title: 'Old passport',
+      type_key: 'passport',
+      identifier: '123456789',
+      expires: on(day(now + 10 * DAY)),
+    });
+    const marked = await api.markNoLongerNeeded(token, old.id, { reason: 'Renewed' });
+    expect(marked.status).toEqual({ value: 'no_longer_needed', label: 'No longer needed' });
+    const listed = (await api.documents(token)).items.find((d) => d.id === old.id) as DocumentView;
+    expect(listed.status).toEqual(marked.status);
+    const kept = (await api.documentTypes(token)).items.map(keptType);
+    for (const later of [0, 5, 30, 400]) {
+      expect([later, statusToday(listed, kept, day(now + later * DAY))]).toEqual([later, marked.status]);
+    }
+    // A copy kept before the phone knew the mark has only the vault's status for it.
+    const { no_longer_needed: _n, ...before } = listed;
+    expect(statusToday(before, kept, day(now + 30 * DAY))).toEqual(marked.status);
+    // Needed again, its expiry speaks again.
+    const again = await api.markNeededAgain(token, old.id);
+    expect(statusToday(again, kept, day(now + 30 * DAY))?.value).toBe('expired');
+  });
+});

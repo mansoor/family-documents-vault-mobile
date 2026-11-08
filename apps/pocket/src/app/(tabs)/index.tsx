@@ -2,6 +2,7 @@ import { ApiRequestError, isSessionOver } from '@fdv/client';
 import {
   can,
   colours,
+  documentName,
   formatDate,
   localToday,
   radii,
@@ -566,7 +567,8 @@ function DocumentRow(props: { doc: DocumentView; token: string | null; thumb: st
   const { t } = useTranslation();
   const router = useRouter();
   const { doc } = props;
-  const title = doc.title ?? t('home.needsAName');
+  // A note with no title is named by its first words (0.9.0).
+  const title = documentName(doc, t('home.needsAName'));
   const menu = useDocumentMenu({ id: doc.id, title, doc });
   return (
     <View style={styles.row}>

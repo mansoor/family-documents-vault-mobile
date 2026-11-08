@@ -1,4 +1,4 @@
-import { colours, radii, statusTone, type DocumentView, type Status } from '@fdv/shared';
+import { colours, documentName, radii, statusTone, type DocumentView, type Status } from '@fdv/shared';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, Text as RNText, View } from 'react-native';
@@ -14,6 +14,9 @@ import { snippetParts } from './snippet';
 export function DocumentRow(props: {
   id: string;
   title: string | null;
+  /** Its kind, and a note's first words (0.9.0): a note with no title is named by them. */
+  type_key?: string | null;
+  note_name?: string | undefined;
   status: Status;
   snippet?: string;
   /** What the list knows of it already: a search hit has none, and its ⋯ asks. */
@@ -21,7 +24,10 @@ export function DocumentRow(props: {
 }) {
   const { t } = useTranslation();
   const router = useRouter();
-  const title = props.title ?? t('document.untitled');
+  const title = documentName(
+    { title: props.title, type_key: props.type_key ?? null, note_name: props.note_name },
+    t('document.untitled'),
+  );
   const menu = useDocumentMenu({ id: props.id, title, doc: props.doc ?? null });
   // Read out as it is shown: its name, its status, and where it matched.
   const said = [

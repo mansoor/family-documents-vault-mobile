@@ -1,14 +1,18 @@
 import { ApiRequestError, NetworkError } from '@fdv/client';
 import {
+  ANOTHER_DOCUMENT,
   can,
   colours,
+  documentName,
   formatDate,
+  NOTE_KIND,
   radii,
   whenExactly,
   whenWords,
   type DocumentTypeView,
   type DocumentView,
   type Member,
+  type NoLongerNeededView,
   type VersionView,
 } from '@fdv/shared';
 import { useRouter } from 'expo-router';
@@ -38,7 +42,8 @@ type Problem = 'offline' | 'not_found' | null;
  * is you if the vault asks. Then its details, its status and who can see
  * it; the Essential switch (online only: a change made meanwhile by
  * somebody else is shown, not overwritten); and its versions, with a new
- * one scanned in.
+ * one scanned in. A note (a vault of 0.9.0) has no file: its words, and
+ * none of what a file is for.
  */
 export function DocumentDetail(props: { id: string }) {
   const { id } = props;
@@ -70,7 +75,9 @@ export function DocumentDetail(props: { id: string }) {
   const mine = !!who && shown?.owner_member_id === who.member_id;
   const mayChange = !!who && can(who.role, 'document.edit') && (who.role !== 'teen' || mine);
   const renewing = capture.queue.some((i) => i.kind === 'version' && i.target === id);
-  const mayAddVersion = !!who && can(who.role, 'document.add') && (who.role !== 'teen' || mine) && !renewing;
+  const note = shown?.type_key === NOTE_KIND;
+  const mayAddVersion =
+    !!who && can(who.role, 'document.add') && (who.role !== 'teen' || mine) && !renewing && !note;
 
   const load = useCallback(async () => {
     try {
@@ -209,8 +216,14 @@ export function DocumentDetail(props: { id: string }) {
       contentContainerStyle={[styles.page, { paddingBottom: 20 + insets.bottom }]}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void refreshNow()} />}
     >
-      <Text variant="hero">{shown.title ?? t('document.untitled')}</Text>
+      <Text variant="hero">{documentName(shown, t('document.untitled'))}</Text>
       <StatusLine status={shown.status} />
+      {shown.no_longer_needed ? (
+        <Unneeded
+          mark={shown.no_longer_needed}
+          open={(to) => router.push({ pathname: '/document/[id]', params: { id: to } })}
+        />
+      ) : null}
       <View style={styles.chip} testID="document-visibility">
         <Text variant="secondary" weight="600">
           {t(`document.visibility_${shown.visibility}`)}
@@ -227,13 +240,15 @@ export function DocumentDetail(props: { id: string }) {
         </Notice>
       ) : null}
 
-      {primaryIsShow ? (
+      {note ? null : primaryIsShow ? (
         <Button testID="document-show" label={t('document.show')} busy={preparing} onPress={() => void showIt()} />
       ) : (
         <Button testID="document-save" label={t('document.saveCopy')} busy={saving} onPress={save} />
       )}
-      <Button testID="document-pages" kind="quiet" label={t('document.showPages')} onPress={() => void pages()} />
-      {primaryIsShow ? (
+      {note ? null : (
+        <Button testID="document-pages" kind="quiet" label={t('document.showPages')} onPress={() => void pages()} />
+      )}
+      {primaryIsShow && !note ? (
         <Button testID="document-save" kind="quiet" label={t('document.saveCopy')} busy={saving} onPress={save} />
       ) : null}
       {warning ? (
@@ -260,7 +275,7 @@ export function DocumentDetail(props: { id: string }) {
           write: an older one says nothing of when a note last changed. */}
       {shown.notes_updated_at !== undefined && shown.notes ? (
         <View style={styles.notes} testID="document-notes">
-          <Text variant="screen">{type?.core?.notes?.label?.trim() || t('document.notes')}</Text>
+          {note ? null : <Text variant="screen">{type?.core?.notes?.label?.trim() || t('document.notes')}</Text>}
           <NoteText source={shown.notes} />
           {shown.notes_updated_at ? (
             <Text tone="soft" variant="secondary" testID="document-notes-edited">
@@ -275,7 +290,7 @@ export function DocumentDetail(props: { id: string }) {
         </View>
       ) : null}
 
-      {mayChange && doc ? (
+      {mayChange && doc && !note ? (
         <View style={styles.switchRow}>
           <View style={styles.flex}>
             <Text weight="600">{t('document.essential')}</Text>
@@ -294,7 +309,7 @@ export function DocumentDetail(props: { id: string }) {
         </View>
       ) : null}
 
-      <Text variant="screen">{t('document.versions')}</Text>
+      {note ? null : <Text variant="screen">{t('document.versions')}</Text>}
       {[...versions]
         .sort((x, y) => y.version_no - x.version_no)
         .map((v) => (
@@ -340,8 +355,37 @@ export function DocumentDetail(props: { id: string }) {
   }
 }
 
+/**
+ * Why a document is no longer needed (a vault of 0.9.0): when it was
+ * marked, and by whom where the reader is told; why, as written; and what
+ * replaced it, opened from here when the reader may see it. Marking it, or
+ * needing it again, is done in the browser.
+ */
+function Unneeded(props: { mark: NoLongerNeededView; open: (id: string) => void }) {
+  const { t } = useTranslation();
+  const { mark } = props;
+  const when = whenExactly(mark.at);
+  const replaced = mark.replaced_by;
+  const to = replaced?.id ?? null;
+  const replacedWords = replaced ? t('document.unneededReplacedBy', { title: replaced.title ?? ANOTHER_DOCUMENT }) : null;
+  return (
+    <View style={styles.unneeded} testID="document-unneeded">
+      <Text tone="soft" variant="secondary">
+        {mark.by_name ? t('document.unneededBy', { when, name: mark.by_name }) : t('document.unneeded', { when })}
+      </Text>
+      {mark.reason ? <Text testID="document-unneeded-reason">{t('document.unneededReason', { reason: mark.reason })}</Text> : null}
+      {replacedWords && to ? (
+        <Button testID="document-unneeded-replacement" kind="quiet" label={replacedWords} onPress={() => props.open(to)} />
+      ) : replacedWords ? (
+        <Text testID="document-unneeded-replacement">{replacedWords}</Text>
+      ) : null}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   page: { padding: 20, gap: 12 },
+  unneeded: { gap: 4 },
   chip: {
     alignSelf: 'flex-start',
     paddingHorizontal: 12,
