@@ -6,14 +6,22 @@ app's own, tagged `vX.Y.Z` in this repository.
 
 ## [Unreleased]
 
-## [0.3.4] — the vault's shared code of v0.9.0-dev.24
+## [0.3.4] — the vault's shared code of v0.9.0-dev.25
 
 A patch for a vault of 0.9.0. It still works with a vault of 0.8.0 and
 0.7.0 (and, as before, 0.4.10 or later), where nothing below appears.
 
 ### Changed
-- Built against the vault's shared code of v0.9.0-dev.24 (was
-  v0.8.0-dev.8). No dependency of the phone's changed.
+- Built against the vault's shared code of v0.9.0-dev.25 (was
+  v0.8.0-dev.8), and Expo SDK 57's latest patches (expo 57.0.32, with
+  @expo/metro-runtime, expo-build-properties, expo-constants,
+  expo-dev-client, expo-image-picker, expo-router and expo-sharing), as
+  expo-doctor asks.
+- A vault of 0.9.0 keeps each version's own details, and a new version
+  starts from the one before's until somebody confirms them. The phone
+  doesn't show either yet. It changes a document only by its Essential
+  switch, one field at a time, so it never confirms a version's details
+  for anyone.
 - **A document no longer needed reads "No longer needed", never
   Expired.** A vault of 0.9.0 can mark a document as kept but no longer
   needed: its expiry then says nothing, and nothing reminds of it. The
