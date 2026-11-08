@@ -14,6 +14,7 @@ import {
   type Visibility,
 } from '@fdv/shared';
 import { MAX_PAGES, type CaptureSource, type PageRef } from '../queue/commit';
+import i18n from '../i18n';
 
 /**
  * The confirm card's answers, and what they become: the capture's
@@ -200,8 +201,6 @@ export type FieldErrors = Partial<Record<string, string>>;
 /** Where a type's own detail is wrong, in FieldErrors. */
 export const detailError = (key: string) => `detail:${key}`;
 
-export const DATE_HINT = 'A date, a month (March 2031) or a year';
-
 /** The fixed fields the card has an input for, in its order. Tags and notes it does not ask. */
 export const CARD_CORE = ['issued_by', 'identifier', 'issued', 'expires', 'physical_location'] as const;
 export type CardCore = (typeof CARD_CORE)[number];
@@ -266,26 +265,26 @@ export function readDetail(
   switch (field.kind) {
     case 'date': {
       const v = parseDateInput(text, { order: DATE_ORDER });
-      return v ? { value: v } : { message: `That isn't a date we can read. ${DATE_HINT}.` };
+      return v ? { value: v } : { message: i18n.t('capture.notADate') };
     }
     case 'year':
-      return /^\d{4}$/.test(text) ? { value: Number(text) } : { message: 'That should be a year, such as 2026.' };
+      return /^\d{4}$/.test(text) ? { value: Number(text) } : { message: i18n.t('capture.notAYear') };
     case 'number': {
       const typed = text.replace(/\s/g, '');
-      if (typed.includes(',') && !THOUSANDS.test(typed)) return { message: 'Use a point for a decimal, such as 3.5.' };
+      if (typed.includes(',') && !THOUSANDS.test(typed)) return { message: i18n.t('capture.decimalPoint') };
       // Written out in figures, as the web card takes it: never 0x10 or 1e3.
       const n = typed.replace(/,/g, '');
       return /^[-+]?(\d+\.?\d*|\.\d+)$/.test(n)
         ? { value: Number(n) }
-        : { message: 'That should be a number, such as 42.' };
+        : { message: i18n.t('capture.notANumber') };
     }
     case 'money': {
       const typed = text.replace(/[£$€\s]/g, '');
-      if (typed.includes(',') && !THOUSANDS.test(typed)) return { message: 'Use a point for pence, such as 12.50.' };
+      if (typed.includes(',') && !THOUSANDS.test(typed)) return { message: i18n.t('capture.pencePoint') };
       const amount = typed.replace(/,/g, '');
       return /^-?(\d+(\.\d{1,2})?|\.\d{1,2})$/.test(amount)
         ? { value: Number(amount) }
-        : { message: 'That should be an amount, such as 12.50.' };
+        : { message: i18n.t('capture.notAnAmount') };
     }
     default:
       // Text, a choice, and a kind this app does not know yet: as written.
@@ -319,7 +318,7 @@ export function toMetadata(
   const date = (raw: string, field: 'issued' | 'expires') => {
     if (raw.trim() === '') return undefined;
     const v = parseDateInput(raw, { order: DATE_ORDER });
-    if (!v) fields[field] = `That isn't a date we can read. ${DATE_HINT}.`;
+    if (!v) fields[field] = i18n.t('capture.notADate');
     return v ?? undefined;
   };
   const text = (s: string) => (s.trim() === '' ? undefined : s.trim());

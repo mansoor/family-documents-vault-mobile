@@ -2,10 +2,8 @@ import { ApiRequestError, isSessionOver } from '@fdv/client';
 import {
   can,
   colours,
-  documentName,
   formatDate,
   localToday,
-  radii,
   shareEndWords,
   type DocumentView,
   type IdentityAudienceView,
@@ -13,7 +11,6 @@ import {
   type ReminderView,
   type ResetNotice,
 } from '@fdv/shared';
-import { Image } from 'expo-image';
 import * as Linking from 'expo-linking';
 import { Link, useNavigation, useRouter } from 'expo-router';
 import { Settings as SettingsIcon } from 'lucide-react-native';
@@ -25,7 +22,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { AccessNotice, myAccess, type MyAccess } from '../../access/access';
 import { QueueRow, withoutWords } from '../../capture/queue-row';
 import { useBeginCapture } from '../../capture/add-button';
-import { useDocumentMenu } from '../../documents/menu';
 import { offersNewScan, reminderHeadline } from '../../documents/reminders';
 import { wordsFor } from '../../errors/words';
 import { OnThisPhone } from '../../essentials/ui';
@@ -36,7 +32,9 @@ import { useCapture, type SavedNote } from '../../state/capture';
 import { on } from '../../state/events';
 import { useStepUp } from '../../state/step-up';
 import { useVault } from '../../state/vault';
-import { Button, Card, Notice, StatusLine, Text } from '../../ui';
+import { Button, Card, Notice, Text } from '../../ui';
+import { DocumentRow } from '../../documents/row';
+import { sp } from '../../ui/space';
 
 interface HomeData {
   due: ReminderView[];
@@ -348,9 +346,19 @@ export default function Home() {
         }
         renderItem={({ item }) => (
           <DocumentRow
+            id={item.id}
+            title={item.title}
+            type_key={item.type_key}
+            note_name={item.note_name}
+            status={item.status}
             doc={item}
-            token={data?.token ?? null}
-            thumb={api && item.latest_version_id ? api.thumbnailUrl(item.latest_version_id) : null}
+            // A note with no title is named by its first words (0.9.0); a scan with none needs a name.
+            untitled={t('home.needsAName')}
+            thumb={
+              api && data?.token && item.latest_version_id
+                ? { uri: api.thumbnailUrl(item.latest_version_id), token: data.token }
+                : null
+            }
           />
         )}
       />
@@ -562,73 +570,18 @@ function FiledWithoutLine(props: { lines: string[] }) {
   );
 }
 
-/** One of what came in lately: its picture, name and status; its ⋯, or a long press, for what may be done (5.36). */
-function DocumentRow(props: { doc: DocumentView; token: string | null; thumb: string | null }) {
-  const { t } = useTranslation();
-  const router = useRouter();
-  const { doc } = props;
-  // A note with no title is named by its first words (0.9.0).
-  const title = documentName(doc, t('home.needsAName'));
-  const menu = useDocumentMenu({ id: doc.id, title, doc });
-  return (
-    <View style={styles.row}>
-      <Pressable
-        style={({ pressed }) => [styles.rowMain, pressed ? styles.pressed : null]}
-        accessibilityRole="button"
-        accessibilityLabel={title}
-        testID={`doc-row-${doc.id}`}
-        onPress={() => router.push({ pathname: '/document/[id]', params: { id: doc.id } })}
-        onLongPress={menu.open}
-      >
-        <View style={styles.thumb}>
-          {props.thumb && props.token ? (
-            <Image
-              source={{ uri: props.thumb, headers: { authorization: `Bearer ${props.token}` } }}
-              // Held in memory only: a document's picture never lands in the
-              // phone's disk cache.
-              cachePolicy="memory"
-              style={styles.thumbImage}
-              contentFit="cover"
-              accessibilityIgnoresInvertColors
-            />
-          ) : null}
-        </View>
-        <View style={styles.flex}>
-          <Text weight="600">{title}</Text>
-          <StatusLine status={doc.status} />
-        </View>
-      </Pressable>
-      {menu.button}
-      {menu.sheet}
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   e2eMarkers: { position: 'absolute', left: 0, bottom: 0, flexDirection: 'row' },
   e2eMarker: { width: 1, height: 1 },
   safe: { flex: 1, backgroundColor: colours.bg },
-  page: { padding: 20, gap: 10 },
-  queue: { gap: 8 },
-  needsYou: { gap: 6, borderColor: colours.danger },
+  page: { padding: sp(20), gap: sp(10) },
+  queue: { gap: sp(8) },
   pressed: { opacity: 0.8 },
-  header: { gap: 12, marginBottom: 4 },
-  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  header: { gap: sp(12), marginBottom: sp(4) },
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: sp(12) },
   flex: { flex: 1 },
   iconButton: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
-  dueCard: { gap: 4, borderColor: colours.warn },
-  inbox: { gap: 6 },
-  recentTitle: { marginTop: 12 },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colours.surface,
-    borderRadius: radii.l,
-    borderWidth: 1,
-    borderColor: colours.border,
-    paddingRight: 4,
-  },
-  rowMain: { flex: 1, flexDirection: 'row', gap: 12, alignItems: 'center', padding: 10, minHeight: 72 },
-  thumb: { width: 48, height: 64, borderRadius: radii.s, backgroundColor: colours.accentSoft, overflow: 'hidden' },
-  thumbImage: { width: 48, height: 64 },
+  dueCard: { gap: sp(4), borderColor: colours.warn },
+  inbox: { gap: sp(6) },
+  recentTitle: { marginTop: sp(12) },
 });

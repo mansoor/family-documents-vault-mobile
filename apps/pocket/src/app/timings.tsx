@@ -6,6 +6,7 @@ import { Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { exportRuns, loadRuns, split, type TimingRun } from '../capture/timings';
 import { Button, Card, Text } from '../ui';
+import { sp } from '../ui/space';
 
 const seconds = (ms: number) => (ms / 1000).toFixed(1);
 
@@ -68,8 +69,8 @@ export default function Timings() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1 },
-  page: { padding: 20, gap: 12 },
-  run: { gap: 4 },
-  row: { flexDirection: 'row', gap: 8 },
+  page: { padding: sp(20), gap: sp(12) },
+  run: { gap: sp(4) },
+  row: { flexDirection: 'row', gap: sp(8) },
   flex: { flex: 1 },
 });

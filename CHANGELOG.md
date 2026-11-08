@@ -6,6 +6,29 @@ app's own, tagged `vX.Y.Z` in this repository.
 
 ## [Unreleased]
 
+## [0.3.5] — the look (polish P1)
+
+The first step of the polish towards 0.4.0. Nothing new to do: the same
+screens, drawn as the project's design says.
+
+### Changed
+- **The app's own typefaces.** Headings are in Fraunces and everything
+  else in Figtree, as on the web. Both were already inside the app, but
+  nothing used them, so every screen drew in the phone's own font.
+- **One way to draw each thing.** Every document in a list (Home, Search,
+  a person's page) is the same row: a picture of its newest page where the
+  list knows it, or a tile showing what kind of thing it is (a search
+  result), then its name and status. Search's chips are the capture card's,
+  with an edge you can see. Every question or set of choices over a screen
+  (the ⋯ menu, Add, signing out, changing vault, removing offline copies,
+  confirming it's you, Essentials' password, a note's link) is one sheet,
+  with rounder corners and a slight lift off the page. Back closes it; a tap
+  on the shade still closes the menus, and still doesn't close a question.
+- **Spacing and corners from the shared scale**, as the web and the
+  prototype space things. A few 2-point gaps under a name became 4.
+- The capture card's messages for a detail it can't read (a date, a year,
+  a number or an amount) come from the app's words, unchanged.
+
 ## [0.3.4] — the vault's shared code of v0.9.0-dev.25
 
 A patch for a vault of 0.9.0. It still works with a vault of 0.8.0 and

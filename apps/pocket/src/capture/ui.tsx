@@ -1,10 +1,8 @@
 import { colours, radii, TAP_MIN } from '@fdv/shared';
 import { Image } from 'expo-image';
 import { ArrowLeft, ArrowRight, Camera, FileText, Plus, Trash2 } from 'lucide-react-native';
-import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -13,66 +11,13 @@ import {
   type PlatformOSType,
   type TextInputProps,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { PageRef, PickedFile } from '../queue/commit';
 import { Button, Text } from '../ui';
+import { Sheet } from '../ui/sheet';
+import { sp } from '../ui/space';
 
-/**
- * One choice among several: a chip that says whether it is chosen — or,
- * given `expanded`, one that opens more (More…), and says whether it is open.
- */
-export function Chip(props: {
-  label: string;
-  selected?: boolean;
-  expanded?: boolean;
-  disabled?: boolean;
-  onPress: () => void;
-  testID?: string;
-  leading?: string;
-}) {
-  const selected = props.selected === true || props.expanded === true;
-  const disabled = props.disabled === true;
-  return (
-    <Pressable
-      testID={props.testID}
-      accessibilityRole="button"
-      accessibilityLabel={props.label}
-      accessibilityState={
-        props.expanded === undefined ? { selected, disabled } : { expanded: props.expanded, disabled }
-      }
-      disabled={disabled}
-      onPress={props.onPress}
-      hitSlop={4}
-      style={({ pressed }) => [
-        styles.chip,
-        selected ? styles.chipOn : null,
-        disabled ? styles.chipOff : null,
-        pressed ? styles.pressed : null,
-      ]}
-    >
-      {props.leading ? (
-        <View style={[styles.avatar, selected ? styles.avatarOn : null]}>
-          <Text weight="700" tone={selected ? 'accent' : 'soft'} role="text">
-            {props.leading}
-          </Text>
-        </View>
-      ) : null}
-      <Text weight="600" tone={selected ? 'onAccent' : 'ink'} role="text">
-        {props.label}
-      </Text>
-    </Pressable>
-  );
-}
-
-/** Chips in a row that wraps: a single choice (a radio group), or just actions side by side. */
-export function ChipRow(props: { children: ReactNode; label: string; role?: 'radiogroup' | 'none' }) {
-  if (props.role === 'none') return <View style={styles.chips}>{props.children}</View>;
-  return (
-    <View style={styles.chips} accessibilityRole="radiogroup" accessibilityLabel={props.label}>
-      {props.children}
-    </View>
-  );
-}
+/** The kit's chips, where the card has always found them. */
+export { Chip, ChipRow } from '../ui/chip';
 
 function IconButton(props: { label: string; onPress: () => void; disabled?: boolean; icon: typeof Camera }) {
   const Icon = props.icon;
@@ -247,71 +192,39 @@ export function LeaveQuestion(props: {
   disabled?: boolean;
 }) {
   const { t } = useTranslation();
-  // The sheet sits above the navigation bar, which the window now draws under.
-  const insets = useSafeAreaInsets();
   return (
-    <Modal visible={props.visible} transparent animationType="fade" onRequestClose={props.onKeepEditing}>
-      <View style={styles.scrim}>
-        <View
-          style={[styles.sheet, { paddingBottom: 20 + insets.bottom }]}
-          accessibilityViewIsModal
-          testID="leave-question"
-        >
-          <Text variant="screen">{t('capture.backTitle')}</Text>
-          <Button
-            label={t(props.inbox ? 'capture.toInbox' : 'capture.saveWithout')}
-            onPress={props.onSaveWithout}
-            disabled={props.disabled === true}
-            testID="leave-save"
-          />
-          <Button
-            label={t('capture.throwAway')}
-            kind="danger"
-            onPress={props.onThrowAway}
-            disabled={props.disabled === true}
-            testID="leave-throw"
-          />
-          <Button label={t('capture.keepEditing')} kind="quiet" onPress={props.onKeepEditing} testID="leave-keep" />
-        </View>
-      </View>
-    </Modal>
+    <Sheet visible={props.visible} onClose={props.onKeepEditing} testID="leave-question">
+      <Text variant="screen">{t('capture.backTitle')}</Text>
+      <Button
+        label={t(props.inbox ? 'capture.toInbox' : 'capture.saveWithout')}
+        onPress={props.onSaveWithout}
+        disabled={props.disabled === true}
+        testID="leave-save"
+      />
+      <Button
+        label={t('capture.throwAway')}
+        kind="danger"
+        onPress={props.onThrowAway}
+        disabled={props.disabled === true}
+        testID="leave-throw"
+      />
+      <Button label={t('capture.keepEditing')} kind="quiet" onPress={props.onKeepEditing} testID="leave-keep" />
+    </Sheet>
   );
 }
 
 const styles = StyleSheet.create({
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: {
-    minHeight: TAP_MIN,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 14,
-    borderRadius: radii.pill,
-    borderWidth: 1,
-    borderColor: colours.borderInput,
-    backgroundColor: colours.surface,
-  },
-  chipOn: { backgroundColor: colours.accent, borderColor: colours.accent },
   chipOff: { opacity: 0.45 },
   pressed: { opacity: 0.8 },
-  avatar: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colours.accentSoft,
-  },
-  avatarOn: { backgroundColor: colours.surface },
-  strip: { gap: 12, paddingVertical: 4 },
-  page: { gap: 6, alignItems: 'center' },
+  strip: { gap: sp(12), paddingVertical: sp(4) },
+  page: { gap: sp(6), alignItems: 'center' },
   thumb: {
     width: 96,
     height: 128,
     borderRadius: radii.s,
     backgroundColor: colours.accentSoft,
   },
-  pageButtons: { flexDirection: 'row', gap: 4 },
+  pageButtons: { flexDirection: 'row', gap: sp(4) },
   iconButton: {
     width: TAP_MIN,
     height: TAP_MIN,
@@ -331,13 +244,13 @@ const styles = StyleSheet.create({
     borderColor: colours.accent,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 4,
+    gap: sp(4),
   },
   fileRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    padding: 12,
+    gap: sp(12),
+    padding: sp(12),
     minHeight: TAP_MIN,
     borderRadius: radii.l,
     borderWidth: 1,
@@ -345,16 +258,4 @@ const styles = StyleSheet.create({
     backgroundColor: colours.surface,
   },
   flex: { flex: 1 },
-  scrim: {
-    flex: 1,
-    backgroundColor: 'rgba(28,26,23,0.45)',
-    justifyContent: 'flex-end',
-  },
-  sheet: {
-    backgroundColor: colours.bg,
-    padding: 20,
-    gap: 12,
-    borderTopLeftRadius: radii.l,
-    borderTopRightRadius: radii.l,
-  },
 });

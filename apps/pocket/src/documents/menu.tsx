@@ -25,8 +25,7 @@ import {
 } from 'lucide-react-native';
 import { useCallback, useEffect, useRef, useState, type ReactNode, type Ref } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { focusOn } from '../capture/add-button';
 import { renewWords } from '../capture/renew-words';
 import { wordsFor } from '../errors/words';
@@ -39,6 +38,8 @@ import { Button, Notice, Text } from '../ui';
 import { saveVersion, setEssential, showDocument, type ActionDeps } from './actions';
 import { latestOf } from './online';
 import { warnedAboutCopies } from './save-copy';
+import { Sheet } from '../ui/sheet';
+import { sp } from '../ui/space';
 
 /**
  * A menu on every row (5.36): a ⋯ beside each document in a list, and a
@@ -190,7 +191,6 @@ function DocumentMenu(props: {
   const essentials = useEssentials();
   const capture = useCapture();
   const lock = useLock();
-  const insets = useSafeAreaInsets();
   const kept = essentials.items.find((i) => i.id === id)?.document ?? null;
   const [doc, setDoc] = useState<DocumentView | null>(() => newer(kept, props.doc));
   // The vault has answered (or could not): until then, nothing is changed from a copy that may be stale.
@@ -341,85 +341,74 @@ function DocumentMenu(props: {
   };
 
   return (
-    <Modal
+    <Sheet
       visible
-      transparent
-      animationType="fade"
-      onRequestClose={leave}
+      onClose={leave}
+      testID="row-sheet"
+      outside="row-sheet-outside"
+      tall
       onShow={() => focusOn(first)}
     >
-      <View style={styles.scrim}>
-        {/* A tap outside the sheet closes it; a screen reader has Back and Cancel. */}
-        <Pressable
-          testID="row-sheet-outside"
-          accessible={false}
-          importantForAccessibility="no"
-          onPress={leave}
-          style={StyleSheet.absoluteFill}
-        />
-        <View style={[styles.sheet, { paddingBottom: 20 + insets.bottom }]} accessibilityViewIsModal testID="row-sheet">
-          <Text variant="screen">{title}</Text>
-          {/* At the largest text the choices scroll rather than run off the screen. */}
-          <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
-            {said ? (
-              <Notice tone={said.tone} testID="row-sheet-said">
-                {said.text}
-              </Notice>
-            ) : null}
-            {picking ? (
-              <CollectionPicker
-                id={id}
-                title={title}
-                role={who?.role ?? null}
-                onBusy={setAdding}
-                onAdded={(s) => setSaid(s)}
-              />
-            ) : (
-              <View accessibilityRole="menu" accessibilityLabel={title} style={styles.choices}>
-                {actions.map((action, i) => {
-                  const Icon = action === 'essential' && doc?.is_essential ? StarOff : ICONS[action];
-                  return (
-                    <Choice
-                      key={action}
-                      ref={i === 0 ? first : undefined}
-                      testID={`row-sheet-${action}`}
-                      label={label(action)}
-                      detail={action === 'essential' ? t('document.essentialHint') : undefined}
-                      busy={busy === action}
-                      // Essential is changed from the vault's copy, once it has come (U536-02).
-                      disabled={busy !== null || (action === 'essential' && !offline && !fetched)}
-                      onPress={() => choose(action)}
-                      icon={
-                        <Icon
-                          color={colours.accent}
-                          size={22}
-                          accessibilityElementsHidden
-                          importantForAccessibility="no"
-                        />
-                      }
-                    />
-                  );
-                })}
-              </View>
-            )}
-            {warning ? (
-              <Notice tone="warn" announce={t('document.saveWarning')}>
-                <Text testID="row-sheet-save-warning">{t('document.saveWarning')}</Text>
-                <Button testID="row-sheet-save-anyway" label={t('document.saveAnyway')} onPress={() => void doSave()} />
-                <Button kind="quiet" label={t('document.saveCancel')} onPress={() => setWarning(false)} />
-              </Notice>
-            ) : null}
-          </ScrollView>
-          <Button
-            kind="quiet"
-            label={picking || said?.tone === 'ok' ? t('row.done') : t('common.cancel')}
-            disabled={working}
-            onPress={leave}
-            testID="row-sheet-cancel"
+      <Text variant="screen">{title}</Text>
+      {/* At the largest text the choices scroll rather than run off the screen. */}
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
+        {said ? (
+          <Notice tone={said.tone} testID="row-sheet-said">
+            {said.text}
+          </Notice>
+        ) : null}
+        {picking ? (
+          <CollectionPicker
+            id={id}
+            title={title}
+            role={who?.role ?? null}
+            onBusy={setAdding}
+            onAdded={(s) => setSaid(s)}
           />
-        </View>
-      </View>
-    </Modal>
+        ) : (
+          <View accessibilityRole="menu" accessibilityLabel={title} style={styles.choices}>
+            {actions.map((action, i) => {
+              const Icon = action === 'essential' && doc?.is_essential ? StarOff : ICONS[action];
+              return (
+                <Choice
+                  key={action}
+                  ref={i === 0 ? first : undefined}
+                  testID={`row-sheet-${action}`}
+                  label={label(action)}
+                  detail={action === 'essential' ? t('document.essentialHint') : undefined}
+                  busy={busy === action}
+                  // Essential is changed from the vault's copy, once it has come (U536-02).
+                  disabled={busy !== null || (action === 'essential' && !offline && !fetched)}
+                  onPress={() => choose(action)}
+                  icon={
+                    <Icon
+                      color={colours.accent}
+                      size={22}
+                      accessibilityElementsHidden
+                      importantForAccessibility="no"
+                    />
+                  }
+                />
+              );
+            })}
+          </View>
+        )}
+        {warning ? (
+          <Notice tone="warn" announce={t('document.saveWarning')}>
+            <Text testID="row-sheet-save-warning">{t('document.saveWarning')}</Text>
+            <Button testID="row-sheet-save-anyway" label={t('document.saveAnyway')} onPress={() => void doSave()} />
+            <Button kind="quiet" label={t('document.saveCancel')} onPress={() => setWarning(false)} />
+          </Notice>
+        ) : null}
+      </ScrollView>
+      <Button
+        kind="quiet"
+        label={picking || said?.tone === 'ok' ? t('row.done') : t('common.cancel')}
+        disabled={working}
+        onPress={leave}
+        testID="row-sheet-cancel"
+      />
+    </Sheet>
   );
 }
 
@@ -599,25 +588,16 @@ const styles = StyleSheet.create({
   more: { minWidth: TAP_MIN, minHeight: TAP_MIN, alignItems: 'center', justifyContent: 'center' },
   pressed: { opacity: 0.8 },
   disabled: { opacity: 0.5 },
-  scrim: { flex: 1, backgroundColor: colours.scrim, justifyContent: 'flex-end' },
-  sheet: {
-    maxHeight: '90%',
-    backgroundColor: colours.bg,
-    padding: 20,
-    gap: 12,
-    borderTopLeftRadius: radii.l,
-    borderTopRightRadius: radii.l,
-  },
   scroll: { flexGrow: 0, flexShrink: 1 },
-  content: { gap: 12 },
-  choices: { gap: 8 },
+  content: { gap: sp(12) },
+  choices: { gap: sp(8) },
   choice: {
     minHeight: TAP_MIN + 12,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+    gap: sp(14),
+    paddingHorizontal: sp(14),
+    paddingVertical: sp(8),
     borderRadius: radii.m,
     borderWidth: 1,
     borderColor: colours.border,
@@ -626,12 +606,12 @@ const styles = StyleSheet.create({
   icon: {
     width: 40,
     height: 40,
-    borderRadius: 20,
+    borderRadius: radii.pill,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colours.accentSoft,
   },
-  label: { flexShrink: 1, gap: 2 },
-  collection: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  flex: { flex: 1, gap: 2 },
+  label: { flexShrink: 1, gap: sp(4) },
+  collection: { flexDirection: 'row', alignItems: 'center', gap: sp(12) },
+  flex: { flex: 1, gap: sp(4) },
 });

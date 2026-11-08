@@ -8,6 +8,7 @@ import { unlocked } from '../test-support/lookup';
 import { installed } from '../test-support/render';
 import { resetRoutes, routes } from '../test-support/router';
 import { testVault } from '../test-support/vault';
+import { font } from '../ui/fonts';
 
 jest.mock(
   'expo-router',
@@ -51,7 +52,7 @@ describe('Search', () => {
     const snippet = await screen.findByTestId('snippet-passport');
     // The match is a bold run; the rest is text, whatever it looks like.
     const bold = snippet.queryAll(
-      (n) => typeof n.props.children === 'string' && StyleSheet.flatten(n.props.style)?.fontWeight === '700',
+      (n) => typeof n.props.children === 'string' && StyleSheet.flatten(n.props.style)?.fontFamily === font('700').fontFamily,
     );
     expect(bold.map((n) => n.props.children)).toEqual(['123456']);
     expect(snippet).toHaveTextContent('Passport number 123456 — <script>x</script>');

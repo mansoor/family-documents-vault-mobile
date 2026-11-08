@@ -7,22 +7,29 @@ import { DocumentRow } from '../../documents/row';
 import { IdentityCard } from '../../identity/card';
 import { useVault } from '../../state/vault';
 import { Notice, Text } from '../../ui';
+import { sp } from '../../ui/space';
 
 /** One person's documents (4.12), from People; and their identity details, where the vault keeps them (5.31). */
 export default function PersonScreen() {
   const params = useLocalSearchParams<{ id: string; name?: string }>();
   const { id } = params;
   const { t } = useTranslation();
-  const { withToken, offline } = useVault();
+  const { withToken, offline, api } = useVault();
   const [docs, setDocs] = useState<DocumentView[] | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  // The token the list was fetched with: its pictures are fetched with it too.
+  const [token, setToken] = useState<string | null>(null);
   // Opened without a name (Home's "Look at yours"): the vault's.
   const [found, setFound] = useState<string | null>(null);
   const name = params.name ?? found ?? undefined;
 
   const load = useCallback(async () => {
     try {
-      setDocs((await withToken((a, token) => a.documents(token, { member_id: id, limit: 200 }))).items);
+      const listed = await withToken((a, tk) => {
+        setToken(tk);
+        return a.documents(tk, { member_id: id, limit: 200 });
+      });
+      setDocs(listed.items);
       if (params.name === undefined) {
         const people = (await withToken((a, token) => a.members(token))).items;
         setFound(people.find((m) => m.id === id)?.display_name ?? null);
@@ -71,6 +78,9 @@ export default function PersonScreen() {
           note_name={item.note_name}
           status={item.status}
           doc={item}
+          thumb={
+            api && token && item.latest_version_id ? { uri: api.thumbnailUrl(item.latest_version_id), token } : null
+          }
         />
       )}
     />
@@ -79,5 +89,5 @@ export default function PersonScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colours.bg },
-  page: { padding: 20, gap: 10 },
+  page: { padding: sp(20), gap: sp(10) },
 });

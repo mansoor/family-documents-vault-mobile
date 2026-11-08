@@ -1,15 +1,21 @@
-import { colours, documentName, radii, statusTone, type DocumentView, type Status } from '@fdv/shared';
+import { colours, documentName, NOTE_KIND, radii, statusTone, type DocumentView, type Status } from '@fdv/shared';
+import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
+import { FileText, NotebookText } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, Text as RNText, View } from 'react-native';
 import { StatusLine, Text } from '../ui';
+import { font } from '../ui/fonts';
 import { useDocumentMenu } from './menu';
 import { snippetParts } from './snippet';
+import { sp } from '../ui/space';
 
 /**
- * One document in a list (4.12): its name and status, and — from a
- * search — where it matched, in bold. It opens the document; its ⋯, or a
- * long press, opens what may be done with it (5.36).
+ * One document in a list (4.12), the same in every list (P1): its picture,
+ * its name and status, and — from a search — where it matched, in bold. It
+ * opens the document; its ⋯, or a long press, opens what may be done with
+ * it (5.36). A list that knows the document's newest version shows its
+ * picture; a search hit does not, and shows what kind of thing it is.
  */
 export function DocumentRow(props: {
   id: string;
@@ -21,13 +27,19 @@ export function DocumentRow(props: {
   snippet?: string;
   /** What the list knows of it already: a search hit has none, and its ⋯ asks. */
   doc?: DocumentView;
+  /** Its newest version's picture, and the token to fetch it with. */
+  thumb?: { uri: string; token: string } | null;
+  /** What it is called with no title (Home says it needs a name). */
+  untitled?: string;
 }) {
   const { t } = useTranslation();
   const router = useRouter();
   const title = documentName(
     { title: props.title, type_key: props.type_key ?? null, note_name: props.note_name },
-    t('document.untitled'),
+    props.untitled ?? t('document.untitled'),
   );
+  const note = props.type_key === NOTE_KIND;
+  const Kind = note ? NotebookText : FileText;
   const menu = useDocumentMenu({ id: props.id, title, doc: props.doc ?? null });
   // Read out as it is shown: its name, its status, and where it matched.
   const said = [
@@ -47,6 +59,22 @@ export function DocumentRow(props: {
         onLongPress={menu.open}
         style={({ pressed }) => [styles.main, pressed ? styles.pressed : null]}
       >
+        <View style={styles.thumb}>
+          {props.thumb ? (
+            <Image
+              source={{ uri: props.thumb.uri, headers: { authorization: `Bearer ${props.thumb.token}` } }}
+              // Held in memory only: a document's picture never lands in the
+              // phone's disk cache.
+              cachePolicy="memory"
+              style={styles.thumbImage}
+              contentFit="cover"
+              accessibilityIgnoresInvertColors
+            />
+          ) : (
+            <Kind color={colours.accent} size={22} accessibilityElementsHidden importantForAccessibility="no" />
+          )}
+        </View>
+        <View style={styles.words}>
         <Text weight="600">{title}</Text>
         <StatusLine status={props.status} />
         {props.snippet ? (
@@ -62,6 +90,7 @@ export function DocumentRow(props: {
             )}
           </Text>
         ) : null}
+        </View>
       </Pressable>
       {menu.button}
       {menu.sheet}
@@ -77,9 +106,20 @@ const styles = StyleSheet.create({
     borderRadius: radii.l,
     borderWidth: 1,
     borderColor: colours.border,
-    paddingRight: 4,
+    paddingRight: sp(4),
   },
-  main: { flex: 1, gap: 4, padding: 12, minHeight: 56 },
+  main: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: sp(12), padding: sp(10), minHeight: 72 },
+  words: { flex: 1, gap: sp(4) },
+  thumb: {
+    width: 48,
+    height: 64,
+    borderRadius: radii.s,
+    backgroundColor: colours.accentSoft,
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  thumbImage: { width: 48, height: 64 },
   pressed: { opacity: 0.8 },
-  bold: { fontWeight: '700', color: colours.ink },
+  bold: { ...font('700'), color: colours.ink },
 });

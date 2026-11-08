@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { StyleSheet, View } from 'react-native';
 import { useVault } from '../state/vault';
 import { Button, Card, Notice, Text } from '../ui';
+import { sp } from '../ui/space';
 
 const when = (iso: string) =>
   new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
@@ -95,6 +96,6 @@ export function SignedInDevices() {
 }
 
 const styles = StyleSheet.create({
-  device: { gap: 4, paddingVertical: 6 },
-  row: { flexDirection: 'row', gap: 12, flexWrap: 'wrap' },
+  device: { gap: sp(4), paddingVertical: sp(6) },
+  row: { flexDirection: 'row', gap: sp(12), flexWrap: 'wrap' },
 });

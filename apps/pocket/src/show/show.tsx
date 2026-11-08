@@ -1,3 +1,4 @@
+import { radii } from '@fdv/shared';
 import { Image } from 'expo-image';
 import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -19,6 +20,7 @@ import { Text } from '../ui';
 import { brighten, restoreBrightness } from './brightness';
 import { takeForShow } from './handoff';
 import { defaultShowPlatform, type ShowPlatform } from './platform';
+import { sp } from '../ui/space';
 
 const ZOOMS = [1, 1.5, 2, 3];
 /** Showing ends by itself after this long: the phone may have been left with someone. */
@@ -358,17 +360,17 @@ function ShowButton(props: {
 
 const styles = StyleSheet.create({
   black: { flex: 1, backgroundColor: '#000000' },
-  stage: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 16 },
+  stage: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: sp(16) },
   top: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
-    paddingHorizontal: 16,
+    paddingHorizontal: sp(16),
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: 12,
+    gap: sp(12),
   },
   bottom: {
     position: 'absolute',
@@ -377,27 +379,27 @@ const styles = StyleSheet.create({
     right: 0,
   },
   row: {
-    paddingHorizontal: 12,
+    paddingHorizontal: sp(12),
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+    gap: sp(8),
     flexWrap: 'wrap',
   },
   /** Pinned (a screen reader is on): beside the page, never over it. */
   barInFlow: {
-    paddingHorizontal: 16,
+    paddingHorizontal: sp(16),
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: 12,
+    gap: sp(12),
   },
   center: { alignItems: 'center', justifyContent: 'center' },
   button: {
     minHeight: 48,
     minWidth: 48,
-    paddingHorizontal: 14,
-    borderRadius: 24,
+    paddingHorizontal: sp(14),
+    borderRadius: radii.pill,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(255,255,255,0.16)',

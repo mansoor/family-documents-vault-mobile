@@ -8,6 +8,7 @@ import { libraryDoc, unlocked } from '../test-support/lookup';
 import { installed } from '../test-support/render';
 import { resetRoutes } from '../test-support/router';
 import { testVault, type TestVault } from '../test-support/vault';
+import { font } from '../ui/fonts';
 
 jest.mock(
   'expo-router',
@@ -61,7 +62,7 @@ describe("a document's note (5.36)", () => {
     );
     expect(note.getByRole('header')).toHaveTextContent('Where it is');
     expect(StyleSheet.flatten(note.getByText('blue').props.style)).toEqual(
-      expect.objectContaining({ fontWeight: '700' }),
+      expect.objectContaining(font('700')),
     );
     expect(StyleSheet.flatten(note.getByText('top').props.style)).toEqual(
       expect.objectContaining({ fontStyle: 'italic' }),
@@ -118,7 +119,7 @@ describe("a document's note (5.36)", () => {
       '<script>alert(1)</script> and <img src=x onerror=alert(2)> still bold',
     );
     expect(StyleSheet.flatten(note.getByText('still bold').props.style)).toEqual(
-      expect.objectContaining({ fontWeight: '700' }),
+      expect.objectContaining(font('700')),
     );
     expect(note.queryByTestId('note-link')).toBeNull();
   });

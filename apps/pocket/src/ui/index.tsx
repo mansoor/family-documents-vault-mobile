@@ -13,7 +13,9 @@ import {
   type TextStyle,
   type ViewStyle,
 } from 'react-native';
+import { font, type Weight } from './fonts';
 import { useTextScale } from './text-scale';
+import { sp } from './space';
 
 /**
  * The app's building blocks, drawn from @fdv/shared's tokens so the phone
@@ -36,7 +38,7 @@ export function Text(props: {
   children: ReactNode;
   variant?: Variant;
   tone?: 'ink' | 'soft' | 'muted' | 'accent' | 'warn' | 'danger' | 'onAccent';
-  weight?: '400' | '500' | '600' | '700';
+  weight?: Weight;
   style?: StyleProp<TextStyle>;
   role?: 'header' | 'text' | 'alert';
   testID?: string;
@@ -63,7 +65,7 @@ export function Text(props: {
           fontSize: size,
           lineHeight: Math.round(size * (display ? 1.2 : 1.45)),
           color,
-          fontWeight: props.weight ?? (display ? '600' : '400'),
+          ...font(props.weight ?? (display ? '600' : '400'), display),
         },
         props.style,
       ]}
@@ -222,7 +224,7 @@ export function Field(
         autoCapitalize="none"
         autoCorrect={false}
         placeholderTextColor={colours.inkMuted}
-        style={[styles.input, { fontSize: typeScale.body * scale }, error ? styles.inputError : null]}
+        style={[styles.input, font(), { fontSize: typeScale.body * scale }, error ? styles.inputError : null]}
         {...input}
         onLayout={(e) => {
           laidOut.current = true;
@@ -246,8 +248,8 @@ const styles = StyleSheet.create({
   button: {
     minHeight: TAP_MIN,
     borderRadius: radii.m,
-    paddingHorizontal: 18,
-    paddingVertical: 10,
+    paddingHorizontal: sp(18),
+    paddingVertical: sp(10),
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -261,19 +263,19 @@ const styles = StyleSheet.create({
     borderRadius: radii.l,
     borderWidth: 1,
     borderColor: colours.border,
-    padding: 16,
-    gap: 12,
+    padding: sp(16),
+    gap: sp(12),
   },
-  notice: { flexDirection: 'row', gap: 10, padding: 12, borderRadius: radii.m, alignItems: 'flex-start' },
-  noticeText: { flex: 1, gap: 8 },
-  status: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  field: { gap: 6 },
+  notice: { flexDirection: 'row', gap: sp(10), padding: sp(12), borderRadius: radii.m, alignItems: 'flex-start' },
+  noticeText: { flex: 1, gap: sp(8) },
+  status: { flexDirection: 'row', alignItems: 'center', gap: sp(6) },
+  field: { gap: sp(6) },
   input: {
     minHeight: TAP_MIN,
     borderWidth: 1,
     borderColor: colours.borderInput,
     borderRadius: radii.m,
-    paddingHorizontal: 14,
+    paddingHorizontal: sp(14),
     color: colours.ink,
     backgroundColor: colours.surface,
   },

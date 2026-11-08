@@ -7,6 +7,7 @@ import { useCapture } from '../state/capture';
 import { useEssentials } from '../state/essentials';
 import { useVault, type SignInResult } from '../state/vault';
 import { Button, Card, Field, Notice, Text } from '../ui';
+import { sp } from '../ui/space';
 
 /**
  * Sign in: email and password, then the six-digit code if the account has
@@ -166,5 +167,5 @@ export default function SignIn() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1 },
-  page: { padding: 20, gap: 16 },
+  page: { padding: sp(20), gap: sp(16) },
 });

@@ -1,13 +1,13 @@
 import { ApiRequestError, StepUpCoordinator, type Api, type StepUpRequest } from '@fdv/client';
 import { wordsFor } from '../errors/words';
-import { colours, FACTOR_STEP_UPS, radii } from '@fdv/shared';
+import { FACTOR_STEP_UPS } from '@fdv/shared';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { AccessibilityInfo, KeyboardAvoidingView, Modal, Platform, StyleSheet, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { AccessibilityInfo } from 'react-native';
 import { Button, Field, Text } from '../ui';
 import { useLock } from './lock';
 import { useVault } from './vault';
+import { Sheet } from '../ui/sheet';
 
 /**
  * "Confirm it's you" on the phone (4.12, SEC-17): some things the vault
@@ -125,7 +125,6 @@ export function useStepUp(): StepUpValue {
 function StepUpSheet(props: { asking: Asking | null }) {
   const { t } = useTranslation();
   const { withToken } = useVault();
-  const insets = useSafeAreaInsets();
   const [chosen, setHow] = useState<'password' | 'code'>('password');
   const [value, setValue] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -163,85 +162,66 @@ function StepUpSheet(props: { asking: Asking | null }) {
   };
 
   return (
-    <Modal visible={asking !== null} transparent animationType="fade" onRequestClose={() => done(false)}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.scrim}>
-        <View
-          style={[styles.sheet, { paddingBottom: 20 + insets.bottom }]}
-          accessibilityViewIsModal
-          testID="step-up-sheet"
-        >
-          <Text variant="screen">{t('stepUp.title')}</Text>
-          {asking?.message ? <Text tone="soft">{asking.message}</Text> : null}
-          {codeOnly && asking?.codeless ? (
-            <Text testID="step-up-no-code">{t('stepUp.noCode')}</Text>
-          ) : codeOnly ? (
-            <Text tone="soft" testID="step-up-code-only">
-              {t('stepUp.codeOnly')}
-            </Text>
-          ) : null}
-          {codeOnly && asking?.codeless ? null : how === 'password' ? (
-            <Field
-              testID="step-up-password"
-              label={t('stepUp.password')}
-              value={value}
-              onChangeText={setValue}
-              secureTextEntry
-              textContentType="password"
-              autoComplete="current-password"
-              returnKeyType="go"
-              onSubmitEditing={() => void confirm()}
-              error={error}
-            />
-          ) : (
-            <Field
-              testID="step-up-code"
-              label={t('stepUp.code')}
-              value={value}
-              onChangeText={setValue}
-              keyboardType="number-pad"
-              textContentType="oneTimeCode"
-              autoComplete="one-time-code"
-              maxLength={9}
-              returnKeyType="go"
-              onSubmitEditing={() => void confirm()}
-              error={error}
-            />
-          )}
-          {codeOnly && asking?.codeless ? null : (
-            <Button
-              testID="step-up-go"
-              label={t('stepUp.confirm')}
-              busy={busy}
-              disabled={!value.trim()}
-              onPress={() => void confirm()}
-            />
-          )}
-          {codeOnly ? null : (
-            <Button
-              testID="step-up-switch"
-              kind="quiet"
-              label={how === 'password' ? t('stepUp.useCode') : t('stepUp.usePassword')}
-              onPress={() => {
-                setValue('');
-                setError(null);
-                setHow(how === 'password' ? 'code' : 'password');
-              }}
-            />
-          )}
-          <Button testID="step-up-cancel" kind="quiet" label={t('stepUp.cancel')} onPress={() => done(false)} />
-        </View>
-      </KeyboardAvoidingView>
-    </Modal>
+    <Sheet visible={asking !== null} onClose={() => done(false)} testID="step-up-sheet" keyboard>
+      <Text variant="screen">{t('stepUp.title')}</Text>
+      {asking?.message ? <Text tone="soft">{asking.message}</Text> : null}
+      {codeOnly && asking?.codeless ? (
+        <Text testID="step-up-no-code">{t('stepUp.noCode')}</Text>
+      ) : codeOnly ? (
+        <Text tone="soft" testID="step-up-code-only">
+          {t('stepUp.codeOnly')}
+        </Text>
+      ) : null}
+      {codeOnly && asking?.codeless ? null : how === 'password' ? (
+        <Field
+          testID="step-up-password"
+          label={t('stepUp.password')}
+          value={value}
+          onChangeText={setValue}
+          secureTextEntry
+          textContentType="password"
+          autoComplete="current-password"
+          returnKeyType="go"
+          onSubmitEditing={() => void confirm()}
+          error={error}
+        />
+      ) : (
+        <Field
+          testID="step-up-code"
+          label={t('stepUp.code')}
+          value={value}
+          onChangeText={setValue}
+          keyboardType="number-pad"
+          textContentType="oneTimeCode"
+          autoComplete="one-time-code"
+          maxLength={9}
+          returnKeyType="go"
+          onSubmitEditing={() => void confirm()}
+          error={error}
+        />
+      )}
+      {codeOnly && asking?.codeless ? null : (
+        <Button
+          testID="step-up-go"
+          label={t('stepUp.confirm')}
+          busy={busy}
+          disabled={!value.trim()}
+          onPress={() => void confirm()}
+        />
+      )}
+      {codeOnly ? null : (
+        <Button
+          testID="step-up-switch"
+          kind="quiet"
+          label={how === 'password' ? t('stepUp.useCode') : t('stepUp.usePassword')}
+          onPress={() => {
+            setValue('');
+            setError(null);
+            setHow(how === 'password' ? 'code' : 'password');
+          }}
+        />
+      )}
+      <Button testID="step-up-cancel" kind="quiet" label={t('stepUp.cancel')} onPress={() => done(false)} />
+    </Sheet>
   );
 }
-
-const styles = StyleSheet.create({
-  scrim: { flex: 1, backgroundColor: 'rgba(28,26,23,0.45)', justifyContent: 'flex-end' },
-  sheet: {
-    backgroundColor: colours.bg,
-    padding: 20,
-    gap: 12,
-    borderTopLeftRadius: radii.l,
-    borderTopRightRadius: radii.l,
-  },
-});

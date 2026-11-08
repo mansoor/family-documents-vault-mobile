@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AddButton } from '../capture/add-button';
 import { useVault } from '../state/vault';
 import { Text } from './index';
+import { sp } from './space';
 
 /**
  * The tabs, in order; the + sits between the second and the third. Each
@@ -72,7 +73,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-around',
-    paddingTop: 6,
+    paddingTop: sp(6),
     backgroundColor: colours.surface,
     borderTopWidth: 1,
     borderTopColor: colours.border,
@@ -87,7 +88,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 2,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 2,
+    gap: sp(4),
   },
   label: { textAlign: 'center' },
   pressed: { opacity: 0.7 },

@@ -1,12 +1,14 @@
 import { NetworkError } from '@fdv/client';
-import { categoryLabel, colours, radii, type DocumentView, type Member, type SearchHit } from '@fdv/shared';
+import { categoryLabel, colours, type DocumentView, type Member, type SearchHit } from '@fdv/shared';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FlatList, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { FlatList, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { DocumentRow } from '../../documents/row';
 import { useVault } from '../../state/vault';
 import { Field, Notice, Text } from '../../ui';
+import { Chip } from '../../ui/chip';
+import { sp } from '../../ui/space';
 
 /** How long typing pauses before the vault is asked (FND). */
 export const SEARCH_DEBOUNCE_MS = 250;
@@ -149,24 +151,24 @@ export default function SearchScreen() {
               clearButtonMode="while-editing"
             />
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
-              <Chip label={t('search.everyone')} on={memberId === null} onPress={() => setMemberId(null)} />
+              <Chip label={t('search.everyone')} selected={memberId === null} onPress={() => setMemberId(null)} />
               {members.map((m) => (
                 <Chip
                   key={m.id}
                   label={m.display_name}
-                  on={memberId === m.id}
+                  selected={memberId === m.id}
                   onPress={() => setMemberId(memberId === m.id ? null : m.id)}
                   testID={`chip-member-${m.id}`}
                 />
               ))}
             </ScrollView>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
-              <Chip label={t('search.allKinds')} on={category === null} onPress={() => setCategory(null)} />
+              <Chip label={t('search.allKinds')} selected={category === null} onPress={() => setCategory(null)} />
               {categories.map((c) => (
                 <Chip
                   key={c}
                   label={categoryLabel(c)}
-                  on={category === c}
+                  selected={category === c}
                   onPress={() => setCategory(category === c ? null : c)}
                   testID={`chip-category-${c}`}
                 />
@@ -228,36 +230,9 @@ export default function SearchScreen() {
   );
 }
 
-function Chip(props: { label: string; on: boolean; onPress: () => void; testID?: string }) {
-  return (
-    <Pressable
-      {...(props.testID ? { testID: props.testID } : {})}
-      accessibilityRole="button"
-      accessibilityState={{ selected: props.on }}
-      accessibilityLabel={props.label}
-      onPress={props.onPress}
-      style={[styles.chip, props.on ? styles.chipOn : null]}
-    >
-      <Text variant="secondary" weight="600" tone={props.on ? 'onAccent' : 'ink'}>
-        {props.label}
-      </Text>
-    </Pressable>
-  );
-}
-
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colours.bg },
-  page: { padding: 20, gap: 10 },
-  header: { gap: 12 },
-  chips: { gap: 8, paddingVertical: 2 },
-  chip: {
-    minHeight: 44,
-    paddingHorizontal: 14,
-    justifyContent: 'center',
-    borderRadius: radii.pill,
-    borderWidth: 1,
-    borderColor: colours.border,
-    backgroundColor: colours.surface,
-  },
-  chipOn: { backgroundColor: colours.accent, borderColor: colours.accent },
+  page: { padding: sp(20), gap: sp(10) },
+  header: { gap: sp(12) },
+  chips: { gap: sp(8), paddingVertical: sp(4) },
 });

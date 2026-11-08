@@ -6,6 +6,7 @@ import { Pressable, RefreshControl, ScrollView, StyleSheet } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useVault } from '../../state/vault';
 import { Notice, Text } from '../../ui';
+import { sp } from '../../ui/space';
 
 /** People (4.12): the family, read-only; each leads to their documents. */
 export default function PeopleScreen() {
@@ -76,14 +77,14 @@ export default function PeopleScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colours.bg },
-  page: { padding: 20, gap: 10 },
+  page: { padding: sp(20), gap: sp(10) },
   row: {
-    gap: 2,
+    gap: sp(4),
     backgroundColor: colours.surface,
     borderRadius: radii.l,
     borderWidth: 1,
     borderColor: colours.border,
-    padding: 12,
+    padding: sp(12),
     minHeight: 56,
   },
   pressed: { opacity: 0.8 },

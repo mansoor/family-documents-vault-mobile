@@ -32,6 +32,7 @@ import { detailFacts } from './details';
 import { NoteText } from './notes';
 import { latestOf } from './online';
 import { warnedAboutCopies } from './save-copy';
+import { sp } from '../ui/space';
 
 type Problem = 'offline' | 'not_found' | null;
 
@@ -384,17 +385,17 @@ function Unneeded(props: { mark: NoLongerNeededView; open: (id: string) => void 
 }
 
 const styles = StyleSheet.create({
-  page: { padding: 20, gap: 12 },
-  unneeded: { gap: 4 },
+  page: { padding: sp(20), gap: sp(12) },
+  unneeded: { gap: sp(4) },
   chip: {
     alignSelf: 'flex-start',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingHorizontal: sp(12),
+    paddingVertical: sp(6),
     borderRadius: radii.pill,
     backgroundColor: colours.accentSoft,
   },
-  fact: { gap: 2 },
-  notes: { gap: 8 },
-  switchRow: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 56 },
+  fact: { gap: sp(4) },
+  notes: { gap: sp(8) },
+  switchRow: { flexDirection: 'row', alignItems: 'center', gap: sp(12), minHeight: 56 },
   flex: { flex: 1 },
 });

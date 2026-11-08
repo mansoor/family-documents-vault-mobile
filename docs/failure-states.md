@@ -74,6 +74,12 @@ Written by `node apps/pocket/scripts/failure-states.mjs`; CI fails if it is out 
 |  |  | `capture.notAllowed` | Your account can open documents but not add them. Ask whoever runs the vault. |
 |  |  | `capture.stillNeeded` | Still needed: {{fields}}. Fill it in, or skip for now. / Still needed: {{fields}}. Fill them in, or skip for now. |
 |  |  | `capture.stillNeededInbox` | Still needed: {{fields}}. Fill it in, or send it to your Inbox for now. / Still needed: {{fields}}. Fill them in, or send it to your Inbox for now. |
+|  |  | `capture.notADate` | That isn't a date we can read. A date, a month (March 2031) or a year. |
+|  |  | `capture.notAYear` | That should be a year, such as 2026. |
+|  |  | `capture.decimalPoint` | Use a point for a decimal, such as 3.5. |
+|  |  | `capture.notANumber` | That should be a number, such as 42. |
+|  |  | `capture.pencePoint` | Use a point for pence, such as 12.50. |
+|  |  | `capture.notAnAmount` | That should be an amount, such as 12.50. |
 | Scans on their way | Home, the queue | `queue.busy` | The vault is busy. Trying again in a moment. |
 |  |  | `queue.notYet` | Not sent yet. Your scan is safe on this phone and will go by itself. |
 |  |  | `queue.couldNotSend` | Couldn't send this scan. It's still on this phone. |
