@@ -576,7 +576,6 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colours.bg },
   page: { padding: sp(20), gap: sp(10) },
   queue: { gap: sp(8) },
-  needsYou: { gap: sp(6), borderColor: colours.danger },
   pressed: { opacity: 0.8 },
   header: { gap: sp(12), marginBottom: sp(4) },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: sp(12) },

@@ -341,7 +341,14 @@ function DocumentMenu(props: {
   };
 
   return (
-    <Sheet visible onClose={leave} testID="row-sheet" outside="row-sheet-outside" tall onShow={() => focusOn(first)}>
+    <Sheet
+      visible
+      onClose={leave}
+      testID="row-sheet"
+      outside="row-sheet-outside"
+      tall
+      onShow={() => focusOn(first)}
+    >
       <Text variant="screen">{title}</Text>
       {/* At the largest text the choices scroll rather than run off the screen. */}
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>

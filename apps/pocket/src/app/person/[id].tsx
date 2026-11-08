@@ -78,7 +78,9 @@ export default function PersonScreen() {
           note_name={item.note_name}
           status={item.status}
           doc={item}
-          thumb={api && token && item.latest_version_id ? { uri: api.thumbnailUrl(item.latest_version_id), token } : null}
+          thumb={
+            api && token && item.latest_version_id ? { uri: api.thumbnailUrl(item.latest_version_id), token } : null
+          }
         />
       )}
     />
