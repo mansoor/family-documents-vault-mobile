@@ -3,10 +3,10 @@ import { useRouter } from 'expo-router';
 import { Camera, FileUp, ImagePlus, Plus, type LucideIcon } from 'lucide-react-native';
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import { useTranslation } from 'react-i18next';
-import { AccessibilityInfo, Modal, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { AccessibilityInfo, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useCapture, type StartOutcome } from '../state/capture';
 import { Button, Notice, Text } from '../ui';
+import { Sheet } from '../ui/sheet';
 
 type How = 'scan' | 'file' | 'photo';
 
@@ -148,8 +148,6 @@ export function AddMenu(props: {
   onClose: () => void;
 }) {
   const { t } = useTranslation();
-  // The sheet sits above the navigation bar, which the window draws under.
-  const insets = useSafeAreaInsets();
   const first = useRef<View>(null);
   const camera: Choice = {
     how: 'scan',
@@ -164,65 +162,54 @@ export function AddMenu(props: {
     { how: 'photo', icon: ImagePlus, label: t('add.picture'), hint: t('add.pictureHint'), testID: 'add-picture' },
   ];
   return (
-    <Modal
+    <Sheet
       visible={props.visible}
-      transparent
-      animationType="fade"
-      onRequestClose={props.onClose}
+      onClose={props.onClose}
+      testID="add-menu"
+      outside="add-menu-outside"
+      tall
       onShow={() => focusOn(first)}
     >
-      <View style={styles.scrim}>
-        {/* A tap outside the sheet closes it; a screen reader has Back and Cancel. */}
-        <Pressable
-          testID="add-menu-outside"
-          accessible={false}
-          importantForAccessibility="no"
-          onPress={props.onClose}
-          style={StyleSheet.absoluteFill}
-        />
-        <View style={[styles.sheet, { paddingBottom: 20 + insets.bottom }]} accessibilityViewIsModal testID="add-menu">
-          <Text variant="screen">{t('add.title')}</Text>
-          {/* At the largest text the choices scroll rather than run off the screen. */}
-          <ScrollView style={styles.scroll} testID="add-menu-scroll">
-            <View
-              accessibilityRole="menu"
-              accessibilityLabel={t('add.title')}
-              style={styles.choices}
-              testID="add-menu-choices"
-            >
-              {choices.map((c, i) => {
-                const Icon = c.icon;
-                return (
-                  <Pressable
-                    key={c.how}
-                    ref={i === 0 ? first : undefined}
-                    testID={c.testID}
-                    accessibilityRole="menuitem"
-                    accessibilityLabel={c.label}
-                    accessibilityHint={c.hint}
-                    onPress={() => props.onChoose(c.how)}
-                    style={({ pressed }) => [styles.choice, pressed ? styles.pressed : null]}
-                  >
-                    <View style={styles.icon}>
-                      <Icon
-                        color={colours.accent}
-                        size={24}
-                        accessibilityElementsHidden
-                        importantForAccessibility="no"
-                      />
-                    </View>
-                    <Text weight="600" role="text" style={styles.label}>
-                      {c.label}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-          </ScrollView>
-          <Button kind="quiet" label={t('common.cancel')} onPress={props.onClose} testID="add-cancel" />
+      <Text variant="screen">{t('add.title')}</Text>
+      {/* At the largest text the choices scroll rather than run off the screen. */}
+      <ScrollView style={styles.scroll} testID="add-menu-scroll">
+        <View
+          accessibilityRole="menu"
+          accessibilityLabel={t('add.title')}
+          style={styles.choices}
+          testID="add-menu-choices"
+        >
+          {choices.map((c, i) => {
+            const Icon = c.icon;
+            return (
+              <Pressable
+                key={c.how}
+                ref={i === 0 ? first : undefined}
+                testID={c.testID}
+                accessibilityRole="menuitem"
+                accessibilityLabel={c.label}
+                accessibilityHint={c.hint}
+                onPress={() => props.onChoose(c.how)}
+                style={({ pressed }) => [styles.choice, pressed ? styles.pressed : null]}
+              >
+                <View style={styles.icon}>
+                  <Icon
+                    color={colours.accent}
+                    size={24}
+                    accessibilityElementsHidden
+                    importantForAccessibility="no"
+                  />
+                </View>
+                <Text weight="600" role="text" style={styles.label}>
+                  {c.label}
+                </Text>
+              </Pressable>
+            );
+          })}
         </View>
-      </View>
-    </Modal>
+      </ScrollView>
+      <Button kind="quiet" label={t('common.cancel')} onPress={props.onClose} testID="add-cancel" />
+    </Sheet>
   );
 }
 
@@ -244,15 +231,6 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   pressed: { opacity: 0.8 },
-  scrim: { flex: 1, backgroundColor: colours.scrim, justifyContent: 'flex-end' },
-  sheet: {
-    maxHeight: '90%',
-    backgroundColor: colours.bg,
-    padding: 20,
-    gap: 12,
-    borderTopLeftRadius: radii.l,
-    borderTopRightRadius: radii.l,
-  },
   scroll: { flexGrow: 0, flexShrink: 1 },
   choices: { gap: 8 },
   choice: {

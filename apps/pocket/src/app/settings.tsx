@@ -1,9 +1,9 @@
-import { colours, radii } from '@fdv/shared';
+import { colours } from '@fdv/shared';
 import * as Linking from 'expo-linking';
 import { useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Modal, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AccessCard } from '../access/access';
 import { APP_VERSION, SPIKE } from '../config';
@@ -16,6 +16,7 @@ import { useVault } from '../state/vault';
 import { forgetVault } from '../state/vaults';
 import { Button, Card, Notice, Text } from '../ui';
 import { useTextScale } from '../ui/text-scale';
+import { Sheet } from '../ui/sheet';
 
 /**
  * Settings, in full (4.15): which vault (and whether it is reached without
@@ -197,63 +198,39 @@ export default function Settings() {
       </Card>
       <Button testID="settings-sign-out" kind="quiet" label={t('settings.signOut')} onPress={leave} />
       {SPIKE ? <Button kind="quiet" label={t('settings.spike')} onPress={() => router.push('/spike')} /> : null}
-      <Modal visible={changing} transparent animationType="fade" onRequestClose={() => setChanging(false)}>
-        <View style={styles.scrim}>
-          <View
-            style={[styles.sheet, { paddingBottom: 20 + insets.bottom }]}
-            accessibilityViewIsModal
-            testID="change-vault-question"
-          >
-            <Text variant="screen">{t('settings.changeVaultTitle')}</Text>
-            <Text>{t('settings.changeVaultWords')}</Text>
-            {here.length - hereOnItsWay > 0 ? (
-              <Text tone="warn">{t('settings.changeVaultWaiting', { count: here.length - hereOnItsWay })}</Text>
-            ) : null}
-            {hereOnItsWay > 0 ? <Text tone="soft">{t('settings.onItsWay', { count: hereOnItsWay })}</Text> : null}
-            <Button
-              testID="change-vault-yes"
-              kind="danger"
-              label={t('settings.changeVaultYes')}
-              busy={busy}
-              onPress={() => void changeVault()}
-            />
-            <Button kind="quiet" label={t('common.cancel')} onPress={() => setChanging(false)} />
-          </View>
-        </View>
-      </Modal>
-      <Modal visible={asking} transparent animationType="fade" onRequestClose={() => setAsking(false)}>
-        <View style={styles.scrim}>
-          <View
-            style={[styles.sheet, { paddingBottom: 20 + insets.bottom }]}
-            accessibilityViewIsModal
-            testID="sign-out-question"
-          >
-            <Text variant="screen">{t('settings.waiting', { count: capture.queue.length })}</Text>
-            {sending > 0 ? <Text tone="soft">{t('settings.onItsWay', { count: sending })}</Text> : null}
-            <Button label={t('settings.keepThem')} onPress={() => void leaveAnyway(false)} testID="sign-out-keep" />
-            <Button
-              label={t('settings.removeThem')}
-              kind="danger"
-              onPress={() => void leaveAnyway(true)}
-              testID="sign-out-remove"
-            />
-            <Button label={t('common.cancel')} kind="quiet" onPress={() => setAsking(false)} testID="sign-out-cancel" />
-          </View>
-        </View>
-      </Modal>
+      <Sheet visible={changing} onClose={() => setChanging(false)} testID="change-vault-question">
+        <Text variant="screen">{t('settings.changeVaultTitle')}</Text>
+        <Text>{t('settings.changeVaultWords')}</Text>
+        {here.length - hereOnItsWay > 0 ? (
+          <Text tone="warn">{t('settings.changeVaultWaiting', { count: here.length - hereOnItsWay })}</Text>
+        ) : null}
+        {hereOnItsWay > 0 ? <Text tone="soft">{t('settings.onItsWay', { count: hereOnItsWay })}</Text> : null}
+        <Button
+          testID="change-vault-yes"
+          kind="danger"
+          label={t('settings.changeVaultYes')}
+          busy={busy}
+          onPress={() => void changeVault()}
+        />
+        <Button kind="quiet" label={t('common.cancel')} onPress={() => setChanging(false)} />
+      </Sheet>
+      <Sheet visible={asking} onClose={() => setAsking(false)} testID="sign-out-question">
+        <Text variant="screen">{t('settings.waiting', { count: capture.queue.length })}</Text>
+        {sending > 0 ? <Text tone="soft">{t('settings.onItsWay', { count: sending })}</Text> : null}
+        <Button label={t('settings.keepThem')} onPress={() => void leaveAnyway(false)} testID="sign-out-keep" />
+        <Button
+          label={t('settings.removeThem')}
+          kind="danger"
+          onPress={() => void leaveAnyway(true)}
+          testID="sign-out-remove"
+        />
+        <Button label={t('common.cancel')} kind="quiet" onPress={() => setAsking(false)} testID="sign-out-cancel" />
+      </Sheet>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  scrim: { flex: 1, backgroundColor: 'rgba(28,26,23,0.45)', justifyContent: 'flex-end' },
-  sheet: {
-    backgroundColor: colours.bg,
-    padding: 20,
-    gap: 12,
-    borderTopLeftRadius: radii.l,
-    borderTopRightRadius: radii.l,
-  },
   page: { padding: 20, gap: 16 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   version: { minHeight: 44, justifyContent: 'center' },

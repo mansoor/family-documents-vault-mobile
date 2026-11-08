@@ -1,12 +1,11 @@
-import { colours, radii } from '@fdv/shared';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Modal, Pressable, StyleSheet, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { useEssentials, type EnrolOutcome } from '../state/essentials';
 import { useLock } from '../state/lock';
 import { Button, Card, Field, Notice, Text } from '../ui';
+import { Sheet } from '../ui/sheet';
 
 export const day = (ms: number) =>
   new Date(ms).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
@@ -132,33 +131,24 @@ export function OnThisPhone() {
           return outcome;
         }}
       />
-      <Modal
-        visible={privateChoice !== null}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setPrivateChoice(null)}
-      >
-        <View style={styles.scrim}>
-          <View style={styles.sheet} accessibilityViewIsModal testID="essentials-private-choice">
-            <Text>{t('essentials.alsoPrivate', { count: privateChoice?.count ?? 0 })}</Text>
-            <Button
-              testID="essentials-private-yes"
-              label={t('essentials.alsoPrivateYes')}
-              onPress={() => {
-                const c = privateChoice;
-                setPrivateChoice(null);
-                if (c) void keepPrivateToo(c.password);
-              }}
-            />
-            <Button
-              testID="essentials-private-no"
-              kind="quiet"
-              label={t('essentials.alsoPrivateNo')}
-              onPress={() => setPrivateChoice(null)}
-            />
-          </View>
-        </View>
-      </Modal>
+      <Sheet visible={privateChoice !== null} onClose={() => setPrivateChoice(null)} testID="essentials-private-choice">
+        <Text>{t('essentials.alsoPrivate', { count: privateChoice?.count ?? 0 })}</Text>
+        <Button
+          testID="essentials-private-yes"
+          label={t('essentials.alsoPrivateYes')}
+          onPress={() => {
+            const c = privateChoice;
+            setPrivateChoice(null);
+            if (c) void keepPrivateToo(c.password);
+          }}
+        />
+        <Button
+          testID="essentials-private-no"
+          kind="quiet"
+          label={t('essentials.alsoPrivateNo')}
+          onPress={() => setPrivateChoice(null)}
+        />
+      </Sheet>
     </View>
   );
 }
@@ -261,7 +251,6 @@ export function PasswordSheet(props: {
   onPassword: (password: string) => Promise<EnrolOutcome>;
 }) {
   const { t } = useTranslation();
-  const insets = useSafeAreaInsets();
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -290,33 +279,25 @@ export function PasswordSheet(props: {
     );
   };
   return (
-    <Modal visible={props.visible} transparent animationType="fade" onRequestClose={close}>
-      <View style={styles.scrim}>
-        <View
-          style={[styles.sheet, { paddingBottom: 20 + insets.bottom }]}
-          accessibilityViewIsModal
-          testID="essentials-password"
-        >
-          <Text>{t('essentials.password')}</Text>
-          <Field
-            label={t('essentials.passwordLabel')}
-            testID="essentials-password-field"
-            secureTextEntry
-            value={password}
-            onChangeText={setPassword}
-            error={error}
-            onSubmitEditing={() => void go()}
-          />
-          <Button
-            testID="essentials-password-go"
-            label={t('essentials.keep')}
-            onPress={() => void go()}
-            disabled={busy || password.length === 0}
-          />
-          <Button kind="quiet" label={t('common.cancel')} onPress={close} />
-        </View>
-      </View>
-    </Modal>
+    <Sheet visible={props.visible} onClose={close} testID="essentials-password">
+      <Text>{t('essentials.password')}</Text>
+      <Field
+        label={t('essentials.passwordLabel')}
+        testID="essentials-password-field"
+        secureTextEntry
+        value={password}
+        onChangeText={setPassword}
+        error={error}
+        onSubmitEditing={() => void go()}
+      />
+      <Button
+        testID="essentials-password-go"
+        label={t('essentials.keep')}
+        onPress={() => void go()}
+        disabled={busy || password.length === 0}
+      />
+      <Button kind="quiet" label={t('common.cancel')} onPress={close} />
+    </Sheet>
   );
 }
 
@@ -324,12 +305,4 @@ const styles = StyleSheet.create({
   section: { gap: 12 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 56 },
   rowText: { flex: 1, gap: 2, minHeight: 44, justifyContent: 'center' },
-  scrim: { flex: 1, backgroundColor: 'rgba(28,26,23,0.45)', justifyContent: 'flex-end' },
-  sheet: {
-    backgroundColor: colours.bg,
-    padding: 20,
-    gap: 12,
-    borderTopLeftRadius: radii.l,
-    borderTopRightRadius: radii.l,
-  },
 });

@@ -4,7 +4,6 @@ import { ArrowLeft, ArrowRight, Camera, FileText, Plus, Trash2 } from 'lucide-re
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -13,9 +12,9 @@ import {
   type PlatformOSType,
   type TextInputProps,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { PageRef, PickedFile } from '../queue/commit';
 import { Button, Text } from '../ui';
+import { Sheet } from '../ui/sheet';
 
 /**
  * One choice among several: a chip that says whether it is chosen — or,
@@ -247,34 +246,24 @@ export function LeaveQuestion(props: {
   disabled?: boolean;
 }) {
   const { t } = useTranslation();
-  // The sheet sits above the navigation bar, which the window now draws under.
-  const insets = useSafeAreaInsets();
   return (
-    <Modal visible={props.visible} transparent animationType="fade" onRequestClose={props.onKeepEditing}>
-      <View style={styles.scrim}>
-        <View
-          style={[styles.sheet, { paddingBottom: 20 + insets.bottom }]}
-          accessibilityViewIsModal
-          testID="leave-question"
-        >
-          <Text variant="screen">{t('capture.backTitle')}</Text>
-          <Button
-            label={t(props.inbox ? 'capture.toInbox' : 'capture.saveWithout')}
-            onPress={props.onSaveWithout}
-            disabled={props.disabled === true}
-            testID="leave-save"
-          />
-          <Button
-            label={t('capture.throwAway')}
-            kind="danger"
-            onPress={props.onThrowAway}
-            disabled={props.disabled === true}
-            testID="leave-throw"
-          />
-          <Button label={t('capture.keepEditing')} kind="quiet" onPress={props.onKeepEditing} testID="leave-keep" />
-        </View>
-      </View>
-    </Modal>
+    <Sheet visible={props.visible} onClose={props.onKeepEditing} testID="leave-question">
+      <Text variant="screen">{t('capture.backTitle')}</Text>
+      <Button
+        label={t(props.inbox ? 'capture.toInbox' : 'capture.saveWithout')}
+        onPress={props.onSaveWithout}
+        disabled={props.disabled === true}
+        testID="leave-save"
+      />
+      <Button
+        label={t('capture.throwAway')}
+        kind="danger"
+        onPress={props.onThrowAway}
+        disabled={props.disabled === true}
+        testID="leave-throw"
+      />
+      <Button label={t('capture.keepEditing')} kind="quiet" onPress={props.onKeepEditing} testID="leave-keep" />
+    </Sheet>
   );
 }
 
@@ -345,16 +334,4 @@ const styles = StyleSheet.create({
     backgroundColor: colours.surface,
   },
   flex: { flex: 1 },
-  scrim: {
-    flex: 1,
-    backgroundColor: 'rgba(28,26,23,0.45)',
-    justifyContent: 'flex-end',
-  },
-  sheet: {
-    backgroundColor: colours.bg,
-    padding: 20,
-    gap: 12,
-    borderTopLeftRadius: radii.l,
-    borderTopRightRadius: radii.l,
-  },
 });

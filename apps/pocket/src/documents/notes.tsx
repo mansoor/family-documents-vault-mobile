@@ -3,17 +3,16 @@ import {
   noteLinkAllowed,
   noteTreeText,
   parseNotes,
-  radii,
   type NoteBlock,
   type NoteInline,
 } from '@fdv/shared';
 import * as Linking from 'expo-linking';
 import { Fragment, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Modal, Pressable, Text as RNText, StyleSheet, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Text as RNText, StyleSheet, View } from 'react-native';
 import { Button, Text } from '../ui';
 import { font } from '../ui/fonts';
+import { Sheet } from '../ui/sheet';
 
 /**
  * A document's note on the phone (5.36), read only. `@fdv/shared` reads it
@@ -187,36 +186,21 @@ export function NoteText(props: { source: string }) {
 /** "Open https://… in your browser?": nothing opens until the person says so. */
 function OpenLink(props: { address: string | null; onOpen: (address: string) => void; onCancel: () => void }) {
   const { t } = useTranslation();
-  const insets = useSafeAreaInsets();
   const { address } = props;
   const mail = address?.toLowerCase().startsWith('mailto:') ?? false;
   const shown = address ? `${LTR_ISOLATE}${address}${POP_ISOLATE}` : '';
   return (
-    <Modal visible={address !== null} transparent animationType="fade" onRequestClose={props.onCancel}>
-      <View style={styles.scrim}>
-        <Pressable
-          accessible={false}
-          importantForAccessibility="no"
-          onPress={props.onCancel}
-          style={StyleSheet.absoluteFill}
-        />
-        <View
-          style={[styles.sheet, { paddingBottom: 20 + insets.bottom }]}
-          accessibilityViewIsModal
-          testID="note-link-question"
-        >
-          <Text variant="screen">
-            {mail ? t('notes.openMail', { address: shown }) : t('notes.openWeb', { address: shown })}
-          </Text>
-          <Button
-            testID="note-link-open"
-            label={t('notes.open')}
-            onPress={() => (address ? props.onOpen(address) : undefined)}
-          />
-          <Button testID="note-link-cancel" kind="quiet" label={t('common.cancel')} onPress={props.onCancel} />
-        </View>
-      </View>
-    </Modal>
+    <Sheet visible={address !== null} onClose={props.onCancel} testID="note-link-question" outside>
+      <Text variant="screen">
+        {mail ? t('notes.openMail', { address: shown }) : t('notes.openWeb', { address: shown })}
+      </Text>
+      <Button
+        testID="note-link-open"
+        label={t('notes.open')}
+        onPress={() => (address ? props.onOpen(address) : undefined)}
+      />
+      <Button testID="note-link-cancel" kind="quiet" label={t('common.cancel')} onPress={props.onCancel} />
+    </Sheet>
   );
 }
 
@@ -228,12 +212,4 @@ const styles = StyleSheet.create({
   list: { gap: 4 },
   item: { flexDirection: 'row', gap: 8, alignItems: 'flex-start' },
   flex: { flex: 1 },
-  scrim: { flex: 1, backgroundColor: colours.scrim, justifyContent: 'flex-end' },
-  sheet: {
-    backgroundColor: colours.bg,
-    padding: 20,
-    gap: 12,
-    borderTopLeftRadius: radii.l,
-    borderTopRightRadius: radii.l,
-  },
 });
