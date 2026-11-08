@@ -1,6 +1,14 @@
 import type { FetchLike } from '@fdv/client';
 import { createFakeVault } from '@fdv/client/testing';
-import type { Capabilities, DocumentView, ReminderView, SearchHit, SessionRow, VersionView } from '@fdv/shared';
+import type {
+  Capabilities,
+  DetailSuggestions,
+  DocumentView,
+  ReminderView,
+  SearchHit,
+  SessionRow,
+  VersionView,
+} from '@fdv/shared';
 
 /**
  * The client's fake vault, with the capability document the app needs to
@@ -133,6 +141,18 @@ export interface Library {
    * keep: the test vault keeps it, and passes the rest of an edit on.
    */
   essential: Map<string, boolean>;
+  /**
+   * What a document's pages read (P2): GET /documents/{id}/suggestions
+   * answers it, "unavailable" when unset; asked this many times.
+   */
+  suggestions: Map<string, DetailSuggestions>;
+  asked: string[];
+  /**
+   * A new version's details used (POST /documents/{id}/renewal), each
+   * body in order, and the document as it was, for Undo while it is open.
+   */
+  renewals: Record<string, unknown>[];
+  undoable: Map<string, DocumentView>;
 }
 
 const JPEG = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x02, 0xff, 0xd9]);
@@ -198,6 +218,10 @@ export function testVault(origins: string[] = ['https://vault.test']): TestVault
       acknowledged: [],
       searches: [],
       essential: new Map(),
+      suggestions: new Map(),
+      asked: [],
+      renewals: [],
+      undoable: new Map(),
     },
     fetch: async (url, init) => {
       t.calls.push(`${init.method} ${url}`);
@@ -364,6 +388,35 @@ async function library(t: TestVault, path: string, init: Parameters<FetchLike>[1
       lib.documents.set(doc.id, next);
       return json(next);
     }
+  }
+  // A new version's details (P2), as the vault of 0.9.0 answers them.
+  m = /^\/api\/v1\/documents\/([^/]+)\/suggestions$/.exec(q);
+  if (m?.[1] && init.method === 'GET' && lib.documents.has(m[1])) {
+    lib.asked.push(m[1]);
+    return json(lib.suggestions.get(m[1]) ?? { state: 'unavailable', version_id: null, proposal: {} });
+  }
+  m = /^\/api\/v1\/documents\/([^/]+)\/renewal(\/undo)?$/.exec(q);
+  if (m?.[1] && init.method === 'POST' && lib.documents.has(m[1])) {
+    const doc = lib.documents.get(m[1]) as DocumentView;
+    if (m[2]) {
+      const before = lib.undoable.get(doc.id);
+      if (!before) return failure(409, 'renewal_not_undoable', 'This can no longer be undone.');
+      lib.undoable.delete(doc.id);
+      const back = { ...before, details_unconfirmed: true, etag: nextEtag() } as DocumentView;
+      lib.documents.set(doc.id, back);
+      return json(back);
+    }
+    const ifMatch = Object.entries(init.headers).find(([k]) => k.toLowerCase() === 'if-match')?.[1];
+    if (!ifMatch) return failure(428, 'precondition_required', 'Send the document as you last saw it.');
+    if (ifMatch !== doc.etag) return failure(409, 'conflict', 'Someone changed this.');
+    if (body.version_id !== doc.latest_version_id) return failure(409, 'version_changed', 'Not its newest version.');
+    if (lib.undoable.has(doc.id)) return failure(409, 'renewal_undo_open', 'Undo the last one first.');
+    lib.renewals.push(body);
+    const { version_id: _version, ...fields } = body;
+    const next = { ...doc, ...fields, details_unconfirmed: false, etag: nextEtag() } as DocumentView;
+    lib.undoable.set(doc.id, doc);
+    lib.documents.set(doc.id, next);
+    return json({ document: next, undo_until: new Date(Date.now() + 5 * 60_000).toISOString() });
   }
   m = /^\/api\/v1\/documents\/([^/]+)\/versions$/.exec(q);
   if (m?.[1] && init.method === 'GET' && lib.documents.has(m[1])) return json({ items: lib.versions.get(m[1]) ?? [] });

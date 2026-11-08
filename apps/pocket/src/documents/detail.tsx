@@ -25,6 +25,7 @@ import { useCapture } from '../state/capture';
 import { useEssentials } from '../state/essentials';
 import { useLock } from '../state/lock';
 import { useStepUp } from '../state/step-up';
+import { NewVersionSays } from './renewal';
 import { useVault } from '../state/vault';
 import { Button, Notice, StatusLine, Text } from '../ui';
 import { keptIsCurrent, saveVersion, setEssential as changeEssential, showDocument, type ActionDeps } from './actions';
@@ -240,6 +241,18 @@ export function DocumentDetail(props: { id: string }) {
           {notice.text}
         </Notice>
       ) : null}
+      {doc && !note ? (
+        <NewVersionSays
+          doc={doc}
+          type={type}
+          mayChange={mayChange}
+          onSaved={(d) => {
+            setDoc(d);
+            void load();
+          }}
+          onStale={load}
+        />
+      ) : null}
 
       {note ? null : primaryIsShow ? (
         <Button testID="document-show" label={t('document.show')} busy={preparing} onPress={() => void showIt()} />
@@ -322,6 +335,15 @@ export function DocumentDetail(props: { id: string }) {
             <Text tone="soft" variant="secondary">
               {versionLine(v)}
             </Text>
+            {v.id !== latest?.id && !note ? (
+              <OlderVersion
+                version={v}
+                fields={type?.fields}
+                onPages={() =>
+                  router.push({ pathname: '/essential/[id]', params: { id, online: '1', version: v.id } })
+                }
+              />
+            ) : null}
           </View>
         ))}
       {mayAddVersion && doc ? (
@@ -357,6 +379,53 @@ export function DocumentDetail(props: { id: string }) {
 }
 
 /**
+ * An older version in the history (P2): its own details, as they were when
+ * a newer one replaced it (a vault of 0.9.0 keeps them), or that they were
+ * not kept, for one replaced before; and its pages, opened as the newest
+ * version's are, through the step-up an Essential or an Only me document
+ * asks for. Its number is not shown, as the newest version's is not.
+ */
+function OlderVersion(props: {
+  version: VersionView;
+  fields: DocumentTypeView['fields'] | undefined;
+  onPages: () => void;
+}) {
+  const { t } = useTranslation();
+  const { version: v } = props;
+  const d = v.details;
+  const lines: [string, string | null][] = d
+    ? [
+        [t('document.issuedBy'), d.issued_by],
+        [t('document.issued'), d.issued ? formatDate(d.issued) : null],
+        [t('document.expires'), d.expires ? formatDate(d.expires) : null],
+        ...detailFacts(props.fields, d.extra, { yes: t('document.yes'), no: t('document.no') }),
+      ]
+    : [];
+  return (
+    <View style={styles.older} testID={`version-${v.version_no}-details`}>
+      {lines
+        .filter(([, value]) => value)
+        .map(([label, value]) => (
+          <Text key={label} variant="secondary">
+            {label}: {value}
+          </Text>
+        ))}
+      {v.details_kept === false ? (
+        <Text tone="soft" variant="secondary">
+          {t('document.detailsNotKept')}
+        </Text>
+      ) : null}
+      <Button
+        testID={`version-${v.version_no}-pages`}
+        kind="quiet"
+        label={t('document.itsPages')}
+        onPress={props.onPages}
+      />
+    </View>
+  );
+}
+
+/**
  * Why a document is no longer needed (a vault of 0.9.0): when it was
  * marked, and by whom where the reader is told; why, as written; and what
  * replaced it, opened from here when the reader may see it. Marking it, or
@@ -387,6 +456,7 @@ function Unneeded(props: { mark: NoLongerNeededView; open: (id: string) => void 
 const styles = StyleSheet.create({
   page: { padding: sp(20), gap: sp(12) },
   unneeded: { gap: sp(4) },
+  older: { gap: sp(4), marginTop: sp(4) },
   chip: {
     alignSelf: 'flex-start',
     paddingHorizontal: sp(12),

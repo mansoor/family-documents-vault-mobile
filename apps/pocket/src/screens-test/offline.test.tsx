@@ -460,6 +460,39 @@ describe('Needs you, and renewals', () => {
     expect(phone.files.size).toBe(0);
   });
 
+  it('a vault that keeps the details of each version: once the new version is in, Home says so and leads to what it says (P2)', async () => {
+    const t = testVault([ORIGIN]);
+    t.caps = capabilities({ features: { ...capabilities().features, version_details: true } });
+    await signedIn(t);
+    t.vault.state.documents.push({ id: 'doc-passport', title: "Aisha's passport", type_key: 'passport' });
+    t.reminders = [
+      {
+        id: 'rem-1',
+        document_id: 'doc-passport',
+        document_title: "Aisha's passport",
+        kind: 'derived',
+        fire_at: '2026-09-25',
+        lead_days: 180,
+        note: null,
+        recurrence: null,
+        status: 'due',
+        snoozed_until: null,
+        label: 'Expires in 6 months',
+      },
+    ];
+    const phone = testCapture({ scanner: fixtureScanner([TWO_PAGES]) });
+    phone.files.set('cache:/scan/1.jpg', jpeg('letter-with-exif.jpg'));
+    phone.files.set('cache:/scan/2.jpg', jpeg('card.jpg'));
+    await renderApp(<App />, { fetch: withStatus(t), capture: phone });
+    await fireEvent.press(await screen.findByTestId('renew-doc-passport'));
+    await waitFor(() =>
+      expect(screen.getByTestId('home-saved')).toHaveTextContent(
+        /^The new version is in the vault\. Until you check what its pages say, its details are the version before's\./,
+      ),
+    );
+    expect(screen.getByTestId('home-renewal-look')).toBeTruthy();
+  });
+
   it('Scan the new one shows once per document, and not while its new version is waiting', async () => {
     const t = testVault([ORIGIN]);
     await signedIn(t);

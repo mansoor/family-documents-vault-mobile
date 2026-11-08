@@ -53,6 +53,12 @@ export const CATALOGUE: Readonly<Record<string, string>> = {
   storage_unreachable: 'errors.storageUnreachable',
   // The phone could not send a scan, for a reason that is not the connection: kept on it, and tried again by a person.
   send_failed: 'queue.couldNotSend',
+  // A new version's details (P2): changed somewhere else, not the newest any more, or Undo.
+  conflict: 'errors.changedElsewhere',
+  version_changed: 'errors.changedElsewhere',
+  renewal_undo_open: 'renewal.undoOpen',
+  renewal_kept: 'renewal.kept',
+  renewal_not_undoable: 'renewal.notUndoable',
 };
 
 /** The vault's "not now" answers: a scan waiting on one of these is sent again later by itself. */

@@ -19,8 +19,8 @@ const ZOOMS = [1, 1.5, 2, 3];
  * written out as a file, and nothing is cached. Buttons move between pages
  * and zoom; so do a swipe and a pinch. Never captured.
  */
-export function EssentialPages(props: { id: string; mode?: string; online?: boolean }) {
-  const { id, mode, online } = props;
+export function EssentialPages(props: { id: string; mode?: string; online?: boolean; version?: string }) {
+  const { id, mode, online, version } = props;
   const { t } = useTranslation();
   const e = useEssentials();
   const { offline, withToken } = useVault();
@@ -42,11 +42,11 @@ export function EssentialPages(props: { id: string; mode?: string; online?: bool
     if (opened.current === attempt || !id) return;
     opened.current = attempt;
     // Not kept on the phone (4.12): from the vault, confirming it is you if it asks.
-    const load = online ? openOnline(withToken, guarded, id) : open(id, mode === 'show' ? 'show' : 'view');
+    const load = online ? openOnline(withToken, guarded, id, version) : open(id, mode === 'show' ? 'show' : 'view');
     void load
       .then((c) => setCopy(c ?? (online ? 'failed' : 'missing')))
       .catch(() => setCopy(online ? 'failed' : 'missing'));
-  }, [id, mode, open, online, withToken, guarded, attempt]);
+  }, [id, mode, open, online, version, withToken, guarded, attempt]);
 
   const ready = copy && typeof copy === 'object' ? copy : null;
   useEffect(() => {
