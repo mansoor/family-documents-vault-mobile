@@ -6,6 +6,34 @@ app's own, tagged `vX.Y.Z` in this repository.
 
 ## [Unreleased]
 
+## [0.3.9] — loading, failures, and the family's clock (polish P5)
+
+### Changed
+- **While a list loads, you see it coming.** Home, Search, Needs attention,
+  People, a person's page and a document show grey rows the shape of
+  what is coming, instead of nothing. They don't move, and a screen reader
+  hears "Loading" once.
+- **A list that couldn't load says so.** When something other than the
+  connection goes wrong, the screen says "Couldn't load this. Try again in
+  a moment.", or the vault's own words for its answer, with **Try again**.
+  Before, it showed nothing at all. The app's log records what kind of
+  failure it was, never its words. No connection is still the offline
+  notice, as before, and being signed out still goes to Sign in.
+- **Every time is on the family's clock**, as the browser shows it since
+  0.9.0: the family's time zone from the vault, whatever zone this phone is
+  in. Where the phone's clock reads otherwise, a time says which clock it
+  is on ("6:00pm PST"). It covers:
+  - a version's "Added…" and a note's "Edited…";
+  - when a document was marked no longer needed;
+  - Home's notices, and when your devices were last used;
+  - an Essential's checked and kept-until dates;
+  - "today" for snoozes, the card's dates and an Essential's status
+    offline.
+
+  A date without a time, such as an expiry, is the same day everywhere.
+  The phone keeps the family's zone for each vault, so it holds offline
+  too. A vault before 0.9.0 says none, so the phone's own zone is used.
+
 ## [0.3.8] — light or dark (polish P4)
 
 ### Added

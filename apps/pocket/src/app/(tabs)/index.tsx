@@ -1,9 +1,6 @@
 import { ApiRequestError, isSessionOver } from '@fdv/client';
 import {
   can,
-  formatDate,
-  localToday,
-  shareEndWords,
   type Capabilities,
   type DocumentView,
   type IdentityAudienceView,
@@ -37,6 +34,8 @@ import { DocumentRow } from '../../documents/row';
 import { sp } from '../../ui/space';
 import { VaultRead } from '../../capture/vault-read';
 import { useColours, useStyles, type Palette } from '../../ui/theme';
+import { dayWords, endWords, useFamilyZone } from '../../state/family-time';
+import { LoadFailed, loadFailure, Placeholder } from '../../ui/states';
 
 interface HomeData {
   due: ReminderView[];
@@ -78,6 +77,8 @@ export default function Home() {
   const { caps, vault, offline, waiting, notice, withTokenQuick, api, who } = useVault();
   const capture = useCapture();
   const [data, setData] = useState<HomeData | null>(null);
+  // A failure that is not the connection (P5): said, with Try again.
+  const [failed, setFailed] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   // A document is added with the tab bar's + (a file, the camera or a
   // picture); here, a renewal's scanner that cannot start is said.
@@ -137,10 +138,12 @@ export default function Home() {
         };
       });
       setData(next);
-    } catch {
-      // Offline or signed out: the banner or the sign-in screen says so.
+      setFailed(null);
+    } catch (err) {
+      // Offline or signed out: the banner or the sign-in screen says so. Anything else, here.
+      setFailed(loadFailure('home', err, t));
     }
-  }, [withTokenQuick, identityOn]);
+  }, [withTokenQuick, identityOn, t]);
 
   useEffect(() => {
     // Loading on arrival, and again each time the vault takes a capture:
@@ -357,6 +360,8 @@ export default function Home() {
             <Text variant="screen" style={styles.recentTitle}>
               {t('home.recentTitle')}
             </Text>
+            {failed ? <LoadFailed words={failed} onRetry={() => void load()} /> : null}
+            {!data && !failed && !offline ? <Placeholder /> : null}
             {data && data.recent.length === 0 ? (
               <Text tone="soft" testID="home-none">
                 {t(canAdd ? 'home.none' : 'home.noneViewer')}
@@ -401,16 +406,11 @@ export default function Home() {
   );
 }
 
-/** The zone this phone keeps its clock in. */
-const phoneZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
-
 /**
- * The day a moment fell on, on this phone's calendar, in words: "3 Oct
- * 2026" — as the web says it on the browser's (toLocaleDateString), never
- * the UTC day, which is tomorrow's for an evening in California.
+ * The day a moment fell on, on the family's calendar (P5), in words: "3 Oct
+ * 2026", as the web says it, never the UTC day.
  */
-const dayOf = (at: string, zone = phoneZone()) =>
-  formatDate({ date: localToday(zone, new Date(at)), precision: 'day' });
+const dayOf = (at: string, zone: string) => dayWords(at, zone);
 
 /**
  * An owner was given a one-time link to set this person's password (5.29),
@@ -420,6 +420,7 @@ const dayOf = (at: string, zone = phoneZone()) =>
  */
 function ResetNoticeCard(props: { notice: ResetNotice; onSeen: () => void }) {
   const { t } = useTranslation();
+  const zone = useFamilyZone();
   const { guarded } = useStepUp();
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
@@ -427,14 +428,14 @@ function ResetNoticeCard(props: { notice: ResetNotice; onSeen: () => void }) {
   const added = [
     ...(n.passkeys_since ?? []).map((k) =>
       k.label
-        ? t('home.resetPasskey', { label: k.label, day: dayOf(k.added_at) })
-        : t('home.resetPasskeyUnnamed', { day: dayOf(k.added_at) }),
+        ? t('home.resetPasskey', { label: k.label, day: dayOf(k.added_at, zone) })
+        : t('home.resetPasskeyUnnamed', { day: dayOf(k.added_at, zone) }),
     ),
-    ...(n.two_step_since ? [t('home.resetTwoStep', { day: dayOf(n.two_step_since) })] : []),
+    ...(n.two_step_since ? [t('home.resetTwoStep', { day: dayOf(n.two_step_since, zone) })] : []),
     ...(n.links_since ?? []).map((l) =>
       l.title
-        ? t('home.resetLink', { title: l.title, day: dayOf(l.made_at) })
-        : t('home.resetLinkUntitled', { day: dayOf(l.made_at) }),
+        ? t('home.resetLink', { title: l.title, day: dayOf(l.made_at, zone) })
+        : t('home.resetLinkUntitled', { day: dayOf(l.made_at, zone) }),
     ),
   ];
   const seen = async () => {
@@ -456,7 +457,7 @@ function ResetNoticeCard(props: { notice: ResetNotice; onSeen: () => void }) {
       <Text weight="700" role="header">
         {title}
       </Text>
-      <Text>{t('home.resetBody', { day: dayOf(n.at), by: n.by ?? t('home.resetSomeone') })}</Text>
+      <Text>{t('home.resetBody', { day: dayOf(n.at, zone), by: n.by ?? t('home.resetSomeone') })}</Text>
       {added.length > 0 ? (
         <>
           <Text>{t('home.resetAdded')}</Text>
@@ -492,13 +493,10 @@ function WideningNotice(props: { pending: NonNullable<IdentityAudienceView['pend
   const { t } = useTranslation();
   const router = useRouter();
   const { who } = useVault();
+  const zone = useFamilyZone();
   const at = new Date(props.pending.notice_until);
-  let when: string;
-  try {
-    when = shareEndWords(at, Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC', { weekday: false });
-  } catch {
-    when = shareEndWords(at, 'UTC', { weekday: false });
-  }
+  // On the family's clock, and its zone named where the phone's reads otherwise (P5).
+  const when = endWords(at, zone, { weekday: false });
   const whom = props.pending.to === 'family' ? t('home.wideningFamily') : t('home.wideningAdults');
   const words = t('home.widening', { when, who: whom });
   const memberId = props.memberId;

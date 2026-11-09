@@ -14,10 +14,12 @@ import { useVault } from '../../state/vault';
 import { Button, Card, Notice, Text } from '../../ui';
 import { sp } from '../../ui/space';
 import { useStyles, type Palette } from '../../ui/theme';
+import { familyZoneNow } from '../../state/family-time';
+import { LoadFailed, loadFailure, Placeholder } from '../../ui/states';
 
-/** Today, as the phone's calendar has it: snoozes are whole days. */
+/** Today, as the family's calendar has it (P5): snoozes are whole days. */
 function today(): string {
-  return localToday(Intl.DateTimeFormat().resolvedOptions().timeZone);
+  return localToday(familyZoneNow());
 }
 
 /**
@@ -39,6 +41,7 @@ export default function AttentionScreen() {
   const [upcoming, setUpcoming] = useState<ReminderView[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [problem, setProblem] = useState<{ tone: 'ok' | 'warn'; text: string } | null>(null);
+  const [failed, setFailed] = useState<string | null>(null);
   const canAdd = who ? can(who.role, 'document.add') : false;
   // Viewers see reminders; putting them off or marking them done is not theirs.
   const canManage = who ? can(who.role, 'reminder.manage') : false;
@@ -50,10 +53,12 @@ export default function AttentionScreen() {
       );
       setDue(d.items);
       setUpcoming(u.items);
-    } catch {
-      // Offline: the banner says so, and what was last seen stays.
+      setFailed(null);
+    } catch (err) {
+      // Offline: the banner says so, and what was last seen stays. Anything else, here (P5).
+      setFailed(loadFailure('attention', err, t));
     }
-  }, [withToken]);
+  }, [withToken, t]);
 
   useEffect(() => {
     // Loaded on arrival, and again when the connection returns or the vault
@@ -179,6 +184,8 @@ export default function AttentionScreen() {
             {problem.text}
           </Notice>
         ) : null}
+        {failed ? <LoadFailed words={failed} onRetry={() => void load()} /> : null}
+        {!due && !failed && !offline ? <Placeholder rows={2} /> : null}
         {due && due.length === 0 && upcoming.length === 0 ? (
           <Text tone="soft" testID="attention-calm">
             {t('attention.calm')}

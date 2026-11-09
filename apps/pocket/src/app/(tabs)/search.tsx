@@ -10,6 +10,7 @@ import { Field, Notice, Text } from '../../ui';
 import { Chip } from '../../ui/chip';
 import { sp } from '../../ui/space';
 import { useStyles, type Palette } from '../../ui/theme';
+import { LoadFailed, loadFailure, Placeholder } from '../../ui/states';
 
 /** How long typing pauses before the vault is asked (FND). */
 export const SEARCH_DEBOUNCE_MS = 250;
@@ -45,6 +46,9 @@ export default function SearchScreen() {
   const [browse, setBrowse] = useState<DocumentView[] | null>(null);
   const [sealed, setSealed] = useState<Sealed>({ state: 'idle', items: [], searched: 0 });
   const [unreachable, setUnreachable] = useState(false);
+  // A failure that is not the connection (P5): said, with Try again.
+  const [failed, setFailed] = useState<string | null>(null);
+  const [again, setAgain] = useState(0);
 
   // The chips: the family, and the kinds of document there are — asked
   // again when the connection returns, until they have come.
@@ -77,6 +81,7 @@ export default function SearchScreen() {
           const r = await withToken((a, token) => a.search(token, q.trim(), filters));
           if (cancelled) return;
           setUnreachable(false);
+          setFailed(null);
           setHits(r.items);
           setBrowse(null);
           const handle = r.sealed_pending.token;
@@ -91,6 +96,7 @@ export default function SearchScreen() {
           const r = await withToken((a, token) => a.documents(token, { ...filters, limit: 100 }));
           if (cancelled) return;
           setUnreachable(false);
+          setFailed(null);
           setBrowse(r.items);
           setHits(null);
           setSealed({ state: 'idle', items: [], searched: 0 });
@@ -98,6 +104,7 @@ export default function SearchScreen() {
       } catch (err) {
         if (cancelled) return;
         if (err instanceof NetworkError) setUnreachable(true);
+        else setFailed(loadFailure('search', err, t));
         // The second pass never stays "looking" once it has failed.
         setSealed((was) => (was.state === 'searching' ? { state: 'done', items: [], searched: 0 } : was));
       }
@@ -107,8 +114,8 @@ export default function SearchScreen() {
       cancelled = true;
       clearTimeout(timer);
     };
-    // The connection coming back asks again.
-  }, [q, category, memberId, withToken, offline]);
+    // The connection coming back asks again; so does Try again (P5).
+  }, [q, category, memberId, withToken, offline, again, t]);
 
   const noConnection = offline || unreachable;
   const found = hits ? hits.length + sealed.items.length : null;
@@ -181,6 +188,10 @@ export default function SearchScreen() {
                 {t('search.needsConnection')}
               </Notice>
             ) : null}
+            {!noConnection && failed ? (
+              <LoadFailed words={failed} onRetry={() => setAgain((n) => n + 1)} />
+            ) : null}
+            {!noConnection && !failed && found === null ? <Placeholder /> : null}
             {!noConnection && found !== null ? (
               found === 0 && sealed.state !== 'searching' ? (
                 <View accessibilityLiveRegion="polite">

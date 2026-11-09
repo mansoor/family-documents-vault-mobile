@@ -8,6 +8,7 @@ import {
   type Status,
   type StatusInput,
 } from '@fdv/shared';
+import { familyZoneNow } from '../state/family-time';
 
 /**
  * A type as it is kept with the copies, for today's status: since 0.2.1
@@ -67,10 +68,10 @@ export function statusToday(doc: DocumentView, types: readonly StatusType[], tod
   return now;
 }
 
-/** Today's status where the phone is; the vault's own word when the phone cannot say. */
+/** Today's status on the family's calendar (P5); the vault's own word when the phone cannot say. */
 export function statusHere(doc: DocumentView, types: readonly StatusType[]): Status | null {
   try {
-    return statusToday(doc, types, localToday(Intl.DateTimeFormat().resolvedOptions().timeZone));
+    return statusToday(doc, types, localToday(familyZoneNow()));
   } catch {
     return doc.status ?? null;
   }

@@ -6,9 +6,10 @@ import { StyleSheet, View } from 'react-native';
 import { useVault } from '../state/vault';
 import { Button, Card, Notice, Text } from '../ui';
 import { sp } from '../ui/space';
+import { dayWords, useFamilyZone } from '../state/family-time';
 
-const when = (iso: string) =>
-  new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+/** The day it was last used, on the family's calendar (P5). */
+const when = (iso: string, zone: string) => dayWords(iso, zone);
 
 /**
  * Settings → Signed-in devices (4.15): every session of this person, named
@@ -17,6 +18,7 @@ const when = (iso: string) =>
  */
 export function SignedInDevices() {
   const { t } = useTranslation();
+  const zone = useFamilyZone();
   const { withToken } = useVault();
   const [items, setItems] = useState<SessionRow[] | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
@@ -65,7 +67,7 @@ export function SignedInDevices() {
           <View key={s.id} style={styles.device} testID={`settings-device-${s.id}`}>
             <Text weight="600">{s.current ? t('settings.thisPhone', { name }) : name}</Text>
             <Text tone="soft" variant="secondary">
-              {t('settings.deviceLastUsed', { date: when(s.last_used_at) })}
+              {t('settings.deviceLastUsed', { date: when(s.last_used_at, zone) })}
               {s.offline ? ` · ${t('settings.deviceKeepsEssentials')}` : ''}
             </Text>
             {s.current ? null : confirming === s.id ? (

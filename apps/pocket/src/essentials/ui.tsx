@@ -7,9 +7,10 @@ import { useLock } from '../state/lock';
 import { Button, Card, Field, Notice, Text } from '../ui';
 import { Sheet } from '../ui/sheet';
 import { sp } from '../ui/space';
+import { dayWords, useFamilyZone } from '../state/family-time';
 
-export const day = (ms: number) =>
-  new Date(ms).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+/** A day, on the family's calendar (P5). */
+export const day = (ms: number, zone: string) => dayWords(ms, zone);
 
 /**
  * "On this phone" (4.10): a section of Home. Offered once; then what is
@@ -18,6 +19,7 @@ export const day = (ms: number) =>
  */
 export function OnThisPhone() {
   const { t } = useTranslation();
+  const zone = useFamilyZone();
   const e = useEssentials();
   const lock = useLock();
   const [asking, setAsking] = useState<null | { includePrivate: boolean; renew?: boolean }>(null);
@@ -72,7 +74,7 @@ export function OnThisPhone() {
           <Text variant="screen">{t('essentials.title')}</Text>
           {e.age?.warn ? (
             <Notice tone="warn" testID="essentials-connect-by">
-              {t('essentials.connectBy', { date: day(e.age.removeAt) })}
+              {t('essentials.connectBy', { date: day(e.age.removeAt, zone) })}
             </Notice>
           ) : null}
           {e.renewDue ? (
@@ -186,6 +188,7 @@ export function EssentialsNotice() {
 /** What is kept: each with Open and Show, and how long it is kept for. */
 function KeptRows() {
   const { t } = useTranslation();
+  const zone = useFamilyZone();
   const router = useRouter();
   const e = useEssentials();
   return e.items.map((item) => (
@@ -199,7 +202,7 @@ function KeptRows() {
         <Text weight="600">{item.document.title ?? t('essentials.untitled')}</Text>
         {e.age ? (
           <Text tone="soft" variant="secondary">
-            {t('essentials.keptUntil', { date: day(e.age.removeAt) })}
+            {t('essentials.keptUntil', { date: day(e.age.removeAt, zone) })}
           </Text>
         ) : null}
       </Pressable>
@@ -219,6 +222,7 @@ function KeptRows() {
  */
 export function KeptWhileSignedOut() {
   const { t } = useTranslation();
+  const zone = useFamilyZone();
   const e = useEssentials();
   const lock = useLock();
   if (!e.keptWhileSignedOut) return null;
@@ -228,7 +232,7 @@ export function KeptWhileSignedOut() {
       <Notice tone="info">{t('essentials.signInToSync')}</Notice>
       {e.age?.warn ? (
         <Notice tone="warn" testID="essentials-connect-by">
-          {t('essentials.connectBy', { date: day(e.age.removeAt) })}
+          {t('essentials.connectBy', { date: day(e.age.removeAt, zone) })}
         </Notice>
       ) : null}
       {lock.status === 'unlocked' ? (

@@ -1,4 +1,4 @@
-import { radii, whenWords } from '@fdv/shared';
+import { radii } from '@fdv/shared';
 import { Image } from 'expo-image';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -11,6 +11,7 @@ import { useVault } from '../state/vault';
 import { Button, Notice, StatusLine, Text } from '../ui';
 import { sp } from '../ui/space';
 import { useStyles, type Palette } from '../ui/theme';
+import { relativeWords, useFamilyZone } from '../state/family-time';
 
 const ZOOMS = [1, 1.5, 2, 3];
 
@@ -24,6 +25,7 @@ export function EssentialPages(props: { id: string; mode?: string; online?: bool
   const styles = useStyles(makeStyles);
   const { id, mode, online, version } = props;
   const { t } = useTranslation();
+  const zone = useFamilyZone();
   const e = useEssentials();
   const { offline, withToken } = useVault();
   const { guarded } = useStepUp();
@@ -135,7 +137,7 @@ export function EssentialPages(props: { id: string; mode?: string; online?: bool
     <View style={styles.page} testID="essential-viewer">
       {offline && e.checked ? (
         <Notice tone="warn" testID="essential-offline">
-          {t('essentials.offlineBanner', { when: whenWords(new Date(e.checked.at).toISOString()) })}
+          {t('essentials.offlineBanner', { when: relativeWords(new Date(e.checked.at).toISOString(), zone) })}
         </Notice>
       ) : null}
       {copy === 'missing' ? <Notice tone="warn">{t('essentials.notKept')}</Notice> : null}

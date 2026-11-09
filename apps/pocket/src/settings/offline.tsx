@@ -7,6 +7,7 @@ import { useLock } from '../state/lock';
 import { Button, Card, Text } from '../ui';
 import { Sheet } from '../ui/sheet';
 import { sp } from '../ui/space';
+import { useFamilyZone } from '../state/family-time';
 
 /** Bytes as people say them: "4.2 MB". */
 export function sizeWords(bytes: number): string {
@@ -23,6 +24,7 @@ export function sizeWords(bytes: number): string {
  */
 export function OfflineCopies() {
   const { t } = useTranslation();
+  const zone = useFamilyZone();
   const e = useEssentials();
   const lock = useLock();
   const [size, setSize] = useState<number | null>(null);
@@ -67,7 +69,7 @@ export function OfflineCopies() {
             {t('settings.offlineSummary', { count, size: size === null ? '…' : sizeWords(size) })}
           </Text>
           <Text tone="soft" variant="secondary">
-            {e.checked ? t('settings.offlineChecked', { date: day(e.checked.at) }) : t('settings.offlineNotChecked')}
+            {e.checked ? t('settings.offlineChecked', { date: day(e.checked.at, zone) }) : t('settings.offlineNotChecked')}
           </Text>
           <Text tone="soft" variant="secondary">
             {t('settings.offlineScope')}

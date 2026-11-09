@@ -358,6 +358,10 @@ async function library(t: TestVault, path: string, init: Parameters<FetchLike>[1
 
   const pushed = await pushRoutes(t, q, init.method, body);
   if (pushed) return pushed;
+  // The profile, as far as the phone reads it: the family's time zone (0.9.0), the fake's.
+  if (q === '/api/v1/profile' && init.method === 'GET') {
+    return json({ timezone: t.vault.state.timezone, timezone_source: t.vault.state.timezoneSource });
+  }
   if (q === '/api/v1/auth/sessions' && init.method === 'GET') return json({ items: t.sessions });
   const s = /^\/api\/v1\/auth\/sessions\/([^/]+)$/.exec(q);
   if (s?.[1] && init.method === 'DELETE') {

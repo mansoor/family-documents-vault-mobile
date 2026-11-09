@@ -17,6 +17,7 @@ import type { Vaults } from '../state/vaults';
 import { TextScaleProvider } from '../ui/text-scale';
 import { INSTANCE, testVault, type TestVault } from './vault';
 import { ThemeProvider } from '../ui/theme';
+import { FamilyTimeProvider } from '../state/family-time';
 
 /** Not the first launch: the app's installation marker is already there. */
 export function installed(): void {
@@ -142,27 +143,29 @@ export async function renderApp(
       <ThemeProvider>
         <TextScaleProvider {...(opts.large !== undefined ? { initialLarge: opts.large } : {})}>
           <VaultProvider deps={deps}>
-            <PushProvider deps={{ native: null, ...opts.push }}>
-              {opts.lock ? (
-                <LockProvider deps={opts.lock}>
-                  {opts.essentials ? (
-                    <EssentialsProvider deps={opts.essentials}>
+            <FamilyTimeProvider>
+              <PushProvider deps={{ native: null, ...opts.push }}>
+                {opts.lock ? (
+                  <LockProvider deps={opts.lock}>
+                    {opts.essentials ? (
+                      <EssentialsProvider deps={opts.essentials}>
+                        <CaptureProvider deps={capture}>
+                          <StepUpProvider>{ui}</StepUpProvider>
+                        </CaptureProvider>
+                      </EssentialsProvider>
+                    ) : (
                       <CaptureProvider deps={capture}>
                         <StepUpProvider>{ui}</StepUpProvider>
                       </CaptureProvider>
-                    </EssentialsProvider>
-                  ) : (
-                    <CaptureProvider deps={capture}>
-                      <StepUpProvider>{ui}</StepUpProvider>
-                    </CaptureProvider>
-                  )}
-                </LockProvider>
-              ) : (
-                <CaptureProvider deps={capture}>
-                  <StepUpProvider>{ui}</StepUpProvider>
-                </CaptureProvider>
-              )}
-            </PushProvider>
+                    )}
+                  </LockProvider>
+                ) : (
+                  <CaptureProvider deps={capture}>
+                    <StepUpProvider>{ui}</StepUpProvider>
+                  </CaptureProvider>
+                )}
+              </PushProvider>
+            </FamilyTimeProvider>
           </VaultProvider>
         </TextScaleProvider>
       </ThemeProvider>

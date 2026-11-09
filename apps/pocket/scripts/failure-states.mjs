@@ -40,6 +40,7 @@ const AREAS = [
     'queue',
     'busy notYet couldNotSend tooBigForVault wrongKind refused needsYou storage noLongerAdd ownerGone versionRefused goesWithout filedWithout',
   ],
+  ['A list or a page that would not load', 'Home, Search, Needs attention, People, a person, a document', 'states', 'loadFailed'],
   ['What the vault read', 'Home, after Send to my Inbox', 'vaultRead', 'slow couldNotRead duplicate finishThere'],
   ["A new version's details", 'A document', 'renewal', 'changed undoOpen kept notUndoable'],
   ['The scanner', 'Home', 'home', 'scannerFailed savedOffline savedInboxOffline savedInboxFiled vaultWait offline'],

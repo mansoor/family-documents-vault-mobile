@@ -52,6 +52,7 @@ import { useVault } from '../state/vault';
 import { Button, Field, Notice, requiredLabel, Text } from '../ui';
 import { sp } from '../ui/space';
 import { useColours, useStyles, type Palette } from '../ui/theme';
+import { familyZoneNow } from '../state/family-time';
 
 type Loaded = CardData;
 
@@ -72,11 +73,11 @@ function dateName(label: string): string {
   return /^[A-Z0-9]{2,}\b/.test(trimmed) ? trimmed : trimmed.charAt(0).toLowerCase() + trimmed.slice(1);
 }
 
-/** Whether a date the card read (a DateValue) is before today, on this phone's calendar. */
+/** Whether a date the card read (a DateValue) is before today, on the family's calendar (P5). */
 function datePassed(value: unknown): boolean {
   const date = (value as { date?: unknown } | null)?.date;
   if (typeof date !== 'string' || date === '') return false;
-  const today = localToday(Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC');
+  const today = localToday(familyZoneNow());
   return date < today.slice(0, date.length);
 }
 

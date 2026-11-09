@@ -1,5 +1,9 @@
 {
+  "states": {
+    "loadFailed": "Couldn't load this. Try again in a moment."
+  },
   "common": {
+    "loading": "Loading",
     "testBuild": "TEST BUILD — for throwaway vaults only",
     "continue": "Continue",
     "cancel": "Cancel",
