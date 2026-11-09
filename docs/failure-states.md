@@ -59,6 +59,7 @@ Written by `node apps/pocket/scripts/failure-states.mjs`; CI fails if it is out 
 |  |  | `errors.batchFull` | The batch it was going into is full. Remove it here and scan it again. |
 |  |  | `errors.alreadyDecided` | It's already been dealt with in your Inbox. |
 |  |  | `errors.changedElsewhere` | This was changed somewhere else, so nothing was saved. Look at it again, then try again. |
+|  |  | `errors.linksChoice` | You have share links to this document. Say whether they end or keep working, then try again. |
 |  |  | `errors.general` | That didn't work. Try again in a moment. |
 | The lock | Lock screen, Settings | `lock.tooMany` | Too many tries. Unlock with your phone's PIN or pattern instead. |
 |  |  | `lock.noScreenLock` | To lock the app and keep documents on this phone, set a screen lock in your phone's settings first. Everything else works as it is. |
@@ -145,6 +146,8 @@ Written by `node apps/pocket/scripts/failure-states.mjs`; CI fails if it is out 
 |  |  | `document.pending` | The vault is still preparing this document's pages. Try again in a minute. |
 |  |  | `document.noPreview` | This document's pages can't be shown on the phone. Save a copy to open it. |
 |  |  | `document.failed` | That didn't work. Try again. |
+| Changing a document | Edit details | `edit.stillNeeded` | Still needed: {{fields}}. |
+|  |  | `edit.changed` | Someone changed this document while you were editing. Here it is as it is now: check it and save again. |
 | A row’s ⋯ | Home, Search, a person | `row.collectionGone` | “{{name}}” is not there any more, so nothing went into it. |
 | A note’s link | Document | `notes.openFailed` | This phone couldn't open that link. |
 | Search, Needs attention, People | Tabs | `search.needsConnection` | Search needs a connection. Your Essentials are under On this phone. |

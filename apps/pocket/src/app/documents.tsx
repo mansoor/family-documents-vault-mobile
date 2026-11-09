@@ -10,6 +10,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, FlatList, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { DocumentRow } from '../documents/row';
+import { on } from '../state/events';
 import { useVault } from '../state/vault';
 import { Notice, Text } from '../ui';
 import { Chip } from '../ui/chip';
@@ -126,6 +127,8 @@ export default function DocumentsScreen() {
     setDocs(null);
     void load();
   }, [load, offline]);
+  // Changed or moved to the Trash on its page (P8): the first page again.
+  useEffect(() => on('documentChanged', () => void load()), [load]);
 
   /** The next 50, as the person scrolls to the end. */
   const loadMore = async () => {

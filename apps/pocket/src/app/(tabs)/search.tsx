@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { FlatList, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { DocumentRow } from '../../documents/row';
+import { on } from '../../state/events';
 import { useVault } from '../../state/vault';
 import { Field, Notice, Text } from '../../ui';
 import { Chip } from '../../ui/chip';
@@ -116,6 +117,8 @@ export default function SearchScreen() {
     };
     // The connection coming back asks again; so does Try again (P5).
   }, [q, category, memberId, withToken, offline, again, t]);
+  // Changed or moved to the Trash on its page (P8): asked again.
+  useEffect(() => on('documentChanged', () => setAgain((n) => n + 1)), []);
 
   const noConnection = offline || unreachable;
   const found = hits ? hits.length + sealed.items.length : null;

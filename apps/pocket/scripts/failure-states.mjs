@@ -25,7 +25,7 @@ const AREAS = [
     'Any request that fails (wordsFor)',
     'Every screen',
     'errors',
-    'offline timeout rateLimited unavailable internal storageUnreachable sessionEnded paused accessEnded stepUp twoStep setupRequired unexpected stranger wifiOnly invalidCredentials notFound previewPending noPreview uploadInProgress invalidExtra batchEnded batchFull alreadyDecided changedElsewhere general',
+    'offline timeout rateLimited unavailable internal storageUnreachable sessionEnded paused accessEnded stepUp twoStep setupRequired unexpected stranger wifiOnly invalidCredentials notFound previewPending noPreview uploadInProgress invalidExtra batchEnded batchFull alreadyDecided changedElsewhere linksChoice general',
   ],
   ['The lock', 'Lock screen, Settings', 'lock', 'tooMany noScreenLock weakBiometrics enrolmentChanged'],
   [
@@ -59,6 +59,7 @@ const AREAS = [
     'document',
     'conflict needsConnection notFound notConfirmed saveWarning saveFailed pageFailed pending noPreview failed',
   ],
+  ['Changing a document', 'Edit details', 'edit', 'stillNeeded changed'],
   ['A row’s ⋯', 'Home, Search, a person', 'row', 'collectionGone'],
   ['A note’s link', 'Document', 'notes', 'openFailed'],
   ['Search, Needs attention, People', 'Tabs', 'search', 'needsConnection sealedNone'],

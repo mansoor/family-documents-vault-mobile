@@ -157,6 +157,8 @@ export default function Home() {
   useEffect(() => on('remindersChanged', () => void load()), [load]);
   // The vault pushed that something about the person's details is changing.
   useEffect(() => on('noticesChanged', () => void load()), [load]);
+  // Changed or moved to the Trash on its page (P8).
+  useEffect(() => on('documentChanged', () => void load()), [load]);
 
   // How many of the person's own files wait in their Inbox (I5), where the
   // vault has batches and they may add documents: a viewer, and so a

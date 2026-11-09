@@ -9,7 +9,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { renewWords } from '../../capture/renew-words';
 import { offersNewScan, reminderHeadline } from '../../documents/reminders';
 import { useCapture } from '../../state/capture';
-import { emit } from '../../state/events';
+import { emit, on } from '../../state/events';
 import { useVault } from '../../state/vault';
 import { Button, Card, Notice, Text } from '../../ui';
 import { sp } from '../../ui/space';
@@ -66,6 +66,8 @@ export default function AttentionScreen() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void load();
   }, [load, capture.delivered, offline]);
+  // Changed or moved to the Trash on its page (P8).
+  useEffect(() => on('documentChanged', () => void load()), [load]);
 
   const act = async (fn: Parameters<typeof withToken>[0]) => {
     setProblem(null);
