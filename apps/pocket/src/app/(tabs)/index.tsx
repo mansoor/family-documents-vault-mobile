@@ -74,6 +74,7 @@ export default function Home() {
   const colours = useColours();
   const styles = useStyles(makeStyles);
   const { t } = useTranslation();
+  const router = useRouter();
   const { caps, vault, offline, waiting, notice, withTokenQuick, api, who } = useVault();
   const capture = useCapture();
   const [data, setData] = useState<HomeData | null>(null);
@@ -357,9 +358,17 @@ export default function Home() {
                 ) : null}
               </Card>
             ))}
-            <Text variant="screen" style={styles.recentTitle}>
-              {t('home.recentTitle')}
-            </Text>
+            <View style={styles.recentHead}>
+              <Text variant="screen" style={styles.flex}>
+                {t('home.recentTitle')}
+              </Text>
+              <Button
+                kind="quiet"
+                label={t('home.allDocuments')}
+                onPress={() => router.push('/documents')}
+                testID="home-all-documents"
+              />
+            </View>
             {failed ? <LoadFailed words={failed} onRetry={() => void load()} /> : null}
             {!data && !failed && !offline ? <Placeholder /> : null}
             {data && data.recent.length === 0 ? (
@@ -617,5 +626,5 @@ const makeStyles = (colours: Palette) =>
     iconButton: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
     dueCard: { gap: sp(4), borderColor: colours.warn },
     inbox: { gap: sp(6) },
-    recentTitle: { marginTop: sp(12) },
+    recentHead: { marginTop: sp(12), flexDirection: 'row', alignItems: 'center', gap: sp(12) },
   });

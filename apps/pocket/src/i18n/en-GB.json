@@ -69,6 +69,7 @@
   "home": {
     "attentionTitle": "Needs attention",
     "calm": "Nothing needs you right now.",
+    "allDocuments": "See all",
     "recentTitle": "Recently added",
     "none": "No documents yet. Add one with the + button below.",
     "noneViewer": "No documents yet.",
@@ -419,8 +420,30 @@
     "inbox": "Your Inbox",
     "inboxHint": "What you sent to be read, finished in the browser",
     "account": "Account",
+    "documentsHint": "Every document, sorted and narrowed as you like",
     "accountHint": "This vault, who is signed in, and signed-in devices",
     "settingsHint": "Large text, light or dark, the lock, offline copies, notifications"
+  },
+  "documents": {
+    "title": "All documents",
+    "sortBy": "Sort by",
+    "sort_recent": "Recently added",
+    "sort_title": "Title, A to Z",
+    "sort_expires": "Expires soonest",
+    "whose": "Whose",
+    "kind": "Kind",
+    "status": "Status",
+    "anyStatus": "Any status",
+    "status_expired": "Expired",
+    "status_expiring_soon": "Expiring soon",
+    "status_needs_info": "Needs details",
+    "status_valid": "In date",
+    "status_no_longer_needed": "No longer needed",
+    "whoCanSee": "Who can see it",
+    "anyone": "Anyone",
+    "none": "No documents yet. Add one with the + button.",
+    "noneMatch": "Nothing matches these choices. Try fewer of them.",
+    "needsConnection": "Showing your documents needs a connection to your vault."
   },
   "document": {
     "show": "Show",
