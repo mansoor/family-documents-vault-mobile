@@ -6,6 +6,30 @@ app's own, tagged `vX.Y.Z` in this repository.
 
 ## [Unreleased]
 
+## [0.3.10] — More (polish P6)
+
+### Changed
+- **A More tab in People's place.** The tabs are now Home, Search, the +,
+  Needs attention and **More**. More leads to:
+  - **People**, as before;
+  - **your Inbox**, with how many wait there, opened in the browser
+    (where the vault has one and you may add documents);
+  - **Account**;
+  - **Settings**.
+
+  Collections and notes join it later in the polish. The gear on Home
+  still opens Settings.
+- **Account** holds what was at the top of Settings: which vault this
+  phone uses and how it's reached, the versions (seven taps still open
+  Timings), who is signed in, **Use another vault**, what a guest may see
+  and until when, and **Signed-in devices**. Settings holds only settings,
+  and Sign out.
+- The tabs have a little more room. The app's own typeface is wider than
+  Android's, and "Attention" at Large text now fits its tab with room to
+  spare on a 360 dp phone.
+- The spike screens are in development builds only. A test build you
+  install no longer shows them in Settings.
+
 ## [0.3.9] — loading, failures, and the family's clock (polish P5)
 
 ### Changed
