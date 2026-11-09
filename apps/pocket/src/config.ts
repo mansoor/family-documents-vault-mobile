@@ -11,7 +11,8 @@ export const extra = (Constants.expoConfig?.extra ?? {}) as {
 };
 
 /** The scanner spike's screens exist in dev and preview builds only. */
-export const SPIKE = extra.variant === 'dev' || extra.variant === 'preview';
+// The spike screens: development builds only (P6), never one somebody installs to try.
+export const SPIKE = extra.variant === 'dev';
 
 /** The app's own version, for negotiating with the vault. */
 export const APP_VERSION = Constants.expoConfig?.version ?? '0.0.0';

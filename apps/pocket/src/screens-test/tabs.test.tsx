@@ -2,7 +2,9 @@ import { fireEvent, screen, waitFor, within } from '@testing-library/react-nativ
 import type { ReactElement } from 'react';
 import { AccessibilityInfo } from 'react-native';
 import Home from '../app/(tabs)/index';
-import PeopleScreen from '../app/(tabs)/people';
+import MoreScreen from '../app/(tabs)/more';
+import PeopleScreen from '../app/people';
+import * as Linking from 'expo-linking';
 import { SecureTokenStore } from '../session/store';
 import { audit } from '../test-support/a11y';
 import { unlocked } from '../test-support/lookup';
@@ -11,7 +13,7 @@ import { MAX_PAGES } from '../queue/commit';
 import { reply } from '../test-support/capture';
 import { installed, renderApp, signedIn, testCapture } from '../test-support/render';
 import { resetRoutes, routes } from '../test-support/router';
-import { testVault } from '../test-support/vault';
+import { capabilities, testVault } from '../test-support/vault';
 import { TabBar } from '../ui/tab-bar';
 
 jest.mock(
@@ -19,10 +21,12 @@ jest.mock(
   () => jest.requireActual<typeof import('../test-support/router')>('../test-support/router').routerMock,
 );
 
+jest.mock('expo-linking', () => ({ openURL: jest.fn(async () => true), createURL: jest.fn(() => '') }));
+
 const ORIGIN = 'https://vault.test';
 const STATE = {
   index: 0,
-  routes: ['index', 'search', 'attention', 'people'].map((name) => ({ key: name, name })),
+  routes: ['index', 'search', 'attention', 'more'].map((name) => ({ key: name, name })),
 };
 
 /**
@@ -72,10 +76,10 @@ describe('the tab bar', () => {
     }
   });
 
-  it('Home, Search, the +, Needs attention, People — each a named tab, in that order', async () => {
+  it('Home, Search, the +, Needs attention, More — each a named tab, in that order', async () => {
     const navigated = await as('owner');
-    const order = ['tab-home', 'tab-search', 'home-add', 'tab-attention', 'tab-people'];
-    await screen.findByTestId('tab-people');
+    const order = ['tab-home', 'tab-search', 'home-add', 'tab-attention', 'tab-more'];
+    await screen.findByTestId('tab-more');
     const shown = screen.root
       ?.queryAll((n) => order.includes(String(n.props.testID)) && typeof n.type === 'string')
       .map((n) => String(n.props.testID));
@@ -101,6 +105,39 @@ describe('the tab bar', () => {
     expect(audit()).toEqual([]);
     await fireEvent.press(screen.getByTestId('person-fake-member'));
     expect(routes().at(-1)).toEqual({ pathname: '/person/[id]', params: { id: 'fake-member', name: 'Fake Owner' } });
+  });
+});
+
+describe("More, in People's place (P6)", () => {
+  it('leads to People, Account and Settings, each a named button', async () => {
+    installed();
+    resetRoutes();
+    const t = testVault([ORIGIN]);
+    await unlocked(t, <MoreScreen />);
+    expect(await screen.findByTestId('more')).toHaveTextContent(/^More/);
+    expect(audit()).toEqual([]);
+    expect(screen.queryByTestId('more-inbox')).toBeNull();
+    for (const [id, to] of [
+      ['more-people', '/people'],
+      ['more-account', '/account'],
+      ['more-settings', '/settings'],
+    ] as const) {
+      expect(screen.getByTestId(id).props.accessibilityRole).toBe('button');
+      await fireEvent.press(screen.getByTestId(id));
+      expect(routes().at(-1)).toEqual({ pathname: to, params: {} });
+    }
+  });
+
+  it('with an Inbox, says how many wait there and opens it in the browser', async () => {
+    installed();
+    const t = testVault([ORIGIN]);
+    t.caps = capabilities({ features: { ...capabilities().features, batches: true } });
+    await unlocked(t, <MoreScreen />);
+    const inbox = await screen.findByTestId('more-inbox');
+    expect(inbox.props.accessibilityRole).toBe('link');
+    await waitFor(() => expect(inbox.props.accessibilityHint).toMatch(/Inbox|browser/));
+    await fireEvent.press(inbox);
+    expect(Linking.openURL).toHaveBeenCalledWith(`${ORIGIN}/inbox`);
   });
 });
 

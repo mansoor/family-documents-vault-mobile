@@ -6,6 +6,7 @@ import { libraryDoc, unlocked } from '../test-support/lookup';
 import { installed, testCapture } from '../test-support/render';
 import { resetRoutes, routes } from '../test-support/router';
 import { testVault } from '../test-support/vault';
+import Account from '../app/account';
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 jest.mock('expo-router', () => require('../test-support/router').routerMock);
@@ -46,13 +47,13 @@ describe('Back', () => {
 
   it('on "Use another vault?" keeps this one', async () => {
     const t = testVault();
-    await unlocked(t, <Settings />);
-    await fireEvent.press(await screen.findByTestId('settings-change-vault'));
+    await unlocked(t, <Account />);
+    await fireEvent.press(await screen.findByTestId('account-change-vault'));
     await screen.findByTestId('change-vault-question');
     await back('change-vault-question');
     await waitFor(() => expect(screen.queryByTestId('change-vault-question')).toBeNull());
     expect(t.calls.filter((c) => c.endsWith('/auth/logout'))).toEqual([]);
-    expect(screen.getByTestId('settings-sign-out')).toBeTruthy();
+    expect(screen.getByTestId('account-change-vault')).toBeTruthy();
   });
 
   it('on the sign-out question signs nobody out', async () => {

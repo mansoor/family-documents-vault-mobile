@@ -16,6 +16,7 @@ import { installed, renderApp, signedIn, testCapture } from '../test-support/ren
 import { resetRoutes, routes } from '../test-support/router';
 import { testVault } from '../test-support/vault';
 import { sizeWords } from './offline';
+import Account from '../app/account';
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 jest.mock('expo-router', () => require('../test-support/router').routerMock);
@@ -74,7 +75,7 @@ describe('Settings, in full (4.15)', () => {
 
   it('signing out another device calls DELETE /auth/sessions/{id}', async () => {
     const t = testVault();
-    await unlocked(t, <Settings />);
+    await unlocked(t, <Account />);
     expect(await screen.findByText('the app on a Test Phone 1 (this phone)')).toBeTruthy();
     // This phone is signed out with Sign out, not from the list.
     expect(screen.queryByTestId('settings-device-sign-out-this-phone')).toBeNull();
@@ -112,8 +113,8 @@ describe('Settings, in full (4.15)', () => {
     await keepOne(parts);
     const queue = new MemoryQueueStore();
     await queue.add(waiting(), new Uint8Array([1, 2, 3, 4]));
-    await unlocked(t, <Settings />, { parts, capture: testCapture({ openStore: async () => queue }) });
-    await fireEvent.press(await screen.findByTestId('settings-change-vault'));
+    await unlocked(t, <Account />, { parts, capture: testCapture({ openStore: async () => queue }) });
+    await fireEvent.press(await screen.findByTestId('account-change-vault'));
     const question = await screen.findByTestId('change-vault-question');
     expect(question).toHaveTextContent('Changing the vault signs you out and removes everything kept on this phone.', {
       exact: false,
@@ -136,8 +137,8 @@ describe('Settings, in full (4.15)', () => {
     await queue.add({ ...waiting(), id: 'q3', state: 'sending' }, new Uint8Array([3]));
     await queue.add({ ...waiting(), id: 'q4', origin: 'https://other.test' }, new Uint8Array([4]));
     await queue.cache('card|https://vault.test|fake-member', { types: [] });
-    await unlocked(t, <Settings />, { capture: testCapture({ openStore: async () => queue }) });
-    await fireEvent.press(await screen.findByTestId('settings-change-vault'));
+    await unlocked(t, <Account />, { capture: testCapture({ openStore: async () => queue }) });
+    await fireEvent.press(await screen.findByTestId('account-change-vault'));
     const question = await screen.findByTestId('change-vault-question');
     expect(question).toHaveTextContent("2 scans haven't reached this vault yet. They will be removed too.", {
       exact: false,
@@ -193,13 +194,13 @@ describe('Settings, in full (4.15)', () => {
     const t = testVault(['http://192.168.1.20:8080']);
     await signedIn(t, 'http://192.168.1.20:8080');
     const parts = phoneParts();
-    await renderApp(<LookupApp start={<Settings />} />, {
+    await renderApp(<LookupApp start={<Account />} />, {
       fetch: t.fetch,
       lock: parts.lock,
       essentials: parts.essentials,
     });
     await fireEvent.press(await screen.findByTestId('lock-unlock'));
-    expect(await screen.findByTestId('settings-not-secure')).toHaveTextContent(
+    expect(await screen.findByTestId('account-not-secure')).toHaveTextContent(
       'Not secure: reached without encryption, on your home network only.',
     );
   });

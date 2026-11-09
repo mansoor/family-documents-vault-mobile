@@ -80,6 +80,8 @@ function Gates() {
         <Stack.Screen name="(tabs)" options={{ headerShown: false, title: t('tabs.home') }} />
         <Stack.Screen name="document/[id]" options={{ title: '' }} />
         <Stack.Screen name="person/[id]" options={{ title: '' }} />
+        <Stack.Screen name="people" options={{ title: '' }} />
+        <Stack.Screen name="account" options={{ title: t('more.account') }} />
         <Stack.Screen name="capture" options={{ title: '', gestureEnabled: false }} />
         <Stack.Screen name="settings" options={{ title: t('settings.title') }} />
         <Stack.Screen name="licences" options={{ title: t('settings.licences') }} />

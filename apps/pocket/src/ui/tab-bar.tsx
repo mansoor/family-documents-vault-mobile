@@ -1,5 +1,5 @@
 import { can, TAP_MIN } from '@fdv/shared';
-import { BellRing, House, Search, Users, type LucideIcon } from 'lucide-react-native';
+import { BellRing, House, Menu, Search, type LucideIcon } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -18,7 +18,7 @@ const TABS: Record<string, { label: string; name?: string; icon: LucideIcon; tes
   index: { label: 'tabs.home', icon: House, testID: 'tab-home' },
   search: { label: 'tabs.search', icon: Search, testID: 'tab-search' },
   attention: { label: 'tabs.attention', name: 'tabs.attentionName', icon: BellRing, testID: 'tab-attention' },
-  people: { label: 'tabs.people', icon: Users, testID: 'tab-people' },
+  more: { label: 'tabs.more', name: 'tabs.moreName', icon: Menu, testID: 'tab-more' },
 };
 
 export interface TabBarProps {
@@ -27,7 +27,7 @@ export interface TabBarProps {
 }
 
 /**
- * The tab bar (4.12): Home, Search, the +, Needs attention, People.
+ * The tab bar (4.12): Home, Search, the +, Needs attention, More (P6).
  * The + is only for those who may add documents.
  */
 export function TabBar(props: TabBarProps) {
@@ -84,12 +84,12 @@ const makeStyles = (colours: Palette) =>
     },
     // An equal share each (flex: 1 grows from nothing), never more: a label
     // wraps inside its own tab rather than reaching the +, whose slot is a
-    // fixed width (add-button.tsx).
+    // fixed width (add-button.tsx). No side padding: Figtree (P1) is wider
+    // than Roboto, and "Attention" at Large text needs the room.
     tab: {
       flex: 1,
       minWidth: TAP_MIN,
       minHeight: TAP_MIN + 8,
-      paddingHorizontal: 2,
       alignItems: 'center',
       justifyContent: 'center',
       gap: sp(4),

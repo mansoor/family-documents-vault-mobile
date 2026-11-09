@@ -46,27 +46,29 @@ function expectScaled(before: ReturnType<typeof sizes>, after: ReturnType<typeof
 }
 
 /**
- * How wide a word is drawn in Roboto, Android's own face: its letters'
- * advance widths (in 1/2048 em), and a tenth more for a selected tab's
- * heavier weight. A guard against a label that cannot fit, not a
- * measurement; a letter not listed here fails the test until it is.
+ * How wide a word is drawn in Figtree, the app's own face since P1 (it was
+ * Roboto, Android's, before): its letters' advance widths at SemiBold, a
+ * selected tab's weight and the wider of the two (in 1/1000 em, read from
+ * the bundled Figtree_600SemiBold.ttf), and a twentieth more to spare. A guard
+ * against a label that cannot fit, not a measurement; a letter not listed
+ * here fails the test until it is.
  */
-const ROBOTO: Record<string, number> = {
-  A: 1336, H: 1428, P: 1292, S: 1216,
-  a: 1088, c: 1049, e: 1058, h: 1103, i: 486, l: 486, m: 1753, n: 1103, o: 1140, p: 1120, r: 677, t: 654,
+const FIGTREE: Record<string, number> = {
+  A: 699, H: 750, M: 853, P: 594, S: 610,
+  a: 524, c: 544, e: 551, h: 565, i: 250, l: 236, m: 864, n: 564, o: 581, p: 597, r: 363, t: 393,
 };
 function drawnWidth(word: string, fontSize: number): number {
   const units = [...word].reduce((sum, c) => {
-    const w = ROBOTO[c];
-    if (w === undefined) throw new Error(`no advance width for "${c}" (in "${word}"): add it to ROBOTO`);
+    const w = FIGTREE[c];
+    if (w === undefined) throw new Error(`no advance width for "${c}" (in "${word}"): add it to FIGTREE`);
     return sum + w;
   }, 0);
-  return (units / 2048) * fontSize * 1.1;
+  return (units / 1000) * fontSize * 1.05;
 }
 
 const TAB_STATE = {
   index: 0,
-  routes: ['index', 'search', 'attention', 'people'].map((name) => ({ key: name, name })),
+  routes: ['index', 'search', 'attention', 'more'].map((name) => ({ key: name, name })),
 };
 
 describe('Large text', () => {
@@ -173,7 +175,7 @@ describe('Large text', () => {
       const plus = Number(style('home-add').width);
       expect(plus).toBeGreaterThanOrEqual(44);
       expect(slot).toBeGreaterThanOrEqual(plus + 8);
-      const tabs = ['tab-home', 'tab-search', 'tab-attention', 'tab-people'];
+      const tabs = ['tab-home', 'tab-search', 'tab-attention', 'tab-more'];
       for (const id of tabs) expect(style(id)).toMatchObject({ flex: 1 });
       const edge = Number(style('tab-bar').paddingHorizontal ?? 0);
       const inset = Number(style('tab-home').paddingHorizontal ?? 0);
