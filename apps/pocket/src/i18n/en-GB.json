@@ -408,7 +408,19 @@
     "search": "Search",
     "attention": "Attention",
     "attentionName": "Needs attention",
-    "people": "People"
+    "people": "People",
+    "more": "More",
+    "moreName": "More: people, your Inbox, account and settings"
+  },
+  "more": {
+    "title": "More",
+    "people": "People",
+    "peopleHint": "The family, and each person's documents",
+    "inbox": "Your Inbox",
+    "inboxHint": "What you sent to be read, finished in the browser",
+    "account": "Account",
+    "accountHint": "This vault, who is signed in, and signed-in devices",
+    "settingsHint": "Large text, light or dark, the lock, offline copies, notifications"
   },
   "document": {
     "show": "Show",

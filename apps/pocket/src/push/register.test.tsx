@@ -239,7 +239,8 @@ describe('notifications on this phone (4.14)', () => {
     const t = pushVault('off');
     const fake = new FakePushNative();
     await settingsOn(t, fake);
-    await waitFor(() => expect(screen.getByTestId('settings-version')).toHaveTextContent(/Vault 0\.4\.14/));
+    // Loaded: About says the vault's version (the vault card is on Account since P6).
+    await waitFor(() => expect(screen.getByText(/Vault 0\.4\.14/)).toBeTruthy());
     expect(screen.queryByTestId('push-title')).toBeNull();
   });
 

@@ -60,9 +60,11 @@ env:
       - tapOn:
           id: lock-unlock
 
-# People, then the owner's own screen.
+# People (under More since P6), then the owner's own screen.
 - tapOn:
-    id: tab-people
+    id: tab-more
+- tapOn:
+    id: more-people
 - extendedWaitUntil:
     visible:
       text: Pocket Owner.*

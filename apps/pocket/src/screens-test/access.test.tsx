@@ -2,7 +2,7 @@ import type { FetchLike } from '@fdv/client';
 import { act, fireEvent, screen, waitFor } from '@testing-library/react-native';
 import { Text } from 'react-native';
 import Home from '../app/(tabs)/index';
-import Settings from '../app/settings';
+import Account from '../app/account';
 import SignIn from '../app/sign-in';
 import { MemoryEssentialsStore } from '../essentials/store';
 import { MemoryQueueStore } from '../queue/store';
@@ -56,7 +56,7 @@ function withProfile(t: TestVault, timezone: string | null) {
 }
 
 /** The app's own gates, as _layout has them: Home once signed in and unlocked, else Sign in. */
-function App(props: { start?: 'home' | 'settings' }) {
+function App(props: { start?: 'home' | 'account' }) {
   const { phase, withToken, signOut } = useVault();
   const { status } = useLock();
   return (
@@ -70,8 +70,8 @@ function App(props: { start?: 'home' | 'settings' }) {
       </Text>
       {phase === 'sign_in' ? (
         <SignIn />
-      ) : phase !== 'ready' || status === 'checking' ? null : props.start === 'settings' ? (
-        <Settings />
+      ) : phase !== 'ready' || status === 'checking' ? null : props.start === 'account' ? (
+        <Account />
       ) : (
         <Home />
       )}
@@ -82,7 +82,7 @@ function App(props: { start?: 'home' | 'settings' }) {
 /** Signed in as the guest, the app unlocked, with something kept on the phone. */
 async function guestApp(
   t: TestVault,
-  opts: { start?: 'home' | 'settings'; fetch?: FetchLike; queue?: MemoryQueueStore } = {},
+  opts: { start?: 'home' | 'account'; fetch?: FetchLike; queue?: MemoryQueueStore } = {},
 ) {
   const parts = phoneParts();
   parts.stores.set('everyday', new MemoryEssentialsStore());
@@ -100,7 +100,7 @@ async function guestApp(
 }
 
 describe('what you may see (5.36)', () => {
-  it('the restriction summary shows when the vault has one: on Home, and in Settings', async () => {
+  it('the restriction summary shows when the vault has one: on Home, and on Account (P6)', async () => {
     const t = vault();
     // A viewer of the family an owner limited to passports.
     t.vault.state.role = 'viewer';
@@ -113,8 +113,8 @@ describe('what you may see (5.36)', () => {
     expect(screen.queryByTestId('home-access-ends')).toBeNull();
     expect(audit()).toEqual([]);
     await screen.unmount();
-    await renderApp(<App start="settings" />, { fetch: t.fetch });
-    expect(await screen.findByTestId('settings-access-summary')).toHaveTextContent(said);
+    await renderApp(<App start="account" />, { fetch: t.fetch });
+    expect(await screen.findByTestId('account-access-summary')).toHaveTextContent(said);
     expect(screen.getByText('What you can see')).toBeTruthy();
   });
 
@@ -309,8 +309,8 @@ describe('what you may see (5.36)', () => {
     expect(screen.queryByTestId('home-access')).toBeNull();
     expect(screen.queryByText(/You can see/)).toBeNull();
     await screen.unmount();
-    await renderApp(<App start="settings" />, { fetch });
-    await screen.findByTestId('settings-change-vault');
+    await renderApp(<App start="account" />, { fetch });
+    await screen.findByTestId('account-change-vault');
     await act(async () => undefined);
     expect(screen.queryByText('What you can see')).toBeNull();
   });

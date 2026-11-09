@@ -4,11 +4,11 @@ import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, RefreshControl, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useVault } from '../../state/vault';
-import { Notice, Text } from '../../ui';
-import { sp } from '../../ui/space';
-import { useStyles, type Palette } from '../../ui/theme';
-import { LoadFailed, loadFailure, Placeholder } from '../../ui/states';
+import { useVault } from '../state/vault';
+import { Notice, Text } from '../ui';
+import { sp } from '../ui/space';
+import { useStyles, type Palette } from '../ui/theme';
+import { LoadFailed, loadFailure, Placeholder } from '../ui/states';
 
 /** People (4.12): the family, read-only; each leads to their documents. */
 export default function PeopleScreen() {
@@ -39,7 +39,7 @@ export default function PeopleScreen() {
   }, [load, offline]);
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
+    <SafeAreaView style={styles.safe} edges={[]}>
       <ScrollView
         testID="people"
         contentContainerStyle={styles.page}

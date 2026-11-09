@@ -1,5 +1,5 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react-native';
-import People from '../app/(tabs)/people';
+import People from '../app/people';
 import { DocumentDetail } from '../documents/detail';
 import { setSink } from '../log';
 import { dayWords, exactWords } from '../state/family-time';

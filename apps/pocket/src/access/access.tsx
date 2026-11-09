@@ -112,7 +112,7 @@ export function AccessCard() {
   return (
     <Card>
       <Text variant="title">{t('access.title')}</Text>
-      <Lines access={access} testID="settings-access" />
+      <Lines access={access} testID="account-access" />
     </Card>
   );
 }

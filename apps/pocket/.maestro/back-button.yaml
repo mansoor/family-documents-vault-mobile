@@ -36,21 +36,30 @@ env:
     timeout: 30000
 - waitForAnimationToEnd
 
-# Settings: a question, then Back.
-- tapOn: Settings
+# Account (under More since P6): a question, then Back.
+- tapOn:
+    id: tab-more
+- tapOn:
+    id: more-account
 - extendedWaitUntil:
     visible:
-      id: settings-change-vault
+      id: account-change-vault
     timeout: 15000
 - tapOn:
-    id: settings-change-vault
+    id: account-change-vault
 - assertVisible:
     id: change-vault-question
 - back
 - assertNotVisible:
     id: change-vault-question
 - assertVisible:
-    id: settings-change-vault
+    id: account-change-vault
+# Back from Account to More, and from More (a tab) to Home.
+- back
+- extendedWaitUntil:
+    visible:
+      id: more
+    timeout: 15000
 - back
 - extendedWaitUntil:
     visible:
