@@ -26,6 +26,7 @@ import { NotThisAccountError, Uploader } from '../queue/uploader';
 import { on } from './events';
 import { useLock } from './lock';
 import { useVault } from './vault';
+import { feel } from '../ui/feel';
 
 /**
  * Capturing a document, from the tap to the vault's 201: what the scanner
@@ -598,6 +599,8 @@ export function CaptureProvider(props: { children: ReactNode; deps?: Partial<Cap
             : { kind: 'file', file: outcome.file };
         });
         pendingFor.current = whoKey;
+        // Taken in: felt, as the card comes (P10).
+        feel('tap');
         timings.mark('pages_accepted', outcome.kind === 'pages' ? outcome.pages.length : 1);
         return 'card';
       }
@@ -610,7 +613,9 @@ export function CaptureProvider(props: { children: ReactNode; deps?: Partial<Cap
   const morePages = useCallback(
     async (max: number): Promise<PageRef[] | null> => {
       const outcome = await run(() => deps.scanner.scan(max));
-      return outcome.kind === 'pages' ? outcome.pages.slice(0, max) : null;
+      if (outcome.kind !== 'pages') return null;
+      feel('tap');
+      return outcome.pages.slice(0, max);
     },
     [deps.scanner, run],
   );

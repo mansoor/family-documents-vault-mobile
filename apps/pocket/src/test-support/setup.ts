@@ -107,6 +107,12 @@ jest.mock('expo-sqlite', () => ({
   deleteDatabaseAsync: jest.fn(async () => undefined),
 }));
 jest.mock('expo-sharing', () => ({ shareAsync: jest.fn(async () => undefined) }));
+jest.mock('expo-haptics', () => ({
+  notificationAsync: jest.fn(async () => undefined),
+  impactAsync: jest.fn(async () => undefined),
+  NotificationFeedbackType: { Success: 'success', Warning: 'warning', Error: 'error' },
+  ImpactFeedbackStyle: { Light: 'light', Medium: 'medium', Heavy: 'heavy' },
+}));
 // The library's own stand-in: no native view to wait for, insets of zero.
 jest.mock('react-native-safe-area-context', () => jest.requireActual('react-native-safe-area-context/jest/mock').default);
 

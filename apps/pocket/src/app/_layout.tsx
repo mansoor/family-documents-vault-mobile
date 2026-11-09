@@ -24,19 +24,29 @@ import { LockProvider, useLock } from '../state/lock';
 import { StepUpProvider } from '../state/step-up';
 import { useVault, VaultProvider } from '../state/vault';
 import { font } from '../ui/fonts';
-import { TextScaleProvider } from '../ui/text-scale';
+import { TextScaleProvider, useTextScale } from '../ui/text-scale';
 import { WEB_FONTS } from '../ui/web-fonts';
 import { sp } from '../ui/space';
 import { ThemeProvider, useColours, useStyles, useTheme, type Palette } from '../ui/theme';
+import { useReduceMotion } from '../ui/feel';
 import { FamilyTimeProvider } from '../state/family-time';
 
-/** Preview builds say so on every screen: they point at throwaway vaults only. */
+/**
+ * Preview builds say so on every screen: they point at throwaway vaults
+ * only. Read out once as words, not as a heading — TalkBack's headings are
+ * each screen's own (P10) — and as large as the app's Large text.
+ */
 function TestBanner() {
   const styles = useStyles(makeStyles);
   const { t } = useTranslation();
+  const { scale } = useTextScale();
   return (
     <SafeAreaView edges={['top']} style={styles.banner}>
-      <Text style={styles.bannerText} accessibilityRole="header">
+      <Text
+        style={[styles.bannerText, { fontSize: 13 * scale }]}
+        accessibilityRole="text"
+        accessibilityLabel={t('common.testBuildSaid')}
+      >
         {t('common.testBuild')}
       </Text>
     </SafeAreaView>
@@ -55,6 +65,8 @@ function Gates() {
   const { status } = useLock();
   const { keptWhileSignedOut } = useEssentials();
   const { t } = useTranslation();
+  // Remove animations (P10): one screen gives way to the next at once.
+  const still = useReduceMotion();
   // A kept Essential opens signed in, or — after the session expired — from
   // sign-in while the lock is open; locking again takes it off the stack.
   const reading = phase === 'ready' || (phase === 'sign_in' && keptWhileSignedOut && status === 'unlocked');
@@ -74,6 +86,7 @@ function Gates() {
         headerTintColor: colours.ink,
         headerShadowVisible: false,
         contentStyle: { backgroundColor: colours.bg },
+        ...(still ? { animation: 'none' as const } : {}),
       }}
     >
       <Stack.Protected guard={phase === 'ready'}>
@@ -95,7 +108,7 @@ function Gates() {
       </Stack.Protected>
       <Stack.Protected guard={reading}>
         <Stack.Screen name="essential/[id]" options={{ title: '' }} />
-        <Stack.Screen name="show/[id]" options={{ headerShown: false, animation: 'fade', gestureEnabled: false }} />
+        <Stack.Screen name="show/[id]" options={{ headerShown: false, animation: still ? 'none' : 'fade', gestureEnabled: false }} />
       </Stack.Protected>
       <Stack.Protected guard={phase === 'sign_in'}>
         <Stack.Screen name="sign-in" options={{ headerShown: false }} />

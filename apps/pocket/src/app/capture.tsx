@@ -50,6 +50,7 @@ import { useCapture, type CardData, type SaveProblem } from '../state/capture';
 import { useScreenGuard } from '../state/lock';
 import { useVault } from '../state/vault';
 import { Button, Field, Notice, requiredLabel, Text } from '../ui';
+import { feel } from '../ui/feel';
 import { sp } from '../ui/space';
 import { useColours, useStyles, type Palette } from '../ui/theme';
 import { familyZoneNow } from '../state/family-time';
@@ -348,7 +349,10 @@ function Card(props: { initial: CaptureSource }) {
     try {
       const r = await capture.save(latest.current.source, metadata, note, labels, skip && inboxOn);
       done = r.kind === 'saved';
-      if (done) leave();
+      if (done) {
+        feel('done');
+        leave();
+      }
       else if (r.kind === 'refused') fail(problemWords(r.problem));
     } finally {
       if (!done) {

@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { noteVisibilities, secretNoteKey } from '../documents/note-write';
 import { wordsFor } from '../errors/words';
 import { emit } from '../state/events';
+import { feel } from '../ui/feel';
 import { useVault } from '../state/vault';
 import { Button, Field, Notice, Text } from '../ui';
 import { Chip, ChipRow } from '../ui/chip';
@@ -49,6 +50,7 @@ export default function NewNoteScreen() {
           owner_member_id: who?.member_id ?? null,
         }),
       );
+      feel('done');
       emit('documentChanged', made.id);
       // New note replaced by the note: Back never finds an empty New note.
       router.replace({ pathname: '/document/[id]', params: { id: made.id } });
