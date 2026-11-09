@@ -6,6 +6,40 @@ app's own, tagged `vX.Y.Z` in this repository.
 
 ## [Unreleased]
 
+## [0.4.0] — the polished app (polish P11)
+
+The polish from 0.3.4 to 0.3.14, finished. In short:
+- **The look:** the vault's own typefaces, spacing and corners, one way of
+  drawing each row, sheet and chip, and a **dark theme** that follows the
+  phone (or is set in Settings).
+- **More** in People's place, with **All documents**, **Collections**,
+  **Notes**, People, your Inbox, Account and Settings.
+- **A document's page, finished:**
+  - **Edit details**, **Who can see it** and **Move to the Trash** from the
+    phone;
+  - a new version's details confirmed, and older versions with their own;
+  - its tags and collections.
+- **What the vault read** of a scan you sent to your Inbox, confirmed on
+  the phone.
+- **The family's clock** for every date and time, grey rows while a list
+  loads, and **Try again** wherever something can't load.
+- **The vault's shield** as the icon and splash; a buzz on Save, on a scan
+  and on Done; **Remove animations** respected; checked with TalkBack and
+  at 200% text.
+
+### Added
+- Emulator runs for this release, against the vault the app is pinned to:
+  - All documents sorted by title;
+  - Who can see it changed and changed back;
+  - a document's name corrected with Edit details, which the run then
+    finds in the vault;
+  - More with Collections and Notes;
+  - the dark theme set from Settings.
+
+  The run also takes screenshots of the lists in light and dark (with
+  "Allow screenshots" on; a document's pages and the card are never
+  captured).
+
 ## [0.3.14] — the finish (polish P10)
 
 ### Changed

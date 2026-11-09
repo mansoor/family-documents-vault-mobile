@@ -3,7 +3,8 @@ name: Maestro
 # The phone on an emulator, against a real vault (4.5; the lock, 4.8; kept
 # Essentials in airplane mode, and wiped by a revoked session, 4.10; Show
 # mode, 4.11; Back, 4.15; the largest text, 4.17; the Identity card, 5.31;
-# a row's menu and a note, 5.36; a scan sent to the Inbox, I5):
+# a row's menu and a note, 5.36; a scan sent to the Inbox, I5; the
+# polish, P11: All documents, Edit details, More and the dark theme):
 # the e2e build (x86_64, fixture scanner) runs .maestro/ flows while a vault
 # from the published images runs on the host, reached as 10.0.2.2. The push
 # and clipboard modules' JVM tests (4.14, 5.31) run with the build. A run costs about 40
@@ -14,7 +15,7 @@ on:
   workflow_dispatch:
   # The exit flows run on the release tags too (4.18).
   push:
-    tags: ['v0.2.*', 'v0.3.*']
+    tags: ['v0.2.*', 'v0.3.*', 'v0.4.*']
   pull_request:
     paths:
       - apps/pocket/.maestro/**
@@ -169,7 +170,9 @@ jobs:
             $HOME/.maestro/bin/maestro test -e EMAIL="$EMAIL" -e PASSWORD="$PASSWORD" --format junit --output maestro-row-menu.xml apps/pocket/.maestro/row-menu.yaml || sh .github/scripts/on-flow-failure.sh row-menu
             # A scan sent to the Inbox (I5): into the day's batch, and counted on Home — with the vault pinned (v0.7.0-dev.12 or later, features.batches).
             $HOME/.maestro/bin/maestro test -e EMAIL="$EMAIL" -e PASSWORD="$PASSWORD" --format junit --output maestro-inbox.xml apps/pocket/.maestro/send-to-inbox.yaml || sh .github/scripts/on-flow-failure.sh inbox
-            sh -c 'for f in capture-failed lock-failed cache-check-failed essentials-seed-failed essentials-failed show-failed back-failed large-text-failed essentials-kept-failed essentials-revoke-failed revoked-failed essentials-gone-failed identity-seed-failed identity-failed notes-seed-failed row-menu-failed inbox-failed; do if [ -f "$f" ]; then echo "failed: $f"; exit 1; fi; done'
+            # The polish (P11): All documents, Who can see it and Edit details on the passport, More, and dark; the lists' screenshots, light and dark.
+            $HOME/.maestro/bin/maestro test -e EMAIL="$EMAIL" -e PASSWORD="$PASSWORD" --format junit --output maestro-polish.xml apps/pocket/.maestro/polish.yaml || sh .github/scripts/on-flow-failure.sh polish
+            sh -c 'for f in capture-failed lock-failed cache-check-failed essentials-seed-failed essentials-failed show-failed back-failed large-text-failed essentials-kept-failed essentials-revoke-failed revoked-failed essentials-gone-failed identity-seed-failed identity-failed notes-seed-failed row-menu-failed inbox-failed polish-failed; do if [ -f "$f" ]; then echo "failed: $f"; exit 1; fi; done'
 
       - name: Exactly one document, carrying the card's fields
         run: |
@@ -184,6 +187,9 @@ jobs:
           test "$(jq -r '.items[0].identifier' docs.json)" = "123456789"
           test "$(jq -r '.items[0].expires.date' docs.json)" = "2031-03-14"
           test "$(jq -r '.items[0].status.value' docs.json)" != "needs_info"
+          # Its name, as Edit details corrected it on the phone (P11), and everyone in the family seeing it again.
+          test "$(jq -r '.items[0].title' docs.json)" = "Passport (checked)"
+          test "$(jq -r '.items[0].visibility' docs.json)" = "household"
           echo "One document, a passport with its person, number and expiry: the scan saved offline arrived once." >> "$GITHUB_STEP_SUMMARY"
 
       - name: One scan in the Inbox, in the phone's batch of the day (I5)
@@ -216,12 +222,23 @@ jobs:
             maestro-identity.xml
             maestro-row-menu.xml
             maestro-inbox.xml
+            maestro-polish.xml
             app-files.txt
             essentials-files.txt
             ui-*.xml
             rn-*.log
             ~/.maestro/tests/
           retention-days: 3
+      # The lists as the emulator drew them, light and dark (P11): the screenshots for the release.
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: screenshots
+          path: |
+            shot-*.png
+            apps/pocket/.maestro/shot-*.png
+          if-no-files-found: ignore
+          retention-days: 14
       - name: Minutes
         if: always()
         run: echo "Took $(( ($(date +%s) - STARTED) / 60 )) minutes" >> "$GITHUB_STEP_SUMMARY"
