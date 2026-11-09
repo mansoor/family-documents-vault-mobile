@@ -6,6 +6,19 @@ app's own, tagged `vX.Y.Z` in this repository.
 
 ## [Unreleased]
 
+## [0.3.8] — light or dark (polish P4)
+
+### Added
+- **A dark theme**, the web's soft one: a slate-blue page, cards a little
+  lighter, soft light words, the brand's green lightened, and warm warning
+  and error colours. Every colour passes the same contrast checks as the
+  light theme. By default the app follows the phone's own setting, and
+  changes with it. Settings → **Light or dark** can fix it to **Light** or
+  **Dark** instead; this phone remembers the choice.
+- Scans, page previews and photos stay on white paper in the dark, and Show
+  mode keeps its own black. The status bar, the window behind each screen
+  and the back arrow follow the theme. Large text works the same in both.
+
 ## [0.3.7] — what the vault read (polish P3)
 
 With a vault that reads what comes into the Inbox and files it from a card
