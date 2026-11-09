@@ -41,10 +41,11 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     name,
     slug: 'family-vault',
     scheme: variant === 'release' ? 'familyvault' : `familyvault-${variant}`,
-    version: '0.3.7',
+    version: '0.3.8',
     orientation: 'portrait',
     icon: './assets/icon.png',
-    userInterfaceStyle: 'light',
+    // Light or dark, as the phone is set (P4); Settings can fix it to one.
+    userInterfaceStyle: 'automatic',
     ios: {
       bundleIdentifier: id,
       supportsTablet: false,

@@ -1,4 +1,4 @@
-import { colours, radii, whenWords } from '@fdv/shared';
+import { radii, whenWords } from '@fdv/shared';
 import { Image } from 'expo-image';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -10,6 +10,7 @@ import { useStepUp } from '../state/step-up';
 import { useVault } from '../state/vault';
 import { Button, Notice, StatusLine, Text } from '../ui';
 import { sp } from '../ui/space';
+import { useStyles, type Palette } from '../ui/theme';
 
 const ZOOMS = [1, 1.5, 2, 3];
 
@@ -20,6 +21,7 @@ const ZOOMS = [1, 1.5, 2, 3];
  * and zoom; so do a swipe and a pinch. Never captured.
  */
 export function EssentialPages(props: { id: string; mode?: string; online?: boolean; version?: string }) {
+  const styles = useStyles(makeStyles);
   const { id, mode, online, version } = props;
   const { t } = useTranslation();
   const e = useEssentials();
@@ -221,10 +223,11 @@ export function EssentialPages(props: { id: string; mode?: string; online?: bool
   );
 }
 
-const styles = StyleSheet.create({
-  page: { flex: 1, padding: sp(16), gap: sp(12), backgroundColor: colours.bg },
-  tools: { flexDirection: 'row', alignItems: 'center', gap: sp(8) },
-  gap: { flex: 1 },
-  frame: { flex: 1, borderRadius: radii.m, backgroundColor: colours.surface, overflow: 'hidden' },
-  center: { alignItems: 'center', justifyContent: 'center', flexGrow: 1 },
-});
+const makeStyles = (colours: Palette) =>
+  StyleSheet.create({
+    page: { flex: 1, padding: sp(16), gap: sp(12), backgroundColor: colours.bg },
+    tools: { flexDirection: 'row', alignItems: 'center', gap: sp(8) },
+    gap: { flex: 1 },
+    frame: { flex: 1, borderRadius: radii.m, backgroundColor: colours.paper, overflow: 'hidden' },
+    center: { alignItems: 'center', justifyContent: 'center', flexGrow: 1 },
+  });

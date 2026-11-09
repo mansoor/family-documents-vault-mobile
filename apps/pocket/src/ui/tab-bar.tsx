@@ -1,4 +1,4 @@
-import { can, colours, TAP_MIN } from '@fdv/shared';
+import { can, TAP_MIN } from '@fdv/shared';
 import { BellRing, House, Search, Users, type LucideIcon } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, View } from 'react-native';
@@ -7,6 +7,7 @@ import { AddButton } from '../capture/add-button';
 import { useVault } from '../state/vault';
 import { Text } from './index';
 import { sp } from './space';
+import { useColours, useStyles, type Palette } from './theme';
 
 /**
  * The tabs, in order; the + sits between the second and the third. Each
@@ -30,6 +31,8 @@ export interface TabBarProps {
  * The + is only for those who may add documents.
  */
 export function TabBar(props: TabBarProps) {
+  const colours = useColours();
+  const styles = useStyles(makeStyles);
   const { t } = useTranslation();
   const { who } = useVault();
   const insets = useSafeAreaInsets();
@@ -68,28 +71,29 @@ export function TabBar(props: TabBarProps) {
   );
 }
 
-const styles = StyleSheet.create({
-  bar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-around',
-    paddingTop: sp(6),
-    backgroundColor: colours.surface,
-    borderTopWidth: 1,
-    borderTopColor: colours.border,
-  },
-  // An equal share each (flex: 1 grows from nothing), never more: a label
-  // wraps inside its own tab rather than reaching the +, whose slot is a
-  // fixed width (add-button.tsx).
-  tab: {
-    flex: 1,
-    minWidth: TAP_MIN,
-    minHeight: TAP_MIN + 8,
-    paddingHorizontal: 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: sp(4),
-  },
-  label: { textAlign: 'center' },
-  pressed: { opacity: 0.7 },
-});
+const makeStyles = (colours: Palette) =>
+  StyleSheet.create({
+    bar: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-around',
+      paddingTop: sp(6),
+      backgroundColor: colours.surface,
+      borderTopWidth: 1,
+      borderTopColor: colours.border,
+    },
+    // An equal share each (flex: 1 grows from nothing), never more: a label
+    // wraps inside its own tab rather than reaching the +, whose slot is a
+    // fixed width (add-button.tsx).
+    tab: {
+      flex: 1,
+      minWidth: TAP_MIN,
+      minHeight: TAP_MIN + 8,
+      paddingHorizontal: 2,
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: sp(4),
+    },
+    label: { textAlign: 'center' },
+    pressed: { opacity: 0.7 },
+  });

@@ -1,6 +1,6 @@
 import { NetworkError } from '@fdv/client';
 import { wordsFor } from '../../errors/words';
-import { addDays, can, colours, localToday, type ReminderView } from '@fdv/shared';
+import { addDays, can, localToday, type ReminderView } from '@fdv/shared';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -13,6 +13,7 @@ import { emit } from '../../state/events';
 import { useVault } from '../../state/vault';
 import { Button, Card, Notice, Text } from '../../ui';
 import { sp } from '../../ui/space';
+import { useStyles, type Palette } from '../../ui/theme';
 
 /** Today, as the phone's calendar has it: snoozes are whole days. */
 function today(): string {
@@ -29,6 +30,7 @@ function today(): string {
  * vault made of it: it stops a due date's snooze at the date.
  */
 export default function AttentionScreen() {
+  const styles = useStyles(makeStyles);
   const { t } = useTranslation();
   const router = useRouter();
   const { withToken, offline, who } = useVault();
@@ -196,9 +198,10 @@ function isReminder(x: unknown): x is ReminderView {
   return typeof x === 'object' && x !== null && 'id' in x && 'status' in x && 'label' in x;
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colours.bg },
-  page: { padding: sp(20), gap: sp(10) },
-  due: { borderColor: colours.warn },
-  actions: { flexDirection: 'row', flexWrap: 'wrap', gap: sp(4) },
-});
+const makeStyles = (colours: Palette) =>
+  StyleSheet.create({
+    safe: { flex: 1, backgroundColor: colours.bg },
+    page: { padding: sp(20), gap: sp(10) },
+    due: { borderColor: colours.warn },
+    actions: { flexDirection: 'row', flexWrap: 'wrap', gap: sp(4) },
+  });

@@ -1,4 +1,4 @@
-import { colours, radii, TAP_MIN } from '@fdv/shared';
+import { radii, TAP_MIN } from '@fdv/shared';
 import { Image } from 'expo-image';
 import { ArrowLeft, ArrowRight, Camera, FileText, Plus, Trash2 } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
@@ -15,11 +15,14 @@ import type { PageRef, PickedFile } from '../queue/commit';
 import { Button, Text } from '../ui';
 import { Sheet } from '../ui/sheet';
 import { sp } from '../ui/space';
+import { useColours, useStyles, type Palette } from '../ui/theme';
 
 /** The kit's chips, where the card has always found them. */
 export { Chip, ChipRow } from '../ui/chip';
 
 function IconButton(props: { label: string; onPress: () => void; disabled?: boolean; icon: typeof Camera }) {
+  const colours = useColours();
+  const styles = useStyles(makeStyles);
   const Icon = props.icon;
   const disabled = props.disabled === true;
   return (
@@ -52,6 +55,8 @@ export function PageStrip(props: {
   onRetake: (i: number) => void;
   onAdd: () => void;
 }) {
+  const colours = useColours();
+  const styles = useStyles(makeStyles);
   const { t } = useTranslation();
   const n = props.pages.length;
   const off = props.disabled === true;
@@ -165,6 +170,8 @@ export function sizeWords(bytes: number | null): string {
 
 /** A picked file shows as one row: its name and its size. */
 export function FileRow(props: { file: PickedFile }) {
+  const colours = useColours();
+  const styles = useStyles(makeStyles);
   const { t } = useTranslation();
   const size = sizeWords(props.file.size);
   return (
@@ -213,49 +220,50 @@ export function LeaveQuestion(props: {
   );
 }
 
-const styles = StyleSheet.create({
-  chipOff: { opacity: 0.45 },
-  pressed: { opacity: 0.8 },
-  strip: { gap: sp(12), paddingVertical: sp(4) },
-  page: { gap: sp(6), alignItems: 'center' },
-  thumb: {
-    width: 96,
-    height: 128,
-    borderRadius: radii.s,
-    backgroundColor: colours.accentSoft,
-  },
-  pageButtons: { flexDirection: 'row', gap: sp(4) },
-  iconButton: {
-    width: TAP_MIN,
-    height: TAP_MIN,
-    borderRadius: radii.s,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: colours.border,
-    backgroundColor: colours.surface,
-  },
-  addPage: {
-    width: 96,
-    height: 128,
-    borderRadius: radii.s,
-    borderWidth: 1,
-    borderStyle: 'dashed',
-    borderColor: colours.accent,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: sp(4),
-  },
-  fileRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: sp(12),
-    padding: sp(12),
-    minHeight: TAP_MIN,
-    borderRadius: radii.l,
-    borderWidth: 1,
-    borderColor: colours.border,
-    backgroundColor: colours.surface,
-  },
-  flex: { flex: 1 },
-});
+const makeStyles = (colours: Palette) =>
+  StyleSheet.create({
+    chipOff: { opacity: 0.45 },
+    pressed: { opacity: 0.8 },
+    strip: { gap: sp(12), paddingVertical: sp(4) },
+    page: { gap: sp(6), alignItems: 'center' },
+    thumb: {
+      width: 96,
+      height: 128,
+      borderRadius: radii.s,
+      backgroundColor: colours.accentSoft,
+    },
+    pageButtons: { flexDirection: 'row', gap: sp(4) },
+    iconButton: {
+      width: TAP_MIN,
+      height: TAP_MIN,
+      borderRadius: radii.s,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1,
+      borderColor: colours.border,
+      backgroundColor: colours.surface,
+    },
+    addPage: {
+      width: 96,
+      height: 128,
+      borderRadius: radii.s,
+      borderWidth: 1,
+      borderStyle: 'dashed',
+      borderColor: colours.accent,
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: sp(4),
+    },
+    fileRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: sp(12),
+      padding: sp(12),
+      minHeight: TAP_MIN,
+      borderRadius: radii.l,
+      borderWidth: 1,
+      borderColor: colours.border,
+      backgroundColor: colours.surface,
+    },
+    flex: { flex: 1 },
+  });

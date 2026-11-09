@@ -1,5 +1,5 @@
 import { ApiRequestError, NetworkError } from '@fdv/client';
-import { colours, radii, type IdentityPart, type IdentityView } from '@fdv/shared';
+import { radii, type IdentityPart, type IdentityView } from '@fdv/shared';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { StyleSheet, View } from 'react-native';
@@ -11,6 +11,7 @@ import { Button, Card, Notice, Text } from '../ui';
 import { copyForAMinute, nativeClipboard, type ClipboardPort } from './clipboard';
 import { identitySections, seenByWords, type IdentityRow } from './rows';
 import { sp } from '../ui/space';
+import { useStyles, type Palette } from '../ui/theme';
 
 /** Somebody with neither two-step sign-in nor a passkey, asking for another person's numbers (5.26). */
 const TWO_STEP: ReadonlySet<string> = new Set(['two_step_required', 'totp_required_for_owner']);
@@ -30,6 +31,7 @@ const TWO_STEP: ReadonlySet<string> = new Set(['two_step_required', 'totp_requir
  * Somebody not given the record (404) sees no card, as there is none.
  */
 export function IdentityCard(props: { memberId: string; name: string; clipboard?: ClipboardPort | null }) {
+  const styles = useStyles(makeStyles);
   const { t } = useTranslation();
   const { caps, withToken, offline, who } = useVault();
   const offered = caps?.features.member_identity === true;
@@ -105,6 +107,7 @@ function Shown(props: {
   clipboard: ClipboardPort | null;
   reload: () => Promise<void>;
 }) {
+  const styles = useStyles(makeStyles);
   useScreenGuard('identity');
   const { t } = useTranslation();
   const { guarded } = useStepUp();
@@ -293,18 +296,19 @@ function Shown(props: {
 
 const capitalised = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
-const styles = StyleSheet.create({
-  card: { marginTop: sp(4) },
-  stack: { gap: sp(8) },
-  row: { gap: sp(4) },
-  labelRow: { flexDirection: 'row', alignItems: 'center', gap: sp(8), flexWrap: 'wrap' },
-  badge: {
-    color: colours.accent,
-    backgroundColor: colours.accentSoft,
-    borderRadius: radii.s,
-    paddingHorizontal: sp(6),
-    paddingVertical: 1,
-  },
-  secret: { gap: sp(4) },
-  actions: { flexDirection: 'row', flexWrap: 'wrap', gap: sp(4) },
-});
+const makeStyles = (colours: Palette) =>
+  StyleSheet.create({
+    card: { marginTop: sp(4) },
+    stack: { gap: sp(8) },
+    row: { gap: sp(4) },
+    labelRow: { flexDirection: 'row', alignItems: 'center', gap: sp(8), flexWrap: 'wrap' },
+    badge: {
+      color: colours.accent,
+      backgroundColor: colours.accentSoft,
+      borderRadius: radii.s,
+      paddingHorizontal: sp(6),
+      paddingVertical: 1,
+    },
+    secret: { gap: sp(4) },
+    actions: { flexDirection: 'row', flexWrap: 'wrap', gap: sp(4) },
+  });

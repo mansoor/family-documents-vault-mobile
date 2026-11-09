@@ -1,11 +1,4 @@
-import {
-  colours,
-  noteLinkAllowed,
-  noteTreeText,
-  parseNotes,
-  type NoteBlock,
-  type NoteInline,
-} from '@fdv/shared';
+import { noteLinkAllowed, noteTreeText, parseNotes, type NoteBlock, type NoteInline } from '@fdv/shared';
 import * as Linking from 'expo-linking';
 import { Fragment, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -14,6 +7,7 @@ import { Button, Text } from '../ui';
 import { font } from '../ui/fonts';
 import { Sheet } from '../ui/sheet';
 import { sp } from '../ui/space';
+import { useStyles, type Palette } from '../ui/theme';
 
 /**
  * A document's note on the phone (5.36), read only. `@fdv/shared` reads it
@@ -70,6 +64,7 @@ const wordsOf = (nodes: NoteInline[]) =>
 
 /** A note, drawn: its links ask before they open. */
 export function NoteText(props: { source: string }) {
+  const styles = useStyles(makeStyles);
   const { t } = useTranslation();
   const tree = useMemo(() => parseNotes(props.source), [props.source]);
   const [asking, setAsking] = useState<string | null>(null);
@@ -205,12 +200,13 @@ function OpenLink(props: { address: string | null; onOpen: (address: string) => 
   );
 }
 
-const styles = StyleSheet.create({
-  note: { gap: sp(8) },
-  strong: font('700'),
-  em: { fontStyle: 'italic' },
-  link: { color: colours.accent, textDecorationLine: 'underline' },
-  list: { gap: sp(4) },
-  item: { flexDirection: 'row', gap: sp(8), alignItems: 'flex-start' },
-  flex: { flex: 1 },
-});
+const makeStyles = (colours: Palette) =>
+  StyleSheet.create({
+    note: { gap: sp(8) },
+    strong: font('700'),
+    em: { fontStyle: 'italic' },
+    link: { color: colours.accent, textDecorationLine: 'underline' },
+    list: { gap: sp(4) },
+    item: { flexDirection: 'row', gap: sp(8), alignItems: 'flex-start' },
+    flex: { flex: 1 },
+  });

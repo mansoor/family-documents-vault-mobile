@@ -1,10 +1,11 @@
 // First: the shared client's uploads need Web Crypto's random numbers, which Hermes lacks.
 import '../platform/web-crypto';
 import '../i18n';
-import { colours } from '@fdv/shared';
+
 import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import * as SystemUI from 'expo-system-ui';
 import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
@@ -26,9 +27,11 @@ import { font } from '../ui/fonts';
 import { TextScaleProvider } from '../ui/text-scale';
 import { WEB_FONTS } from '../ui/web-fonts';
 import { sp } from '../ui/space';
+import { ThemeProvider, useColours, useStyles, useTheme, type Palette } from '../ui/theme';
 
 /** Preview builds say so on every screen: they point at throwaway vaults only. */
 function TestBanner() {
+  const styles = useStyles(makeStyles);
   const { t } = useTranslation();
   return (
     <SafeAreaView edges={['top']} style={styles.banner}>
@@ -45,6 +48,8 @@ function TestBanner() {
  * rest. Anything else is not on the stack at all.
  */
 function Gates() {
+  const colours = useColours();
+  const styles = useStyles(makeStyles);
   const { phase } = useVault();
   const { status } = useLock();
   const { keptWhileSignedOut } = useEssentials();
@@ -64,6 +69,8 @@ function Gates() {
       screenOptions={{
         headerStyle: { backgroundColor: colours.bg },
         headerTitleStyle: { color: colours.ink, ...font('600') },
+        // Back and any other header button, in the theme in use (P4).
+        headerTintColor: colours.ink,
         headerShadowVisible: false,
         contentStyle: { backgroundColor: colours.bg },
       }}
@@ -120,13 +127,35 @@ function ShowRecovery() {
 }
 
 export default function RootLayout() {
+  return (
+    <ThemeProvider>
+      <Root />
+    </ThemeProvider>
+  );
+}
+
+/**
+ * The window behind every screen, and the bars the system draws over it,
+ * in the theme in use (P4): no white flash between screens in the dark.
+ */
+function SystemColours() {
+  const colours = useColours();
+  const { scheme } = useTheme();
+  useEffect(() => {
+    void SystemUI.setBackgroundColorAsync(colours.bg).catch(() => undefined);
+  }, [colours.bg]);
+  return <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />;
+}
+
+function Root() {
+  const styles = useStyles(makeStyles);
   // The web build draws nothing until its typefaces are in; a phone has
   // them embedded, and asks for none.
   const [fontsReady, fontsFailed] = useFonts(WEB_FONTS);
   const drawn = fontsReady || fontsFailed !== null;
   return (
     <SafeAreaProvider>
-      <StatusBar style="dark" />
+      <SystemColours />
       <TextScaleProvider>
         <VaultProvider>
           <LockProvider>
@@ -157,15 +186,16 @@ export default function RootLayout() {
   );
 }
 
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colours.bg },
-  loading: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colours.bg },
-  banner: { backgroundColor: colours.warn },
-  bannerText: {
-    color: colours.onAccent,
-    ...font('700'),
-    textAlign: 'center',
-    paddingVertical: sp(4),
-    fontSize: 13,
-  },
-});
+const makeStyles = (colours: Palette) =>
+  StyleSheet.create({
+    root: { flex: 1, backgroundColor: colours.bg },
+    loading: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colours.bg },
+    banner: { backgroundColor: colours.warn },
+    bannerText: {
+      color: colours.onAccent,
+      ...font('700'),
+      textAlign: 'center',
+      paddingVertical: sp(4),
+      fontSize: 13,
+    },
+  });

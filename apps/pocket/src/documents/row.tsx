@@ -1,4 +1,4 @@
-import { colours, documentName, NOTE_KIND, radii, statusTone, type DocumentView, type Status } from '@fdv/shared';
+import { documentName, NOTE_KIND, radii, statusTone, type DocumentView, type Status } from '@fdv/shared';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { FileText, NotebookText } from 'lucide-react-native';
@@ -9,6 +9,7 @@ import { font } from '../ui/fonts';
 import { useDocumentMenu } from './menu';
 import { snippetParts } from './snippet';
 import { sp } from '../ui/space';
+import { useColours, useStyles, type Palette } from '../ui/theme';
 
 /**
  * One document in a list (4.12), the same in every list (P1): its picture,
@@ -32,6 +33,8 @@ export function DocumentRow(props: {
   /** What it is called with no title (Home says it needs a name). */
   untitled?: string;
 }) {
+  const colours = useColours();
+  const styles = useStyles(makeStyles);
   const { t } = useTranslation();
   const router = useRouter();
   const title = documentName(
@@ -98,28 +101,29 @@ export function DocumentRow(props: {
   );
 }
 
-const styles = StyleSheet.create({
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colours.surface,
-    borderRadius: radii.l,
-    borderWidth: 1,
-    borderColor: colours.border,
-    paddingRight: sp(4),
-  },
-  main: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: sp(12), padding: sp(10), minHeight: 72 },
-  words: { flex: 1, gap: sp(4) },
-  thumb: {
-    width: 48,
-    height: 64,
-    borderRadius: radii.s,
-    backgroundColor: colours.accentSoft,
-    overflow: 'hidden',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  thumbImage: { width: 48, height: 64 },
-  pressed: { opacity: 0.8 },
-  bold: { ...font('700'), color: colours.ink },
-});
+const makeStyles = (colours: Palette) =>
+  StyleSheet.create({
+    row: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colours.surface,
+      borderRadius: radii.l,
+      borderWidth: 1,
+      borderColor: colours.border,
+      paddingRight: sp(4),
+    },
+    main: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: sp(12), padding: sp(10), minHeight: 72 },
+    words: { flex: 1, gap: sp(4) },
+    thumb: {
+      width: 48,
+      height: 64,
+      borderRadius: radii.s,
+      backgroundColor: colours.accentSoft,
+      overflow: 'hidden',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    thumbImage: { width: 48, height: 64 },
+    pressed: { opacity: 0.8 },
+    bold: { ...font('700'), color: colours.ink },
+  });

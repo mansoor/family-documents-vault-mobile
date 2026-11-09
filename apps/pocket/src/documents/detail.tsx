@@ -2,7 +2,6 @@ import { ApiRequestError, NetworkError } from '@fdv/client';
 import {
   ANOTHER_DOCUMENT,
   can,
-  colours,
   documentName,
   formatDate,
   NOTE_KIND,
@@ -34,6 +33,7 @@ import { NoteText } from './notes';
 import { latestOf } from './online';
 import { warnedAboutCopies } from './save-copy';
 import { sp } from '../ui/space';
+import { useColours, useStyles, type Palette } from '../ui/theme';
 
 type Problem = 'offline' | 'not_found' | null;
 
@@ -48,6 +48,8 @@ type Problem = 'offline' | 'not_found' | null;
  * none of what a file is for.
  */
 export function DocumentDetail(props: { id: string }) {
+  const colours = useColours();
+  const styles = useStyles(makeStyles);
   const { id } = props;
   const { t } = useTranslation();
   const router = useRouter();
@@ -390,6 +392,7 @@ function OlderVersion(props: {
   fields: DocumentTypeView['fields'] | undefined;
   onPages: () => void;
 }) {
+  const styles = useStyles(makeStyles);
   const { t } = useTranslation();
   const { version: v } = props;
   const d = v.details;
@@ -432,6 +435,7 @@ function OlderVersion(props: {
  * needing it again, is done in the browser.
  */
 function Unneeded(props: { mark: NoLongerNeededView; open: (id: string) => void }) {
+  const styles = useStyles(makeStyles);
   const { t } = useTranslation();
   const { mark } = props;
   const when = whenExactly(mark.at);
@@ -453,19 +457,20 @@ function Unneeded(props: { mark: NoLongerNeededView; open: (id: string) => void 
   );
 }
 
-const styles = StyleSheet.create({
-  page: { padding: sp(20), gap: sp(12) },
-  unneeded: { gap: sp(4) },
-  older: { gap: sp(4), marginTop: sp(4) },
-  chip: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: sp(12),
-    paddingVertical: sp(6),
-    borderRadius: radii.pill,
-    backgroundColor: colours.accentSoft,
-  },
-  fact: { gap: sp(4) },
-  notes: { gap: sp(8) },
-  switchRow: { flexDirection: 'row', alignItems: 'center', gap: sp(12), minHeight: 56 },
-  flex: { flex: 1 },
-});
+const makeStyles = (colours: Palette) =>
+  StyleSheet.create({
+    page: { padding: sp(20), gap: sp(12) },
+    unneeded: { gap: sp(4) },
+    older: { gap: sp(4), marginTop: sp(4) },
+    chip: {
+      alignSelf: 'flex-start',
+      paddingHorizontal: sp(12),
+      paddingVertical: sp(6),
+      borderRadius: radii.pill,
+      backgroundColor: colours.accentSoft,
+    },
+    fact: { gap: sp(4) },
+    notes: { gap: sp(8) },
+    switchRow: { flexDirection: 'row', alignItems: 'center', gap: sp(12), minHeight: 56 },
+    flex: { flex: 1 },
+  });

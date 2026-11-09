@@ -1,6 +1,5 @@
 import {
   can,
-  colours,
   dateReminderSentence,
   issuedByLabel,
   issuerFromFilename,
@@ -52,6 +51,7 @@ import { useScreenGuard } from '../state/lock';
 import { useVault } from '../state/vault';
 import { Button, Field, Notice, requiredLabel, Text } from '../ui';
 import { sp } from '../ui/space';
+import { useColours, useStyles, type Palette } from '../ui/theme';
 
 type Loaded = CardData;
 
@@ -110,6 +110,8 @@ function initial(name: string): string {
 }
 
 function Card(props: { initial: CaptureSource }) {
+  const colours = useColours();
+  const styles = useStyles(makeStyles);
   const { t } = useTranslation();
   const { withToken, caps, who } = useVault();
   const capture = useCapture();
@@ -846,17 +848,18 @@ function Card(props: { initial: CaptureSource }) {
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colours.bg },
-  page: { padding: sp(20), gap: sp(16) },
-  section: { gap: sp(10) },
-  switchRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: sp(12),
-    minHeight: 44,
-  },
-  row: { flexDirection: 'row' },
-  flex: { flex: 1 },
-  dateNote: { gap: sp(4) },
-});
+const makeStyles = (colours: Palette) =>
+  StyleSheet.create({
+    safe: { flex: 1, backgroundColor: colours.bg },
+    page: { padding: sp(20), gap: sp(16) },
+    section: { gap: sp(10) },
+    switchRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: sp(12),
+      minHeight: 44,
+    },
+    row: { flexDirection: 'row' },
+    flex: { flex: 1 },
+    dateNote: { gap: sp(4) },
+  });

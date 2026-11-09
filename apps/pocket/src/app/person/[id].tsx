@@ -1,4 +1,4 @@
-import { colours, type DocumentView } from '@fdv/shared';
+import { type DocumentView } from '@fdv/shared';
 import { useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -8,9 +8,11 @@ import { IdentityCard } from '../../identity/card';
 import { useVault } from '../../state/vault';
 import { Notice, Text } from '../../ui';
 import { sp } from '../../ui/space';
+import { useStyles, type Palette } from '../../ui/theme';
 
 /** One person's documents (4.12), from People; and their identity details, where the vault keeps them (5.31). */
 export default function PersonScreen() {
+  const styles = useStyles(makeStyles);
   const params = useLocalSearchParams<{ id: string; name?: string }>();
   const { id } = params;
   const { t } = useTranslation();
@@ -87,7 +89,8 @@ export default function PersonScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colours.bg },
-  page: { padding: sp(20), gap: sp(10) },
-});
+const makeStyles = (colours: Palette) =>
+  StyleSheet.create({
+    safe: { flex: 1, backgroundColor: colours.bg },
+    page: { padding: sp(20), gap: sp(10) },
+  });
