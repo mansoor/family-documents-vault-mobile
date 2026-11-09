@@ -6,8 +6,6 @@ import {
   formatDate,
   NOTE_KIND,
   radii,
-  whenExactly,
-  whenWords,
   type DocumentTypeView,
   type DocumentView,
   type Member,
@@ -34,8 +32,10 @@ import { latestOf } from './online';
 import { warnedAboutCopies } from './save-copy';
 import { sp } from '../ui/space';
 import { useColours, useStyles, type Palette } from '../ui/theme';
+import { exactWords, relativeWords, useFamilyZone } from '../state/family-time';
+import { LoadFailed, loadFailure, Placeholder } from '../ui/states';
 
-type Problem = 'offline' | 'not_found' | null;
+type Problem = 'offline' | 'not_found' | 'failed' | null;
 
 /**
  * A document (4.12). Its primary action is Show for an Essential, Save a
@@ -54,6 +54,8 @@ export function DocumentDetail(props: { id: string }) {
   const { t } = useTranslation();
   const router = useRouter();
   const { withToken, offline, who } = useVault();
+  // Every time on this page on the family's clock (P5).
+  const zone = useFamilyZone();
   const { guarded } = useStepUp();
   // The last control clears the gesture bar (0.2.0), as in Settings.
   const insets = useSafeAreaInsets();
@@ -65,6 +67,7 @@ export function DocumentDetail(props: { id: string }) {
   const [members, setMembers] = useState<Member[]>([]);
   const [types, setTypes] = useState<DocumentTypeView[]>([]);
   const [problem, setProblem] = useState<Problem>(null);
+  const [failedWords, setFailedWords] = useState('');
   const [notice, setNotice] = useState<{ tone: 'ok' | 'warn'; text: string } | null>(null);
   const [warning, setWarning] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -102,8 +105,16 @@ export function DocumentDetail(props: { id: string }) {
     } catch (err) {
       if (err instanceof ApiRequestError && (err.status === 404 || err.code === 'not_found')) setProblem('not_found');
       else if (err instanceof NetworkError) setProblem('offline');
+      else {
+        // Anything else, said with Try again (P5): never a blank page.
+        const words = loadFailure('document', err, t);
+        if (words) {
+          setFailedWords(words);
+          setProblem('failed');
+        }
+      }
     }
-  }, [withToken, id]);
+  }, [withToken, id, t]);
 
   useEffect(() => {
     // Loaded on arrival, again when the connection returns and when the
@@ -189,6 +200,8 @@ export function DocumentDetail(props: { id: string }) {
     return (
       <View style={styles.page} testID="document">
         {problem === 'not_found' ? <Notice tone="warn">{t('document.notFound')}</Notice> : null}
+        {problem === 'failed' ? <LoadFailed words={failedWords} onRetry={() => void load()} /> : null}
+        {problem === null ? <Placeholder rows={2} /> : null}
         {problem === 'offline' ? (
           <Notice tone="warn">
             <Text>{t('document.offline')}</Text>
@@ -297,10 +310,10 @@ export function DocumentDetail(props: { id: string }) {
             <Text tone="soft" variant="secondary" testID="document-notes-edited">
               {shown.notes_updated_by_name
                 ? t('document.notesEditedBy', {
-                    when: whenExactly(shown.notes_updated_at),
+                    when: exactWords(shown.notes_updated_at, zone),
                     name: shown.notes_updated_by_name,
                   })
-                : t('document.notesEdited', { when: whenExactly(shown.notes_updated_at) })}
+                : t('document.notesEdited', { when: exactWords(shown.notes_updated_at, zone) })}
             </Text>
           ) : null}
         </View>
@@ -372,8 +385,8 @@ export function DocumentDetail(props: { id: string }) {
    * and its history reads as in 0.2.0.
    */
   function versionLine(v: VersionView): string {
-    if (v.uploaded_by_name === undefined) return t('document.versionAdded', { when: whenWords(v.uploaded_at) });
-    const when = whenExactly(v.uploaded_at);
+    if (v.uploaded_by_name === undefined) return t('document.versionAdded', { when: relativeWords(v.uploaded_at, zone) });
+    const when = exactWords(v.uploaded_at, zone);
     return v.uploaded_by_name
       ? t('document.versionAddedBy', { when, name: v.uploaded_by_name })
       : t('document.versionAdded', { when });
@@ -437,8 +450,9 @@ function OlderVersion(props: {
 function Unneeded(props: { mark: NoLongerNeededView; open: (id: string) => void }) {
   const styles = useStyles(makeStyles);
   const { t } = useTranslation();
+  const zone = useFamilyZone();
   const { mark } = props;
-  const when = whenExactly(mark.at);
+  const when = exactWords(mark.at, zone);
   const replaced = mark.replaced_by;
   const to = replaced?.id ?? null;
   const replacedWords = replaced ? t('document.unneededReplacedBy', { title: replaced.title ?? ANOTHER_DOCUMENT }) : null;

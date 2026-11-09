@@ -9,6 +9,7 @@ import { useVault } from '../../state/vault';
 import { Notice, Text } from '../../ui';
 import { sp } from '../../ui/space';
 import { useStyles, type Palette } from '../../ui/theme';
+import { LoadFailed, loadFailure, Placeholder } from '../../ui/states';
 
 /** One person's documents (4.12), from People; and their identity details, where the vault keeps them (5.31). */
 export default function PersonScreen() {
@@ -25,6 +26,9 @@ export default function PersonScreen() {
   const [found, setFound] = useState<string | null>(null);
   const name = params.name ?? found ?? undefined;
 
+  // A failure that is not the connection (P5): said, with Try again.
+  const [failed, setFailed] = useState<string | null>(null);
+
   const load = useCallback(async () => {
     try {
       const listed = await withToken((a, tk) => {
@@ -32,14 +36,16 @@ export default function PersonScreen() {
         return a.documents(tk, { member_id: id, limit: 200 });
       });
       setDocs(listed.items);
+      setFailed(null);
       if (params.name === undefined) {
         const people = (await withToken((a, token) => a.members(token))).items;
         setFound(people.find((m) => m.id === id)?.display_name ?? null);
       }
-    } catch {
-      // Offline: the banner says so.
+    } catch (err) {
+      // Offline: the banner says so. Anything else, here.
+      setFailed(loadFailure('person', err, t));
     }
-  }, [withToken, id, params.name]);
+  }, [withToken, id, params.name, t]);
 
   useEffect(() => {
     // Loaded on arrival; the state is set after the request answers.
@@ -69,6 +75,8 @@ export default function PersonScreen() {
           <Text variant="hero">{name ?? ''}</Text>
           {id ? <IdentityCard memberId={id} name={name ?? ''} /> : null}
           {offline && !docs ? <Notice tone="warn">{t('people.needsConnection')}</Notice> : null}
+          {failed ? <LoadFailed words={failed} onRetry={() => void load()} /> : null}
+          {!docs && !failed && !offline ? <Placeholder /> : null}
           {docs && docs.length === 0 ? <Text tone="soft">{t('people.none', { name: name ?? '' })}</Text> : null}
         </>
       }

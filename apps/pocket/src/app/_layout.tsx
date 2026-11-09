@@ -28,6 +28,7 @@ import { TextScaleProvider } from '../ui/text-scale';
 import { WEB_FONTS } from '../ui/web-fonts';
 import { sp } from '../ui/space';
 import { ThemeProvider, useColours, useStyles, useTheme, type Palette } from '../ui/theme';
+import { FamilyTimeProvider } from '../state/family-time';
 
 /** Preview builds say so on every screen: they point at throwaway vaults only. */
 function TestBanner() {
@@ -158,28 +159,30 @@ function Root() {
       <SystemColours />
       <TextScaleProvider>
         <VaultProvider>
-          <LockProvider>
-            <EssentialsProvider>
-              <CaptureProvider>
-                <PushProvider>
-                  <StepUpProvider>
-                    <View style={styles.root}>
-                      {drawn ? null : <View style={styles.loading} />}
-                      <ForgetHttpCache />
-                      <ShowRecovery />
-                      <PushLinks />
-                      {extra.testBanner ? <TestBanner /> : null}
-                      {drawn ? (
-                        <LockGate>
-                          <Gates />
-                        </LockGate>
-                      ) : null}
-                    </View>
-                  </StepUpProvider>
-                </PushProvider>
-              </CaptureProvider>
-            </EssentialsProvider>
-          </LockProvider>
+          <FamilyTimeProvider>
+            <LockProvider>
+              <EssentialsProvider>
+                <CaptureProvider>
+                  <PushProvider>
+                    <StepUpProvider>
+                      <View style={styles.root}>
+                        {drawn ? null : <View style={styles.loading} />}
+                        <ForgetHttpCache />
+                        <ShowRecovery />
+                        <PushLinks />
+                        {extra.testBanner ? <TestBanner /> : null}
+                        {drawn ? (
+                          <LockGate>
+                            <Gates />
+                          </LockGate>
+                        ) : null}
+                      </View>
+                    </StepUpProvider>
+                  </PushProvider>
+                </CaptureProvider>
+              </EssentialsProvider>
+            </LockProvider>
+          </FamilyTimeProvider>
         </VaultProvider>
       </TextScaleProvider>
     </SafeAreaProvider>

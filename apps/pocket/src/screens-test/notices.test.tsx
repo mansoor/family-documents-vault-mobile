@@ -67,9 +67,11 @@ describe('Home tells the person (5.31)', () => {
     expect(within(notice).queryByTestId('home-reset-added')).toBeNull();
   });
 
-  it("the notice's days are this phone's calendar days, as the browser says them, never the UTC day", async () => {
+  it("the notice's days are the family's calendar days (P5), never the UTC day, whatever the phone's zone", async () => {
     const t = testVault([ORIGIN]);
     newer(t);
+    // The family is in California (the vault's profile says so); this phone keeps UTC.
+    t.vault.state.timezone = 'America/Los_Angeles';
     // 18:00 and 19:00 on 3 October in California: already the 4th in UTC.
     t.vault.state.resetNotices.set('fake-member', {
       by: 'Mansoor',
@@ -79,20 +81,10 @@ describe('Home tells the person (5.31)', () => {
       two_step_since: null,
       links_since: [],
     });
-    const original = Intl.DateTimeFormat.prototype.resolvedOptions;
-    const zone = jest.spyOn(Intl.DateTimeFormat.prototype, 'resolvedOptions').mockImplementation(function (
-      this: Intl.DateTimeFormat,
-    ) {
-      return { ...original.call(this), timeZone: 'America/Los_Angeles' };
-    });
-    try {
-      await unlocked(t, <Home />);
-      const notice = await screen.findByTestId('home-reset-notice');
-      expect(notice).toHaveTextContent(/On 3 Oct 2026, Mansoor was given a one-time link/);
-      expect(within(notice).getByTestId('home-reset-added')).toHaveTextContent('• A passkey called “Pixel 9”, on 3 Oct 2026');
-    } finally {
-      zone.mockRestore();
-    }
+    await unlocked(t, <Home />);
+    const notice = await screen.findByTestId('home-reset-notice');
+    await waitFor(() => expect(notice).toHaveTextContent(/On 3 Oct 2026, Mansoor was given a one-time link/));
+    expect(within(notice).getByTestId('home-reset-added')).toHaveTextContent('• A passkey called “Pixel 9”, on 3 Oct 2026');
   });
 
   it('a wider audience for identity details waiting its notice: when, who, and the way to yours', async () => {

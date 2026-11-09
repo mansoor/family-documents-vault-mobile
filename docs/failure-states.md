@@ -94,6 +94,7 @@ Written by `node apps/pocket/scripts/failure-states.mjs`; CI fails if it is out 
 |  |  | `queue.versionRefused` | The vault didn't let you add a new version of this document. Whoever it belongs to can. |
 |  |  | `queue.goesWithout` | It will go without {{names}}: its kind of document no longer asks for it. / It will go without {{names}}: its kind of document no longer asks for them. |
 |  |  | `queue.filedWithout` | {{title}} is in the vault without {{names}}: its kind of document no longer asks for it. / {{title}} is in the vault without {{names}}: its kind of document no longer asks for them. |
+| A list or a page that would not load | Home, Search, Needs attention, People, a person, a document | `states.loadFailed` | Couldn't load this. Try again in a moment. |
 | What the vault read | Home, after Send to my Inbox | `vaultRead.slow` | The vault hasn't finished reading it yet. It's safe in your Inbox, where you can finish it. |
 |  |  | `vaultRead.couldNotRead` | The vault couldn't read its pages. |
 |  |  | `vaultRead.duplicate` | The vault already has this very file. |

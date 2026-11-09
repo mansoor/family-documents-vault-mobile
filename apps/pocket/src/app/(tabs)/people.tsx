@@ -8,6 +8,7 @@ import { useVault } from '../../state/vault';
 import { Notice, Text } from '../../ui';
 import { sp } from '../../ui/space';
 import { useStyles, type Palette } from '../../ui/theme';
+import { LoadFailed, loadFailure, Placeholder } from '../../ui/states';
 
 /** People (4.12): the family, read-only; each leads to their documents. */
 export default function PeopleScreen() {
@@ -17,14 +18,18 @@ export default function PeopleScreen() {
   const { withToken, offline } = useVault();
   const [members, setMembers] = useState<Member[] | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  // A failure that is not the connection (P5): said, with Try again.
+  const [failed, setFailed] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
       setMembers((await withToken((a, token) => a.members(token))).items);
-    } catch {
-      // Offline: the banner says so.
+      setFailed(null);
+    } catch (err) {
+      // Offline: the banner says so. Anything else, here.
+      setFailed(loadFailure('people', err, t));
     }
-  }, [withToken]);
+  }, [withToken, t]);
 
   useEffect(() => {
     // Loaded on arrival; the state is set after the request answers.
@@ -54,6 +59,8 @@ export default function PeopleScreen() {
             {t('people.needsConnection')}
           </Notice>
         ) : null}
+        {failed ? <LoadFailed words={failed} onRetry={() => void load()} /> : null}
+        {!members && !failed && !offline ? <Placeholder rows={4} /> : null}
         {members?.map((m) => {
           const name = m.is_me ? t('people.you', { name: m.display_name }) : m.display_name;
           return (
