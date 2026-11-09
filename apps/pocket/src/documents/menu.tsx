@@ -17,6 +17,7 @@ import {
   Eye,
   FilePlus,
   FileText,
+  FolderMinus,
   FolderPlus,
   Star,
   StarOff,
@@ -29,6 +30,7 @@ import { focusOn } from '../capture/add-button';
 import { renewWords } from '../capture/renew-words';
 import { wordsFor } from '../errors/words';
 import { useCapture } from '../state/capture';
+import { emit } from '../state/events';
 import { useEssentials } from '../state/essentials';
 import { useLock } from '../state/lock';
 import { useStepUp } from '../state/step-up';
@@ -48,7 +50,16 @@ import { useColours, useStyles, type Palette } from '../ui/theme';
  * decides regardless.
  */
 
-export type RowAction = 'open' | 'show' | 'save' | 'version' | 'essential' | 'collect';
+export type RowAction = 'open' | 'show' | 'save' | 'version' | 'essential' | 'collect' | 'remove';
+
+/**
+ * On a collection's page, for its maker (P9, as the web's 0.9.0): Remove
+ * from this collection. `onRemove` takes it out and answers what went
+ * wrong, in words, or null.
+ */
+export interface RemoveFrom {
+  onRemove: () => Promise<string | null>;
+}
 
 /**
  * What the ⋯ offers for one document (A14), in order. With no document yet
@@ -106,7 +117,12 @@ function newer(a: DocumentView | null, b: DocumentView | null): DocumentView | n
  * not from the list's, which nobody reloaded: an Essential made a moment
  * ago is offered as one (U536-02).
  */
-export function useDocumentMenu(props: { id: string; title: string; doc?: DocumentView | null }) {
+export function useDocumentMenu(props: {
+  id: string;
+  title: string;
+  doc?: DocumentView | null;
+  remove?: RemoveFrom | undefined;
+}) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [latest, setLatest] = useState<DocumentView | null>(null);
@@ -150,6 +166,7 @@ export function useDocumentMenu(props: { id: string; title: string; doc?: Docume
       title={props.title}
       doc={newer(props.doc ?? null, latest)}
       onDoc={setLatest}
+      remove={props.remove}
       onClose={close}
     />
   ) : null;
@@ -163,6 +180,7 @@ const ICONS: Record<RowAction, LucideIcon> = {
   version: FilePlus,
   essential: Star,
   collect: FolderPlus,
+  remove: FolderMinus,
 };
 
 type Said = { tone: 'ok' | 'warn'; text: string };
@@ -182,6 +200,7 @@ function DocumentMenu(props: {
   doc: DocumentView | null;
   /** The vault's newest copy, as the sheet fetched or saved it. */
   onDoc: (doc: DocumentView) => void;
+  remove?: RemoveFrom | undefined;
   /** `back`: the focus goes back to the ⋯ (nothing else took it). */
   onClose: (back: boolean) => void;
 }) {
@@ -232,7 +251,10 @@ function DocumentMenu(props: {
   }, [fetchDoc, offline]);
 
   const renewing = capture.queue.some((i) => i.kind === 'version' && i.target === id);
-  const actions = rowActions(who, doc, { collections: caps?.features.collections === true, renewing });
+  const actions: RowAction[] = [
+    ...rowActions(who, doc, { collections: caps?.features.collections === true, renewing }),
+    ...(props.remove ? (['remove'] as const) : []),
+  ];
   const deps: ActionDeps = {
     withToken,
     guarded,
@@ -324,6 +346,14 @@ function DocumentMenu(props: {
         setSaid(null);
         setPicking(true);
         return;
+      case 'remove':
+        void run('remove', async () => {
+          if (offline || !props.remove) return warn(t('document.needsConnection'));
+          const problem = await props.remove.onRemove();
+          if (problem) warn(problem);
+          else props.onClose(false);
+        });
+        return;
     }
   };
 
@@ -341,6 +371,8 @@ function DocumentMenu(props: {
         return doc?.is_essential ? t('row.essentialOff') : t('row.essentialOn');
       case 'collect':
         return t('row.collect');
+      case 'remove':
+        return t('row.removeFrom');
     }
   };
 
@@ -511,6 +543,8 @@ function CollectionPicker(props: {
     setProblem(null);
     try {
       const after = await withToken((a, token) => a.addToCollection(token, collection.id, [props.id]));
+      // Its page and the list of collections, if open behind, look again (P9).
+      emit('collectionChanged', collection.id);
       setData((d) =>
         d
           ? {

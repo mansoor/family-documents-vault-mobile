@@ -6,7 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, Text as RNText, View } from 'react-native';
 import { StatusLine, Text } from '../ui';
 import { font } from '../ui/fonts';
-import { useDocumentMenu } from './menu';
+import { useDocumentMenu, type RemoveFrom } from './menu';
 import { snippetParts } from './snippet';
 import { sp } from '../ui/space';
 import { useColours, useStyles, type Palette } from '../ui/theme';
@@ -32,6 +32,8 @@ export function DocumentRow(props: {
   thumb?: { uri: string; token: string } | null;
   /** What it is called with no title (Home says it needs a name). */
   untitled?: string;
+  /** On a collection's page, for its maker: Remove from this collection in its ⋯ (P9). */
+  remove?: RemoveFrom;
 }) {
   const colours = useColours();
   const styles = useStyles(makeStyles);
@@ -43,7 +45,7 @@ export function DocumentRow(props: {
   );
   const note = props.type_key === NOTE_KIND;
   const Kind = note ? NotebookText : FileText;
-  const menu = useDocumentMenu({ id: props.id, title, doc: props.doc ?? null });
+  const menu = useDocumentMenu({ id: props.id, title, doc: props.doc ?? null, remove: props.remove });
   // Read out as it is shown: its name, its status, and where it matched.
   const said = [
     title,

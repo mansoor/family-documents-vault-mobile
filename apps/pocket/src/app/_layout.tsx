@@ -80,6 +80,10 @@ function Gates() {
         <Stack.Screen name="(tabs)" options={{ headerShown: false, title: t('tabs.home') }} />
         <Stack.Screen name="document/[id]" options={{ title: '' }} />
         <Stack.Screen name="edit/[id]" options={{ title: '' }} />
+        <Stack.Screen name="collections" options={{ title: '' }} />
+        <Stack.Screen name="collection/[id]" options={{ title: '' }} />
+        <Stack.Screen name="notes" options={{ title: '' }} />
+        <Stack.Screen name="new-note" options={{ title: '' }} />
         <Stack.Screen name="person/[id]" options={{ title: '' }} />
         <Stack.Screen name="people" options={{ title: '' }} />
         <Stack.Screen name="documents" options={{ title: '' }} />

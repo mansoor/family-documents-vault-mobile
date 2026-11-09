@@ -1,11 +1,23 @@
 import { can, radii } from '@fdv/shared';
 import * as Linking from 'expo-linking';
 import { useRouter } from 'expo-router';
-import { ChevronRight, ExternalLink, Files, Inbox, Settings, UserRound, Users, type LucideIcon } from 'lucide-react-native';
+import {
+  ChevronRight,
+  ExternalLink,
+  Files,
+  FolderOpen,
+  Inbox,
+  NotebookText,
+  Settings,
+  UserRound,
+  Users,
+  type LucideIcon,
+} from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { collectionsOffered } from '../../collections/rules';
 import { waitingInInbox } from '../../queue/inbox';
 import { useVault } from '../../state/vault';
 import { Text } from '../../ui';
@@ -17,7 +29,7 @@ import { useColours, useStyles, type Palette } from '../../ui/theme';
  * place): everything that is not Home, Search, the + or Needs attention.
  * The family; the person's Inbox, which is finished in the browser;
  * Account (the vault, what a guest may see, signed-in devices); and
- * Settings. Collections and notes join it later in the polish (P9).
+ * Settings. Collections and notes since P9, where the vault has them.
  */
 export default function MoreScreen() {
   const styles = useStyles(makeStyles);
@@ -28,6 +40,9 @@ export default function MoreScreen() {
   // a viewer, and so a guest, has none.
   const inboxOn = caps?.features.batches === true && !!who && can(who.role, 'document.add');
   const [waiting, setWaiting] = useState<number | null>(null);
+  // Collections for whoever makes them, as the web offers them (a viewer, none); notes on a vault of 0.9.0.
+  const collectionsOn = collectionsOffered(caps, who?.role);
+  const notesOn = caps?.features.notes === true;
   useEffect(() => {
     if (!inboxOn || offline) return;
     let stopped = false;
@@ -53,6 +68,24 @@ export default function MoreScreen() {
             hint={t('more.documentsHint')}
             onPress={() => router.push('/documents')}
           />
+          {collectionsOn ? (
+            <Row
+              testID="more-collections"
+              icon={FolderOpen}
+              label={t('collections.title')}
+              hint={t('more.collectionsHint')}
+              onPress={() => router.push('/collections')}
+            />
+          ) : null}
+          {notesOn ? (
+            <Row
+              testID="more-notes"
+              icon={NotebookText}
+              label={t('notesList.title')}
+              hint={t('more.notesHint')}
+              onPress={() => router.push('/notes')}
+            />
+          ) : null}
           <Row
             testID="more-people"
             icon={Users}
