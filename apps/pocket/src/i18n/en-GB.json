@@ -422,7 +422,9 @@
     "account": "Account",
     "documentsHint": "Every document, sorted and narrowed as you like",
     "accountHint": "This vault, who is signed in, and signed-in devices",
-    "settingsHint": "Large text, light or dark, the lock, offline copies, notifications"
+    "settingsHint": "Large text, light or dark, the lock, offline copies, notifications",
+    "collectionsHint": "Documents gathered for a purpose, and what is in each",
+    "notesHint": "Your notes, and a new one"
   },
   "documents": {
     "title": "All documents",
@@ -701,7 +703,8 @@
     "collectionGone": "“{{name}}” is not there any more, so nothing went into it.",
     "documents_one": "1 document",
     "documents_other": "{{count}} documents",
-    "done": "Done"
+    "done": "Done",
+    "removeFrom": "Remove from this collection"
   },
   "notes": {
     "done": "Done",
@@ -737,5 +740,58 @@
     "title": "Move to the Trash?",
     "words": "“{{title}}” leaves every list, search and reminder. You can bring it back from the Trash in the browser.",
     "yes": "Move to the Trash"
+  },
+  "collections": {
+    "title": "Collections",
+    "documents_one": "1 document",
+    "documents_other": "{{count}} documents",
+    "yours": "Made by you",
+    "sharedOutside": "Shared outside the family",
+    "audience_everyone": "Everyone in the family",
+    "audience_adults": "Adults",
+    "audience_teens": "Teens and up",
+    "audience_only_me": "Only me",
+    "audience_some": "Some of the family",
+    "none": "No collections yet. Collections are made in the browser; then Add to a collection, in the ⋯ beside any document, puts documents in one you made.",
+    "needsConnection": "Collections need a connection to the vault."
+  },
+  "collection": {
+    "forWhom": "For {{audience}}",
+    "neverWidens": "Whoever sees a collection sees only the documents in it they could see already.",
+    "gone": "This collection isn't there any more, or isn't one you can see.",
+    "empty": "Nothing in this collection yet.",
+    "emptyYours": "Nothing in this collection yet. Use Add documents, above, or Add to a collection in the ⋯ beside any document.",
+    "add": "Add documents",
+    "addTitle": "Add documents to “{{name}}”",
+    "find": "Find a document",
+    "findNone": "Nothing found for those words.",
+    "nothingYet": "There are no documents to add yet.",
+    "addNone": "Tick the documents to add",
+    "addCount_one": "Add 1 document",
+    "addCount_other": "Add {{count}} documents",
+    "added_one": "1 document is in “{{name}}” now.",
+    "added_other": "{{count}} documents are in “{{name}}” now.",
+    "removed": "“{{title}}” is out of “{{name}}”. It is still in the vault."
+  },
+  "notesList": {
+    "title": "Notes",
+    "new": "New note",
+    "find": "Find in notes",
+    "none": "No notes yet.",
+    "noneMatch": "No notes have “{{q}}” in them.",
+    "truncated": "Only the newest notes are shown. Find in notes to narrow them down.",
+    "untitled": "Untitled note",
+    "changed": "Changed {{when}}",
+    "needsConnection": "Notes need a connection to the vault."
+  },
+  "newNote": {
+    "title": "New note",
+    "name": "Title",
+    "words": "Note",
+    "onlyMeTitle": "Only the words of an Only me note are sealed, not its title: keep anything secret out of the title.",
+    "notFor": "A note is not a password manager: keep passwords and PINs in one, or at the very least in an Only me note.",
+    "tooLong": "Too long to save: {{count}} characters.",
+    "secret": "This looks like a password or a PIN. Everyone who can see this note can read and search it: keep passwords and PINs in a password manager, or make the note Only me.",
+    "secretOnlyMe": "This looks like a password or a PIN. A note is not a password manager: keep them in one if you can."
   }
 }

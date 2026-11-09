@@ -6,6 +6,34 @@ app's own, tagged `vX.Y.Z` in this repository.
 
 ## [Unreleased]
 
+## [0.3.13] — collections and notes (polish P9)
+
+### Added
+- **Collections**, in More, for everyone who makes them (not viewers),
+  where the vault has collections.
+  - The list shows each collection you may see: how many of its documents
+    you can see, who it's for, whether you made it, and whether it's
+    shared outside the family.
+  - A collection's page shows its documents, 50 at a time, in the order
+    they went in, with the same rows as everywhere else. It says who it's
+    for, and that a collection never shows anyone a document they
+    couldn't see already.
+  - For the collection you made:
+    - **Add documents** offers the newest, or finds them by words. Tick
+      the ones you want; those already in it say so. The vault's warning
+      about who else will now see them is shown.
+    - **Remove from this collection** is in each row's ⋯. The document
+      stays in the vault.
+  - Making, sharing and checklists stay in the browser.
+- **Notes**, in More, on a vault of 0.9.0.
+  - Your notes, newest first, each named by its title or its first words,
+    with when it last changed and, when it isn't for the whole family,
+    who can see it.
+  - **Find in notes** narrows them. A note opens like any document.
+  - **New note** asks for a title, who can see it and the words. It warns
+    when the words look like a password or a PIN, and an Only me note
+    says that its title isn't sealed. Saved, it opens.
+
 ## [0.3.12] — a document, changed from the phone (polish P8)
 
 ### Added

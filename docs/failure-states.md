@@ -148,6 +148,10 @@ Written by `node apps/pocket/scripts/failure-states.mjs`; CI fails if it is out 
 |  |  | `document.failed` | That didn't work. Try again. |
 | Changing a document | Edit details | `edit.stillNeeded` | Still needed: {{fields}}. |
 |  |  | `edit.changed` | Someone changed this document while you were editing. Here it is as it is now: check it and save again. |
+| Collections | Collections, a collection | `collections.needsConnection` | Collections need a connection to the vault. |
+|  |  | `collection.gone` | This collection isn't there any more, or isn't one you can see. |
+| Notes | Notes, New note | `notesList.needsConnection` | Notes need a connection to the vault. |
+|  |  | `newNote.tooLong` | Too long to save: {{count}} characters. |
 | A row’s ⋯ | Home, Search, a person | `row.collectionGone` | “{{name}}” is not there any more, so nothing went into it. |
 | A note’s link | Document | `notes.openFailed` | This phone couldn't open that link. |
 | Search, Needs attention, People | Tabs | `search.needsConnection` | Search needs a connection. Your Essentials are under On this phone. |

@@ -2,7 +2,11 @@ import type { DocumentView, VersionView } from '@fdv/shared';
 import { fireEvent, screen } from '@testing-library/react-native';
 import type { ReactElement } from 'react';
 import CaptureScreen from '../app/capture';
+import CollectionScreen from '../app/collection/[id]';
+import CollectionsScreen from '../app/collections';
 import EditScreen from '../app/edit/[id]';
+import NewNoteScreen from '../app/new-note';
+import NotesScreen from '../app/notes';
 import { DocumentDetail } from '../documents/detail';
 import type { Tier } from '../essentials/open';
 import { EssentialPages } from '../essentials/pages';
@@ -52,6 +56,14 @@ export function LookupApp(props: { start: ReactElement }) {
       <CaptureScreen />
     ) : top?.pathname === '/edit/[id]' ? (
       <EditScreen />
+    ) : top?.pathname === '/collections' ? (
+      <CollectionsScreen />
+    ) : top?.pathname === '/collection/[id]' ? (
+      <CollectionScreen />
+    ) : top?.pathname === '/notes' ? (
+      <NotesScreen />
+    ) : top?.pathname === '/new-note' ? (
+      <NewNoteScreen />
     ) : (
       props.start
     );
