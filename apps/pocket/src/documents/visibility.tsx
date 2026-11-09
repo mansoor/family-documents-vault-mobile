@@ -8,6 +8,7 @@ import { wordsFor } from '../errors/words';
 import { useStepUp } from '../state/step-up';
 import { useVault } from '../state/vault';
 import { Button, Notice, Text } from '../ui';
+import { feel } from '../ui/feel';
 import { Sheet } from '../ui/sheet';
 import { sp } from '../ui/space';
 import { useColours, useStyles, type Palette } from '../ui/theme';
@@ -46,6 +47,7 @@ export function VisibilityControl(props: { doc: DocumentView; onChanged: () => P
     try {
       const done = await guarded((a, tk) => a.setVisibility(tk, doc.id, to, ownLinks));
       if (done === null) return;
+      feel('done');
       setOpen(false);
       setLinks(null);
       setSaid({ tone: 'ok', text: done.notice?.body ?? t('visibility.changed', { to: t(`document.visibility_${to}`) }) });

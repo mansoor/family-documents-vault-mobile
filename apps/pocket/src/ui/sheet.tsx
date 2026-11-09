@@ -2,6 +2,7 @@ import { radii } from '@fdv/shared';
 import type { ReactNode } from 'react';
 import { KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useReduceMotion } from './feel';
 import { sp } from './space';
 import { useStyles, type Palette } from './theme';
 
@@ -30,6 +31,8 @@ export function Sheet(props: {
 }) {
   const styles = useStyles(makeStyles);
   const insets = useSafeAreaInsets();
+  // Remove animations (P10): it is there at once, not faded in.
+  const still = useReduceMotion();
   const body = (
     <>
       {props.outside ? (
@@ -54,7 +57,7 @@ export function Sheet(props: {
     <Modal
       visible={props.visible}
       transparent
-      animationType="fade"
+      animationType={still ? 'none' : 'fade'}
       onRequestClose={props.onClose}
       {...(props.onShow ? { onShow: props.onShow } : {})}
     >

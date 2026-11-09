@@ -12,6 +12,7 @@ import { useCapture } from '../../state/capture';
 import { emit, on } from '../../state/events';
 import { useVault } from '../../state/vault';
 import { Button, Card, Notice, Text } from '../../ui';
+import { feel } from '../../ui/feel';
 import { sp } from '../../ui/space';
 import { useStyles, type Palette } from '../../ui/theme';
 import { familyZoneNow } from '../../state/family-time';
@@ -69,7 +70,7 @@ export default function AttentionScreen() {
   // Changed or moved to the Trash on its page (P8).
   useEffect(() => on('documentChanged', () => void load()), [load]);
 
-  const act = async (fn: Parameters<typeof withToken>[0]) => {
+  const act = async (fn: Parameters<typeof withToken>[0], felt = false) => {
     setProblem(null);
     try {
       const answer = await withToken(fn);
@@ -79,6 +80,7 @@ export default function AttentionScreen() {
         setDue((d) => d?.filter((x) => x.id !== answer.id) ?? d);
         setUpcoming((u) => [answer, ...u.filter((x) => x.id !== answer.id)]);
       }
+      if (felt) feel('done');
       await load();
       emit('remindersChanged');
     } catch (err) {
@@ -92,7 +94,7 @@ export default function AttentionScreen() {
   };
   const snooze = (r: ReminderView, days: number) =>
     act((a, token) => a.snoozeReminder(token, r.id, addDays(today(), days)));
-  const done = (r: ReminderView) => act((a, token) => a.acknowledgeReminder(token, r.id));
+  const done = (r: ReminderView) => act((a, token) => a.acknowledgeReminder(token, r.id), true);
   const scanNew = async (r: ReminderView) => {
     setProblem(null);
     const outcome = await capture.renew(r.document_id);

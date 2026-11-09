@@ -6,6 +6,31 @@ app's own, tagged `vX.Y.Z` in this repository.
 
 ## [Unreleased]
 
+## [0.3.14] — the finish (polish P10)
+
+### Changed
+- **The app's own icon and splash.** Until now they were the Expo
+  template's. They now use the vault's shield, as the browser shows it:
+  - white on the vault's green for the icon, and on Android's round and
+    themed icons;
+  - the shield on the page's own colour for the splash, light or dark as
+    the phone is set.
+- **Felt as well as seen:** a short buzz when you Save (the capture card,
+  Edit details, New note, Who can see it), when a scan's pages are taken
+  in, and when a reminder is Done. The phone's own touch-feedback setting
+  decides whether it's felt, and each is still said in words.
+- **Remove animations** is respected: with it on, screens change at once
+  and sheets appear without fading in.
+- **TalkBack:** the test build's banner is no longer read as a heading on
+  every screen, and it's spoken as words rather than spelled out. All
+  documents and a person's page are now checked like every other screen.
+  Every control says what it is, and every control is big enough to
+  press.
+- **200% text:** the person chips' initials grow with the letter instead
+  of being cut off. The banner follows the app's Large text. The 200%
+  emulator run now also covers More, All documents, a document and its
+  Edit details, Notes with New note, and Collections.
+
 ## [0.3.13] — collections and notes (polish P9)
 
 ### Added

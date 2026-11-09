@@ -80,9 +80,11 @@ const makeStyles = (colours: Palette) =>
     },
     chipOn: { backgroundColor: colours.accent, borderColor: colours.accent },
     chipOff: { opacity: 0.45 },
+    // At least 28 across, and as big as its letter at the largest text (P10).
     avatar: {
-      width: 28,
-      height: 28,
+      minWidth: 28,
+      minHeight: 28,
+      paddingHorizontal: sp(4),
       borderRadius: radii.pill,
       alignItems: 'center',
       justifyContent: 'center',

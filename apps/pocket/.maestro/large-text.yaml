@@ -2,7 +2,9 @@
 # by the workflow around this flow) with the app's own Large text on as
 # well. Everything that matters is still reached — by scrolling where it
 # must — on Home, in Settings, in the + menu and on the capture card;
-# nothing is thrown away but the scan made here. Home is known by its list,
+# nothing is thrown away but the scan made here. Since P10 the newer
+# screens too: More, All documents, a document and its Edit details, Notes
+# and New note, and Collections, nothing saved. Home is known by its list,
 # always at the top: at this size the "all calm" line can sit below the
 # fold, under the offer to keep the Essentials.
 appId: io.github.mansoor.familyvault.e2e
@@ -94,6 +96,120 @@ env:
 - back
 - tapOn:
     id: leave-throw
+- extendedWaitUntil:
+    visible:
+      id: home-list
+    timeout: 15000
+
+# The screens since 0.3.0 at that size (P10): More, All documents, the
+# passport the capture flow filed, its Edit details, Notes with New note,
+# and Collections. Each one's last control is reached by scrolling; nothing
+# is saved, so the vault still holds exactly the one document.
+- tapOn:
+    id: tab-more
+- extendedWaitUntil:
+    visible:
+      id: more
+    timeout: 10000
+- scrollUntilVisible:
+    element:
+      id: more-settings
+- scrollUntilVisible:
+    element:
+      id: more-documents
+    direction: UP
+- tapOn:
+    id: more-documents
+- extendedWaitUntil:
+    visible:
+      id: documents
+    timeout: 15000
+- scrollUntilVisible:
+    element:
+      id: doc-row-.*
+    timeout: 30000
+- tapOn:
+    id: doc-row-.*
+- extendedWaitUntil:
+    visible:
+      id: document
+    timeout: 15000
+- scrollUntilVisible:
+    element:
+      id: document-edit
+    timeout: 30000
+- tapOn:
+    id: document-edit
+- extendedWaitUntil:
+    visible:
+      id: edit-name
+    timeout: 15000
+- scrollUntilVisible:
+    element:
+      id: edit-cancel
+    timeout: 30000
+- assertVisible:
+    id: edit-save
+- tapOn:
+    id: edit-cancel
+- extendedWaitUntil:
+    visible:
+      id: document
+    timeout: 10000
+- back
+- extendedWaitUntil:
+    visible:
+      id: documents
+    timeout: 10000
+- back
+- extendedWaitUntil:
+    visible:
+      id: more
+    timeout: 10000
+- scrollUntilVisible:
+    element:
+      id: more-notes
+- tapOn:
+    id: more-notes
+- extendedWaitUntil:
+    visible:
+      id: notes-find
+    timeout: 15000
+- tapOn:
+    id: notes-new
+- extendedWaitUntil:
+    visible:
+      id: new-note-title
+    timeout: 10000
+- scrollUntilVisible:
+    element:
+      id: new-note-cancel
+    timeout: 30000
+- assertVisible:
+    id: new-note-save
+- tapOn:
+    id: new-note-cancel
+- extendedWaitUntil:
+    visible:
+      id: notes-find
+    timeout: 10000
+- back
+- extendedWaitUntil:
+    visible:
+      id: more
+    timeout: 10000
+- scrollUntilVisible:
+    element:
+      id: more-collections
+- tapOn:
+    id: more-collections
+- extendedWaitUntil:
+    visible:
+      id: collections
+    timeout: 15000
+- back
+- tapOn:
+    id: tab-home
 - extendedWaitUntil:
     visible:
       id: home-list

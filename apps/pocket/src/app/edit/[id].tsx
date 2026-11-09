@@ -11,6 +11,7 @@ import { Chip, ChipRow, detailInput } from '../../capture/ui';
 import { draftOf, editBody } from '../../documents/edit';
 import { wordsFor } from '../../errors/words';
 import { emit } from '../../state/events';
+import { feel } from '../../ui/feel';
 import { useStepUp } from '../../state/step-up';
 import { useVault } from '../../state/vault';
 import { Button, Field, Notice, requiredLabel, Text } from '../../ui';
@@ -121,6 +122,7 @@ export default function EditScreen() {
       // Through the step-up, as the page's own Essential switch is.
       const saved = await guarded((a, tk) => a.updateDocument(tk, doc.id, out.body ?? {}, doc.etag));
       if (saved === null) return;
+      feel('done');
       emit('documentChanged', saved.id);
       router.back();
     } catch (err) {

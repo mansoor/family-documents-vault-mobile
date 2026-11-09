@@ -41,7 +41,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     name,
     slug: 'family-vault',
     scheme: variant === 'release' ? 'familyvault' : `familyvault-${variant}`,
-    version: '0.3.13',
+    version: '0.3.14',
     orientation: 'portrait',
     icon: './assets/icon.png',
     // Light or dark, as the phone is set (P4); Settings can fix it to one.
@@ -59,8 +59,9 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     },
     android: {
       package: id,
+      // The vault's shield on its accent (P10; scripts/draw-icons.py draws them).
       adaptiveIcon: {
-        backgroundColor: '#FAF8F4',
+        backgroundColor: '#1F5D4C',
         foregroundImage: './assets/android-icon-foreground.png',
         backgroundImage: './assets/android-icon-background.png',
         monochromeImage: './assets/android-icon-monochrome.png',
@@ -106,6 +107,17 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       ],
       'expo-sharing',
       'expo-image',
+      // The shield on the page's own colour, light or dark as the phone is set (P10).
+      [
+        'expo-splash-screen',
+        {
+          image: './assets/splash-icon.png',
+          imageWidth: 160,
+          resizeMode: 'contain',
+          backgroundColor: '#FAF8F4',
+          dark: { image: './assets/splash-icon-dark.png', backgroundColor: '#1E2633' },
+        },
+      ],
       'expo-localization',
       'expo-status-bar',
       './plugins/with-network-security.js',
