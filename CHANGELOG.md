@@ -6,6 +6,33 @@ app's own, tagged `vX.Y.Z` in this repository.
 
 ## [Unreleased]
 
+## [0.3.12] — a document, changed from the phone (polish P8)
+
+### Added
+- **Edit details** on a document's page, for whoever may change it. It
+  asks what the capture card asks, already filled in:
+  - what it is and whose it is;
+  - its name, and the fields its kind shows (issued by, number, dates,
+    where the paper is kept);
+  - the kind's own details.
+
+  **Save** checks what the card checks and says what's still needed, in
+  the kind's own words. Empty a field and it's taken away. On a vault
+  that keeps each version's details, saving also confirms them for the
+  newest version. If someone changed the document meanwhile, nothing is
+  overwritten: the phone says so and shows it as it is now.
+- **Who can see it** can be changed from the page: press the chip and
+  choose, as the browser allows you (Everyone in the family, Adults only,
+  Only me). Making a document Only me while you have share links to it
+  asks whether they end or keep working, where the household lets them.
+- **Move to the Trash**, after an "are you sure?". It can be brought back
+  from the Trash in the browser. A teen can do this only for their own
+  documents.
+- A document's **tags** and the **collections** it's in are shown on its
+  page.
+- Home, Needs attention, Search and All documents look again when a
+  document changes or goes to the Trash.
+
 ## [0.3.11] — all your documents (polish P7)
 
 ### Added

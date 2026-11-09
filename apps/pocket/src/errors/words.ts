@@ -59,6 +59,8 @@ export const CATALOGUE: Readonly<Record<string, string>> = {
   renewal_undo_open: 'renewal.undoOpen',
   renewal_kept: 'renewal.kept',
   renewal_not_undoable: 'renewal.notUndoable',
+  // Into Only me with share links of the person's own (P8): Who can see it asks what becomes of them.
+  links_choice_needed: 'errors.linksChoice',
 };
 
 /** The vault's "not now" answers: a scan waiting on one of these is sent again later by itself. */

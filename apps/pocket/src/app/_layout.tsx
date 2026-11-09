@@ -79,6 +79,7 @@ function Gates() {
       <Stack.Protected guard={phase === 'ready'}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false, title: t('tabs.home') }} />
         <Stack.Screen name="document/[id]" options={{ title: '' }} />
+        <Stack.Screen name="edit/[id]" options={{ title: '' }} />
         <Stack.Screen name="person/[id]" options={{ title: '' }} />
         <Stack.Screen name="people" options={{ title: '' }} />
         <Stack.Screen name="documents" options={{ title: '' }} />

@@ -2,6 +2,7 @@ import type { DocumentView, VersionView } from '@fdv/shared';
 import { fireEvent, screen } from '@testing-library/react-native';
 import type { ReactElement } from 'react';
 import CaptureScreen from '../app/capture';
+import EditScreen from '../app/edit/[id]';
 import { DocumentDetail } from '../documents/detail';
 import type { Tier } from '../essentials/open';
 import { EssentialPages } from '../essentials/pages';
@@ -49,6 +50,8 @@ export function LookupApp(props: { start: ReactElement }) {
       <ShowMode id={id} online={online} onLeave={back} platform={quietPlatform} />
     ) : top?.pathname === '/capture' ? (
       <CaptureScreen />
+    ) : top?.pathname === '/edit/[id]' ? (
+      <EditScreen />
     ) : (
       props.start
     );

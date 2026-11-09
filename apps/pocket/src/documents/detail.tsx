@@ -19,6 +19,7 @@ import { RefreshControl, ScrollView, StyleSheet, Switch, View } from 'react-nati
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { renewWords } from '../capture/renew-words';
 import { useCapture } from '../state/capture';
+import { on } from '../state/events';
 import { useEssentials } from '../state/essentials';
 import { useLock } from '../state/lock';
 import { useStepUp } from '../state/step-up';
@@ -30,6 +31,8 @@ import { detailFacts } from './details';
 import { NoteText } from './notes';
 import { latestOf } from './online';
 import { warnedAboutCopies } from './save-copy';
+import { TrashButton } from './trash';
+import { VisibilityControl } from './visibility';
 import { sp } from '../ui/space';
 import { useColours, useStyles, type Palette } from '../ui/theme';
 import { exactWords, relativeWords, useFamilyZone } from '../state/family-time';
@@ -53,7 +56,7 @@ export function DocumentDetail(props: { id: string }) {
   const { id } = props;
   const { t } = useTranslation();
   const router = useRouter();
-  const { withToken, offline, who } = useVault();
+  const { withToken, offline, who, caps } = useVault();
   // Every time on this page on the family's clock (P5).
   const zone = useFamilyZone();
   const { guarded } = useStepUp();
@@ -74,6 +77,8 @@ export function DocumentDetail(props: { id: string }) {
   const [preparing, setPreparing] = useState(false);
   const [toggling, setToggling] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  // The collections it is in (P8), of those the person may see.
+  const [inCollections, setInCollections] = useState<{ id: string; name: string }[]>([]);
   const warn = useCallback((text: string) => setNotice({ tone: 'warn', text }), []);
 
   const kept = essentials.items.find((i) => i.id === id) ?? null;
@@ -83,24 +88,31 @@ export function DocumentDetail(props: { id: string }) {
   const mayChange = !!who && can(who.role, 'document.edit') && (who.role !== 'teen' || mine);
   const renewing = capture.queue.some((i) => i.kind === 'version' && i.target === id);
   const note = shown?.type_key === NOTE_KIND;
+  // Into the Trash: a teen, only their own (P8), as the web allows.
+  const mayTrash = !!who && can(who.role, 'document.delete') && (who.role !== 'teen' || mine);
+  const hasCollections = caps?.features.collections === true;
   const mayAddVersion =
     !!who && can(who.role, 'document.add') && (who.role !== 'teen' || mine) && !renewing && !note;
 
   const load = useCallback(async () => {
     try {
-      const [d, v, m, ty] = await withToken((a, token) =>
+      const [d, v, m, ty, c] = await withToken((a, token) =>
         Promise.all([
           a.document(token, id),
           a.versions(token, id),
           a.members(token).catch(() => ({ items: [] })),
           // For the type's details: its own fields, and its names for them.
           a.documentTypes(token).catch(() => ({ items: [] })),
+          hasCollections
+            ? a.documentCollections(token, id).catch(() => ({ items: [] }))
+            : Promise.resolve({ items: [] }),
         ]),
       );
       setDoc(d);
       setVersions(v.items);
       setMembers(m.items);
       setTypes(ty.items);
+      setInCollections(c.items.map((x) => ({ id: x.id, name: x.name })));
       setProblem(null);
     } catch (err) {
       if (err instanceof ApiRequestError && (err.status === 404 || err.code === 'not_found')) setProblem('not_found');
@@ -114,7 +126,7 @@ export function DocumentDetail(props: { id: string }) {
         }
       }
     }
-  }, [withToken, id, t]);
+  }, [withToken, id, t, hasCollections]);
 
   useEffect(() => {
     // Loaded on arrival, again when the connection returns and when the
@@ -122,6 +134,8 @@ export function DocumentDetail(props: { id: string }) {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void load();
   }, [load, offline, capture.delivered]);
+  // Its details changed on Edit details: looked at again.
+  useEffect(() => on('documentChanged', (changed) => (changed === id ? void load() : undefined)), [id, load]);
 
   const latest = latestOf(versions);
   // What this page and a row's ⋯ do alike (5.36). The store itself is asked
@@ -241,11 +255,15 @@ export function DocumentDetail(props: { id: string }) {
           open={(to) => router.push({ pathname: '/document/[id]', params: { id: to } })}
         />
       ) : null}
-      <View style={styles.chip} testID="document-visibility">
-        <Text variant="secondary" weight="600">
-          {t(`document.visibility_${shown.visibility}`)}
-        </Text>
-      </View>
+      {doc && !offline ? (
+        <VisibilityControl doc={doc} onChanged={load} />
+      ) : (
+        <View style={styles.chip} testID="document-visibility">
+          <Text variant="secondary" weight="600">
+            {t(`document.visibility_${shown.visibility}`)}
+          </Text>
+        </View>
+      )}
       {problem === 'offline' || offline ? (
         <Notice tone="warn" testID="document-offline">
           {t('document.offline')}
@@ -299,6 +317,36 @@ export function DocumentDetail(props: { id: string }) {
             <Text>{value}</Text>
           </View>
         ))}
+      {(shown.tags ?? []).length > 0 ? (
+        <View style={styles.fact} testID="document-tags">
+          <Text tone="soft" variant="secondary">
+            {t('document.tags')}
+          </Text>
+          <View style={styles.tags}>
+            {shown.tags.map((tag) => (
+              <View key={tag} style={styles.tag}>
+                <Text variant="secondary">{tag}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+      ) : null}
+      {inCollections.length > 0 ? (
+        <View style={styles.fact} testID="document-collections">
+          <Text tone="soft" variant="secondary">
+            {t('document.collections')}
+          </Text>
+          <Text>{inCollections.map((c) => c.name).join(', ')}</Text>
+        </View>
+      ) : null}
+      {mayChange && doc && !note && !offline ? (
+        <Button
+          testID="document-edit"
+          kind="quiet"
+          label={t('document.edit')}
+          onPress={() => router.push({ pathname: '/edit/[id]', params: { id } })}
+        />
+      ) : null}
 
       {/* Its note (5.35), read only, from a vault that has notes you can
           write: an older one says nothing of when a note last changed. */}
@@ -368,6 +416,9 @@ export function DocumentDetail(props: { id: string }) {
           label={t('document.addVersion')}
           onPress={() => void addVersion()}
         />
+      ) : null}
+      {mayTrash && doc && !offline ? (
+        <TrashButton id={id} title={documentName(doc, t('document.untitled'))} onGone={() => router.back()} />
       ) : null}
     </ScrollView>
   );
@@ -484,6 +535,14 @@ const makeStyles = (colours: Palette) =>
       backgroundColor: colours.accentSoft,
     },
     fact: { gap: sp(4) },
+    tags: { flexDirection: 'row', flexWrap: 'wrap', gap: sp(8) },
+    tag: {
+      paddingHorizontal: sp(10),
+      paddingVertical: sp(4),
+      borderRadius: radii.pill,
+      borderWidth: 1,
+      borderColor: colours.border,
+    },
     notes: { gap: sp(8) },
     switchRow: { flexDirection: 'row', alignItems: 'center', gap: sp(12), minHeight: 56 },
     flex: { flex: 1 },

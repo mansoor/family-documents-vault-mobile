@@ -153,6 +153,18 @@ export interface Library {
    */
   renewals: Record<string, unknown>[];
   undoable: Map<string, DocumentView>;
+  /**
+   * Who can see it (P8): each POST /documents/{id}/visibility, in order;
+   * a document here has share links of the person's own, so a change to
+   * Only me without `own_links` is asked about first (409
+   * links_choice_needed), Keep offered when `keep` says.
+   */
+  visibilityChanges: { id: string; visibility: string; own_links?: string }[];
+  ownLinks: Map<string, { links: number; keep: boolean }>;
+  /** The collections each document is in (GET /documents/{id}/collections). */
+  collections: Map<string, { id: string; name: string }[]>;
+  /** Moved to the Trash (DELETE /documents/{id}), in order. */
+  trashed: string[];
 }
 
 const JPEG = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x02, 0xff, 0xd9]);
@@ -222,6 +234,10 @@ export function testVault(origins: string[] = ['https://vault.test']): TestVault
       asked: [],
       renewals: [],
       undoable: new Map(),
+      visibilityChanges: [],
+      ownLinks: new Map(),
+      collections: new Map(),
+      trashed: [],
     },
     fetch: async (url, init) => {
       t.calls.push(`${init.method} ${url}`);
@@ -392,6 +408,39 @@ async function library(t: TestVault, path: string, init: Parameters<FetchLike>[1
       lib.documents.set(doc.id, next);
       return json(next);
     }
+  }
+  if (m?.[1] && lib.documents.has(m[1]) && init.method === 'DELETE') {
+    lib.trashed.push(m[1]);
+    lib.documents.delete(m[1]);
+    return { ...json(null), status: 204, text: async () => '' } as Reply;
+  }
+  // Who can see it (P8), as the vault of 0.9.0 answers it.
+  m = /^\/api\/v1\/documents\/([^/]+)\/visibility$/.exec(q);
+  if (m?.[1] && init.method === 'POST' && lib.documents.has(m[1])) {
+    const doc = lib.documents.get(m[1]) as DocumentView;
+    const own = lib.ownLinks.get(doc.id);
+    if (body.visibility === 'private' && own && body.own_links === undefined) {
+      const links = Array.from({ length: own.links }, (_, i) => ({ id: `link-${i}` }));
+      const error = {
+        code: 'links_choice_needed',
+        message: 'You have share links to this document.',
+        detail: JSON.stringify({ links, keep_allowed: own.keep, others: 0 }),
+      };
+      return { ...failure(409, 'links_choice_needed', error.message), json: async () => ({ error }) } as Reply;
+    }
+    lib.visibilityChanges.push({
+      id: doc.id,
+      visibility: String(body.visibility),
+      ...(typeof body.own_links === 'string' ? { own_links: body.own_links } : {}),
+    });
+    lib.documents.set(doc.id, { ...doc, visibility: body.visibility as DocumentView['visibility'], etag: nextEtag() });
+    const notice =
+      body.own_links === 'end' ? { title: 'Links ended', body: 'Your share links to it have ended.' } : null;
+    return json({ notice });
+  }
+  m = /^\/api\/v1\/documents\/([^/]+)\/collections$/.exec(q);
+  if (m?.[1] && init.method === 'GET' && lib.documents.has(m[1])) {
+    return json({ items: (lib.collections.get(m[1]) ?? []).map((c) => ({ ...c, description: null, mine: true, item_count: 1 })) });
   }
   // A new version's details (P2), as the vault of 0.9.0 answers them.
   m = /^\/api\/v1\/documents\/([^/]+)\/suggestions$/.exec(q);

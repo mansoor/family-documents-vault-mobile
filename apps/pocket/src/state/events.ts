@@ -12,6 +12,8 @@ interface Events {
   remindersChanged: [];
   /** The vault pushed `notice` (5.31): something about the person's details is changing; Home looks again. */
   noticesChanged: [];
+  /** A document's details, who can see it, or the Trash changed on the phone (P8): lists showing it look again. */
+  documentChanged: [id: string];
 }
 
 type Listener<K extends keyof Events> = (...args: Events[K]) => void;
@@ -22,6 +24,7 @@ const listeners: { [K in keyof Events]: Set<Listener<K>> } = {
   sessionEnded: new Set(),
   remindersChanged: new Set(),
   noticesChanged: new Set(),
+  documentChanged: new Set(),
 };
 
 export function on<K extends keyof Events>(event: K, fn: Listener<K>): () => void {

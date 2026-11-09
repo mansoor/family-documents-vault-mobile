@@ -495,7 +495,10 @@
     "tryAgain": "Try again",
     "pageFailed": "The pages couldn't be fetched. Check the connection and try again.",
     "preparingShow": "Getting the pages ready…",
-    "failed": "That didn't work. Try again."
+    "failed": "That didn't work. Try again.",
+    "edit": "Edit details",
+    "tags": "Tags",
+    "collections": "In collections"
   },
   "search": {
     "title": "Search",
@@ -667,7 +670,8 @@
     "batchEnded": "The batch it was going into has ended. Remove it here and scan it again.",
     "batchFull": "The batch it was going into is full. Remove it here and scan it again.",
     "changedElsewhere": "This was changed somewhere else, so nothing was saved. Look at it again, then try again.",
-    "alreadyDecided": "It's already been dealt with in your Inbox."
+    "alreadyDecided": "It's already been dealt with in your Inbox.",
+    "linksChoice": "You have share links to this document. Say whether they end or keep working, then try again."
   },
   "inbox": {
     "batchName": "From my phone, {{date}}"
@@ -707,5 +711,31 @@
     "openMail": "Open {{address}} in your email app?",
     "open": "Open it",
     "openFailed": "This phone couldn't open that link."
+  },
+  "edit": {
+    "title": "Edit details",
+    "save": "Save",
+    "stillNeeded": "Still needed: {{fields}}.",
+    "changed": "Someone changed this document while you were editing. Here it is as it is now: check it and save again."
+  },
+  "visibility": {
+    "title": "Who can see it",
+    "button": "Who can see it: {{now}}. Change",
+    "change": "Change",
+    "changed": "Now: {{to}}.",
+    "hint_household": "Anybody with a sign-in here can open it.",
+    "hint_adults": "The teens and viewers will not see it.",
+    "hint_private": "Nobody else, including the owner of this vault.",
+    "links_one": "You have a share link to this document. Made Only me, should it end, or keep working?",
+    "links_other": "You have {{count}} share links to this document. Made Only me, should they end, or keep working?",
+    "linksNoKeep": "This household doesn’t share Only me documents outside the family, so they end.",
+    "linksEnd": "End these links",
+    "linksKeep": "Keep them: the people they are for can still open it"
+  },
+  "trash": {
+    "button": "Move to the Trash",
+    "title": "Move to the Trash?",
+    "words": "“{{title}}” leaves every list, search and reminder. You can bring it back from the Trash in the browser.",
+    "yes": "Move to the Trash"
   }
 }
