@@ -5,6 +5,7 @@ import {
   formatDate,
   localToday,
   shareEndWords,
+  type Capabilities,
   type DocumentView,
   type IdentityAudienceView,
   type Member,
@@ -35,6 +36,7 @@ import { useVault } from '../../state/vault';
 import { Button, Card, Notice, Text } from '../../ui';
 import { DocumentRow } from '../../documents/row';
 import { sp } from '../../ui/space';
+import { VaultRead } from '../../capture/vault-read';
 
 interface HomeData {
   due: ReminderView[];
@@ -256,11 +258,19 @@ export default function Home() {
             ) : null}
             {capture.saved ? (
               <SavedLine
-                text={savedWords(capture.saved, t, caps?.features.version_details === true)}
+                text={savedWords(capture.saved, t, caps)}
                 onDismiss={capture.dismissSaved}
                 {...(capture.saved.renewalSent && capture.saved.renews && caps?.features.version_details === true
                   ? { renews: capture.saved.renews }
                   : {})}
+              />
+            ) : null}
+            {/* What the vault read of a scan sent to the Inbox (P3), where it can say. */}
+            {capture.saved?.inboxItem && caps?.features.batch_review === true ? (
+              <VaultRead
+                key={capture.saved.inboxItem.item}
+                batch={capture.saved.inboxItem.batch}
+                item={capture.saved.inboxItem.item}
               />
             ) : null}
             {capture.filedWithout.length > 0 ? (
@@ -507,8 +517,11 @@ function WideningNotice(props: { pending: NonNullable<IdentityAudienceView['pend
 }
 
 /** What Home says once a capture is safe on the phone. */
-function savedWords(note: SavedNote, t: TFunction, versionDetails: boolean): string {
+function savedWords(note: SavedNote, t: TFunction, caps: Capabilities | null): string {
+  const versionDetails = caps?.features.version_details === true;
   if (note.inbox) {
+    // What the vault reads of it is shown below the line, where it can be filed (P3).
+    if (note.inboxSent && note.inboxItem && caps?.features.batch_review === true) return t('home.savedInboxReading');
     if (note.inboxSent) return t('home.savedInbox');
     if (note.inboxFiled) return t('home.savedInboxFiled');
     return t(note.offline ? 'home.savedInboxOffline' : 'home.savedInboxSending');

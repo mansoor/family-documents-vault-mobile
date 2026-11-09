@@ -62,12 +62,19 @@ env:
 - tapOn:
     id: capture-inbox
 
-# Home: said once the vault has it, then counted.
+# Home: said once the vault has it, then counted. A vault that reads it and
+# files it from a card (batch_review) says what it reads is below (P3).
 - extendedWaitUntil:
-    visible: 'Sent to your Inbox\. Finish it on the web: it will suggest the details\..*'
+    visible: 'Sent to your Inbox\. (Finish it on the web: it will suggest the details|What the vault reads of it is below)\..*'
     timeout: 60000
+# What the vault read (P3): still reading, or read. Never filed here: the
+# workflow checks the batch still holds it, and no document was made.
 - extendedWaitUntil:
-    visible:
+    visible: '(The vault is reading your scan…|The vault read your scan:|The vault hasn.t finished reading it yet.*)'
+    timeout: 30000
+# The card sits above the Inbox count now.
+- scrollUntilVisible:
+    element:
       id: home-inbox
     timeout: 30000
 - assertVisible: '1 waiting in your Inbox: review it in the browser'

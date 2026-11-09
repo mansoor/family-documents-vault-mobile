@@ -63,6 +63,8 @@ export interface SavedNote {
   inboxSent?: boolean;
   /** A vault with no batches (rolled back) filed it instead, as Only me (I5-1). */
   inboxFiled?: boolean;
+  /** Which item of which batch it is, once in: what the vault read of it is shown under the line (P3). */
+  inboxItem?: { batch: string; item: string };
   /** Saved with no connection to the vault: it goes when there is one. */
   offline?: boolean;
   /** A new version of a document already in the vault: which document. */
@@ -280,6 +282,8 @@ export function CaptureProvider(props: { children: ReactNode; deps?: Partial<Cap
       });
     // What became of each Inbox scan the uploader sent, for the Saved line.
     const outcomes = new Map<string, InboxOutcome | 'filed'>();
+    // And which batch item each became (P3), for what the vault read of it.
+    const inboxItems = new Map<string, { batch: string; item: string }>();
     /**
      * A scan sent to the Inbox (I5): into the day's batch, where the vault
      * has batches. One that has none — rolled back since, as it says now,
@@ -292,14 +296,15 @@ export function CaptureProvider(props: { children: ReactNode; deps?: Partial<Cap
       let caps = current.current.caps ?? (await up.capabilities());
       if (caps.features.batches === true) {
         try {
-          const outcome = await sendToInbox(item, bytes, {
+          const sent = await sendToInbox(item, bytes, {
             api: up,
             token,
             store,
             now: deps.now,
             name: (at) => i18n.t('inbox.batchName', { date: shortDay(at) }),
           });
-          outcomes.set(item.id, outcome);
+          outcomes.set(item.id, sent.outcome);
+          if (sent.outcome === 'sent') inboxItems.set(item.id, { batch: sent.batch, item: sent.item });
           return { document_id: null };
         } catch (err) {
           if (!(err instanceof NoBatchesError)) throw err;
@@ -375,12 +380,14 @@ export function CaptureProvider(props: { children: ReactNode; deps?: Partial<Cap
           // with on the web already — nothing more to say.
           const outcome = outcomes.get(e.item.id);
           outcomes.delete(e.item.id);
+          const inboxItem = inboxItems.get(e.item.id);
+          inboxItems.delete(e.item.id);
           if (e.item.kind === 'inbox' && e.item.id === savedItem.current) {
             setSaved((n) =>
               !n?.inbox
                 ? n
                 : outcome === 'sent'
-                  ? { ...n, offline: false, inboxSent: true }
+                  ? { ...n, offline: false, inboxSent: true, ...(inboxItem ? { inboxItem } : {}) }
                   : outcome === 'filed'
                     ? { ...n, offline: false, inboxFiled: true }
                     : null,

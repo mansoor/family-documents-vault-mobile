@@ -6,6 +6,30 @@ app's own, tagged `vX.Y.Z` in this repository.
 
 ## [Unreleased]
 
+## [0.3.7] — what the vault read (polish P3)
+
+With a vault that reads what comes into the Inbox and files it from a card
+(`batch_review`, 0.7.0 or later). With an older one, Send to my Inbox works
+as before.
+
+### Added
+- **What the vault read of a scan sent to your Inbox**, on Home under the
+  Saved line. While the vault reads it, Home says "The vault is reading
+  your scan…". Then it shows what it read: what it is, whose it is, the
+  issuer, the dates and the number. It also says, in the vault's words,
+  anything the vault isn't sure of. The vault reads the scan; the phone
+  never does.
+- **File it like this.** When the vault calls the scan Ready, it can be
+  filed from the phone. The phone files exactly what the browser files
+  for a card nobody changed, with the batch's defaults. Then Home says
+  what it was filed as, with **Open it**.
+- **Finish in the browser.** A scan the vault isn't sure about, one it
+  already has, a probable new version of a document, or pages it couldn't
+  read are finished in the browser, at that very item. There, any detail
+  can be changed. Nothing is ever filed unasked.
+- If the vault takes longer than 3 minutes to read it, Home says it's
+  safe in your Inbox, where you can finish it.
+
 ## [0.3.6] — new versions, confirmed (polish P2)
 
 With a vault of 0.9.0 (0.9.0-dev.25 or later), which keeps each version's
