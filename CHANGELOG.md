@@ -6,6 +6,22 @@ app's own, tagged `vX.Y.Z` in this repository.
 
 ## [Unreleased]
 
+## [0.3.11] — all your documents (polish P7)
+
+### Added
+- **All documents**: every document you may see, in one list, with the
+  same rows as Home and Search, each with its picture. You reach it with
+  **See all** beside Recently added on Home, or from More.
+  - **Sort** by when a document was added, by title, or by when it
+    expires.
+  - **Narrow** by whose it is, its kind, its status (Expired, Expiring
+    soon, Needs details, In date, No longer needed) and who can see it.
+    Press a chosen chip again to let go of it.
+  - The first 50 come at once, and the next 50 as you scroll to the end.
+  - The list says when nothing matches, and how to widen it. It shows
+    grey rows while it loads, and Try again when it can't load.
+  - Search keeps its own job: words first.
+
 ## [0.3.10] — More (polish P6)
 
 ### Changed

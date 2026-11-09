@@ -1,7 +1,7 @@
 import { can, radii } from '@fdv/shared';
 import * as Linking from 'expo-linking';
 import { useRouter } from 'expo-router';
-import { ChevronRight, ExternalLink, Inbox, Settings, UserRound, Users, type LucideIcon } from 'lucide-react-native';
+import { ChevronRight, ExternalLink, Files, Inbox, Settings, UserRound, Users, type LucideIcon } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
@@ -46,6 +46,13 @@ export default function MoreScreen() {
       <ScrollView testID="more" contentContainerStyle={styles.page}>
         <Text variant="hero">{t('more.title')}</Text>
         <View style={styles.group}>
+          <Row
+            testID="more-documents"
+            icon={Files}
+            label={t('documents.title')}
+            hint={t('more.documentsHint')}
+            onPress={() => router.push('/documents')}
+          />
           <Row
             testID="more-people"
             icon={Users}
