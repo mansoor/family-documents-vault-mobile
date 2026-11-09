@@ -1,4 +1,4 @@
-import { colours, type CaptureMetadata, type Member } from '@fdv/shared';
+import { type CaptureMetadata, type Member } from '@fdv/shared';
 import type { TFunction } from 'i18next';
 import { BUSY_CODES, wordsForCode } from '../errors/words';
 import { useTranslation } from 'react-i18next';
@@ -8,6 +8,7 @@ import { andList } from './draft';
 import { Button, Card, Text } from '../ui';
 import { Chip, ChipRow, sizeWords } from './ui';
 import { sp } from '../ui/space';
+import { useStyles, type Palette } from '../ui/theme';
 
 /** Codes that mean the vault is there but not taking it just now. */
 
@@ -65,6 +66,7 @@ export function QueueRow(props: {
   /** Sent again; with new details when a person put them right, or as it was. */
   onRetry: (metadata?: CaptureMetadata) => void;
 }) {
+  const styles = useStyles(makeStyles);
   const { t } = useTranslation();
   const { item } = props;
   const p = item.problem;
@@ -143,8 +145,9 @@ export function QueueRow(props: {
   );
 }
 
-const styles = StyleSheet.create({
-  row: { gap: sp(4) },
-  needsYou: { gap: sp(6), borderColor: colours.danger },
-  choices: { gap: sp(6) },
-});
+const makeStyles = (colours: Palette) =>
+  StyleSheet.create({
+    row: { gap: sp(4) },
+    needsYou: { gap: sp(6), borderColor: colours.danger },
+    choices: { gap: sp(6) },
+  });

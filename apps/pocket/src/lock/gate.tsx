@@ -1,9 +1,9 @@
-import { colours } from '@fdv/shared';
 import type { ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useLock } from '../state/lock';
 import { useVault } from '../state/vault';
 import { LockScreen } from './lock-screen';
+import { useStyles, type Palette } from '../ui/theme';
 
 /**
  * What the lock allows on screen: while locked, the lock screen and nothing
@@ -13,6 +13,7 @@ import { LockScreen } from './lock-screen';
  * the person is where they were.
  */
 export function LockGate(props: { children: ReactNode }) {
+  const styles = useStyles(makeStyles);
   const { phase } = useVault();
   const { status, covered, lockedFor } = useLock();
   // After Show mode, the lock screen whatever the phase: signed out (an
@@ -28,7 +29,8 @@ export function LockGate(props: { children: ReactNode }) {
   );
 }
 
-const styles = StyleSheet.create({
-  root: { flex: 1 },
-  cover: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, backgroundColor: colours.bg },
-});
+const makeStyles = (colours: Palette) =>
+  StyleSheet.create({
+    root: { flex: 1 },
+    cover: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, backgroundColor: colours.bg },
+  });

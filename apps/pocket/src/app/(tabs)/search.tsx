@@ -1,5 +1,5 @@
 import { NetworkError } from '@fdv/client';
-import { categoryLabel, colours, type DocumentView, type Member, type SearchHit } from '@fdv/shared';
+import { categoryLabel, type DocumentView, type Member, type SearchHit } from '@fdv/shared';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FlatList, ScrollView, StyleSheet, View } from 'react-native';
@@ -9,6 +9,7 @@ import { useVault } from '../../state/vault';
 import { Field, Notice, Text } from '../../ui';
 import { Chip } from '../../ui/chip';
 import { sp } from '../../ui/space';
+import { useStyles, type Palette } from '../../ui/theme';
 
 /** How long typing pauses before the vault is asked (FND). */
 export const SEARCH_DEBOUNCE_MS = 250;
@@ -32,6 +33,7 @@ type Row = {
  * so — and where the kept Essentials are.
  */
 export default function SearchScreen() {
+  const styles = useStyles(makeStyles);
   const { t } = useTranslation();
   const { withToken, offline } = useVault();
   const [q, setQ] = useState('');
@@ -230,9 +232,10 @@ export default function SearchScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colours.bg },
-  page: { padding: sp(20), gap: sp(10) },
-  header: { gap: sp(12) },
-  chips: { gap: sp(8), paddingVertical: sp(4) },
-});
+const makeStyles = (colours: Palette) =>
+  StyleSheet.create({
+    safe: { flex: 1, backgroundColor: colours.bg },
+    page: { padding: sp(20), gap: sp(10) },
+    header: { gap: sp(12) },
+    chips: { gap: sp(8), paddingVertical: sp(4) },
+  });

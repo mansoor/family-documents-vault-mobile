@@ -1,4 +1,4 @@
-import { colours, radii, statusTone, TAP_MIN, type as typeScale, type Status } from '@fdv/shared';
+import { radii, statusTone, TAP_MIN, type as typeScale, type Status } from '@fdv/shared';
 import { AlertTriangle, CheckCircle2, Clock, Info, XCircle, type LucideIcon } from 'lucide-react-native';
 import { useCallback, useEffect, useRef, type ReactNode } from 'react';
 import {
@@ -16,6 +16,7 @@ import {
 import { font, type Weight } from './fonts';
 import { useTextScale } from './text-scale';
 import { sp } from './space';
+import { useColours, useStyles, type Palette } from './theme';
 
 /**
  * The app's building blocks, drawn from @fdv/shared's tokens so the phone
@@ -43,6 +44,7 @@ export function Text(props: {
   role?: 'header' | 'text' | 'alert';
   testID?: string;
 }) {
+  const colours = useColours();
   const { scale } = useTextScale();
   const variant = props.variant ?? 'body';
   const size = SIZES[variant] * scale;
@@ -86,6 +88,7 @@ export function Button(props: {
   /** What a screen reader says, when the label is a symbol ("‹", "+"). */
   accessibilityLabel?: string;
 }) {
+  const styles = useStyles(makeStyles);
   const kind = props.kind ?? 'primary';
   const disabled = props.disabled === true || props.busy === true;
   return (
@@ -113,15 +116,19 @@ export function Button(props: {
 }
 
 export function Card(props: { children: ReactNode; style?: StyleProp<ViewStyle> }) {
+  const styles = useStyles(makeStyles);
   return <View style={[styles.card, props.style]}>{props.children}</View>;
 }
 
-const NOTICE: Record<'info' | 'ok' | 'warn' | 'danger', { icon: LucideIcon; ink: string; bg: string }> = {
+type NoticeTone = 'info' | 'ok' | 'warn' | 'danger';
+
+/** Each tone's icon and colours, in the theme in use. */
+const noticeLook = (colours: Palette): Record<NoticeTone, { icon: LucideIcon; ink: string; bg: string }> => ({
   info: { icon: Info, ink: colours.accent, bg: colours.accentSoft },
   ok: { icon: CheckCircle2, ink: colours.ok, bg: colours.accentSoft },
   warn: { icon: AlertTriangle, ink: colours.warn, bg: colours.warnSoft },
   danger: { icon: XCircle, ink: colours.danger, bg: colours.dangerSoft },
-};
+});
 
 /**
  * A sentence with an icon and a tone — never a colour alone. Said aloud
@@ -129,8 +136,9 @@ const NOTICE: Record<'info' | 'ok' | 'warn' | 'danger', { icon: LucideIcon; ink:
  * role by itself. `announce` is what to say when the children are more
  * than words.
  */
-export function Notice(props: { tone?: keyof typeof NOTICE; children: ReactNode; testID?: string; announce?: string }) {
-  const n = NOTICE[props.tone ?? 'info'];
+export function Notice(props: { tone?: NoticeTone; children: ReactNode; testID?: string; announce?: string }) {
+  const styles = useStyles(makeStyles);
+  const n = useStyles(noticeLook)[props.tone ?? 'info'];
   const Icon = n.icon;
   const words = props.announce ?? (typeof props.children === 'string' ? props.children : null);
   useEffect(() => {
@@ -161,6 +169,8 @@ const STATUS_ICON: Record<string, LucideIcon> = {
 
 /** A document's status: an icon and its words, from @fdv/shared's statusTone. */
 export function StatusLine(props: { status: Status }) {
+  const colours = useColours();
+  const styles = useStyles(makeStyles);
   const tone = statusTone(props.status);
   if (!tone) return null;
   const Icon = STATUS_ICON[tone.icon] ?? Info;
@@ -194,6 +204,8 @@ export function Field(
     goTo?: object | null;
   } & Omit<TextInputProps, 'style'>,
 ) {
+  const colours = useColours();
+  const styles = useStyles(makeStyles);
   const { label, error, testID, required, goTo, onLayout, ...input } = props;
   const { scale } = useTextScale();
   const box = useRef<TextInput>(null);
@@ -244,40 +256,41 @@ export function Field(
   );
 }
 
-const styles = StyleSheet.create({
-  button: {
-    minHeight: TAP_MIN,
-    borderRadius: radii.m,
-    paddingHorizontal: sp(18),
-    paddingVertical: sp(10),
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  primary: { backgroundColor: colours.accent },
-  danger: { backgroundColor: colours.danger },
-  quiet: { backgroundColor: colours.surface, borderWidth: 1, borderColor: colours.borderInput },
-  disabled: { opacity: 0.5 },
-  pressed: { opacity: 0.85 },
-  card: {
-    backgroundColor: colours.surface,
-    borderRadius: radii.l,
-    borderWidth: 1,
-    borderColor: colours.border,
-    padding: sp(16),
-    gap: sp(12),
-  },
-  notice: { flexDirection: 'row', gap: sp(10), padding: sp(12), borderRadius: radii.m, alignItems: 'flex-start' },
-  noticeText: { flex: 1, gap: sp(8) },
-  status: { flexDirection: 'row', alignItems: 'center', gap: sp(6) },
-  field: { gap: sp(6) },
-  input: {
-    minHeight: TAP_MIN,
-    borderWidth: 1,
-    borderColor: colours.borderInput,
-    borderRadius: radii.m,
-    paddingHorizontal: sp(14),
-    color: colours.ink,
-    backgroundColor: colours.surface,
-  },
-  inputError: { borderColor: colours.danger },
-});
+const makeStyles = (colours: Palette) =>
+  StyleSheet.create({
+    button: {
+      minHeight: TAP_MIN,
+      borderRadius: radii.m,
+      paddingHorizontal: sp(18),
+      paddingVertical: sp(10),
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    primary: { backgroundColor: colours.accent },
+    danger: { backgroundColor: colours.danger },
+    quiet: { backgroundColor: colours.surface, borderWidth: 1, borderColor: colours.borderInput },
+    disabled: { opacity: 0.5 },
+    pressed: { opacity: 0.85 },
+    card: {
+      backgroundColor: colours.surface,
+      borderRadius: radii.l,
+      borderWidth: 1,
+      borderColor: colours.border,
+      padding: sp(16),
+      gap: sp(12),
+    },
+    notice: { flexDirection: 'row', gap: sp(10), padding: sp(12), borderRadius: radii.m, alignItems: 'flex-start' },
+    noticeText: { flex: 1, gap: sp(8) },
+    status: { flexDirection: 'row', alignItems: 'center', gap: sp(6) },
+    field: { gap: sp(6) },
+    input: {
+      minHeight: TAP_MIN,
+      borderWidth: 1,
+      borderColor: colours.borderInput,
+      borderRadius: radii.m,
+      paddingHorizontal: sp(14),
+      color: colours.ink,
+      backgroundColor: colours.surface,
+    },
+    inputError: { borderColor: colours.danger },
+  });

@@ -1,4 +1,4 @@
-import { colours, radii, type Member } from '@fdv/shared';
+import { radii, type Member } from '@fdv/shared';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -7,9 +7,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useVault } from '../../state/vault';
 import { Notice, Text } from '../../ui';
 import { sp } from '../../ui/space';
+import { useStyles, type Palette } from '../../ui/theme';
 
 /** People (4.12): the family, read-only; each leads to their documents. */
 export default function PeopleScreen() {
+  const styles = useStyles(makeStyles);
   const { t } = useTranslation();
   const router = useRouter();
   const { withToken, offline } = useVault();
@@ -75,17 +77,18 @@ export default function PeopleScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colours.bg },
-  page: { padding: sp(20), gap: sp(10) },
-  row: {
-    gap: sp(4),
-    backgroundColor: colours.surface,
-    borderRadius: radii.l,
-    borderWidth: 1,
-    borderColor: colours.border,
-    padding: sp(12),
-    minHeight: 56,
-  },
-  pressed: { opacity: 0.8 },
-});
+const makeStyles = (colours: Palette) =>
+  StyleSheet.create({
+    safe: { flex: 1, backgroundColor: colours.bg },
+    page: { padding: sp(20), gap: sp(10) },
+    row: {
+      gap: sp(4),
+      backgroundColor: colours.surface,
+      borderRadius: radii.l,
+      borderWidth: 1,
+      borderColor: colours.border,
+      padding: sp(12),
+      minHeight: 56,
+    },
+    pressed: { opacity: 0.8 },
+  });

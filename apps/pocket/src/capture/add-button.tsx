@@ -1,4 +1,4 @@
-import { colours, radii, TAP_MIN } from '@fdv/shared';
+import { radii, TAP_MIN } from '@fdv/shared';
 import { useRouter } from 'expo-router';
 import { Camera, FileUp, ImagePlus, Plus, type LucideIcon } from 'lucide-react-native';
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
@@ -8,6 +8,7 @@ import { useCapture, type StartOutcome } from '../state/capture';
 import { Button, Notice, Text } from '../ui';
 import { Sheet } from '../ui/sheet';
 import { sp } from '../ui/space';
+import { useColours, useStyles, type Palette } from '../ui/theme';
 
 type How = 'scan' | 'file' | 'photo';
 
@@ -57,6 +58,8 @@ export function focusOn(view: RefObject<View | null>) {
  * camera (on a phone with a scanner) or a picture.
  */
 export function AddButton() {
+  const colours = useColours();
+  const styles = useStyles(makeStyles);
   const { t } = useTranslation();
   const capture = useCapture();
   const { begin, scannerFailed, setScannerFailed } = useBeginCapture();
@@ -148,6 +151,8 @@ export function AddMenu(props: {
   onChoose: (how: How) => void;
   onClose: () => void;
 }) {
+  const colours = useColours();
+  const styles = useStyles(makeStyles);
   const { t } = useTranslation();
   const first = useRef<View>(null);
   const camera: Choice = {
@@ -216,43 +221,44 @@ export function AddMenu(props: {
 
 const PLUS = 56;
 
-const styles = StyleSheet.create({
-  // The tab bar's centre: a fixed width, the + and a little air either
-  // side, so the tabs' labels never run up against it.
-  slot: { width: PLUS + 8, alignItems: 'center' },
-  notice: { position: 'absolute', bottom: 72, width: 300 },
-  // As on the web: 56 across.
-  plus: {
-    width: PLUS,
-    height: PLUS,
-    borderRadius: PLUS / 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colours.accent,
-    elevation: 3,
-  },
-  pressed: { opacity: 0.8 },
-  scroll: { flexGrow: 0, flexShrink: 1 },
-  choices: { gap: sp(8) },
-  choice: {
-    minHeight: TAP_MIN + 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: sp(14),
-    paddingHorizontal: sp(14),
-    paddingVertical: sp(8),
-    borderRadius: radii.m,
-    borderWidth: 1,
-    borderColor: colours.border,
-    backgroundColor: colours.surface,
-  },
-  icon: {
-    width: 40,
-    height: 40,
-    borderRadius: radii.pill,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colours.accentSoft,
-  },
-  label: { flexShrink: 1 },
-});
+const makeStyles = (colours: Palette) =>
+  StyleSheet.create({
+    // The tab bar's centre: a fixed width, the + and a little air either
+    // side, so the tabs' labels never run up against it.
+    slot: { width: PLUS + 8, alignItems: 'center' },
+    notice: { position: 'absolute', bottom: 72, width: 300 },
+    // As on the web: 56 across.
+    plus: {
+      width: PLUS,
+      height: PLUS,
+      borderRadius: PLUS / 2,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colours.accent,
+      elevation: 3,
+    },
+    pressed: { opacity: 0.8 },
+    scroll: { flexGrow: 0, flexShrink: 1 },
+    choices: { gap: sp(8) },
+    choice: {
+      minHeight: TAP_MIN + 12,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: sp(14),
+      paddingHorizontal: sp(14),
+      paddingVertical: sp(8),
+      borderRadius: radii.m,
+      borderWidth: 1,
+      borderColor: colours.border,
+      backgroundColor: colours.surface,
+    },
+    icon: {
+      width: 40,
+      height: 40,
+      borderRadius: radii.pill,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colours.accentSoft,
+    },
+    label: { flexShrink: 1 },
+  });

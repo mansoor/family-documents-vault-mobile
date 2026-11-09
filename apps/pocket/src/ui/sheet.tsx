@@ -1,8 +1,9 @@
-import { colours, radii } from '@fdv/shared';
+import { radii } from '@fdv/shared';
 import type { ReactNode } from 'react';
 import { KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { sp } from './space';
+import { useStyles, type Palette } from './theme';
 
 /**
  * Every question and choice the app puts over a screen (P1): a sheet from
@@ -27,6 +28,7 @@ export function Sheet(props: {
   tall?: boolean;
   children: ReactNode;
 }) {
+  const styles = useStyles(makeStyles);
   const insets = useSafeAreaInsets();
   const body = (
     <>
@@ -67,20 +69,21 @@ export function Sheet(props: {
   );
 }
 
-const styles = StyleSheet.create({
-  shade: { flex: 1, backgroundColor: colours.scrim, justifyContent: 'flex-end' },
-  sheet: {
-    backgroundColor: colours.bg,
-    padding: sp(20),
-    gap: sp(12),
-    borderTopLeftRadius: radii.xl,
-    borderTopRightRadius: radii.xl,
-    // Lifted off the page it covers, as the web's sheets are.
-    shadowColor: colours.ink,
-    shadowOpacity: 0.12,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: -2 },
-    elevation: 12,
-  },
-  tall: { maxHeight: '90%' },
-});
+const makeStyles = (colours: Palette) =>
+  StyleSheet.create({
+    shade: { flex: 1, backgroundColor: colours.scrim, justifyContent: 'flex-end' },
+    sheet: {
+      backgroundColor: colours.bg,
+      padding: sp(20),
+      gap: sp(12),
+      borderTopLeftRadius: radii.xl,
+      borderTopRightRadius: radii.xl,
+      // Lifted off the page it covers, as the web's sheets are.
+      shadowColor: colours.ink,
+      shadowOpacity: 0.12,
+      shadowRadius: 12,
+      shadowOffset: { width: 0, height: -2 },
+      elevation: 12,
+    },
+    tall: { maxHeight: '90%' },
+  });

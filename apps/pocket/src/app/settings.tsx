@@ -1,4 +1,4 @@
-import { colours, radii } from '@fdv/shared';
+import { radii } from '@fdv/shared';
 import * as Linking from 'expo-linking';
 import { useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
@@ -18,6 +18,8 @@ import { Button, Card, Notice, Text } from '../ui';
 import { useTextScale } from '../ui/text-scale';
 import { Sheet } from '../ui/sheet';
 import { sp } from '../ui/space';
+import { useStyles, useTheme, type Palette } from '../ui/theme';
+import { Chip, ChipRow } from '../ui/chip';
 
 /**
  * Settings, in full (4.15): which vault (and whether it is reached without
@@ -27,10 +29,12 @@ import { sp } from '../ui/space';
  * everything else.
  */
 export default function Settings() {
+  const styles = useStyles(makeStyles);
   const { t } = useTranslation();
   const router = useRouter();
   const { vault, caps, signOut, chooseAnotherVault } = useVault();
   const { large, setLarge } = useTextScale();
+  const theme = useTheme();
   const lock = useLock();
   const timeouts: [LockTimeout, string][] = [
     ['immediately', t('settings.lockImmediately')],
@@ -135,6 +139,23 @@ export default function Settings() {
         </View>
       </Card>
       <Card>
+        <Text weight="600">{t('settings.theme')}</Text>
+        <Text tone="soft" variant="secondary">
+          {t('settings.themeHint')}
+        </Text>
+        <ChipRow label={t('settings.theme')}>
+          {(['auto', 'light', 'dark'] as const).map((c) => (
+            <Chip
+              key={c}
+              testID={`settings-theme-${c}`}
+              label={t(`settings.theme_${c}`)}
+              selected={theme.choice === c}
+              onPress={() => theme.choose(c)}
+            />
+          ))}
+        </ChipRow>
+      </Card>
+      <Card>
         <Text variant="title">{t('settings.lock')}</Text>
         {lock.status === 'none' ? (
           <Notice testID="settings-no-screen-lock">{t('lock.noScreenLock')}</Notice>
@@ -231,13 +252,14 @@ export default function Settings() {
   );
 }
 
-const styles = StyleSheet.create({
-  page: { padding: sp(20), gap: sp(16) },
-  row: { flexDirection: 'row', alignItems: 'center', gap: sp(12) },
-  version: { minHeight: 44, justifyContent: 'center' },
-  flex: { flex: 1 },
-  choices: { gap: sp(4) },
-  choice: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: sp(12) },
-  dot: { width: 20, height: 20, borderRadius: radii.pill, borderWidth: 2, borderColor: colours.borderInput },
-  dotOn: { borderWidth: 6, borderColor: colours.accent },
-});
+const makeStyles = (colours: Palette) =>
+  StyleSheet.create({
+    page: { padding: sp(20), gap: sp(16) },
+    row: { flexDirection: 'row', alignItems: 'center', gap: sp(12) },
+    version: { minHeight: 44, justifyContent: 'center' },
+    flex: { flex: 1 },
+    choices: { gap: sp(4) },
+    choice: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: sp(12) },
+    dot: { width: 20, height: 20, borderRadius: radii.pill, borderWidth: 2, borderColor: colours.borderInput },
+    dotOn: { borderWidth: 6, borderColor: colours.accent },
+  });

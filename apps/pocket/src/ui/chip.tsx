@@ -1,8 +1,9 @@
-import { colours, radii, TAP_MIN } from '@fdv/shared';
+import { radii, TAP_MIN } from '@fdv/shared';
 import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Text } from './index';
 import { sp } from './space';
+import { useStyles, type Palette } from './theme';
 
 /**
  * One choice among several: a chip that says whether it is chosen — or,
@@ -17,6 +18,7 @@ export function Chip(props: {
   testID?: string;
   leading?: string;
 }) {
+  const styles = useStyles(makeStyles);
   const selected = props.selected === true || props.expanded === true;
   const disabled = props.disabled === true;
   return (
@@ -53,6 +55,7 @@ export function Chip(props: {
 
 /** Chips in a row that wraps: a single choice (a radio group), or just actions side by side. */
 export function ChipRow(props: { children: ReactNode; label: string; role?: 'radiogroup' | 'none' }) {
+  const styles = useStyles(makeStyles);
   if (props.role === 'none') return <View style={styles.chips}>{props.children}</View>;
   return (
     <View style={styles.chips} accessibilityRole="radiogroup" accessibilityLabel={props.label}>
@@ -61,29 +64,30 @@ export function ChipRow(props: { children: ReactNode; label: string; role?: 'rad
   );
 }
 
-const styles = StyleSheet.create({
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: sp(8) },
-  chip: {
-    minHeight: TAP_MIN,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: sp(8),
-    paddingHorizontal: sp(14),
-    borderRadius: radii.pill,
-    borderWidth: 1,
-    borderColor: colours.borderInput,
-    backgroundColor: colours.surface,
-  },
-  chipOn: { backgroundColor: colours.accent, borderColor: colours.accent },
-  chipOff: { opacity: 0.45 },
-  avatar: {
-    width: 28,
-    height: 28,
-    borderRadius: radii.pill,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colours.accentSoft,
-  },
-  avatarOn: { backgroundColor: colours.surface },
-  pressed: { opacity: 0.8 },
-});
+const makeStyles = (colours: Palette) =>
+  StyleSheet.create({
+    chips: { flexDirection: 'row', flexWrap: 'wrap', gap: sp(8) },
+    chip: {
+      minHeight: TAP_MIN,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: sp(8),
+      paddingHorizontal: sp(14),
+      borderRadius: radii.pill,
+      borderWidth: 1,
+      borderColor: colours.borderInput,
+      backgroundColor: colours.surface,
+    },
+    chipOn: { backgroundColor: colours.accent, borderColor: colours.accent },
+    chipOff: { opacity: 0.45 },
+    avatar: {
+      width: 28,
+      height: 28,
+      borderRadius: radii.pill,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colours.accentSoft,
+    },
+    avatarOn: { backgroundColor: colours.surface },
+    pressed: { opacity: 0.8 },
+  });

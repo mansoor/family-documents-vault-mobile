@@ -1,7 +1,6 @@
 import { ApiRequestError, NetworkError } from '@fdv/client';
 import {
   can,
-  colours,
   inCollectionAudience,
   NOTE_KIND,
   radii,
@@ -40,6 +39,7 @@ import { latestOf } from './online';
 import { warnedAboutCopies } from './save-copy';
 import { Sheet } from '../ui/sheet';
 import { sp } from '../ui/space';
+import { useColours, useStyles, type Palette } from '../ui/theme';
 
 /**
  * A menu on every row (5.36): a ⋯ beside each document in a list, and a
@@ -128,6 +128,8 @@ export function useDocumentMenu(props: { id: string; title: string; doc?: Docume
     }, 300);
   }, []);
   const show = useCallback(() => setOpen(true), []);
+  const colours = useColours();
+  const styles = useStyles(makeStyles);
   const menuButton = (
     <Pressable
       ref={button}
@@ -183,6 +185,8 @@ function DocumentMenu(props: {
   /** `back`: the focus goes back to the ⋯ (nothing else took it). */
   onClose: (back: boolean) => void;
 }) {
+  const colours = useColours();
+  const styles = useStyles(makeStyles);
   const { id, title } = props;
   const { t } = useTranslation();
   const router = useRouter();
@@ -426,6 +430,7 @@ function Choice({
   onPress: () => void;
   icon: ReactNode;
 }) {
+  const styles = useStyles(makeStyles);
   return (
     <Pressable
       ref={ref}
@@ -471,6 +476,7 @@ function CollectionPicker(props: {
   onBusy: (busy: boolean) => void;
   onAdded: (said: Said) => void;
 }) {
+  const styles = useStyles(makeStyles);
   const { t } = useTranslation();
   const { withToken } = useVault();
   const [data, setData] = useState<{ collections: CollectionView[]; on: Set<string> } | null>(null);
@@ -584,34 +590,35 @@ function CollectionPicker(props: {
   );
 }
 
-const styles = StyleSheet.create({
-  more: { minWidth: TAP_MIN, minHeight: TAP_MIN, alignItems: 'center', justifyContent: 'center' },
-  pressed: { opacity: 0.8 },
-  disabled: { opacity: 0.5 },
-  scroll: { flexGrow: 0, flexShrink: 1 },
-  content: { gap: sp(12) },
-  choices: { gap: sp(8) },
-  choice: {
-    minHeight: TAP_MIN + 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: sp(14),
-    paddingHorizontal: sp(14),
-    paddingVertical: sp(8),
-    borderRadius: radii.m,
-    borderWidth: 1,
-    borderColor: colours.border,
-    backgroundColor: colours.surface,
-  },
-  icon: {
-    width: 40,
-    height: 40,
-    borderRadius: radii.pill,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colours.accentSoft,
-  },
-  label: { flexShrink: 1, gap: sp(4) },
-  collection: { flexDirection: 'row', alignItems: 'center', gap: sp(12) },
-  flex: { flex: 1, gap: sp(4) },
-});
+const makeStyles = (colours: Palette) =>
+  StyleSheet.create({
+    more: { minWidth: TAP_MIN, minHeight: TAP_MIN, alignItems: 'center', justifyContent: 'center' },
+    pressed: { opacity: 0.8 },
+    disabled: { opacity: 0.5 },
+    scroll: { flexGrow: 0, flexShrink: 1 },
+    content: { gap: sp(12) },
+    choices: { gap: sp(8) },
+    choice: {
+      minHeight: TAP_MIN + 12,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: sp(14),
+      paddingHorizontal: sp(14),
+      paddingVertical: sp(8),
+      borderRadius: radii.m,
+      borderWidth: 1,
+      borderColor: colours.border,
+      backgroundColor: colours.surface,
+    },
+    icon: {
+      width: 40,
+      height: 40,
+      borderRadius: radii.pill,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colours.accentSoft,
+    },
+    label: { flexShrink: 1, gap: sp(4) },
+    collection: { flexDirection: 'row', alignItems: 'center', gap: sp(12) },
+    flex: { flex: 1, gap: sp(4) },
+  });

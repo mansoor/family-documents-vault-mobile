@@ -1,4 +1,3 @@
-import { colours } from '@fdv/shared';
 import { Lock } from 'lucide-react-native';
 import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -7,12 +6,15 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLock } from '../state/lock';
 import { Button, Notice, Text } from '../ui';
 import { sp } from '../ui/space';
+import { useColours, useStyles, type Palette } from '../ui/theme';
 
 /**
  * What the app shows while it is locked, and nothing else: no screen of the
  * app is behind it to be revealed. Back leaves the app.
  */
 export function LockScreen() {
+  const colours = useColours();
+  const styles = useStyles(makeStyles);
   const { t } = useTranslation();
   const lock = useLock();
   const { exitApp, unlock, lockedFor } = lock;
@@ -66,7 +68,8 @@ export function LockScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  page: { flex: 1, backgroundColor: colours.bg },
-  body: { flex: 1, justifyContent: 'center', padding: sp(24), gap: sp(20), alignItems: 'stretch' },
-});
+const makeStyles = (colours: Palette) =>
+  StyleSheet.create({
+    page: { flex: 1, backgroundColor: colours.bg },
+    body: { flex: 1, justifyContent: 'center', padding: sp(24), gap: sp(20), alignItems: 'stretch' },
+  });

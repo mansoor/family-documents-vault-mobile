@@ -1,4 +1,4 @@
-import { colours, radii } from '@fdv/shared';
+import { radii } from '@fdv/shared';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Linking, Platform, Pressable, StyleSheet, Switch, View } from 'react-native';
@@ -6,9 +6,11 @@ import { Button, Card, Notice, Text } from '../ui';
 import type { Distributor } from './native';
 import { usePush, type TurnOn } from './push';
 import { sp } from '../ui/space';
+import { useStyles, type Palette } from '../ui/theme';
 
 /** Settings → Notifications (4.14): whether this phone hears from the vault, and how. */
 export function NotificationsCard() {
+  const styles = useStyles(makeStyles);
   const { t } = useTranslation();
   const push = usePush();
   const s = push.status;
@@ -162,10 +164,11 @@ export function NotificationsCard() {
   );
 }
 
-const styles = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center', gap: sp(12) },
-  flex: { flex: 1 },
-  choices: { gap: sp(4) },
-  choice: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: sp(12) },
-  dot: { width: 20, height: 20, borderRadius: radii.pill, borderWidth: 2, borderColor: colours.borderInput },
-});
+const makeStyles = (colours: Palette) =>
+  StyleSheet.create({
+    row: { flexDirection: 'row', alignItems: 'center', gap: sp(12) },
+    flex: { flex: 1 },
+    choices: { gap: sp(4) },
+    choice: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: sp(12) },
+    dot: { width: 20, height: 20, borderRadius: radii.pill, borderWidth: 2, borderColor: colours.borderInput },
+  });

@@ -1,6 +1,5 @@
 import { ApiRequestError } from '@fdv/client';
 import {
-  colours,
   formatDate,
   issuedByLabel,
   radii,
@@ -23,6 +22,7 @@ import { readPrefs, writePrefs } from '../platform/prefs';
 import { useVault } from '../state/vault';
 import { Button, Card, Notice, Text } from '../ui';
 import { sp } from '../ui/space';
+import { useColours, useStyles, type Palette } from '../ui/theme';
 
 /**
  * What a document's newest version's pages say (P2; the owner's decision of
@@ -74,6 +74,7 @@ export function NewVersionSays(props: {
   /** Changed somewhere else: the page loads it again. */
   onStale: () => Promise<void>;
 }) {
+  const styles = useStyles(makeStyles);
   const { doc, type } = props;
   const { t } = useTranslation();
   const { withToken, caps, offline, who } = useVault();
@@ -270,6 +271,8 @@ function Tick(props: {
   was: string;
   weak: string | null;
 }) {
+  const colours = useColours();
+  const styles = useStyles(makeStyles);
   return (
     <Pressable
       testID={props.testID}
@@ -304,29 +307,30 @@ function Tick(props: {
   );
 }
 
-const styles = StyleSheet.create({
-  card: { borderColor: colours.accent },
-  inside: { gap: sp(12) },
-  tick: { flexDirection: 'row', alignItems: 'flex-start', gap: sp(12), minHeight: 44, paddingVertical: sp(4) },
-  pressed: { opacity: 0.8 },
-  box: {
-    width: 26,
-    height: 26,
-    marginTop: 1,
-    borderRadius: 6,
-    borderWidth: 2,
-    borderColor: colours.borderInput,
-    backgroundColor: colours.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  boxOn: { backgroundColor: colours.accent, borderColor: colours.accent },
-  words: { flex: 1, gap: sp(4) },
-  weak: {
-    alignSelf: 'flex-start',
-    backgroundColor: colours.warnSoft,
-    borderRadius: radii.pill,
-    paddingHorizontal: sp(8),
-    paddingVertical: 1,
-  },
-});
+const makeStyles = (colours: Palette) =>
+  StyleSheet.create({
+    card: { borderColor: colours.accent },
+    inside: { gap: sp(12) },
+    tick: { flexDirection: 'row', alignItems: 'flex-start', gap: sp(12), minHeight: 44, paddingVertical: sp(4) },
+    pressed: { opacity: 0.8 },
+    box: {
+      width: 26,
+      height: 26,
+      marginTop: 1,
+      borderRadius: 6,
+      borderWidth: 2,
+      borderColor: colours.borderInput,
+      backgroundColor: colours.surface,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    boxOn: { backgroundColor: colours.accent, borderColor: colours.accent },
+    words: { flex: 1, gap: sp(4) },
+    weak: {
+      alignSelf: 'flex-start',
+      backgroundColor: colours.warnSoft,
+      borderRadius: radii.pill,
+      paddingHorizontal: sp(8),
+      paddingVertical: 1,
+    },
+  });

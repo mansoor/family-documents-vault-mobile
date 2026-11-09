@@ -1,7 +1,6 @@
 import { ApiRequestError, isSessionOver } from '@fdv/client';
 import {
   can,
-  colours,
   formatDate,
   localToday,
   shareEndWords,
@@ -37,6 +36,7 @@ import { Button, Card, Notice, Text } from '../../ui';
 import { DocumentRow } from '../../documents/row';
 import { sp } from '../../ui/space';
 import { VaultRead } from '../../capture/vault-read';
+import { useColours, useStyles, type Palette } from '../../ui/theme';
 
 interface HomeData {
   due: ReminderView[];
@@ -72,6 +72,8 @@ const optional = <T,>(p: Promise<T>): Promise<T | null> =>
  * see, when an owner limited it, and a guest's end (5.36).
  */
 export default function Home() {
+  const colours = useColours();
+  const styles = useStyles(makeStyles);
   const { t } = useTranslation();
   const { caps, vault, offline, waiting, notice, withTokenQuick, api, who } = useVault();
   const capture = useCapture();
@@ -561,6 +563,7 @@ function SavedLine(props: { text: string; onDismiss: () => void; renews?: string
  * shown, as words a screen reader reads too, beside the button that opens it.
  */
 function InboxLine(props: { count: number; origin: string }) {
+  const styles = useStyles(makeStyles);
   const { t } = useTranslation();
   const url = `${props.origin}/inbox`;
   const address = url.replace(/^https?:\/\//, '');
@@ -602,18 +605,19 @@ function FiledWithoutLine(props: { lines: string[] }) {
   );
 }
 
-const styles = StyleSheet.create({
-  e2eMarkers: { position: 'absolute', left: 0, bottom: 0, flexDirection: 'row' },
-  e2eMarker: { width: 1, height: 1 },
-  safe: { flex: 1, backgroundColor: colours.bg },
-  page: { padding: sp(20), gap: sp(10) },
-  queue: { gap: sp(8) },
-  pressed: { opacity: 0.8 },
-  header: { gap: sp(12), marginBottom: sp(4) },
-  titleRow: { flexDirection: 'row', alignItems: 'center', gap: sp(12) },
-  flex: { flex: 1 },
-  iconButton: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
-  dueCard: { gap: sp(4), borderColor: colours.warn },
-  inbox: { gap: sp(6) },
-  recentTitle: { marginTop: sp(12) },
-});
+const makeStyles = (colours: Palette) =>
+  StyleSheet.create({
+    e2eMarkers: { position: 'absolute', left: 0, bottom: 0, flexDirection: 'row' },
+    e2eMarker: { width: 1, height: 1 },
+    safe: { flex: 1, backgroundColor: colours.bg },
+    page: { padding: sp(20), gap: sp(10) },
+    queue: { gap: sp(8) },
+    pressed: { opacity: 0.8 },
+    header: { gap: sp(12), marginBottom: sp(4) },
+    titleRow: { flexDirection: 'row', alignItems: 'center', gap: sp(12) },
+    flex: { flex: 1 },
+    iconButton: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
+    dueCard: { gap: sp(4), borderColor: colours.warn },
+    inbox: { gap: sp(6) },
+    recentTitle: { marginTop: sp(12) },
+  });
