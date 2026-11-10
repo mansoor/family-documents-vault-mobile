@@ -1,4 +1,5 @@
-import { type as typeScale, type Capabilities } from '@fdv/shared';
+import type { Capabilities } from '@fdv/shared';
+import { TYPE } from '../ui/scale';
 import { act, fireEvent, screen, waitFor } from '@testing-library/react-native';
 import * as Linking from 'expo-linking';
 import { AccessibilityInfo, AppState, StyleSheet, type AppStateStatus } from 'react-native';
@@ -637,11 +638,11 @@ describe("the Inbox count on Home (I5)", () => {
       Number(StyleSheet.flatten(screen.getByText(/waiting in your Inbox/).props.style)?.fontSize ?? 0);
     const normal = await renderApp(<Home />, { fetch: t.fetch, large: false });
     await screen.findByTestId('home-inbox');
-    expect(size()).toBe(typeScale.body);
+    expect(size()).toBe(TYPE.body);
     await normal.unmount();
     await renderApp(<Home />, { fetch: t.fetch, large: true });
     await screen.findByTestId('home-inbox');
-    expect(size()).toBeCloseTo(typeScale.body * LARGE, 5);
+    expect(size()).toBeCloseTo(TYPE.body * LARGE, 5);
   });
 });
 

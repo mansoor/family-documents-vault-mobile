@@ -30,7 +30,7 @@ import { on } from '../../state/events';
 import { useStepUp } from '../../state/step-up';
 import { useVault } from '../../state/vault';
 import { Button, Card, Notice, Text } from '../../ui';
-import { DocumentRow } from '../../documents/row';
+import { DocumentRow, rowPlace } from '../../documents/row';
 import { sp } from '../../ui/space';
 import { VaultRead } from '../../capture/vault-read';
 import { useColours, useStyles, type Palette } from '../../ui/theme';
@@ -380,7 +380,7 @@ export default function Home() {
             ) : null}
           </View>
         }
-        renderItem={({ item }) => (
+        renderItem={({ item, index }) => (
           <DocumentRow
             id={item.id}
             title={item.title}
@@ -388,6 +388,7 @@ export default function Home() {
             note_name={item.note_name}
             status={item.status}
             doc={item}
+            place={rowPlace(index, data?.recent.length ?? 0)}
             // A note with no title is named by its first words (0.9.0); a scan with none needs a name.
             untitled={t('home.needsAName')}
             thumb={
@@ -619,10 +620,10 @@ const makeStyles = (colours: Palette) =>
     e2eMarkers: { position: 'absolute', left: 0, bottom: 0, flexDirection: 'row' },
     e2eMarker: { width: 1, height: 1 },
     safe: { flex: 1, backgroundColor: colours.bg },
-    page: { padding: sp(20), gap: sp(10) },
+    page: { padding: sp(20) },
     queue: { gap: sp(8) },
     pressed: { opacity: 0.8 },
-    header: { gap: sp(12), marginBottom: sp(4) },
+    header: { gap: sp(12), marginBottom: sp(10) },
     titleRow: { flexDirection: 'row', alignItems: 'center', gap: sp(12) },
     flex: { flex: 1 },
     iconButton: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },

@@ -137,7 +137,7 @@ const makeStyles = (colours: Palette) =>
       alignItems: 'center',
       gap: sp(12),
       padding: sp(12),
-      minHeight: 72,
+      minHeight: 56,
       backgroundColor: colours.surface,
       borderRadius: radii.l,
       borderWidth: 1,

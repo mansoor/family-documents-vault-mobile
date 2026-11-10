@@ -171,7 +171,7 @@ const makeStyles = (colours: Palette) =>
       alignItems: 'flex-start',
       gap: sp(12),
       padding: sp(12),
-      minHeight: 64,
+      minHeight: 52,
       backgroundColor: colours.surface,
       borderRadius: radii.l,
       borderWidth: 1,

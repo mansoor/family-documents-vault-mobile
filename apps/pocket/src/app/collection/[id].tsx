@@ -6,7 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, View } from 'react-native';
 import { AddDocuments } from '../../collections/add';
 import { audienceKey, mayChangeCollection } from '../../collections/rules';
-import { DocumentRow } from '../../documents/row';
+import { DocumentRow, rowPlace } from '../../documents/row';
 import { wordsFor } from '../../errors/words';
 import { emit, on } from '../../state/events';
 import { useVault } from '../../state/vault';
@@ -201,7 +201,7 @@ export default function CollectionScreen() {
           ) : null}
         </View>
       }
-      renderItem={({ item }) => {
+      renderItem={({ item, index }) => {
         const doc = item.document;
         const title = documentName(doc, t('document.untitled'));
         return (
@@ -212,6 +212,7 @@ export default function CollectionScreen() {
             note_name={doc.note_name}
             status={doc.status}
             doc={doc}
+            place={rowPlace(index, items.length)}
             thumb={api && token && doc.latest_version_id ? { uri: api.thumbnailUrl(doc.latest_version_id), token } : null}
             {...(mayChange ? { remove: { onRemove: remove(doc.id, title) } } : {})}
           />
@@ -229,6 +230,6 @@ export default function CollectionScreen() {
 const makeStyles = (colours: Palette) =>
   StyleSheet.create({
     screen: { backgroundColor: colours.bg },
-    page: { padding: sp(20), gap: sp(10) },
-    header: { gap: sp(12) },
+    page: { padding: sp(20) },
+    header: { gap: sp(12), marginBottom: sp(10) },
   });

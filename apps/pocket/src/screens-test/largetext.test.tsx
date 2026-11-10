@@ -1,4 +1,4 @@
-import { type as typeScale } from '@fdv/shared';
+import { TYPE } from '../ui/scale';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react-native';
 import { StyleSheet } from 'react-native';
 import Connect from '../app/connect';
@@ -105,17 +105,17 @@ describe('Large text', () => {
     await screen.findByTestId('settings-sign-out');
     const signOutSize = () =>
       Number(StyleSheet.flatten(screen.getByText('Sign out').props.style)?.fontSize ?? 0);
-    expect(signOutSize()).toBe(typeScale.body);
+    expect(signOutSize()).toBe(TYPE.body);
 
     await fireEvent(screen.getByTestId('settings-large-text'), 'valueChange', true);
-    await waitFor(() => expect(signOutSize()).toBeCloseTo(typeScale.body * LARGE, 5));
+    await waitFor(() => expect(signOutSize()).toBeCloseTo(TYPE.body * LARGE, 5));
     expect(readPrefs<{ large?: boolean }>('display', {})).toEqual({ large: true });
     await first.unmount();
 
     // The next launch reads what was chosen.
     await renderApp(<Settings />, { fetch: t.fetch });
     await screen.findByTestId('settings-sign-out');
-    expect(signOutSize()).toBeCloseTo(typeScale.body * LARGE, 5);
+    expect(signOutSize()).toBeCloseTo(TYPE.body * LARGE, 5);
     expect(screen.getByTestId('settings-large-text').props.value).toBe(true);
   });
 

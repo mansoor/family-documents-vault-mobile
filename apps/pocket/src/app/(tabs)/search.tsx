@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FlatList, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { DocumentRow } from '../../documents/row';
+import { DocumentRow, rowPlace } from '../../documents/row';
 import { on } from '../../state/events';
 import { useVault } from '../../state/vault';
 import { Field, Notice, Text } from '../../ui';
@@ -212,10 +212,10 @@ export default function SearchScreen() {
             ) : null}
           </View>
         }
-        renderItem={({ item }) => <DocumentRow {...item} />}
+        renderItem={({ item, index }) => <DocumentRow {...item} place={rowPlace(index, rows.length)} />}
         ListFooterComponent={
           noConnection || !hits ? null : (
-            <View style={styles.header}>
+            <View style={styles.footer}>
               {sealed.state === 'searching' ? (
                 <Text tone="soft" testID="search-sealed-searching">
                   {t('search.sealedSearching')}
@@ -249,7 +249,8 @@ export default function SearchScreen() {
 const makeStyles = (colours: Palette) =>
   StyleSheet.create({
     safe: { flex: 1, backgroundColor: colours.bg },
-    page: { padding: sp(20), gap: sp(10) },
-    header: { gap: sp(12) },
+    page: { padding: sp(20) },
+    header: { gap: sp(12), marginBottom: sp(10) },
+    footer: { gap: sp(12), marginTop: sp(10) },
     chips: { gap: sp(8), paddingVertical: sp(4) },
   });
