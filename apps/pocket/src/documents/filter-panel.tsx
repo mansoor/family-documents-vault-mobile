@@ -23,7 +23,9 @@ import { useColours, useStyles, type Palette } from '../ui/theme';
 import { NO_FILTERS, QUICK, quickRange, toggle, type DateWhich, type Filters } from './filter-model';
 
 /** The statuses worth narrowing to, most pressing first. */
-export const STATUSES: StatusValue[] = ['expired', 'expiring_soon', 'needs_info', 'valid', 'no_longer_needed'];
+// In date (`active`: an expiry, still to come) and Nothing to renew
+// (`valid`: complete, with no expiry), as the vault and the web say them.
+export const STATUSES: StatusValue[] = ['expired', 'expiring_soon', 'needs_info', 'active', 'valid', 'no_longer_needed'];
 const VISIBILITIES: Visibility[] = ['household', 'adults', 'private'];
 const WHICH: DateWhich[] = ['added', 'issued', 'expires'];
 /** How many people before "Show all". */

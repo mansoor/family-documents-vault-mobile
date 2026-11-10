@@ -114,7 +114,8 @@ describe('the filter panel (R5)', () => {
     await fireEvent.press(await screen.findByTestId('filter-kinds-pick-bank_statement'));
     await fireEvent.press(screen.getByTestId('filter-kinds-done'));
     await fireEvent.press(screen.getByTestId('filter-status-expired'));
-    await fireEvent.press(screen.getByTestId('filter-status-valid'));
+    // In date is a passport's with its expiry still to come: `active`, as the vault says it.
+    await fireEvent.press(screen.getByTestId('filter-status-active'));
     await fireEvent.press(screen.getByTestId('filter-quick-next90'));
     // How many, asked of the vault as the choices change.
     await waitFor(() => expect(screen.getByTestId('filters-apply')).toHaveTextContent(/^Show \d+ documents?$/));
@@ -125,7 +126,7 @@ describe('the filter panel (R5)', () => {
         expect.objectContaining({
           member_id: 'fake-member',
           type_key: 'passport,bank_statement',
-          status: 'expired,valid',
+          status: 'expired,active',
           expires_from: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
           expires_to: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
         }),

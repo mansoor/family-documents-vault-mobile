@@ -33,6 +33,11 @@ app's own, tagged `vX.Y.Z` in this repository.
   The rows of chips under the search box are gone.
 - The app is tested against the vault of 0.9.0-dev.26.
 
+### Fixed
+- **In date finds what is in date.** It asked for documents with nothing
+  to renew, so a passport valid for years was never among them. Those
+  have their own choice now, Nothing to renew, as on the web.
+
 ## [0.4.4] — Home, at a glance (redesign R4)
 
 ### Changed
