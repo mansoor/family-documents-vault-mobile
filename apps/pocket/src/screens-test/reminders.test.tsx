@@ -45,6 +45,8 @@ describe('Needs attention', () => {
     t.upcoming = [reminder({ id: 'r2', document_id: 'card', document_title: 'Bank card', label: 'In 40 days' })];
     await unlocked(t, <AttentionScreen />);
     expect(await screen.findByText('Expires in 12 days')).toBeTruthy();
+    // Later (R6): how long, asked in a sheet.
+    await fireEvent.press(await screen.findByTestId('later-r1'));
     await fireEvent.press(screen.getByTestId('snooze-week-r1'));
     await waitFor(() => expect(screen.queryByText('Expires in 12 days')).toBeNull());
     const today = localToday(Intl.DateTimeFormat().resolvedOptions().timeZone);
@@ -52,7 +54,7 @@ describe('Needs attention', () => {
     // What is coming up is still there; Done takes it away too.
     expect(screen.getByText('In 40 days')).toBeTruthy();
     await fireEvent.press(screen.getByTestId('done-r2'));
-    expect(await screen.findByTestId('attention-calm')).toHaveTextContent('Nothing needs you right now.');
+    expect(await screen.findByTestId('attention-calm')).toHaveTextContent('Nothing is due, and nothing is coming up.');
     expect(t.library.acknowledged).toEqual(['r2']);
   });
 

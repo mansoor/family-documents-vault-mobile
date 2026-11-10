@@ -6,6 +6,27 @@ app's own, tagged `vX.Y.Z` in this repository.
 
 ## [Unreleased]
 
+## [0.4.6] — Needs attention and a document, compact (redesign R6)
+
+### Changed
+- **Needs attention** (from the bell) shows **Now** or **Coming up**, one at
+  a time, each with how many, as one card of rows. Each row has its actions
+  on it: **Scan the new one** for a document running out, **Done**, and
+  **Later**, which asks how long (a week or a month). Tapping a row opens
+  the document.
+- Where the vault counts, Needs attention says how many documents need
+  details, with **Review them**, which opens Documents filtered to them.
+- The screen's name is no longer said twice, and with nothing due and
+  nothing coming up it says just that.
+- **A document's page is compact**, as in the mockup: its picture, its
+  name, one line of whose it is, what kind and who can see it, and its
+  status (and Essential). Then one row of round actions (Show, Pages, Save
+  copy, New version), its details in two columns, and one card of lines:
+  Who can see it, Tags, Collections, Versions (opened in place) and
+  Essential. Who added it and when is at the foot.
+- **Edit details is the pencil in the header**, and **Move to the Trash is
+  under the header's ⋯**, still asking first.
+
 ## [0.4.5] — filters from the side (redesign R5)
 
 ### Added

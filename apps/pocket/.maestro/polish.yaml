@@ -129,13 +129,15 @@ env:
       id: documents-chip-statuses
     timeout: 10000
 
-# The passport's page: Who can see it, Adults only and back.
+# The passport's page (compact since R6): Who can see it, Adults only and back.
 - tapOn:
     id: doc-row-.*
 - extendedWaitUntil:
     visible:
       id: document-visibility
     timeout: 15000
+- waitForAnimationToEnd
+- takeScreenshot: shot-light-document
 - tapOn:
     id: document-visibility
 - extendedWaitUntil:

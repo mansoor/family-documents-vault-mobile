@@ -56,6 +56,8 @@ describe("the family's clock (P5)", () => {
     t.vault.state.timezone = 'America/Los_Angeles';
     libraryDoc(t, { id: 'bill', title: 'Council tax bill' }, { uploaded_at: LATE, uploaded_by_name: 'Sam' });
     await unlocked(t, <DocumentDetail id="bill" />);
+    // The versions open in place, from their line (R6).
+    await fireEvent.press(await screen.findByTestId('document-versions'));
     await waitFor(() => expect(screen.getByTestId('version-1')).toHaveTextContent(/8 Nov 2026.*PST by Sam/));
   });
 });

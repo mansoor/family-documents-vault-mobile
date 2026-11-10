@@ -49,6 +49,8 @@ describe('felt (P10)', () => {
     const t = testVault([ORIGIN]);
     t.reminders = [reminder('r1'), reminder('r2')];
     await unlocked(t, <AttentionScreen />);
+    // Later (R6): how long, asked in a sheet.
+    await fireEvent.press(await screen.findByTestId('later-r1'));
     await fireEvent.press(await screen.findByTestId('snooze-week-r1'));
     await waitFor(() => expect(t.library.snoozed).toHaveLength(1));
     expect(Haptics.notificationAsync).not.toHaveBeenCalled();
@@ -88,6 +90,8 @@ describe('Remove animations (P10)', () => {
     libraryDoc(t, { id: 'passport', title: 'Passport' });
     jest.spyOn(AccessibilityInfo, 'isReduceMotionEnabled').mockResolvedValue(true);
     await unlocked(t, <DocumentDetail id="passport" />);
+    // Move to the Trash is under the header's ⋯ (R6).
+    await fireEvent.press(await screen.findByTestId('document-more'));
     await fireEvent.press(await screen.findByTestId('document-trash'));
     await waitFor(() => expect(sheetAnimation()).toBe('none'));
   });
@@ -97,6 +101,8 @@ describe('Remove animations (P10)', () => {
     libraryDoc(t, { id: 'passport', title: 'Passport' });
     jest.spyOn(AccessibilityInfo, 'isReduceMotionEnabled').mockResolvedValue(false);
     await unlocked(t, <DocumentDetail id="passport" />);
+    // Move to the Trash is under the header's ⋯ (R6).
+    await fireEvent.press(await screen.findByTestId('document-more'));
     await fireEvent.press(await screen.findByTestId('document-trash'));
     await act(async () => undefined);
     expect(sheetAnimation()).toBe('fade');

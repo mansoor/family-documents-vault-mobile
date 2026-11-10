@@ -1,4 +1,4 @@
-import { useEffect, useReducer } from 'react';
+import { useEffect, useReducer, type ReactNode } from 'react';
 
 /**
  * expo-router, as far as the screens' tests need it (4.12): pushes go on a
@@ -44,6 +44,8 @@ export function useTopRoute(): Route | null {
 
 export const routerMock = {
   Link: (p: { children: unknown }) => p.children,
+  // A screen's own header buttons (R6: Edit details and ⋯ on a document), drawn where the test can press them.
+  Stack: { Screen: (p: { options?: { headerRight?: () => ReactNode } }) => p.options?.headerRight?.() ?? null },
   useRouter: () => ({ push, back, replace: push, canGoBack: () => nav.stack.length > 0 }),
   useNavigation: () => ({ addListener: () => () => undefined, dispatch: () => undefined }),
   useLocalSearchParams: () => nav.stack[nav.stack.length - 1]?.params ?? {},
