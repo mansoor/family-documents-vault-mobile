@@ -663,7 +663,7 @@ describe('after the save', () => {
       /^Saved\. It's under Needs a name whenever you want to finish it\./,
     );
     await waitFor(() => expect(t.vault.state.documents).toHaveLength(3));
-    expect(await screen.findByTestId('home-unnamed')).toHaveTextContent('1 document needs a name');
+    expect(await screen.findByTestId('home-unnamed')).toHaveTextContent(/^1 document needs a name/);
   });
 });
 

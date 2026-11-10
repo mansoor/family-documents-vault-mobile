@@ -33,7 +33,7 @@ env:
 # on the phone (a marker only the e2e build draws).
 - extendedWaitUntil:
     visible:
-      id: home-calm
+      id: home-ready
     timeout: 30000
 - extendedWaitUntil:
     visible:

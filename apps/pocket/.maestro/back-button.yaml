@@ -32,7 +32,7 @@ env:
     id: sign-in-go
 - extendedWaitUntil:
     visible:
-      id: home-calm
+      id: home-ready
     timeout: 30000
 - waitForAnimationToEnd
 
@@ -63,7 +63,7 @@ env:
 - back
 - extendedWaitUntil:
     visible:
-      id: home-calm
+      id: home-ready
     timeout: 15000
 
 # The + menu: Back closes it; a tap above it closes it too.
@@ -83,7 +83,7 @@ env:
 - assertNotVisible:
     id: add-menu
 - assertVisible:
-    id: home-calm
+    id: home-ready
 - tapOn:
     id: home-add
 - extendedWaitUntil:
@@ -118,7 +118,7 @@ env:
     id: leave-throw
 - extendedWaitUntil:
     visible:
-      id: home-calm
+      id: home-ready
     timeout: 15000
 - assertNotVisible:
     id: capture-card

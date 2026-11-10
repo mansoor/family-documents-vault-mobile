@@ -104,7 +104,7 @@ describe('what the vault read of a scan sent to the Inbox (P3)', () => {
     t.caps = readingVault();
     await signedIn(t);
     await renderApp(<App />, { fetch: readAtOnce(t, { proposal: PASSPORT }), capture: phone() });
-    await screen.findByTestId('home-calm');
+    await screen.findByTestId('home-ready');
     await sendToInbox();
 
     const card = await screen.findByTestId('vault-read');
@@ -139,7 +139,7 @@ describe('what the vault read of a scan sent to the Inbox (P3)', () => {
     // The pages say what it is, not whose.
     const { owner_member_id: _whose, ...unsure } = PASSPORT as Record<string, unknown>;
     await renderApp(<App />, { fetch: readAtOnce(t, { proposal: unsure as DetailProposal }), capture: phone() });
-    await screen.findByTestId('home-calm');
+    await screen.findByTestId('home-ready');
     await sendToInbox();
     await screen.findByTestId('vault-read');
     expect(screen.queryByTestId('vault-read-confirm')).toBeNull();
@@ -156,7 +156,7 @@ describe('what the vault read of a scan sent to the Inbox (P3)', () => {
     t.caps = readingVault();
     await signedIn(t);
     await renderApp(<App />, { fetch: readAtOnce(t, { failed: 'blank' }), capture: phone() });
-    await screen.findByTestId('home-calm');
+    await screen.findByTestId('home-ready');
     await sendToInbox();
     expect(await screen.findByTestId('vault-read-failed')).toHaveTextContent(/^The pages look blank/);
     expect(screen.queryByTestId('vault-read-confirm')).toBeNull();
@@ -168,7 +168,7 @@ describe('what the vault read of a scan sent to the Inbox (P3)', () => {
     t.caps = readingVault();
     await signedIn(t);
     await renderApp(<App />, { fetch: readAtOnce(t, null), capture: phone() });
-    await screen.findByTestId('home-calm');
+    await screen.findByTestId('home-ready');
     await sendToInbox();
     expect(await screen.findByTestId('vault-read-reading')).toHaveTextContent('The vault is reading your scan…');
   });
@@ -178,7 +178,7 @@ describe('what the vault read of a scan sent to the Inbox (P3)', () => {
     t.caps = readingVault({ batch_review: false });
     await signedIn(t);
     await renderApp(<App />, { fetch: readAtOnce(t, { proposal: PASSPORT }), capture: phone() });
-    await screen.findByTestId('home-calm');
+    await screen.findByTestId('home-ready');
     await sendToInbox();
     await waitFor(() => expect(screen.getByTestId('home-saved')).toHaveTextContent(/^Sent to your Inbox\./));
     expect(screen.queryByTestId('vault-read')).toBeNull();

@@ -29,7 +29,7 @@ env:
     id: sign-in-go
 - extendedWaitUntil:
     visible:
-      id: home-calm
+      id: home-ready
     timeout: 30000
 
 # Keep them: the password, once.

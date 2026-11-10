@@ -107,7 +107,7 @@ describe('Home tells the person (5.31)', () => {
     const t = testVault([ORIGIN]);
     newer(t);
     await unlocked(t, <Home />);
-    await screen.findByTestId('home-calm');
+    await screen.findByTestId('home-ready');
     expect(screen.queryByTestId('home-widening')).toBeNull();
     t.vault.state.identityPending = {
       to: 'family',
@@ -123,7 +123,7 @@ describe('Home tells the person (5.31)', () => {
     // A vault of 0.5.19: no identity details; GET /me says nothing of a reset.
     t.caps = caps0519();
     await unlocked(t, <Home />);
-    await screen.findByTestId('home-calm');
+    await screen.findByTestId('home-ready');
     expect(screen.queryByTestId('home-reset-notice')).toBeNull();
     expect(screen.queryByTestId('home-widening')).toBeNull();
     expect(t.calls.filter((c) => c.includes('identity'))).toEqual([]);

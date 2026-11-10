@@ -822,5 +822,34 @@
     "none": "Needs attention: nothing now",
     "due_one": "Needs attention: 1 thing",
     "due_other": "Needs attention: {{count}} things"
+  },
+  "alerts": {
+    "open": "Open",
+    "nameThem": "Name them",
+    "unnamedWords": "Say what they are, so they can be found and reminded about.",
+    "hideLabel": "Hide “{{title}}”",
+    "hideTitle": "Hide this alert",
+    "hide_1": "For a day",
+    "hide_7": "For a week",
+    "hide_30": "For 30 days",
+    "hide_change": "Until something changes",
+    "hidden": "Hidden. It comes back {{when}}.",
+    "back_1": "tomorrow",
+    "back_7": "in a week",
+    "back_30": "in 30 days",
+    "back_change": "when something changes",
+    "undo": "Undo",
+    "more_one": "1 more needs attention",
+    "more_other": "{{count}} more need attention"
+  },
+  "glance": {
+    "documents_one": "document",
+    "documents_other": "documents",
+    "expiring_one": "expiring soon",
+    "expiring_other": "expiring soon",
+    "details_one": "needs details",
+    "details_other": "need details",
+    "essentials": "Essentials",
+    "kept": "Kept on this phone"
   }
 }

@@ -87,7 +87,7 @@ describe('the card with no connection', () => {
     phone.files.set('cache:/scan/2.jpg', jpeg('card.jpg'));
     await renderApp(<App />, { fetch: withStatus(t), capture: phone });
     // Online at the start: the card's choices are fetched and kept.
-    await screen.findByTestId('home-calm');
+    await screen.findByTestId('home-ready');
     await waitFor(() => expect(t.calls.some((c) => c.includes('/api/v1/members'))).toBe(true));
 
     // Airplane mode.
@@ -146,7 +146,7 @@ describe('the card with no connection', () => {
       return res;
     };
     await renderApp(<App />, { fetch: slow, capture: phone });
-    await screen.findByTestId('home-calm');
+    await screen.findByTestId('home-ready');
     // …and the connection goes while it is on its way; then the card opens.
     t.reachable.delete(ORIGIN);
     await add();
@@ -171,7 +171,7 @@ describe('the card with no connection', () => {
     };
     // Online once: the card's choices are kept on the phone, and what the vault asks for.
     const first = await renderApp(<App />, { fetch: withStatus(t), capture: phone() });
-    await screen.findByTestId('home-calm');
+    await screen.findByTestId('home-ready');
     const key = `card|${ORIGIN}|fake-member`;
     await waitFor(async () => expect(await store.cached(key)).not.toBeNull());
     await waitFor(async () => expect(await store.cached(`${key}|kinds`)).toEqual({ customTypes: true, batches: false }));

@@ -304,7 +304,7 @@ describe('what you may see (5.36)', () => {
     };
     await signedIn(t);
     await renderApp(<App />, { fetch });
-    await screen.findByTestId('home-calm');
+    await screen.findByTestId('home-ready');
     await waitFor(() => expect(t.calls.some((c) => c.endsWith('/api/v1/me'))).toBe(true));
     expect(screen.queryByTestId('home-access')).toBeNull();
     expect(screen.queryByText(/You can see/)).toBeNull();

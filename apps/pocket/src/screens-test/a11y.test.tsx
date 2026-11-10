@@ -66,7 +66,7 @@ describe('every screen can be used with a screen reader and a thumb', () => {
     const t = testVault();
     await signedIn(t);
     await renderApp(<Home />, { fetch: t.fetch });
-    await screen.findByTestId('home-calm');
+    await screen.findByTestId('home-ready');
     expect(audit()).toEqual([]);
   });
 
@@ -88,7 +88,7 @@ describe('every screen can be used with a screen reader and a thumb', () => {
       return pending ? <CaptureScreen /> : <Home />;
     }
     await renderApp(<Both />, { fetch: busy, capture: phone });
-    await screen.findByTestId('home-calm');
+    await screen.findByTestId('home-ready');
     expect(audit()).toEqual([]);
 
     // The + menu, open.

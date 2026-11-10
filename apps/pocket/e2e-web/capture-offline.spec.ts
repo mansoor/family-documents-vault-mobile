@@ -44,7 +44,7 @@ test('saved with no connection, sent once when it is back', async ({ page, conte
   await page.getByLabel('Email').fill(EMAIL);
   await page.getByLabel('Password').fill(PASSWORD);
   await page.getByRole('button', { name: 'Sign in' }).click();
-  await expect(page.getByText('Needs attention').first()).toBeVisible();
+  await expect(page.getByTestId('home-ready')).toBeVisible();
 
   // The connection goes, after the app has seen the vault's choices.
   await page.waitForTimeout(1000);

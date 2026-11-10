@@ -57,7 +57,7 @@ async function signIn(page: Page, address: string) {
   await page.getByLabel('Email').fill(EMAIL);
   await page.getByLabel('Password').fill(PASSWORD);
   await page.getByRole('button', { name: 'Sign in' }).click();
-  await expect(page.getByText('Needs attention').first()).toBeVisible();
+  await expect(page.getByTestId('home-ready')).toBeVisible();
 }
 
 test.beforeAll(async ({ request }) => {

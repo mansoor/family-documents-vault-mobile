@@ -161,7 +161,7 @@ describe('Send to my Inbox (I5)', () => {
     const { p, store } = phone(2);
     const heard = jest.spyOn(AccessibilityInfo, 'announceForAccessibility');
     await renderApp(<App />, { fetch: rec.fetch, capture: p });
-    await screen.findByTestId('home-calm');
+    await screen.findByTestId('home-ready');
 
     await add();
     const button = await screen.findByTestId('capture-inbox');
@@ -206,7 +206,7 @@ describe('Send to my Inbox (I5)', () => {
     let now = TEN_OCT;
     const { p } = phone(2, () => now);
     await renderApp(<App />, { fetch: t.fetch, capture: p });
-    await screen.findByTestId('home-calm');
+    await screen.findByTestId('home-ready');
     await sendOne();
     await waitFor(() => expect(batches(t)).toHaveLength(1));
     now = TEN_OCT + 24 * 3600_000;
@@ -227,7 +227,7 @@ describe('Send to my Inbox (I5)', () => {
     rec.scripted.push({ turn: 'lost' });
     const { p, store } = phone(1);
     await renderApp(<App />, { fetch: rec.fetch, capture: p });
-    await screen.findByTestId('home-calm');
+    await screen.findByTestId('home-ready');
     await sendOne();
     await waitFor(() => expect(rec.sent).toHaveLength(1));
     // The vault has it; the phone does not know yet, and keeps it.
@@ -250,7 +250,7 @@ describe('Send to my Inbox (I5)', () => {
     let now = new Date(2026, 9, 10, 23, 59).getTime();
     const { p, store } = phone(1, () => now);
     await renderApp(<App />, { fetch: rec.fetch, capture: p });
-    await screen.findByTestId('home-calm');
+    await screen.findByTestId('home-ready');
     await sendOne();
     await waitFor(() => expect(rec.sent).toHaveLength(1));
     await waitFor(async () => expect((await store.list())[0]?.target).toBe(rec.sent[0]?.batch));
@@ -270,7 +270,7 @@ describe('Send to my Inbox (I5)', () => {
     rec.scripted.push({ turn: 'lost' });
     const { p, store } = phone(1);
     await renderApp(<App />, { fetch: rec.fetch, capture: p });
-    await screen.findByTestId('home-calm');
+    await screen.findByTestId('home-ready');
     await sendOne();
     await waitFor(() => expect(batches(t)).toEqual([{ name: 'From my phone, 10 Oct', waiting: 1 }]));
     // "Not a document, remove it", at a computer.
@@ -326,7 +326,7 @@ describe('Send to my Inbox (I5)', () => {
     const rec = recording(t);
     const { p, store } = phone(2);
     await renderApp(<App />, { fetch: rec.fetch, capture: p });
-    await screen.findByTestId('home-calm');
+    await screen.findByTestId('home-ready');
     await sendOne();
     await waitFor(() => expect(batches(t)).toEqual([{ name: 'From my phone, 10 Oct', waiting: 1 }]));
     const first = rec.sent[0]?.batch;
@@ -355,7 +355,7 @@ describe('Send to my Inbox (I5)', () => {
     const rec = recording(t);
     const { p, store } = phone(2);
     await renderApp(<App />, { fetch: rec.fetch, capture: p });
-    await screen.findByTestId('home-calm');
+    await screen.findByTestId('home-ready');
     await sendOne();
     await waitFor(() => expect(batches(t)).toHaveLength(1));
     // At a computer, the whole batch is removed.
@@ -373,7 +373,7 @@ describe('Send to my Inbox (I5)', () => {
     await signedIn(t);
     const { p, store } = phone(1);
     await renderApp(<App />, { fetch: t.fetch, capture: p });
-    await screen.findByTestId('home-calm');
+    await screen.findByTestId('home-ready');
     // The card's choices kept; then airplane mode.
     await waitFor(() => expect(t.calls.some((c) => c.includes('/api/v1/members'))).toBe(true));
     t.reachable.delete(ORIGIN);
@@ -404,7 +404,7 @@ describe('Send to my Inbox (I5)', () => {
     await signedIn(t);
     const { p, store } = phone(1);
     const first = await renderApp(<App />, { fetch: t.fetch, capture: p });
-    await screen.findByTestId('home-calm');
+    await screen.findByTestId('home-ready');
     await waitFor(async () =>
       expect(await store.cached(`card|${ORIGIN}|fake-member|kinds`)).toEqual({ customTypes: true, batches: true }),
     );
@@ -423,7 +423,7 @@ describe('Send to my Inbox (I5)', () => {
     await signedIn(t);
     const { p } = phone(1);
     await renderApp(<App />, { fetch: t.fetch, capture: p });
-    await screen.findByTestId('home-calm');
+    await screen.findByTestId('home-ready');
     await add();
     const skip = await screen.findByTestId('capture-skip');
     expect(skip).toHaveTextContent('Skip');
@@ -453,7 +453,7 @@ describe('Send to my Inbox (I5)', () => {
       return queue.length > 0 ? <Settings /> : <Home />;
     }
     await renderApp(<Both />, { fetch: busy, capture: p });
-    await screen.findByTestId('home-calm');
+    await screen.findByTestId('home-ready');
     await add();
     await fireEvent.press(await screen.findByTestId('capture-inbox'));
     await waitFor(async () => expect(await store.list()).toHaveLength(1));
@@ -491,7 +491,8 @@ describe("the Inbox count on Home (I5)", () => {
     await waitingFromComputer(t, 3);
     await renderApp(<Home />, { fetch: t.fetch });
     const line = await screen.findByTestId('home-inbox');
-    expect(line).toHaveTextContent('3 waiting in your Inbox: review them in the browserAt vault.test/inbox');
+    // An alert since R4: its words first, then Open and Hide.
+    expect(line).toHaveTextContent(/^3 waiting in your Inbox: review them in the browserAt vault\.test\/inbox/);
     expect(audit()).toEqual([]);
     const open = screen.getByTestId('home-inbox-open');
     expect(open.props.accessibilityLabel).toBe('Open your Inbox in the browser');
@@ -543,7 +544,7 @@ describe("the Inbox count on Home (I5)", () => {
       return Promise.resolve(reply(403, { error: { code: 'forbidden', message: 'Refused.', retriable: false } }));
     };
     await renderApp(<Home />, { fetch });
-    await screen.findByTestId('home-calm');
+    await screen.findByTestId('home-ready');
     await waitFor(() => expect(asked).toBeGreaterThan(0));
     expect(screen.queryByTestId('home-inbox')).toBeNull();
     expect(t.calls).not.toContain(`GET ${ORIGIN}/api/v1/batches`);
@@ -555,7 +556,7 @@ describe("the Inbox count on Home (I5)", () => {
     await signedIn(t);
     await waitingFromComputer(t, 0);
     await renderApp(<Home />, { fetch: t.fetch });
-    await screen.findByTestId('home-calm');
+    await screen.findByTestId('home-ready');
     await waitFor(() => expect(t.calls).toContain(`GET ${ORIGIN}/api/v1/batches/counts`));
     expect(screen.queryByTestId('home-inbox')).toBeNull();
   });
@@ -625,7 +626,7 @@ describe("the Inbox count on Home (I5)", () => {
     const t = testVault([ORIGIN]);
     await signedIn(t);
     await renderApp(<Home />, { fetch: t.fetch });
-    await screen.findByTestId('home-calm');
+    await screen.findByTestId('home-ready');
     await focused();
     expect(screen.queryByTestId('home-inbox')).toBeNull();
     expect(t.calls.filter((c) => c.includes('/api/v1/batches'))).toEqual([]);
@@ -683,7 +684,7 @@ describe('the review round (I5)', () => {
       let fetch: TestVault['fetch'] = t.fetch;
       const { p, store } = phone(1);
       await renderApp(<App />, { fetch: (url, init) => fetch(url, init), capture: p });
-      await screen.findByTestId('home-calm');
+      await screen.findByTestId('home-ready');
       await add();
       const button = await screen.findByTestId('capture-inbox');
       // Meanwhile the vault is put back to a version with no batches.
@@ -709,7 +710,7 @@ describe('the review round (I5)', () => {
     rec.scripted.push({ turn: 'lost' });
     const { p, store } = phone(1);
     await renderApp(<App />, { fetch: rec.fetch, capture: p });
-    await screen.findByTestId('home-calm');
+    await screen.findByTestId('home-ready');
     await sendOne();
     await waitFor(() => expect(batches(t)).toEqual([{ name: 'From my phone, 10 Oct', waiting: 1 }]));
     await waitFor(async () => expect((await store.list())[0]?.target).toBe(rec.sent[0]?.batch));
@@ -730,7 +731,7 @@ describe('the review round (I5)', () => {
     let fetch: TestVault['fetch'] = t.fetch;
     const { p, store } = phone(1, () => clock);
     await renderApp(<App />, { fetch: (url, init) => fetch(url, init), capture: p });
-    await screen.findByTestId('home-calm');
+    await screen.findByTestId('home-ready');
     await add();
     const button = await screen.findByTestId('capture-inbox');
     fetch = rolledBack(t, { batches: true });
@@ -764,7 +765,7 @@ describe('the review round (I5)', () => {
     };
     const { p, store } = phone(1);
     await renderApp(<App />, { fetch, capture: p });
-    await screen.findByTestId('home-calm');
+    await screen.findByTestId('home-ready');
     await sendOne();
     await waitFor(() => expect(lose).toBe(false));
     await waitFor(async () => expect((await store.list())[0]?.lastCode).toBe('offline'));
@@ -805,7 +806,7 @@ describe('a renewal the vault turns away for too many tries (I5-4)', () => {
     const h = anHourOn(t);
     const { p } = phone(1);
     await renderApp(<App />, { fetch: h.fetch, deps: { now: h.now }, capture: p });
-    await screen.findByTestId('home-calm');
+    await screen.findByTestId('home-ready');
     await waitFor(() => expect(t.calls.some((c) => c.includes('/api/v1/members'))).toBe(true));
     h.later();
     await add();
@@ -866,7 +867,7 @@ describe('a renewal the vault turns away for too many tries (I5-4)', () => {
       );
     }
     await renderApp(<WithAsker />, { fetch: h.fetch, deps: { now: h.now } });
-    await screen.findByTestId('home-calm');
+    await screen.findByTestId('home-ready');
     h.later();
 
     // Something that waits: Home says how long the vault asked for.
