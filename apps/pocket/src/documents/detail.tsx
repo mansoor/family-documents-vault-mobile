@@ -544,6 +544,6 @@ const makeStyles = (colours: Palette) =>
       borderColor: colours.border,
     },
     notes: { gap: sp(8) },
-    switchRow: { flexDirection: 'row', alignItems: 'center', gap: sp(12), minHeight: 56 },
+    switchRow: { flexDirection: 'row', alignItems: 'center', gap: sp(12), minHeight: 48 },
     flex: { flex: 1 },
   });

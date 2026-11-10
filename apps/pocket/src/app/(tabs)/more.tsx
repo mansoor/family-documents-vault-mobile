@@ -178,7 +178,7 @@ const makeStyles = (colours: Palette) =>
       gap: sp(12),
       paddingHorizontal: sp(14),
       paddingVertical: sp(12),
-      minHeight: 64,
+      minHeight: 52,
       borderBottomWidth: StyleSheet.hairlineWidth,
       borderBottomColor: colours.border,
     },

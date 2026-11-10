@@ -1,4 +1,4 @@
-import { radii, statusTone, TAP_MIN, type as typeScale, type Status } from '@fdv/shared';
+import { radii, statusTone, TAP_MIN, type Status } from '@fdv/shared';
 import { AlertTriangle, CheckCircle2, Clock, Info, XCircle, type LucideIcon } from 'lucide-react-native';
 import { useCallback, useEffect, useRef, type ReactNode } from 'react';
 import {
@@ -14,25 +14,26 @@ import {
   type ViewStyle,
 } from 'react-native';
 import { font, type Weight } from './fonts';
+import { LINE, TYPE } from './scale';
 import { useTextScale } from './text-scale';
 import { sp } from './space';
 import { useColours, useStyles, type Palette } from './theme';
 
 /**
- * The app's building blocks, drawn from @fdv/shared's tokens so the phone
- * and the web say things in the same colours. Every text size goes through
+ * The app's building blocks, drawn from @fdv/shared's colours so the phone
+ * and the web say things alike, on the phone's own compact scale (R1). Every text size goes through
  * Large text; every pressable is at least 44 dp with its hit slop.
  */
 
 type Variant = 'hero' | 'title' | 'screen' | 'body' | 'secondary' | 'small';
 
 const SIZES: Record<Variant, number> = {
-  hero: typeScale.display.hero,
-  title: typeScale.display.title,
-  screen: typeScale.display.screen,
-  body: typeScale.body,
-  secondary: typeScale.secondary,
-  small: typeScale.small,
+  hero: TYPE.display.hero,
+  title: TYPE.display.title,
+  screen: TYPE.display.screen,
+  body: TYPE.body,
+  secondary: TYPE.secondary,
+  small: TYPE.small,
 };
 
 export function Text(props: {
@@ -65,7 +66,7 @@ export function Text(props: {
       style={[
         {
           fontSize: size,
-          lineHeight: Math.round(size * (display ? 1.2 : 1.45)),
+          lineHeight: Math.round(size * (display ? LINE.display : LINE.body)),
           color,
           ...font(props.weight ?? (display ? '600' : '400'), display),
         },
@@ -236,7 +237,7 @@ export function Field(
         autoCapitalize="none"
         autoCorrect={false}
         placeholderTextColor={colours.inkMuted}
-        style={[styles.input, font(), { fontSize: typeScale.body * scale }, error ? styles.inputError : null]}
+        style={[styles.input, font(), { fontSize: TYPE.body * scale }, error ? styles.inputError : null]}
         {...input}
         onLayout={(e) => {
           laidOut.current = true;

@@ -308,6 +308,6 @@ export function PasswordSheet(props: {
 
 const styles = StyleSheet.create({
   section: { gap: sp(12) },
-  row: { flexDirection: 'row', alignItems: 'center', gap: sp(12), minHeight: 56 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: sp(12), minHeight: 48 },
   rowText: { flex: 1, gap: sp(4), minHeight: 44, justifyContent: 'center' },
 });

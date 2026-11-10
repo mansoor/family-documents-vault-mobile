@@ -95,7 +95,7 @@ const makeStyles = (colours: Palette) =>
       borderWidth: 1,
       borderColor: colours.border,
       padding: sp(12),
-      minHeight: 56,
+      minHeight: 48,
     },
     pressed: { opacity: 0.8 },
   });

@@ -7,6 +7,7 @@ import { Pressable, StyleSheet, Text as RNText, View } from 'react-native';
 import { StatusLine, Text } from '../ui';
 import { font } from '../ui/fonts';
 import { useDocumentMenu, type RemoveFrom } from './menu';
+import { ROW } from '../ui/scale';
 import { snippetParts } from './snippet';
 import { sp } from '../ui/space';
 import { useColours, useStyles, type Palette } from '../ui/theme';
@@ -34,6 +35,8 @@ export function DocumentRow(props: {
   untitled?: string;
   /** On a collection's page, for its maker: Remove from this collection in its ⋯ (P9). */
   remove?: RemoveFrom;
+  /** Where it sits in its list, which is drawn as one card (R1): `rowPlace`. Alone, a card of its own. */
+  place?: RowPlace;
 }) {
   const colours = useColours();
   const styles = useStyles(makeStyles);
@@ -55,7 +58,7 @@ export function DocumentRow(props: {
     .filter(Boolean)
     .join('. ');
   return (
-    <View style={styles.row}>
+    <View style={[styles.row, styles[props.place ?? 'only']]}>
       <Pressable
         testID={`doc-row-${props.id}`}
         accessibilityRole="button"
@@ -76,7 +79,7 @@ export function DocumentRow(props: {
               accessibilityIgnoresInvertColors
             />
           ) : (
-            <Kind color={colours.accent} size={22} accessibilityElementsHidden importantForAccessibility="no" />
+            <Kind color={colours.accent} size={18} accessibilityElementsHidden importantForAccessibility="no" />
           )}
         </View>
         <View style={styles.words}>
@@ -103,6 +106,15 @@ export function DocumentRow(props: {
   );
 }
 
+export type RowPlace = 'only' | 'first' | 'middle' | 'last';
+
+/** Where the row at `index` of `count` sits in its card. */
+export function rowPlace(index: number, count: number): RowPlace {
+  if (count <= 1) return 'only';
+  if (index === 0) return 'first';
+  return index === count - 1 ? 'last' : 'middle';
+}
+
 const makeStyles = (colours: Palette) =>
   StyleSheet.create({
     row: {
@@ -114,18 +126,24 @@ const makeStyles = (colours: Palette) =>
       borderColor: colours.border,
       paddingRight: sp(4),
     },
-    main: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: sp(12), padding: sp(10), minHeight: 72 },
+    main: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: sp(12), padding: sp(10), minHeight: ROW },
     words: { flex: 1, gap: sp(4) },
     thumb: {
-      width: 48,
-      height: 64,
+      width: 30,
+      height: 40,
       borderRadius: radii.s,
       backgroundColor: colours.accentSoft,
       overflow: 'hidden',
       alignItems: 'center',
       justifyContent: 'center',
     },
-    thumbImage: { width: 48, height: 64 },
+    thumbImage: { width: 30, height: 40 },
+    // One card for the list (R1): its first row rounds the top, its last the
+    // bottom, and a hairline parts each row from the one above.
+    only: {},
+    first: { borderBottomWidth: 0, borderBottomLeftRadius: 0, borderBottomRightRadius: 0 },
+    middle: { borderRadius: 0, borderBottomWidth: 0, borderTopWidth: StyleSheet.hairlineWidth },
+    last: { borderTopWidth: StyleSheet.hairlineWidth, borderTopLeftRadius: 0, borderTopRightRadius: 0 },
     pressed: { opacity: 0.8 },
     bold: { ...font('700'), color: colours.ink },
   });

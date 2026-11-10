@@ -2,8 +2,8 @@ import { type DocumentView } from '@fdv/shared';
 import { useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FlatList, RefreshControl, StyleSheet } from 'react-native';
-import { DocumentRow } from '../../documents/row';
+import { FlatList, RefreshControl, StyleSheet, View } from 'react-native';
+import { DocumentRow, rowPlace } from '../../documents/row';
 import { IdentityCard } from '../../identity/card';
 import { useVault } from '../../state/vault';
 import { Notice, Text } from '../../ui';
@@ -71,16 +71,16 @@ export default function PersonScreen() {
       }
       keyExtractor={(d) => d.id}
       ListHeaderComponent={
-        <>
+        <View style={styles.header}>
           <Text variant="hero">{name ?? ''}</Text>
           {id ? <IdentityCard memberId={id} name={name ?? ''} /> : null}
           {offline && !docs ? <Notice tone="warn">{t('people.needsConnection')}</Notice> : null}
           {failed ? <LoadFailed words={failed} onRetry={() => void load()} /> : null}
           {!docs && !failed && !offline ? <Placeholder /> : null}
           {docs && docs.length === 0 ? <Text tone="soft">{t('people.none', { name: name ?? '' })}</Text> : null}
-        </>
+        </View>
       }
-      renderItem={({ item }) => (
+      renderItem={({ item, index }) => (
         <DocumentRow
           id={item.id}
           title={item.title}
@@ -88,6 +88,7 @@ export default function PersonScreen() {
           note_name={item.note_name}
           status={item.status}
           doc={item}
+          place={rowPlace(index, docs?.length ?? 0)}
           thumb={
             api && token && item.latest_version_id ? { uri: api.thumbnailUrl(item.latest_version_id), token } : null
           }
@@ -100,5 +101,6 @@ export default function PersonScreen() {
 const makeStyles = (colours: Palette) =>
   StyleSheet.create({
     safe: { flex: 1, backgroundColor: colours.bg },
-    page: { padding: sp(20), gap: sp(10) },
+    page: { padding: sp(20) },
+    header: { gap: sp(10), marginBottom: sp(10) },
   });

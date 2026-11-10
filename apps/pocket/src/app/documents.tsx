@@ -9,7 +9,7 @@ import {
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, FlatList, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
-import { DocumentRow } from '../documents/row';
+import { DocumentRow, rowPlace } from '../documents/row';
 import { on } from '../state/events';
 import { useVault } from '../state/vault';
 import { Notice, Text } from '../ui';
@@ -262,7 +262,7 @@ export default function DocumentsScreen() {
           ) : null}
         </View>
       }
-      renderItem={({ item }) => (
+      renderItem={({ item, index }) => (
         <DocumentRow
           id={item.id}
           title={item.title}
@@ -270,6 +270,7 @@ export default function DocumentsScreen() {
           note_name={item.note_name}
           status={item.status}
           doc={item}
+          place={rowPlace(index, docs?.length ?? 0)}
           thumb={
             api && token && item.latest_version_id ? { uri: api.thumbnailUrl(item.latest_version_id), token } : null
           }
@@ -287,8 +288,8 @@ export default function DocumentsScreen() {
 const makeStyles = (colours: Palette) =>
   StyleSheet.create({
     screen: { backgroundColor: colours.bg },
-    page: { padding: sp(20), gap: sp(10) },
-    header: { gap: sp(12) },
+    page: { padding: sp(20) },
+    header: { gap: sp(12), marginBottom: sp(10) },
     chips: { paddingVertical: sp(4) },
     chipRow: { flexDirection: 'row', gap: sp(8) },
   });

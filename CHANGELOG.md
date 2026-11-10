@@ -6,6 +6,24 @@ app's own, tagged `vX.Y.Z` in this repository.
 
 ## [Unreleased]
 
+## [0.4.1] — more on every screen (redesign R1)
+
+### Changed
+- **A compact scale, everywhere.** The first step of the redesign:
+  - smaller type: words 14, secondary lines 12, small labels 11, titles
+    22;
+  - every gap and margin a step tighter;
+  - a document's row 52 high, with a smaller picture;
+  - other rows (More, Notes, People, choices in a sheet) a step lower
+    too.
+
+  Large text, the phone's own font size, and light and dark (following
+  the phone, or as set in Settings) all work as before. Every button
+  is still big enough to press.
+- **A list is one card.** Documents on Home, All documents, Search, a
+  person's page and a collection's page sit in one card, parted by thin
+  lines, instead of a card per document.
+
 ## [0.4.0] — the polished app (polish P11)
 
 The polish from 0.3.4 to 0.3.14, finished. In short:
