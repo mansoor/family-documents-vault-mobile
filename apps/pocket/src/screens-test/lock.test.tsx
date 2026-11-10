@@ -105,7 +105,7 @@ describe('the lock', () => {
     await signedInApp(p);
     expect(await screen.findByTestId('lock-screen')).toBeTruthy();
     expect(screen.getByText('Unlock to open your vault.')).toBeTruthy();
-    expect(screen.queryByTestId('home-calm')).toBeNull();
+    expect(screen.queryByTestId('home-ready')).toBeNull();
     expect(p.keys.everydayKey).toBeNull();
   });
 
@@ -113,7 +113,7 @@ describe('the lock', () => {
     const p = phone();
     await signedInApp(p);
     await fireEvent.press(await screen.findByTestId('lock-unlock'));
-    expect(await screen.findByTestId('home-calm')).toBeTruthy();
+    expect(await screen.findByTestId('home-ready')).toBeTruthy();
     expect(p.calls.prompts).toBe(1);
     expect(p.keys.everydayKey).toMatch(/^[0-9a-f]{64}$/);
   });
@@ -122,19 +122,19 @@ describe('the lock', () => {
     const p = phone();
     await signedInApp(p);
     await fireEvent.press(await screen.findByTestId('lock-unlock'));
-    await screen.findByTestId('home-calm');
+    await screen.findByTestId('home-ready');
 
     await goTo('background');
     clock += 30_000;
     await goTo('active');
     expect(screen.queryByTestId('lock-screen')).toBeNull();
-    expect(screen.getByTestId('home-calm')).toBeTruthy();
+    expect(screen.getByTestId('home-ready')).toBeTruthy();
 
     await goTo('background');
     clock += 70_000;
     await goTo('active');
     expect(await screen.findByTestId('lock-screen')).toBeTruthy();
-    expect(screen.queryByTestId('home-calm')).toBeNull();
+    expect(screen.queryByTestId('home-ready')).toBeNull();
     // Locked, the key is out of memory.
     expect(p.keys.everydayKey).toBeNull();
   });
@@ -144,7 +144,7 @@ describe('the lock', () => {
     const p = phone();
     await signedInApp(p);
     await fireEvent.press(await screen.findByTestId('lock-unlock'));
-    await screen.findByTestId('home-calm');
+    await screen.findByTestId('home-ready');
     await goTo('background');
     expect(await screen.findByTestId('lock-screen')).toBeTruthy();
   });
@@ -156,7 +156,7 @@ describe('the lock', () => {
     await pressBack();
     expect(p.calls.exited).toBe(1);
     expect(screen.getByTestId('lock-screen')).toBeTruthy();
-    expect(screen.queryByTestId('home-calm')).toBeNull();
+    expect(screen.queryByTestId('home-ready')).toBeNull();
     // Declining the prompt leaves it locked too.
     await fireEvent.press(screen.getByTestId('lock-unlock'));
     expect(screen.getByTestId('lock-screen')).toBeTruthy();
@@ -169,7 +169,7 @@ describe('the lock', () => {
     expect(await screen.findByText("Too many tries. Unlock with your phone's PIN or pattern instead.")).toBeTruthy();
     p.answer('ok');
     await fireEvent.press(screen.getByTestId('lock-unlock'));
-    expect(await screen.findByTestId('home-calm')).toBeTruthy();
+    expect(await screen.findByTestId('home-ready')).toBeTruthy();
   });
 
   it('no screen lock turns offline off with the explanation, and everything else works', async () => {
@@ -202,7 +202,7 @@ describe('the lock', () => {
     await fireEvent.changeText(await screen.findByTestId('sign-in-email'), 'owner@example.test');
     await fireEvent.changeText(screen.getByTestId('sign-in-password'), 'correct horse battery staple');
     await fireEvent.press(screen.getByTestId('sign-in-go'));
-    expect(await screen.findByTestId('home-calm')).toBeTruthy();
+    expect(await screen.findByTestId('home-ready')).toBeTruthy();
     expect(screen.queryByTestId('lock-screen')).toBeNull();
     expect(p.calls.prompts).toBe(0);
     expect(p.keys.everydayKey).toMatch(/^[0-9a-f]{64}$/);
@@ -229,7 +229,7 @@ describe('the lock', () => {
       { fetch: t.fetch, lock: p.deps },
     );
     await fireEvent.press(await screen.findByTestId('lock-unlock'));
-    await screen.findByTestId('home-calm');
+    await screen.findByTestId('home-ready');
     const scan = (minutes: number) =>
       act(async () => {
         await (grabbed.lock as ReturnType<typeof useLock>).away(async () => {
@@ -255,7 +255,7 @@ describe('the lock', () => {
     await fireEvent.changeText(await screen.findByTestId('sign-in-email'), 'owner@example.test');
     await fireEvent.changeText(screen.getByTestId('sign-in-password'), 'correct horse battery staple');
     await fireEvent.press(screen.getByTestId('sign-in-go'));
-    expect(await screen.findByTestId('home-calm')).toBeTruthy();
+    expect(await screen.findByTestId('home-ready')).toBeTruthy();
     expect(p.calls.prompts).toBe(0);
   });
 
@@ -263,7 +263,7 @@ describe('the lock', () => {
     const p = phone();
     await signedInApp(p);
     await fireEvent.press(await screen.findByTestId('lock-unlock'));
-    await screen.findByTestId('home-calm');
+    await screen.findByTestId('home-ready');
     await goTo('background');
     expect(screen.getByTestId('lock-cover')).toBeTruthy();
     clock += 20_000;
@@ -281,7 +281,7 @@ describe('the lock', () => {
     await waitFor(() => expect(p.calls.prompts).toBe(1));
     p.answer('ok');
     await fireEvent.press(screen.getByTestId('lock-unlock'));
-    await screen.findByTestId('home-calm');
+    await screen.findByTestId('home-ready');
     // "Immediately": locked as it leaves — and not asked until it is back.
     await goTo('background');
     await screen.findByTestId('lock-screen');

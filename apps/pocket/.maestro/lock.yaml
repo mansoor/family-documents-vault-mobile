@@ -30,7 +30,7 @@ env:
     id: sign-in-go
 - extendedWaitUntil:
     visible:
-      id: home-calm
+      id: home-ready
     timeout: 30000
 - assertNotVisible:
     id: lock-screen
@@ -43,12 +43,12 @@ env:
       id: lock-screen
     timeout: 30000
 - assertNotVisible:
-    id: home-calm
+    id: home-ready
 - tapOn:
     id: lock-unlock
 - extendedWaitUntil:
     visible:
-      id: home-calm
+      id: home-ready
     timeout: 30000
 
 # Away for longer than a minute.
@@ -65,7 +65,7 @@ env:
       id: lock-screen
     timeout: 30000
 - assertNotVisible:
-    id: home-calm
+    id: home-ready
 
 # Back leaves.
 - back

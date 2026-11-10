@@ -8,7 +8,6 @@ import {
   type ReminderView,
   type ResetNotice,
 } from '@fdv/shared';
-import * as Linking from 'expo-linking';
 import { Link, useNavigation, useRouter } from 'expo-router';
 import { Settings as SettingsIcon } from 'lucide-react-native';
 import { useCallback, useEffect, useState } from 'react';
@@ -19,7 +18,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { AccessNotice, myAccess, type MyAccess } from '../../access/access';
 import { QueueRow, withoutWords } from '../../capture/queue-row';
 import { useBeginCapture } from '../../capture/add-button';
-import { offersNewScan, reminderHeadline } from '../../documents/reminders';
+import { offersNewScan } from '../../documents/reminders';
 import { wordsFor } from '../../errors/words';
 import { OnThisPhone } from '../../essentials/ui';
 import { waitingInInbox } from '../../queue/inbox';
@@ -29,9 +28,12 @@ import { useCapture, type SavedNote } from '../../state/capture';
 import { on } from '../../state/events';
 import { useStepUp } from '../../state/step-up';
 import { useVault } from '../../state/vault';
-import { Button, Card, Notice, Text } from '../../ui';
+import { Button, Notice, Text } from '../../ui';
 import { DocumentRow, rowPlace } from '../../documents/row';
 import { BellButton } from '../../ui/bell';
+import { countAlert, reminderAlert, type HomeAlert } from '../../home/alerts';
+import { AlertCards } from '../../home/alert-cards';
+import { Counts, EssentialsLine, type HomeCounts } from '../../home/glance';
 import { sp } from '../../ui/space';
 import { VaultRead } from '../../capture/vault-read';
 import { useColours, useStyles, type Palette } from '../../ui/theme';
@@ -50,6 +52,8 @@ interface HomeData {
   widening: IdentityAudienceView['pending'];
   /** What an owner limited this person to, and a guest's end (5.33, 5.34). */
   access: MyAccess | null;
+  /** At a glance (R4), where the vault counts: a vault with the Documents table. */
+  counts: HomeCounts | null;
 }
 
 /**
@@ -64,7 +68,12 @@ const optional = <T,>(p: Promise<T>): Promise<T | null> =>
   });
 
 /**
- * Home: what needs attention, and what came in lately. It shows what it
+ * Home (R4, the owner's redesign of 10 Nov 2026): what needs doing, as
+ * alerts that can be hidden for a while; three numbers at a glance; the
+ * Essentials kept on the phone; and the five documents added last. Nothing
+ * says "nothing to do": the bell carries what is due.
+ *
+ * Earlier: what needs attention, and what came in lately. It shows what it
  * last had when the vault cannot be reached, under a plain banner. Above
  * them, what the person must be told (5.31): that an owner made a link to
  * reset their password, and what was added to their sign-in since; and
@@ -89,6 +98,7 @@ export default function Home() {
   const [members, setMembers] = useState<Member[] | null>(null);
   const canAdd = who ? can(who.role, 'document.add') : false;
   const identityOn = caps?.features.member_identity === true;
+  const counted = caps?.features.document_table === true;
   const needsYou = capture.queue.some((i) => i.state === 'needs_you');
 
   // The family as last seen, for putting a refused scan right.
@@ -121,12 +131,21 @@ export default function Home() {
           }
           return n;
         };
-        const [due, recent, unnamed, me, audience] = await Promise.all([
+        // How many: the table's total for a column sort, one row asked for (0.6.0).
+        const total = async (status?: 'expiring_soon' | 'needs_info') =>
+          (await a.documents(token, { sort: 'title', direction: 'asc', limit: 1, ...(status ? { status } : {}) })).total ?? 0;
+        const glance = async (): Promise<HomeCounts | null> => {
+          if (!counted) return null;
+          const [all, expiring, details] = await Promise.all([total(), total('expiring_soon'), total('needs_info')]);
+          return { total: all, expiring, details };
+        };
+        const [due, recent, unnamed, me, audience, counts] = await Promise.all([
           a.reminders(token, 'due'),
-          a.documents(token, { limit: 20 }),
+          a.documents(token, { limit: 5 }),
           unnamedCount(),
           optional(a.me(token)),
           identityOn ? optional(a.identityAudience(token)) : Promise.resolve(null),
+          optional(glance()),
         ]);
         return {
           due: due.items,
@@ -137,6 +156,7 @@ export default function Home() {
           widening: audience?.pending ?? null,
           // A guest's end is said on the family's clock, which the profile knows.
           access: await myAccess(me, async () => (await optional(a.profile(token)))?.timezone),
+          counts,
         };
       });
       setData(next);
@@ -145,7 +165,7 @@ export default function Home() {
       // Offline or signed out: the banner or the sign-in screen says so. Anything else, here.
       setFailed(loadFailure('home', err, t));
     }
-  }, [withTokenQuick, identityOn, t]);
+  }, [withTokenQuick, identityOn, counted, t]);
 
   useEffect(() => {
     // Loading on arrival, and again each time the vault takes a capture:
@@ -205,7 +225,7 @@ export default function Home() {
   // only their own, which Home cannot tell), and not while a new version of
   // it is already waiting to go.
   const renewing = new Set(capture.queue.filter((i) => i.kind === 'version').map((i) => i.target));
-  const canRenew = (r: ReminderView, index: number, due: ReminderView[]) =>
+  const canRenewAt = (r: ReminderView, index: number, due: ReminderView[]) =>
     canAdd &&
     who?.role !== 'teen' &&
     !renewing.has(r.document_id) &&
@@ -221,12 +241,25 @@ export default function Home() {
   };
 
   const name = caps?.branding.display_name ?? vault?.displayName ?? '';
+  // What needs doing, as alerts (R4): due reminders, documents with no name, files in the Inbox.
+  const due = data?.due ?? [];
+  const recent = (data?.recent ?? []).slice(0, 5);
+  const alerts: HomeAlert[] = [
+    ...due.map(reminderAlert),
+    ...(data && data.unnamed > 0 ? [countAlert('unnamed', data.unnamed)] : []),
+    ...(inboxOn && inbox !== null && inbox > 0 ? [countAlert('inbox', inbox)] : []),
+  ];
+  const canRenew = (alert: HomeAlert) => {
+    const r = alert.reminder;
+    return !!r && canRenewAt(r, due.indexOf(r), due);
+  };
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <FlatList
         testID="home-list"
-        data={data?.recent ?? []}
+        // The five added last (R4); See all opens Documents.
+        data={recent}
         keyExtractor={(d) => d.id}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void refresh()} />}
         contentContainerStyle={styles.page}
@@ -329,40 +362,24 @@ export default function Home() {
                 ))}
               </View>
             ) : null}
-            {inboxOn && inbox !== null && inbox > 0 && vault ? <InboxLine count={inbox} origin={vault.origin} /> : null}
             {data?.resetNotice ? <ResetNoticeCard notice={data.resetNotice} onSeen={() => void load()} /> : null}
             {data?.widening ? <WideningNotice pending={data.widening} memberId={who?.member_id ?? null} /> : null}
             {data?.access ? <AccessNotice access={data.access} /> : null}
+            {vault && who ? (
+              <AlertCards
+                alerts={alerts}
+                who={`${vault.origin}|${who.member_id}`}
+                canRenew={canRenew}
+                onRenew={(id) => void renew(id)}
+                inboxOrigin={vault.origin}
+              />
+            ) : null}
             <OnThisPhone />
-            <Text variant="screen">{t('home.attentionTitle')}</Text>
-            {data && data.unnamed > 0 ? (
-              <Text weight="600" tone="warn" testID="home-unnamed">
-                {t('home.needName', { count: data.unnamed })}
-              </Text>
-            ) : null}
-            {data && data.due.length === 0 && data.unnamed === 0 ? (
-              <Text tone="soft" testID="home-calm">
-                {t('home.calm')}
-              </Text>
-            ) : null}
-            {data?.due.map((r, i, due) => (
-              <Card key={r.id} style={styles.dueCard}>
-                <Text weight="600">{r.document_title ?? t('home.untitled')}</Text>
-                <Text variant="secondary" tone="warn" weight="600">
-                  {reminderHeadline(r)}
-                </Text>
-                {canRenew(r, i, due) ? (
-                  <Button
-                    label={t('home.renew')}
-                    kind="quiet"
-                    hint={t('home.renewHint')}
-                    onPress={() => void renew(r.document_id)}
-                    testID={`renew-${r.document_id}`}
-                  />
-                ) : null}
-              </Card>
-            ))}
-            <View style={styles.recentHead}>
+            {data?.counts ? <Counts counts={data.counts} /> : null}
+            <EssentialsLine />
+            {/* Home has what it asked for: what a test or a flow waits for, now that
+                nothing says "nothing to do" (R4). */}
+            <View style={styles.recentHead} {...(data ? { testID: 'home-ready' } : {})}>
               <Text variant="screen" style={styles.flex}>
                 {t('home.recentTitle')}
               </Text>
@@ -390,7 +407,7 @@ export default function Home() {
             note_name={item.note_name}
             status={item.status}
             doc={item}
-            place={rowPlace(index, data?.recent.length ?? 0)}
+            place={rowPlace(index, recent.length)}
             // A note with no title is named by its first words (0.9.0); a scan with none needs a name.
             untitled={t('home.needsAName')}
             thumb={
@@ -569,34 +586,6 @@ function SavedLine(props: { text: string; onDismiss: () => void; renews?: string
   );
 }
 
-/**
- * The person's own files waiting in their Inbox (I5): how many, and where
- * they are reviewed — the vault's /inbox, in the browser. Its address is
- * shown, as words a screen reader reads too, beside the button that opens it.
- */
-function InboxLine(props: { count: number; origin: string }) {
-  const styles = useStyles(makeStyles);
-  const { t } = useTranslation();
-  const url = `${props.origin}/inbox`;
-  const address = url.replace(/^https?:\/\//, '');
-  return (
-    <Card style={styles.inbox}>
-      <View testID="home-inbox">
-        <Text weight="600">{t('home.inbox', { count: props.count })}</Text>
-        <Text tone="soft" testID="home-inbox-address">
-          {t('home.inboxAt', { address })}
-        </Text>
-      </View>
-      <Button
-        label={t('home.inboxOpen')}
-        kind="quiet"
-        hint={t('home.inboxOpenHint', { address })}
-        onPress={() => void Linking.openURL(url)}
-        testID="home-inbox-open"
-      />
-    </Card>
-  );
-}
 
 /** Scans the vault took without a detail their kind no longer asks for: said once they are in. */
 function FiledWithoutLine(props: { lines: string[] }) {

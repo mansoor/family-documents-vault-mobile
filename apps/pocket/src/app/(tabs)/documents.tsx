@@ -8,6 +8,7 @@ import {
   type StatusValue,
   type Visibility,
 } from '@fdv/shared';
+import { useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, FlatList, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
@@ -60,6 +61,8 @@ export default function DocumentsScreen() {
   const { withToken, offline, caps, api } = useVault();
   const table = caps?.features.document_table === true;
 
+  // Opened from Home's numbers or an alert (R4): narrowed to that status.
+  const { status: asked } = useLocalSearchParams<{ status?: string }>();
   const [q, setQ] = useState('');
   const searching = q.trim() !== '';
   const [sort, setSort] = useState<Sort>('recent');
@@ -68,6 +71,14 @@ export default function DocumentsScreen() {
   const [status, setStatus] = useState<StatusValue | null>(null);
   const [visibility, setVisibility] = useState<Visibility | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
+  useEffect(() => {
+    if (asked && (STATUSES as string[]).includes(asked)) {
+      // Set when Home asks for it, each time it does.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setStatus(asked as StatusValue);
+      setQ('');
+    }
+  }, [asked]);
   const [categories, setCategories] = useState<string[]>([]);
 
   const [docs, setDocs] = useState<DocumentView[] | null>(null);

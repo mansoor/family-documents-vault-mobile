@@ -130,7 +130,7 @@ async function start(t: TestVault, parts = phoneParts(), fetch: FetchLike = t.fe
   await signedIn(t);
   await renderApp(<App />, { fetch, lock: parts.lock, essentials: parts.essentials });
   await fireEvent.press(await screen.findByTestId('lock-unlock'));
-  await screen.findByTestId('home-calm');
+  await screen.findByTestId('home-ready');
   return parts;
 }
 

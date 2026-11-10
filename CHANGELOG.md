@@ -6,6 +6,30 @@ app's own, tagged `vX.Y.Z` in this repository.
 
 ## [Unreleased]
 
+## [0.4.4] — Home, at a glance (redesign R4)
+
+### Changed
+- **Alerts you can hide.** What needs doing now shows on Home as alerts:
+  - a reminder that's due, with **Open** and **Scan the new one**;
+  - documents with no name, with **Name them**;
+  - files waiting in your Inbox, with **Open your Inbox in the browser**.
+
+  Each one's **✕** hides it on this phone for a day, a week, 30 days, or
+  until something changes, with **Undo** for a moment after. A
+  reminder's daily countdown doesn't count as a change, but a new date
+  does. Three show at most; the rest are behind the bell.
+- **Nothing says "nothing to do".** The "Needs attention" heading and
+  "Nothing needs you right now" are gone; the bell carries what's due.
+- **At a glance**, on a vault of 0.6.0 or later: how many documents, how
+  many expire soon, and how many need details. Each opens Documents,
+  narrowed to them.
+- **Your Essentials on one line**: three of those kept on this phone, then
+  how many more.
+- **Recently added** shows the five added last; **See all** opens
+  Documents.
+- Notices that must be read stay as they were: a password reset, more
+  people seeing identity details, and what an owner has limited.
+
 ## [0.4.3] — Documents, Notes, and the bell (redesign R3)
 
 ### Changed
