@@ -2,7 +2,8 @@ import type { ReminderView } from '@fdv/shared';
 import { fireEvent, screen, waitFor } from '@testing-library/react-native';
 import Home from '../app/(tabs)/index';
 import DocumentsScreen from '../app/(tabs)/documents';
-import { countAlert, hide, prune, reminderAlert, shows, unhide, type Hidden } from '../home/alerts';
+import { countAlert, hide, prefsName, prune, reminderAlert, shows, unhide, type Hidden } from '../home/alerts';
+import { fileNameOf } from '../platform/prefs';
 import { audit } from '../test-support/a11y';
 import { unlocked } from '../test-support/lookup';
 import { installed } from '../test-support/render';
@@ -59,6 +60,15 @@ describe("Home's alerts, hidden for a while (R4): the rules", () => {
     const unnamed = hide({}, countAlert('unnamed', 2), 'change', now);
     expect(shows(countAlert('unnamed', 2), unnamed, now)).toBe(false);
     expect(shows(countAlert('unnamed', 3), unnamed, now)).toBe(true);
+  });
+
+  it('kept under a name a phone may use for a file: nothing of the address but letters, digits, dots, dashes', () => {
+    const name = prefsName('http://10.0.2.2:8099|4473223a-d7db-464b-9dfa-58a3d93220e3');
+    expect(name).toMatch(/^[A-Za-z0-9._-]+$/);
+    expect(name).not.toBe(prefsName('https://10.0.2.2:8099|4473223a-d7db-464b-9dfa-58a3d93220e3'));
+    // And whatever a name holds, the phone's file for it is a plain one; a plain name keeps its file.
+    expect(fileNameOf('homeHidden.http://x|y')).toBe('homeHidden.http___x_y.json');
+    expect(fileNameOf('display')).toBe('display.json');
   });
 
   it('Undo puts it back; what has gone, or run out, is let go of', () => {

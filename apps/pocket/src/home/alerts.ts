@@ -72,7 +72,12 @@ export function prune(hidden: Hidden, alerts: readonly HomeAlert[], now: number)
   );
 }
 
-/** The person's hidden alerts, on this phone: one set per vault and person. */
-const prefsName = (who: string) => `homeHidden.${who}`;
+/**
+ * The person's hidden alerts, on this phone: one set per vault and person.
+ * On Android each set is a file named for it, so the vault's address and
+ * the person's id are kept to what a file name may hold (R4's first
+ * emulator run: "Illegal character in path" for `http:/…|…`).
+ */
+export const prefsName = (who: string) => `homeHidden.${who.replace(/[^A-Za-z0-9._-]/g, '_')}`;
 export const readHidden = (who: string): Hidden => readPrefs<Hidden>(prefsName(who), {});
 export const writeHidden = (who: string, hidden: Hidden): void => writePrefs(prefsName(who), hidden);
