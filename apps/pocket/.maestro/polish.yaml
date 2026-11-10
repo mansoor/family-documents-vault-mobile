@@ -101,8 +101,9 @@ env:
     timeout: 15000
 - takeScreenshot: shot-light-documents
 
-# The filters, from the side (R5): In date, shown as a chip under the box,
-# and taken off again with it.
+# The filters, from the side (R5): Passport (the capture flow's passport has
+# no expiry date, so it is not In date), shown as a chip under the box, and
+# taken off again with it.
 - tapOn:
     id: documents-filters
 - extendedWaitUntil:
@@ -111,22 +112,22 @@ env:
     timeout: 10000
 - takeScreenshot: shot-light-filters
 - tapOn:
-    id: filter-status-valid
+    id: filter-kind-passport
 - tapOn:
     id: filters-apply
 - extendedWaitUntil:
     visible:
-      id: documents-chip-statuses
+      id: documents-chip-kinds
     timeout: 15000
 - extendedWaitUntil:
     visible:
       id: doc-row-.*
     timeout: 15000
 - tapOn:
-    id: documents-chip-statuses
+    id: documents-chip-kinds
 - extendedWaitUntil:
     notVisible:
-      id: documents-chip-statuses
+      id: documents-chip-kinds
     timeout: 10000
 
 # The passport's page: Who can see it, Adults only and back.
