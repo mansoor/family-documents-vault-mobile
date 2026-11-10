@@ -6,6 +6,38 @@ app's own, tagged `vX.Y.Z` in this repository.
 
 ## [Unreleased]
 
+## [0.4.5] — filters from the side (redesign R5)
+
+### Added
+- **Filters, from a button beside the search box.** It opens a panel
+  from the side, grouped:
+  - **Whose**;
+  - **Kind**: three on the line, the rest under ⋯, found by words;
+  - **Dates**: added, issued or expires, with quick ranges (Expired, Next
+    30 or 90 days, This year, Last year…), or From and To typed as the
+    card takes dates ("14 Mar 2031", "Mar 2031");
+  - **Status**;
+  - **Who can see it**.
+
+  "Show N documents" says how many before you leave the panel; "Clear
+  all" starts again. Closed without Show, nothing changes.
+- **What's on shows under the box** as chips, each taken off with its
+  ✕, and the filter button says how many are on.
+- On a vault of 0.9.0-dev.26 or later, you can choose several in each
+  group (Sam's or Leo's, passports or licences), and filter by dates.
+  The filters narrow your search too. On an older vault, one choice in
+  each group, and no dates; the panel says so.
+
+### Changed
+- **Sorting is one button**, by the count, with its choices in a picker.
+  The rows of chips under the search box are gone.
+- The app is tested against the vault of 0.9.0-dev.26.
+
+### Fixed
+- **In date finds what is in date.** It asked for documents with nothing
+  to renew, so a passport valid for years was never among them. Those
+  have their own choice now, Nothing to renew, as on the web.
+
 ## [0.4.4] — Home, at a glance (redesign R4)
 
 ### Changed

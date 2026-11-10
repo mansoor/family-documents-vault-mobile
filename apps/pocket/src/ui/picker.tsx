@@ -45,6 +45,16 @@ export function PickerSheet(props: {
   const { t } = useTranslation();
   const [q, setQ] = useState('');
   const [ticked, setTicked] = useState<string[]>([...props.chosen]);
+  // Opened: from what is chosen now. Set while drawing, as React allows,
+  // rather than on the window's onShow, which not every renderer sends.
+  const chosenKey = JSON.stringify(props.chosen);
+  const [openedWith, setOpenedWith] = useState<string | null>(null);
+  if (props.visible && openedWith !== chosenKey) {
+    setOpenedWith(chosenKey);
+    setTicked([...props.chosen]);
+  } else if (!props.visible && openedWith !== null) {
+    setOpenedWith(null);
+  }
   const words = q.toLowerCase().split(/\s+/).filter(Boolean);
   const shown = props.options.filter((o) => words.every((w) => o.label.toLowerCase().includes(w)));
   const groups = useMemo(() => {
@@ -75,7 +85,6 @@ export function PickerSheet(props: {
     <Sheet
       visible={props.visible}
       onClose={close}
-      onShow={() => setTicked([...props.chosen])}
       testID={props.testID}
       outside
       tall

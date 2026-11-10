@@ -90,6 +90,9 @@ env:
     visible:
       id: doc-row-.*
     timeout: 15000
+# The sort is one button, its choices in a picker (R5).
+- tapOn:
+    id: documents-sort
 - tapOn:
     id: documents-sort-title
 - extendedWaitUntil:
@@ -97,6 +100,34 @@ env:
       id: doc-row-.*
     timeout: 15000
 - takeScreenshot: shot-light-documents
+
+# The filters, from the side (R5): In date (the passport, valid for years),
+# shown as a chip under the box, and taken off again with it.
+- tapOn:
+    id: documents-filters
+- extendedWaitUntil:
+    visible:
+      id: filter-status-active
+    timeout: 10000
+- takeScreenshot: shot-light-filters
+- tapOn:
+    id: filter-status-active
+- tapOn:
+    id: filters-apply
+- extendedWaitUntil:
+    visible:
+      id: documents-chip-statuses
+    timeout: 15000
+- extendedWaitUntil:
+    visible:
+      id: doc-row-.*
+    timeout: 15000
+- tapOn:
+    id: documents-chip-statuses
+- extendedWaitUntil:
+    notVisible:
+      id: documents-chip-statuses
+    timeout: 10000
 
 # The passport's page: Who can see it, Adults only and back.
 - tapOn:

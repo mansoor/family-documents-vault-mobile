@@ -166,10 +166,7 @@ describe('Home at a glance (R4)', () => {
     counting(t, 2);
     push({ pathname: '/documents', params: { status: 'expiring_soon' } });
     await unlocked(t, <DocumentsScreen />);
-    await waitFor(() =>
-      expect(screen.getByTestId('documents-status-expiring_soon').props.accessibilityState).toEqual(
-        expect.objectContaining({ selected: true }),
-      ),
-    );
+    // What is on, as a chip under the box (R5).
+    expect(await screen.findByTestId('documents-chip-statuses')).toHaveTextContent('Expiring soon');
   });
 });
