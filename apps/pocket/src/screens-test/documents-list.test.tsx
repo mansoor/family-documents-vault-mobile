@@ -23,7 +23,14 @@ const asked = (t: TestVault) =>
   t.calls
     .filter((c) => c.startsWith(`GET ${ORIGIN}/api/v1/documents?`))
     .map((c) => Object.fromEntries(new URL(c.slice(4)).searchParams))
-    .filter((q) => q.sort !== undefined);
+    // The filter panel's "Show N" asks for one row, to count: not the list.
+    .filter((q) => q.sort !== undefined && q.limit !== '1');
+
+/** Sorted from the sort button's picker (R5). */
+async function sortBy(sort: string) {
+  await fireEvent.press(await screen.findByTestId('documents-sort'));
+  await fireEvent.press(await screen.findByTestId(`documents-sort-${sort}`));
+}
 
 /** A vault with the Documents table (0.6.0): its column sorts. */
 function tableVault(): TestVault {
@@ -46,7 +53,7 @@ describe('all your documents (P7)', () => {
     await waitFor(() => expect(asked(t)[0]).toEqual({ sort: 'recent', limit: '50' }));
     // Paged by the table's own sort (the client's fake pages only those): in
     // title order, the first 50, then at the end of the list the next page by its cursor.
-    await fireEvent.press(await screen.findByTestId('documents-sort-title'));
+    await sortBy('title');
     const held = () => (screen.getByTestId('documents').props.data as unknown[]).length;
     await waitFor(() => expect(held()).toBe(50));
     await fireEvent(screen.getByTestId('documents'), 'onEndReached');
@@ -64,9 +71,9 @@ describe('all your documents (P7)', () => {
     papers(t, 3);
     await unlocked(t, <DocumentsScreen />);
     await waitFor(() => expect(screen.getAllByTestId(/^doc-row-/)).toHaveLength(3));
-    await fireEvent.press(screen.getByTestId('documents-sort-title'));
+    await sortBy('title');
     await waitFor(() => expect(asked(t).at(-1)).toEqual({ sort: 'title', direction: 'asc', limit: '50' }));
-    await fireEvent.press(screen.getByTestId('documents-sort-expires'));
+    await sortBy('expires');
     await waitFor(() => expect(asked(t).at(-1)).toEqual({ sort: 'expires', direction: 'asc', limit: '50' }));
   });
 
@@ -75,9 +82,9 @@ describe('all your documents (P7)', () => {
     papers(t, 2);
     await unlocked(t, <DocumentsScreen />);
     await waitFor(() => expect(screen.getAllByTestId(/^doc-row-/)).toHaveLength(2));
-    await fireEvent.press(screen.getByTestId('documents-sort-title'));
+    await sortBy('title');
     await waitFor(() => expect(asked(t).at(-1)).toEqual({ sort: 'alpha', limit: '50' }));
-    await fireEvent.press(screen.getByTestId('documents-sort-expires'));
+    await sortBy('expires');
     await waitFor(() => expect(asked(t).at(-1)).toEqual({ sort: 'expiring', limit: '50' }));
   });
 
@@ -86,18 +93,22 @@ describe('all your documents (P7)', () => {
     papers(t, 2);
     await unlocked(t, <DocumentsScreen />);
     await waitFor(() => expect(screen.getAllByTestId(/^doc-row-/)).toHaveLength(2));
-    await fireEvent.press(screen.getByTestId('documents-status-expired'));
-    await waitFor(() => expect(asked(t).at(-1)).toEqual(expect.objectContaining({ status: 'expired' })));
-    await fireEvent.press(screen.getByTestId('documents-visibility-private'));
+    // From the filter panel (R5), applied with Show.
+    await fireEvent.press(screen.getByTestId('documents-filters'));
+    await fireEvent.press(await screen.findByTestId('filter-status-expired'));
+    await fireEvent.press(screen.getByTestId('filter-visibility-private'));
+    await fireEvent.press(screen.getByTestId('filters-apply'));
     await waitFor(() =>
       expect(asked(t).at(-1)).toEqual(expect.objectContaining({ status: 'expired', visibility: 'private' })),
     );
     expect(await screen.findByTestId('documents-none')).toHaveTextContent(
       'Nothing matches these choices. Try fewer of them.',
     );
-    // A chip pressed again lets go of it.
-    await fireEvent.press(screen.getByTestId('documents-status-expired'));
+    // What is on, under the box; its ✕ lets go of it.
+    expect(screen.getByTestId('documents-chip-statuses')).toHaveTextContent('Expired');
+    await fireEvent.press(screen.getByTestId('documents-chip-statuses'));
     await waitFor(() => expect(asked(t).at(-1)?.status).toBeUndefined());
+    expect(asked(t).at(-1)?.visibility).toBe('private');
   });
 
   it('is reached from Home (and is the Documents tab since R3)', async () => {

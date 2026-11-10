@@ -1,56 +1,54 @@
 import { NetworkError } from '@fdv/client';
 import {
-  categoryLabel,
-  type DocumentListParams,
+  formatDate,
+  localToday,
+  type DocumentTypeView,
   type DocumentView,
   type Member,
   type SearchHit,
   type StatusValue,
-  type Visibility,
 } from '@fdv/shared';
 import { useLocalSearchParams } from 'expo-router';
+import { ArrowUpDown, SlidersHorizontal, X } from 'lucide-react-native';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, FlatList, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { countOn, listQuery, NO_FILTERS, searchQuery, type Filters, type Sort } from '../../documents/filter-model';
+import { FilterPanel, STATUSES } from '../../documents/filter-panel';
 import { DocumentRow, rowPlace } from '../../documents/row';
 import { on } from '../../state/events';
+import { useFamilyZone } from '../../state/family-time';
 import { useVault } from '../../state/vault';
 import { Field, Notice, Text } from '../../ui';
 import { BellButton } from '../../ui/bell';
-import { Chip } from '../../ui/chip';
+import { PickerSheet } from '../../ui/picker';
 import { sp } from '../../ui/space';
 import { LoadFailed, loadFailure, Placeholder } from '../../ui/states';
 import { useColours, useStyles, type Palette } from '../../ui/theme';
 
 /**
- * Documents (R3; the owner, 10 Nov 2026: one place for finding things).
- * All documents (P7) and Search (4.12) as one tab:
- *  - With the box empty, every document this person may see, 50 at a time
- *    as they scroll, sorted by when it was added, by title or by when it
- *    expires, and narrowed by person, kind, status and who can see it.
+ * Documents (R3; the filters, R5 — the owner's redesign of 10 Nov 2026):
+ * one place for finding things. The search box, with a filter button
+ * beside it that opens the filters from the side; what is on, as chips
+ * under the box, each taken off with its ✕; how many, and the sort.
+ *  - With the box empty, every document the person may see, 50 at a time
+ *    as they scroll, sorted and narrowed.
  *  - With words in it, what the vault finds for them, a quarter of a second
- *    after typing stops, narrowed by person and kind. Matches inside the
- *    pages are shown in bold, and the person's own sealed documents are
- *    searched in a second pass. Sort, status and who can see it wait for
- *    the box to be empty: the vault's search does not narrow by them.
+ *    after typing stops, narrowed as the vault's search can: on a vault
+ *    with `document_filters` (V1) by every filter, on an older one by the
+ *    person and the kind's category. The person's own sealed documents are
+ *    searched in a second pass.
  *
  * A vault with the Documents table (0.6.0, `document_table`) sorts by its
- * columns, title and expiry, with every filter on every page; an older one
- * by its older sorts, alpha and expiring. Date added is `recent` on either.
+ * columns and counts; an older one by its older sorts.
  */
 
 /** How long typing pauses before the vault is asked (FND). */
 export const SEARCH_DEBOUNCE_MS = 250;
 
 const PAGE = 50;
-
-type Sort = 'recent' | 'title' | 'expires';
 const SORTS: Sort[] = ['recent', 'title', 'expires'];
-
-/** The statuses worth narrowing to, most pressing first. */
-const STATUSES: StatusValue[] = ['expired', 'expiring_soon', 'needs_info', 'valid', 'no_longer_needed'];
-const VISIBILITIES: Visibility[] = ['household', 'adults', 'private'];
 
 type Sealed = { state: 'idle' | 'searching' | 'done'; items: SearchHit[]; searched: number };
 
@@ -58,32 +56,34 @@ export default function DocumentsScreen() {
   const styles = useStyles(makeStyles);
   const colours = useColours();
   const { t } = useTranslation();
+  const zone = useFamilyZone();
   const { withToken, offline, caps, api } = useVault();
   const table = caps?.features.document_table === true;
+  const several = caps?.features.document_filters === true;
 
   // Opened from Home's numbers or an alert (R4): narrowed to that status.
   const { status: asked } = useLocalSearchParams<{ status?: string }>();
   const [q, setQ] = useState('');
   const searching = q.trim() !== '';
   const [sort, setSort] = useState<Sort>('recent');
-  const [memberId, setMemberId] = useState<string | null>(null);
-  const [category, setCategory] = useState<string | null>(null);
-  const [status, setStatus] = useState<StatusValue | null>(null);
-  const [visibility, setVisibility] = useState<Visibility | null>(null);
+  const [filters, setFilters] = useState<Filters>(NO_FILTERS);
+  const [panel, setPanel] = useState(false);
+  const [sorting, setSorting] = useState(false);
   const [members, setMembers] = useState<Member[]>([]);
+  const [types, setTypes] = useState<DocumentTypeView[]>([]);
   useEffect(() => {
     if (asked && (STATUSES as string[]).includes(asked)) {
       // Set when Home asks for it, each time it does.
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      setStatus(asked as StatusValue);
+      setFilters({ ...NO_FILTERS, statuses: [asked as StatusValue] });
       setQ('');
     }
   }, [asked]);
-  const [categories, setCategories] = useState<string[]>([]);
 
   const [docs, setDocs] = useState<DocumentView[] | null>(null);
   const [cursor, setCursor] = useState<string | null>(null);
   const [more, setMore] = useState(false);
+  const [total, setTotal] = useState<number | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
   const [token, setToken] = useState<string | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
@@ -98,19 +98,15 @@ export default function DocumentsScreen() {
   const [searchFailed, setSearchFailed] = useState<string | null>(null);
   const [again, setAgain] = useState(0);
 
-  // The chips' choices: the family, and the kinds there are.
+  // The filters' choices: the family, and the kinds there are.
   useEffect(() => {
     if (offline || members.length > 0) return;
     let stopped = false;
     withToken((a, tk) => Promise.all([a.members(tk), a.documentTypes(tk)]))
-      .then(([m, types]) => {
+      .then(([m, ty]) => {
         if (stopped) return;
         setMembers(m.items);
-        setCategories(
-          [...new Set(types.items.map((x) => x.category))].sort((x, y) =>
-            categoryLabel(x).localeCompare(categoryLabel(y)),
-          ),
-        );
+        setTypes(ty.items);
       })
       .catch(() => undefined);
     return () => {
@@ -118,21 +114,14 @@ export default function DocumentsScreen() {
     };
   }, [withToken, offline, members.length]);
 
+  const categoryOf = useCallback((kind: string) => types.find((ty) => ty.key === kind)?.category ?? null, [types]);
   const params = useCallback(
-    (after: string | null): DocumentListParams => ({
-      ...(sort === 'recent'
-        ? { sort: 'recent' }
-        : table
-          ? { sort, direction: 'asc' }
-          : { sort: sort === 'title' ? 'alpha' : 'expiring' }),
-      ...(memberId ? { member_id: memberId } : {}),
-      ...(category ? { category } : {}),
-      ...(status ? { status } : {}),
-      ...(visibility ? { visibility } : {}),
+    (f: Filters, after: string | null) => ({
+      ...listQuery(f, { sort, table, several }),
       limit: PAGE,
       ...(after ? { cursor: after } : {}),
     }),
-    [sort, table, memberId, category, status, visibility],
+    [sort, table, several],
   );
 
   /** The first page, for the choices as they are now. */
@@ -141,18 +130,19 @@ export default function DocumentsScreen() {
     try {
       const page = await withToken((a, tk) => {
         setToken(tk);
-        return a.documents(tk, params(null));
+        return a.documents(tk, params(filters, null));
       });
       if (n !== asking.current) return;
       setDocs(page.items);
       setCursor(page.next_cursor);
       setMore(page.has_more && !!page.next_cursor);
+      setTotal(page.total ?? null);
       setFailed(null);
     } catch (err) {
       if (n !== asking.current) return;
       setFailed(loadFailure('documents', err, t));
     }
-  }, [withToken, params, t]);
+  }, [withToken, params, filters, t]);
 
   useEffect(() => {
     // Asked again whenever a choice changes, and when the connection returns.
@@ -170,15 +160,15 @@ export default function DocumentsScreen() {
     [load],
   );
 
-  // Search: the words, narrowed by person and kind, a quarter of a second after typing stops.
+  // Search: the words, narrowed as the vault's search can, a quarter of a second after typing stops.
   useEffect(() => {
     // The box emptied: the list is shown, and what was found waits, unshown, for the next words.
     if (!searching) return;
     let cancelled = false;
-    const filters = { ...(category ? { category } : {}), ...(memberId ? { member_id: memberId } : {}) };
+    const narrowed = searchQuery(filters, { several, categoryOf });
     const run = async () => {
       try {
-        const r = await withToken((a, tk) => a.search(tk, q.trim(), filters));
+        const r = await withToken((a, tk) => a.search(tk, q.trim(), narrowed));
         if (cancelled) return;
         setUnreachable(false);
         setSearchFailed(null);
@@ -205,7 +195,7 @@ export default function DocumentsScreen() {
       clearTimeout(timer);
     };
     // The connection coming back asks again; so does Try again (P5).
-  }, [q, searching, category, memberId, withToken, offline, again, t]);
+  }, [q, searching, filters, several, categoryOf, withToken, offline, again, t]);
 
   /** The next 50, as the person scrolls to the end. */
   const loadMore = async () => {
@@ -213,7 +203,7 @@ export default function DocumentsScreen() {
     const n = asking.current;
     setLoadingMore(true);
     try {
-      const page = await withToken((a, tk) => a.documents(tk, params(cursor)));
+      const page = await withToken((a, tk) => a.documents(tk, params(filters, cursor)));
       if (n !== asking.current) return;
       setDocs((d) => [...(d ?? []), ...page.items]);
       setCursor(page.next_cursor);
@@ -225,31 +215,57 @@ export default function DocumentsScreen() {
     }
   };
 
-  const narrowed = !!(memberId || category || status || visibility);
-  const chips = <T extends string>(
-    label: string,
-    all: string,
-    values: readonly T[],
-    chosen: T | null,
-    choose: (v: T | null) => void,
-    words: (v: T) => string,
-    id: string,
-  ) => (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
-      <View accessibilityRole="radiogroup" accessibilityLabel={label} style={styles.chipRow}>
-        <Chip label={all} selected={chosen === null} onPress={() => choose(null)} testID={`${id}-all`} />
-        {values.map((v) => (
-          <Chip
-            key={v}
-            label={words(v)}
-            selected={chosen === v}
-            onPress={() => choose(chosen === v ? null : v)}
-            testID={`${id}-${v}`}
-          />
-        ))}
-      </View>
-    </ScrollView>
+  /** How many the panel's choices would give, for "Show N documents": where the vault can say. */
+  const countFor = useCallback(
+    async (f: Filters): Promise<number | null> => {
+      if (searching) {
+        const r = await withToken((a, tk) => a.search(tk, q.trim(), searchQuery(f, { several, categoryOf })));
+        return r.items.length;
+      }
+      if (!table) return null;
+      // Counted with a column sort, whichever the list has: only the table counts.
+      const page = await withToken((a, tk) =>
+        a.documents(tk, { ...listQuery(f, { sort: 'title', table, several }), limit: 1 }),
+      );
+      return page.total ?? null;
+    },
+    [searching, q, withToken, several, categoryOf, table],
   );
+
+  const on_ = countOn(filters);
+  const named = (ids: string[], name: (id: string) => string) =>
+    ids.length === 1 ? name(ids[0] as string) : t('filters.chipMany', { first: name(ids[0] as string), count: ids.length - 1 });
+  const person = (id: string) =>
+    id === 'none' ? t('filters.nobody') : (members.find((m) => m.id === id)?.display_name ?? '');
+  const kind = (key: string) => types.find((ty) => ty.key === key)?.label ?? key;
+  const day = (d: string | null) => (d ? formatDate({ date: d, precision: 'day' }) : '…');
+  const chips: { id: string; label: string; clear: Partial<Filters> }[] = [
+    ...(filters.people.length > 0 ? [{ id: 'people', label: named(filters.people, person), clear: { people: [] } }] : []),
+    ...(filters.kinds.length > 0 ? [{ id: 'kinds', label: named(filters.kinds, kind), clear: { kinds: [] } }] : []),
+    ...(filters.date
+      ? [
+          {
+            id: 'date',
+            label: filters.date.quick
+              ? t(`filters.chip_${filters.date.which}_${filters.date.quick}`)
+              : t(`filters.chipDays_${filters.date.which}`, { from: day(filters.date.from), to: day(filters.date.to) }),
+            clear: { date: null },
+          },
+        ]
+      : []),
+    ...(filters.statuses.length > 0
+      ? [{ id: 'statuses', label: named(filters.statuses, (s) => t(`documents.status_${s}`)), clear: { statuses: [] } }]
+      : []),
+    ...(filters.visibilities.length > 0
+      ? [
+          {
+            id: 'visibilities',
+            label: named(filters.visibilities, (v) => t(`document.visibility_${v}`)),
+            clear: { visibilities: [] },
+          },
+        ]
+      : []),
+  ];
 
   const noConnection = searching && (offline || unreachable);
   const found = hits ? hits.length + sealed.items.length : null;
@@ -312,73 +328,74 @@ export default function DocumentsScreen() {
               </Text>
               <BellButton />
             </View>
-            <Field
-              testID="search-field"
-              label={t('search.field')}
-              value={q}
-              onChangeText={setQ}
-              returnKeyType="search"
-              clearButtonMode="while-editing"
-            />
-            {searching ? null : (
+            <View style={styles.searchRow}>
+              <View style={styles.flex}>
+                <Field
+                  testID="search-field"
+                  label={t('search.field')}
+                  value={q}
+                  onChangeText={setQ}
+                  returnKeyType="search"
+                  clearButtonMode="while-editing"
+                />
+              </View>
+              <Pressable
+                testID="documents-filters"
+                accessibilityRole="button"
+                accessibilityLabel={on_ > 0 ? t('filters.buttonOn', { count: on_ }) : t('filters.button')}
+                accessibilityState={{ expanded: panel }}
+                onPress={() => setPanel(true)}
+                style={({ pressed }) => [styles.filterButton, on_ > 0 ? styles.filterOn : null, pressed ? styles.pressed : null]}
+              >
+                <SlidersHorizontal
+                  color={on_ > 0 ? colours.onAccent : colours.ink}
+                  size={20}
+                  accessibilityElementsHidden
+                  importantForAccessibility="no"
+                />
+                {on_ > 0 ? (
+                  <View style={styles.badge} accessibilityElementsHidden importantForAccessibility="no">
+                    <Text variant="small" weight="700" tone="onAccent">
+                      {String(on_)}
+                    </Text>
+                  </View>
+                ) : null}
+              </Pressable>
+            </View>
+            {chips.length > 0 ? (
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
-                <View accessibilityRole="radiogroup" accessibilityLabel={t('documents.sortBy')} style={styles.chipRow}>
-                  {SORTS.map((s) => (
-                    <Chip
-                      key={s}
-                      label={t(`documents.sort_${s}`)}
-                      selected={sort === s}
-                      onPress={() => setSort(s)}
-                      testID={`documents-sort-${s}`}
-                    />
-                  ))}
-                </View>
+                {chips.map((c) => (
+                  <Pressable
+                    key={c.id}
+                    testID={`documents-chip-${c.id}`}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('filters.chipOff', { what: c.label })}
+                    hitSlop={6}
+                    onPress={() => setFilters((f) => ({ ...f, ...c.clear }))}
+                    style={({ pressed }) => [styles.chip, pressed ? styles.pressed : null]}
+                  >
+                    <Text variant="secondary" weight="600" tone="accent">
+                      {c.label}
+                    </Text>
+                    <X color={colours.accent} size={14} accessibilityElementsHidden importantForAccessibility="no" />
+                  </Pressable>
+                ))}
+                {chips.length > 1 ? (
+                  <Pressable
+                    testID="documents-chips-clear"
+                    accessibilityRole="button"
+                    accessibilityLabel={t('filters.clearAll')}
+                    hitSlop={6}
+                    onPress={() => setFilters(NO_FILTERS)}
+                    style={styles.clearAll}
+                  >
+                    <Text variant="secondary" weight="700" tone="soft">
+                      {t('filters.clearAll')}
+                    </Text>
+                  </Pressable>
+                ) : null}
               </ScrollView>
-            )}
-            {members.length > 0
-              ? chips(
-                  t('documents.whose'),
-                  t('search.everyone'),
-                  members.map((m) => m.id),
-                  memberId,
-                  setMemberId,
-                  (id) => members.find((m) => m.id === id)?.display_name ?? '',
-                  'documents-person',
-                )
-              : null}
-            {categories.length > 0
-              ? chips(
-                  t('documents.kind'),
-                  t('search.allKinds'),
-                  categories,
-                  category,
-                  setCategory,
-                  (c) => categoryLabel(c),
-                  'documents-kind',
-                )
-              : null}
-            {searching
-              ? null
-              : chips(
-                  t('documents.status'),
-                  t('documents.anyStatus'),
-                  STATUSES,
-                  status,
-                  setStatus,
-                  (s) => t(`documents.status_${s}`),
-                  'documents-status',
-                )}
-            {searching
-              ? null
-              : chips(
-                  t('documents.whoCanSee'),
-                  t('documents.anyone'),
-                  VISIBILITIES,
-                  visibility,
-                  setVisibility,
-                  (v) => t(`document.visibility_${v}`),
-                  'documents-visibility',
-                )}
+            ) : null}
 
             {searching ? (
               <>
@@ -407,6 +424,24 @@ export default function DocumentsScreen() {
               </>
             ) : (
               <>
+                <View style={styles.countRow}>
+                  <Text variant="secondary" tone="soft" style={styles.flex} testID="documents-count">
+                    {total !== null ? t('glance.documentsCount', { count: total }) : ''}
+                  </Text>
+                  <Pressable
+                    testID="documents-sort"
+                    accessibilityRole="button"
+                    accessibilityLabel={t('documents.sortNow', { sort: t(`documents.sort_${sort}`) })}
+                    hitSlop={6}
+                    onPress={() => setSorting(true)}
+                    style={({ pressed }) => [styles.sortButton, pressed ? styles.pressed : null]}
+                  >
+                    <ArrowUpDown color={colours.ink} size={15} accessibilityElementsHidden importantForAccessibility="no" />
+                    <Text variant="secondary" weight="600">
+                      {t(`documents.sort_${sort}`)}
+                    </Text>
+                  </Pressable>
+                </View>
                 {offline && !docs ? (
                   <Notice tone="warn" testID="documents-offline">
                     {t('documents.needsConnection')}
@@ -416,7 +451,7 @@ export default function DocumentsScreen() {
                 {!docs && !failed && !offline ? <Placeholder rows={4} /> : null}
                 {docs && docs.length === 0 && !more ? (
                   <Text tone="soft" testID="documents-none">
-                    {t(narrowed ? 'documents.noneMatch' : 'documents.none')}
+                    {t(on_ > 0 ? 'documents.noneMatch' : 'documents.none')}
                   </Text>
                 ) : null}
               </>
@@ -470,6 +505,35 @@ export default function DocumentsScreen() {
           ) : null
         }
       />
+      <FilterPanel
+        visible={panel}
+        value={filters}
+        onApply={(f) => {
+          setFilters(f);
+          setPanel(false);
+        }}
+        onClose={() => setPanel(false)}
+        members={members}
+        types={types}
+        several={several}
+        // Nobody's goes with a column sort only, and the list's first sort is not one.
+        nobody={false}
+        today={localToday(zone)}
+        count={countFor}
+      />
+      <PickerSheet
+        visible={sorting}
+        title={t('documents.sortBy')}
+        options={SORTS.map((s) => ({ value: s, label: t(`documents.sort_${s}`) }))}
+        chosen={[sort]}
+        onDone={([s]) => {
+          setSorting(false);
+          if (s) setSort(s as Sort);
+        }}
+        onClose={() => setSorting(false)}
+        testID="documents-sort-sheet"
+        optionID="documents-sort"
+      />
     </SafeAreaView>
   );
 }
@@ -478,10 +542,47 @@ const makeStyles = (colours: Palette) =>
   StyleSheet.create({
     screen: { flex: 1, backgroundColor: colours.bg },
     page: { padding: sp(20) },
-    header: { gap: sp(12), marginBottom: sp(10) },
+    header: { gap: sp(10), marginBottom: sp(10) },
     footer: { gap: sp(12), marginTop: sp(10) },
     titleRow: { flexDirection: 'row', alignItems: 'center', gap: sp(8) },
     flex: { flex: 1 },
-    chips: { paddingVertical: sp(4) },
-    chipRow: { flexDirection: 'row', gap: sp(8) },
+    searchRow: { flexDirection: 'row', alignItems: 'flex-end', gap: sp(8) },
+    filterButton: {
+      width: 44,
+      height: 44,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: colours.borderInput,
+      backgroundColor: colours.surface,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    filterOn: { backgroundColor: colours.accent, borderColor: colours.accent },
+    badge: {
+      position: 'absolute',
+      top: -6,
+      right: -6,
+      minWidth: 18,
+      height: 18,
+      paddingHorizontal: 4,
+      borderRadius: 9,
+      backgroundColor: colours.danger,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    pressed: { opacity: 0.8 },
+    chips: { flexDirection: 'row', alignItems: 'center', gap: sp(8), paddingVertical: 2 },
+    chip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: sp(4),
+      minHeight: 32,
+      paddingLeft: sp(12),
+      paddingRight: sp(8),
+      borderRadius: 999,
+      backgroundColor: colours.accentSoft,
+    },
+    clearAll: { minHeight: 32, justifyContent: 'center', paddingHorizontal: sp(4) },
+    countRow: { flexDirection: 'row', alignItems: 'center', gap: sp(8) },
+    sortButton: { flexDirection: 'row', alignItems: 'center', gap: sp(6), minHeight: 32 },
   });
