@@ -327,6 +327,8 @@ describe('a document', () => {
     t.vault.state.role = 'viewer';
     await unlocked(t, <DocumentDetail id={made.document_id} />);
     expect(await screen.findByText(`Added ${whenExactly(at)}`)).toBeTruthy();
+    // The versions open in place, from their line (R6).
+    await fireEvent.press(await screen.findByTestId('document-versions'));
     expect(screen.getByTestId('version-1')).not.toHaveTextContent(/ by /);
   });
 

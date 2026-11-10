@@ -82,6 +82,8 @@ export function Button(props: {
   label: string;
   onPress: () => void;
   kind?: 'primary' | 'quiet' | 'danger';
+  /** Small (R6): an action on a row, 32 dp high and 44 with its hit slop. */
+  size?: 'small';
   disabled?: boolean;
   busy?: boolean;
   hint?: string;
@@ -91,6 +93,7 @@ export function Button(props: {
 }) {
   const styles = useStyles(makeStyles);
   const kind = props.kind ?? 'primary';
+  const small = props.size === 'small';
   const disabled = props.disabled === true || props.busy === true;
   return (
     <Pressable
@@ -101,15 +104,21 @@ export function Button(props: {
       accessibilityState={{ disabled, busy: props.busy === true }}
       disabled={disabled}
       onPress={props.onPress}
-      hitSlop={8}
+      hitSlop={small ? 6 : 8}
       style={({ pressed }) => [
         styles.button,
+        small ? styles.small : null,
         kind === 'quiet' ? styles.quiet : kind === 'danger' ? styles.danger : styles.primary,
         disabled ? styles.disabled : null,
         pressed ? styles.pressed : null,
       ]}
     >
-      <Text weight="700" tone={kind === 'quiet' ? 'ink' : 'onAccent'} role="text">
+      <Text
+        weight="700"
+        variant={small ? 'secondary' : 'body'}
+        tone={kind === 'quiet' ? 'ink' : 'onAccent'}
+        role="text"
+      >
         {props.label}
       </Text>
     </Pressable>
@@ -267,6 +276,7 @@ const makeStyles = (colours: Palette) =>
       justifyContent: 'center',
       alignItems: 'center',
     },
+    small: { minHeight: 32, borderRadius: radii.s, paddingHorizontal: sp(10), paddingVertical: sp(4) },
     primary: { backgroundColor: colours.accent },
     danger: { backgroundColor: colours.danger },
     quiet: { backgroundColor: colours.surface, borderWidth: 1, borderColor: colours.borderInput },

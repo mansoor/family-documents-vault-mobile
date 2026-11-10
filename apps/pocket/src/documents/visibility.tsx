@@ -22,7 +22,12 @@ import { useColours, useStyles, type Palette } from '../ui/theme';
  * them (409 links_choice_needed): ended, or kept while the household lets
  * them out. What the vault says back about it is said under the chip.
  */
-export function VisibilityControl(props: { doc: DocumentView; onChanged: () => Promise<void> | void }) {
+export function VisibilityControl(props: {
+  doc: DocumentView;
+  onChanged: () => Promise<void> | void;
+  /** A line in the document's card (R6): "Who can see it   Everyone in the family ›". */
+  line?: boolean;
+}) {
   const styles = useStyles(makeStyles);
   const colours = useColours();
   const { t } = useTranslation();
@@ -72,9 +77,26 @@ export function VisibilityControl(props: { doc: DocumentView; onChanged: () => P
     </View>
   );
 
+  const now = t(`document.visibility_${doc.visibility}`);
+  const line = props.line ? (
+    <Pressable
+      testID="document-visibility"
+      accessibilityRole="button"
+      accessibilityLabel={t('visibility.button', { now })}
+      disabled={choices.length === 0}
+      onPress={() => setOpen(true)}
+      style={({ pressed }) => [styles.line, pressed ? styles.pressed : null]}
+    >
+      <Text style={styles.flexLine}>{t('document.whoCanSee')}</Text>
+      <Text variant="secondary" tone="soft">
+        {choices.length > 0 ? `${now} ›` : now}
+      </Text>
+    </Pressable>
+  ) : null;
+
   return (
-    <View style={styles.wrap}>
-      {choices.length > 0 ? (
+    <View style={props.line ? null : styles.wrap}>
+      {line ?? (choices.length > 0 ? (
         <Pressable
           testID="document-visibility"
           accessibilityRole="button"
@@ -89,11 +111,13 @@ export function VisibilityControl(props: { doc: DocumentView; onChanged: () => P
         </Pressable>
       ) : (
         <View testID="document-visibility">{chip}</View>
-      )}
+      ))}
       {said ? (
-        <Notice tone={said.tone} testID="visibility-said">
-          {said.text}
-        </Notice>
+        <View style={props.line ? styles.saidInLine : null}>
+          <Notice tone={said.tone} testID="visibility-said">
+            {said.text}
+          </Notice>
+        </View>
       ) : null}
       <Sheet
         visible={open}
@@ -195,6 +219,9 @@ export function linksAsked(err: unknown, to: Visibility): LinksAsked | null {
 const makeStyles = (colours: Palette) =>
   StyleSheet.create({
     wrap: { gap: sp(8) },
+    line: { flexDirection: 'row', alignItems: 'center', gap: sp(8), minHeight: 44, paddingHorizontal: sp(12) },
+    flexLine: { flex: 1 },
+    saidInLine: { paddingHorizontal: sp(12), paddingBottom: sp(10) },
     pressable: { flexDirection: 'row', alignItems: 'center', gap: sp(12), minHeight: 44, alignSelf: 'flex-start' },
     pressed: { opacity: 0.8 },
     chip: {

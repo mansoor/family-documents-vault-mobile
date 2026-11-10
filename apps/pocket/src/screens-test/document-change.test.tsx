@@ -163,7 +163,7 @@ describe('Edit details (P8)', () => {
     const { t } = vault();
     passport(t);
     await unlocked(t, <DocumentDetail id="passport" />, { before: withRole('viewer') });
-    expect(await screen.findByTestId('document-visibility')).toHaveTextContent('Everyone in the family');
+    expect(await screen.findByTestId('document-visibility')).toHaveTextContent(/Everyone in the family$/);
     expect(screen.queryByText('Change')).toBeNull();
     expect(screen.queryByTestId('document-edit')).toBeNull();
     expect(screen.queryByTestId('document-trash')).toBeNull();
@@ -222,6 +222,8 @@ describe('Move to the Trash (P8)', () => {
     passport(t);
     push({ pathname: '/document/[id]', params: { id: 'passport' } });
     await unlocked(t, <Text>Documents</Text>);
+    // Move to the Trash is under the header's ⋯ (R6).
+    await fireEvent.press(await screen.findByTestId('document-more'));
     await fireEvent.press(await screen.findByTestId('document-trash'));
     expect(await screen.findByText('Move to the Trash?')).toBeTruthy();
     expect(screen.getByText(/^“Passport” leaves every list/)).toBeTruthy();
@@ -229,7 +231,8 @@ describe('Move to the Trash (P8)', () => {
     await fireEvent.press(screen.getByTestId('trash-cancel'));
     expect(t.library.trashed).toEqual([]);
 
-    await fireEvent.press(screen.getByTestId('document-trash'));
+    await fireEvent.press(screen.getByTestId('document-more'));
+    await fireEvent.press(await screen.findByTestId('document-trash'));
     await fireEvent.press(await screen.findByTestId('trash-yes'));
     await waitFor(() => expect(routes()).toEqual([]));
     expect(t.library.trashed).toEqual(['passport']);

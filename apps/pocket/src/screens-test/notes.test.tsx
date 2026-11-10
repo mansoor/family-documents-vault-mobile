@@ -187,7 +187,7 @@ describe("a document's note (5.36)", () => {
     libraryDoc(t, { id: 'water', title: 'Water bill', notes: 'Paid by **direct debit**' });
     await unlocked(t, <DocumentDetail id="water" />);
     expect(await screen.findByText('Water bill')).toBeTruthy();
-    await screen.findByTestId('version-1');
+    await screen.findByTestId('document-versions');
     expect(screen.queryByTestId('document-notes')).toBeNull();
     expect(screen.queryByText(/direct debit/)).toBeNull();
   });

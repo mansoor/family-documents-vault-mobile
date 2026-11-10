@@ -209,6 +209,8 @@ describe('a new version, confirmed (P2)', () => {
     const t = versionVault();
     renewedLicence(t, { details_unconfirmed: false });
     await unlocked(t, <DocumentDetail id="licence" />);
+    // The versions open in place, from their line (R6).
+    await fireEvent.press(await screen.findByTestId('document-versions'));
     const v1 = await screen.findByTestId('version-1-details');
     expect(v1).toHaveTextContent(/Issued by: DVLA/);
     expect(v1).toHaveTextContent(/Expires: 1 Mar 2025/);
@@ -230,6 +232,8 @@ describe('a new version, confirmed (P2)', () => {
       versions.map((v) => (v.id === 'licence-v1' ? { ...v, details: null, details_kept: false } : v)),
     );
     await unlocked(t, <DocumentDetail id="licence" />);
+    // The versions open in place, from their line (R6).
+    await fireEvent.press(await screen.findByTestId('document-versions'));
     expect(await screen.findByTestId('version-1-details')).toHaveTextContent(
       /^Details weren't kept for versions replaced before 0\.9\.0\.Its pages$/,
     );

@@ -12,10 +12,22 @@ import {
   type NoLongerNeededView,
   type VersionView,
 } from '@fdv/shared';
-import { useRouter } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { Image } from 'expo-image';
+import { Stack, useRouter } from 'expo-router';
+import {
+  Download,
+  Ellipsis,
+  Eye,
+  FilePlus,
+  FileText,
+  NotebookText,
+  Pencil,
+  Trash2,
+  type LucideIcon,
+} from 'lucide-react-native';
+import { Fragment, useCallback, useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { RefreshControl, ScrollView, StyleSheet, Switch, View } from 'react-native';
+import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Switch, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { renewWords } from '../capture/renew-words';
 import { useCapture } from '../state/capture';
@@ -31,25 +43,32 @@ import { detailFacts } from './details';
 import { NoteText } from './notes';
 import { latestOf } from './online';
 import { warnedAboutCopies } from './save-copy';
-import { TrashButton } from './trash';
+import { TrashConfirm } from './trash';
 import { ConfirmSheet } from '../ui/confirm';
+import { Sheet } from '../ui/sheet';
+import { useTextScale } from '../ui/text-scale';
 import { VisibilityControl } from './visibility';
 import { sp } from '../ui/space';
 import { useColours, useStyles, type Palette } from '../ui/theme';
-import { exactWords, relativeWords, useFamilyZone } from '../state/family-time';
+import { dayWords, exactWords, relativeWords, useFamilyZone } from '../state/family-time';
 import { LoadFailed, loadFailure, Placeholder } from '../ui/states';
 
 type Problem = 'offline' | 'not_found' | 'failed' | null;
 
 /**
- * A document (4.12). Its primary action is Show for an Essential, Save a
- * copy for everything else. Its pages come from the phone when it is kept
- * there (without asking anything), otherwise from the vault, confirming it
- * is you if the vault asks. Then its details, its status and who can see
- * it; the Essential switch (online only: a change made meanwhile by
- * somebody else is shown, not overwritten); and its versions, with a new
- * one scanned in. A note (a vault of 0.9.0) has no file: its words, and
- * none of what a file is for.
+ * A document (4.12), compact (R6, the mockup's second screen): its
+ * picture, its name, a line of whose it is, what kind and who can see it,
+ * and its status; one row of round actions — Show for an Essential, its
+ * Pages, Save a copy, a New version; its details in two columns; and one
+ * card of lines for who can see it, its tags, its collections, its
+ * versions (opened in place) and whether it is an Essential. Edit details
+ * is the pencil in the header, Move to the Trash is under its ⋯.
+ *
+ * Its pages come from the phone when it is kept there (without asking
+ * anything), otherwise from the vault, confirming it is you if the vault
+ * asks. The Essential switch works online only: a change made meanwhile by
+ * somebody else is shown, not overwritten. A note (a vault of 0.9.0) has
+ * no file: its words, and none of what a file is for.
  */
 export function DocumentDetail(props: { id: string }) {
   const colours = useColours();
@@ -57,7 +76,8 @@ export function DocumentDetail(props: { id: string }) {
   const { id } = props;
   const { t } = useTranslation();
   const router = useRouter();
-  const { withToken, offline, who, caps } = useVault();
+  const { withToken, offline, who, caps, api } = useVault();
+  const { scale } = useTextScale();
   // Every time on this page on the family's clock (P5).
   const zone = useFamilyZone();
   const { guarded } = useStepUp();
@@ -70,6 +90,7 @@ export function DocumentDetail(props: { id: string }) {
   const [versions, setVersions] = useState<VersionView[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
   const [types, setTypes] = useState<DocumentTypeView[]>([]);
+  const [token, setToken] = useState<string | null>(null);
   const [problem, setProblem] = useState<Problem>(null);
   const [failedWords, setFailedWords] = useState('');
   const [notice, setNotice] = useState<{ tone: 'ok' | 'warn'; text: string } | null>(null);
@@ -78,6 +99,9 @@ export function DocumentDetail(props: { id: string }) {
   const [preparing, setPreparing] = useState(false);
   const [toggling, setToggling] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [versionsOpen, setVersionsOpen] = useState(false);
+  // The header's ⋯: its choices, then the question Move to the Trash asks, in the same sheet.
+  const [more, setMore] = useState<'menu' | 'trash' | null>(null);
   // Essential off: its copies leave the phones that keep them, so it asks first (R2).
   const [askOff, setAskOff] = useState(false);
   // The collections it is in (P8), of those the person may see.
@@ -99,18 +123,20 @@ export function DocumentDetail(props: { id: string }) {
 
   const load = useCallback(async () => {
     try {
-      const [d, v, m, ty, c] = await withToken((a, token) =>
-        Promise.all([
-          a.document(token, id),
-          a.versions(token, id),
-          a.members(token).catch(() => ({ items: [] })),
+      const [d, v, m, ty, c] = await withToken((a, tk) => {
+        // Its picture is fetched with the token, as a list's are.
+        setToken(tk);
+        return Promise.all([
+          a.document(tk, id),
+          a.versions(tk, id),
+          a.members(tk).catch(() => ({ items: [] })),
           // For the type's details: its own fields, and its names for them.
-          a.documentTypes(token).catch(() => ({ items: [] })),
+          a.documentTypes(tk).catch(() => ({ items: [] })),
           hasCollections
-            ? a.documentCollections(token, id).catch(() => ({ items: [] }))
+            ? a.documentCollections(tk, id).catch(() => ({ items: [] }))
             : Promise.resolve({ items: [] }),
-        ]),
-      );
+        ]);
+      });
       setDoc(d);
       setVersions(v.items);
       setMembers(m.items);
@@ -229,20 +255,175 @@ export function DocumentDetail(props: { id: string }) {
     );
   }
 
+  const name = documentName(shown, t('document.untitled'));
   const owner = members.find((m) => m.id === shown.owner_member_id);
   // The type's own details, from the vault's answer for this document only:
   // an Only me document's are sealed everywhere else (a list, the offline
   // set, so a kept copy) and opened there for its owner (0.5.8).
   const type = types.find((x) => x.key === shown.type_key);
   const details = doc ? detailFacts(type?.fields, doc.extra, { yes: t('document.yes'), no: t('document.no') }) : [];
-  const facts: [string, string | null][] = [
-    [t('document.owner'), owner?.display_name ?? null],
-    [t('document.issuedBy'), shown.issued_by ?? null],
-    [t('document.issued'), shown.issued ? formatDate(shown.issued) : null],
-    [t('document.expires'), shown.expires ? formatDate(shown.expires) : null],
-    ...details,
+  const facts = (
+    [
+      [t('document.issuedBy'), shown.issued_by ?? null],
+      [t('document.issued'), shown.issued ? formatDate(shown.issued) : null],
+      [t('document.expires'), shown.expires ? formatDate(shown.expires) : null],
+      ...details,
+    ] as [string, string | null][]
+  ).filter((f): f is [string, string] => !!f[1]);
+  // Whose · what kind · who can see it: what the old page said in three places, on one line.
+  const subline = [owner?.display_name, note ? null : type?.label, t(`document.visibility_${shown.visibility}`)]
+    .filter(Boolean)
+    .join(' · ');
+  const ordered = [...versions].sort((x, y) => y.version_no - x.version_no);
+  const first = ordered[ordered.length - 1];
+  const thumb = api && token && latest && !note ? api.thumbnailUrl(latest.id) : null;
+  const mayEdit = mayChange && !!doc && !note && !offline;
+  const hasMore = mayTrash && !!doc && !offline;
+  // Two columns, until the text is so large that one reads better.
+  const oneColumn = scale > 1.2;
+
+  const actions: { key: string; testID: string; label: string; icon: LucideIcon; busy?: boolean; onPress: () => void }[] =
+    note
+      ? []
+      : [
+          ...(shown.is_essential
+            ? [{ key: 'show', testID: 'document-show', label: t('document.show'), icon: Eye, busy: preparing, onPress: () => void showIt() }]
+            : []),
+          { key: 'pages', testID: 'document-pages', label: t('document.pagesShort'), icon: FileText, onPress: () => void pages() },
+          { key: 'save', testID: 'document-save', label: t('document.saveCopyShort'), icon: Download, busy: saving, onPress: save },
+          ...(mayAddVersion && doc
+            ? [{ key: 'version', testID: 'document-add-version', label: t('document.newVersionShort'), icon: FilePlus, onPress: () => void addVersion() }]
+            : []),
+        ];
+
+  // The lines of the card under the details, each with a hairline above all but the first.
+  const lines: { key: string; node: ReactNode }[] = [
+    {
+      key: 'visibility',
+      node:
+        doc && !offline ? (
+          <VisibilityControl doc={doc} onChanged={load} line />
+        ) : (
+          <View style={styles.line} testID="document-visibility">
+            <Text style={styles.flex}>{t('document.whoCanSee')}</Text>
+            <Text variant="secondary" tone="soft">
+              {t(`document.visibility_${shown.visibility}`)}
+            </Text>
+          </View>
+        ),
+    },
+    ...((shown.tags ?? []).length > 0
+      ? [
+          {
+            key: 'tags',
+            node: (
+              <View style={styles.line} testID="document-tags">
+                <Text>{t('document.tags')}</Text>
+                <View style={styles.tags}>
+                  {shown.tags.map((tag) => (
+                    <View key={tag} style={styles.tag}>
+                      <Text variant="small" weight="600">
+                        {tag}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            ),
+          },
+        ]
+      : []),
+    ...(inCollections.length > 0
+      ? [
+          {
+            key: 'collections',
+            node: (
+              <View style={styles.line} testID="document-collections">
+                <Text style={styles.flex}>{t('document.collections')}</Text>
+                <Text variant="secondary" tone="soft" style={styles.value}>
+                  {inCollections.map((c) => c.name).join(', ')}
+                </Text>
+              </View>
+            ),
+          },
+        ]
+      : []),
+    ...(!note && latest
+      ? [
+          {
+            key: 'versions',
+            node: (
+              <View>
+                <Pressable
+                  testID="document-versions"
+                  accessibilityRole="button"
+                  accessibilityLabel={t('document.versionsLabel', {
+                    count: versions.length,
+                    when: dayWords(latest.uploaded_at, zone),
+                  })}
+                  accessibilityState={{ expanded: versionsOpen }}
+                  onPress={() => setVersionsOpen((o) => !o)}
+                  style={({ pressed }) => [styles.line, pressed ? styles.pressed : null]}
+                >
+                  <Text style={styles.flex}>{t('document.versions')}</Text>
+                  <Text variant="secondary" tone="soft">
+                    {t('document.versionsLine', { count: versions.length, when: dayWords(latest.uploaded_at, zone) })}
+                    {versionsOpen ? ' ⌃' : ' ›'}
+                  </Text>
+                </Pressable>
+                {versionsOpen
+                  ? ordered.map((v) => (
+                      <View key={v.id} style={styles.version} testID={`version-${v.version_no}`}>
+                        <Text variant="secondary" weight="600">
+                          {v.filename}
+                          {v.id === latest.id ? ` · ${t('document.current')}` : ''}
+                        </Text>
+                        <Text tone="soft" variant="small">
+                          {versionLine(v)}
+                        </Text>
+                        {v.id !== latest.id ? (
+                          <OlderVersion
+                            version={v}
+                            fields={type?.fields}
+                            onPages={() =>
+                              router.push({ pathname: '/essential/[id]', params: { id, online: '1', version: v.id } })
+                            }
+                          />
+                        ) : null}
+                      </View>
+                    ))
+                  : null}
+              </View>
+            ),
+          },
+        ]
+      : []),
+    ...(mayChange && doc && !note
+      ? [
+          {
+            key: 'essential',
+            node: (
+              <View style={styles.line}>
+                <View style={styles.flex}>
+                  <Text>{t('document.essential')}</Text>
+                  <Text tone="soft" variant="small">
+                    {t('document.essentialHint')}
+                  </Text>
+                </View>
+                <Switch
+                  testID="document-essential"
+                  accessibilityLabel={t('document.essential')}
+                  value={doc.is_essential}
+                  disabled={offline || toggling}
+                  onValueChange={(v) => (v ? void setEssential(true) : setAskOff(true))}
+                  trackColor={{ true: colours.accent, false: colours.border }}
+                />
+              </View>
+            ),
+          },
+        ]
+      : []),
   ];
-  const primaryIsShow = shown.is_essential;
 
   return (
     <ScrollView
@@ -250,23 +431,74 @@ export function DocumentDetail(props: { id: string }) {
       contentContainerStyle={[styles.page, { paddingBottom: 20 + insets.bottom }]}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void refreshNow()} />}
     >
-      <Text variant="hero">{documentName(shown, t('document.untitled'))}</Text>
-      <StatusLine status={shown.status} />
+      {/* Edit details and ⋯, in the header beside Back (R6). */}
+      <Stack.Screen
+        options={{
+          headerRight: () => (
+            <View style={styles.headerButtons}>
+              {mayEdit ? (
+                <IconButton
+                  testID="document-edit"
+                  label={t('document.edit')}
+                  icon={Pencil}
+                  onPress={() => router.push({ pathname: '/edit/[id]', params: { id } })}
+                />
+              ) : null}
+              {hasMore ? (
+                <IconButton
+                  testID="document-more"
+                  label={t('document.more', { title: name })}
+                  icon={Ellipsis}
+                  onPress={() => setMore('menu')}
+                />
+              ) : null}
+            </View>
+          ),
+        }}
+      />
+
+      <View style={styles.head}>
+        <View style={styles.thumb}>
+          {thumb && token ? (
+            <Image
+              source={{ uri: thumb, headers: { authorization: `Bearer ${token}` } }}
+              // Held in memory only: a document's picture never lands in the phone's disk cache.
+              cachePolicy="memory"
+              style={styles.thumbImage}
+              contentFit="cover"
+              accessibilityIgnoresInvertColors
+            />
+          ) : note ? (
+            <NotebookText color={colours.accent} size={22} accessibilityElementsHidden importantForAccessibility="no" />
+          ) : (
+            <FileText color={colours.accent} size={22} accessibilityElementsHidden importantForAccessibility="no" />
+          )}
+        </View>
+        <View style={styles.headWords}>
+          <Text variant="hero">{name}</Text>
+          {subline ? (
+            <Text variant="secondary" tone="soft" testID="document-subline">
+              {subline}
+            </Text>
+          ) : null}
+          <View style={styles.pills}>
+            <StatusLine status={shown.status} />
+            {shown.is_essential && !note ? (
+              <View style={styles.pill} testID="document-essential-pill">
+                <Text variant="small" tone="accent" weight="700">
+                  {t('document.essentialPill')}
+                </Text>
+              </View>
+            ) : null}
+          </View>
+        </View>
+      </View>
       {shown.no_longer_needed ? (
         <Unneeded
           mark={shown.no_longer_needed}
           open={(to) => router.push({ pathname: '/document/[id]', params: { id: to } })}
         />
       ) : null}
-      {doc && !offline ? (
-        <VisibilityControl doc={doc} onChanged={load} />
-      ) : (
-        <View style={styles.chip} testID="document-visibility">
-          <Text variant="secondary" weight="600">
-            {t(`document.visibility_${shown.visibility}`)}
-          </Text>
-        </View>
-      )}
       {problem === 'offline' || offline ? (
         <Notice tone="warn" testID="document-offline">
           {t('document.offline')}
@@ -290,16 +522,32 @@ export function DocumentDetail(props: { id: string }) {
         />
       ) : null}
 
-      {note ? null : primaryIsShow ? (
-        <Button testID="document-show" label={t('document.show')} busy={preparing} onPress={() => void showIt()} />
-      ) : (
-        <Button testID="document-save" label={t('document.saveCopy')} busy={saving} onPress={save} />
-      )}
-      {note ? null : (
-        <Button testID="document-pages" kind="quiet" label={t('document.showPages')} onPress={() => void pages()} />
-      )}
-      {primaryIsShow && !note ? (
-        <Button testID="document-save" kind="quiet" label={t('document.saveCopy')} busy={saving} onPress={save} />
+      {actions.length > 0 ? (
+        <View style={[styles.card, styles.actions]} testID="document-actions">
+          {actions.map((a) => (
+            <Pressable
+              key={a.key}
+              testID={a.testID}
+              accessibilityRole="button"
+              accessibilityLabel={a.label}
+              accessibilityState={{ busy: a.busy === true, disabled: a.busy === true }}
+              disabled={a.busy === true}
+              onPress={a.onPress}
+              style={({ pressed }) => [styles.action, pressed ? styles.pressed : null]}
+            >
+              <View style={styles.round}>
+                {a.busy ? (
+                  <ActivityIndicator color={colours.accent} />
+                ) : (
+                  <a.icon color={colours.accent} size={19} accessibilityElementsHidden importantForAccessibility="no" />
+                )}
+              </View>
+              <Text variant="small" weight="600" style={styles.actionLabel}>
+                {a.label}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
       ) : null}
       {warning ? (
         <Notice tone="warn" announce={t('document.saveWarning')}>
@@ -309,56 +557,40 @@ export function DocumentDetail(props: { id: string }) {
         </Notice>
       ) : null}
 
-      <Text variant="screen">{t('document.facts')}</Text>
-      {facts
-        .filter(([, value]) => value)
-        .map(([label, value]) => (
-          <View key={label} style={styles.fact}>
-            <Text tone="soft" variant="secondary">
-              {label}
-            </Text>
-            <Text>{value}</Text>
-          </View>
+      {facts.length > 0 ? (
+        <View style={[styles.card, styles.grid]} testID="document-facts" accessibilityLabel={t('document.facts')}>
+          {facts.map(([label, value]) => (
+            <View key={label} style={[styles.fact, oneColumn ? styles.factWide : null]}>
+              <Text tone="soft" variant="small">
+                {label}
+              </Text>
+              <Text weight="600">{value}</Text>
+            </View>
+          ))}
+        </View>
+      ) : null}
+
+      <View style={styles.card}>
+        {lines.map((l, i) => (
+          <Fragment key={l.key}>
+            {i > 0 ? <View style={styles.sep} /> : null}
+            {l.node}
+          </Fragment>
         ))}
-      {(shown.tags ?? []).length > 0 ? (
-        <View style={styles.fact} testID="document-tags">
-          <Text tone="soft" variant="secondary">
-            {t('document.tags')}
-          </Text>
-          <View style={styles.tags}>
-            {shown.tags.map((tag) => (
-              <View key={tag} style={styles.tag}>
-                <Text variant="secondary">{tag}</Text>
-              </View>
-            ))}
-          </View>
-        </View>
-      ) : null}
-      {inCollections.length > 0 ? (
-        <View style={styles.fact} testID="document-collections">
-          <Text tone="soft" variant="secondary">
-            {t('document.collections')}
-          </Text>
-          <Text>{inCollections.map((c) => c.name).join(', ')}</Text>
-        </View>
-      ) : null}
-      {mayChange && doc && !note && !offline ? (
-        <Button
-          testID="document-edit"
-          kind="quiet"
-          label={t('document.edit')}
-          onPress={() => router.push({ pathname: '/edit/[id]', params: { id } })}
-        />
-      ) : null}
+      </View>
 
       {/* Its note (5.35), read only, from a vault that has notes you can
           write: an older one says nothing of when a note last changed. */}
       {shown.notes_updated_at !== undefined && shown.notes ? (
-        <View style={styles.notes} testID="document-notes">
-          {note ? null : <Text variant="screen">{type?.core?.notes?.label?.trim() || t('document.notes')}</Text>}
+        <View style={[styles.card, styles.notes]} testID="document-notes">
+          {note ? null : (
+            <Text variant="secondary" weight="700">
+              {type?.core?.notes?.label?.trim() || t('document.notes')}
+            </Text>
+          )}
           <NoteText source={shown.notes} />
           {shown.notes_updated_at ? (
-            <Text tone="soft" variant="secondary" testID="document-notes-edited">
+            <Text tone="soft" variant="small" testID="document-notes-edited">
               {shown.notes_updated_by_name
                 ? t('document.notesEditedBy', {
                     when: exactWords(shown.notes_updated_at, zone),
@@ -370,56 +602,12 @@ export function DocumentDetail(props: { id: string }) {
         </View>
       ) : null}
 
-      {mayChange && doc && !note ? (
-        <View style={styles.switchRow}>
-          <View style={styles.flex}>
-            <Text weight="600">{t('document.essential')}</Text>
-            <Text tone="soft" variant="secondary">
-              {t('document.essentialHint')}
-            </Text>
-          </View>
-          <Switch
-            testID="document-essential"
-            accessibilityLabel={t('document.essential')}
-            value={doc.is_essential}
-            disabled={offline || toggling}
-            onValueChange={(v) => (v ? void setEssential(true) : setAskOff(true))}
-            trackColor={{ true: colours.accent, false: colours.border }}
-          />
-        </View>
+      {first && !note ? (
+        <Text variant="small" tone="soft" testID="document-added">
+          {versionLine(first)}
+        </Text>
       ) : null}
 
-      {note ? null : <Text variant="screen">{t('document.versions')}</Text>}
-      {[...versions]
-        .sort((x, y) => y.version_no - x.version_no)
-        .map((v) => (
-          <View key={v.id} style={styles.fact} testID={`version-${v.version_no}`}>
-            <Text weight="600">
-              {v.filename}
-              {v.id === latest?.id ? ` · ${t('document.current')}` : ''}
-            </Text>
-            <Text tone="soft" variant="secondary">
-              {versionLine(v)}
-            </Text>
-            {v.id !== latest?.id && !note ? (
-              <OlderVersion
-                version={v}
-                fields={type?.fields}
-                onPages={() =>
-                  router.push({ pathname: '/essential/[id]', params: { id, online: '1', version: v.id } })
-                }
-              />
-            ) : null}
-          </View>
-        ))}
-      {mayAddVersion && doc ? (
-        <Button
-          testID="document-add-version"
-          kind="quiet"
-          label={t('document.addVersion')}
-          onPress={() => void addVersion()}
-        />
-      ) : null}
       <ConfirmSheet
         visible={askOff}
         testID="essential-off-question"
@@ -435,9 +623,28 @@ export function DocumentDetail(props: { id: string }) {
         confirmID="essential-off-yes"
         cancelID="essential-off-cancel"
       />
-      {mayTrash && doc && !offline ? (
-        <TrashButton id={id} title={documentName(doc, t('document.untitled'))} onGone={() => router.back()} />
-      ) : null}
+      <Sheet visible={more !== null} onClose={() => setMore(null)} {...(more === 'menu' ? { outside: true as const } : {})} testID="document-more-sheet">
+        {more === 'trash' && doc ? (
+          <TrashConfirm id={id} title={name} onGone={() => router.back()} onCancel={() => setMore(null)} />
+        ) : (
+          <View style={styles.menu}>
+            <Text variant="screen">{name}</Text>
+            <Pressable
+              testID="document-trash"
+              accessibilityRole="button"
+              accessibilityLabel={t('trash.button')}
+              onPress={() => setMore('trash')}
+              style={({ pressed }) => [styles.menuRow, pressed ? styles.pressed : null]}
+            >
+              <Trash2 color={colours.danger} size={20} accessibilityElementsHidden importantForAccessibility="no" />
+              <Text tone="danger" weight="600">
+                {t('trash.button')}
+              </Text>
+            </Pressable>
+            <Button kind="quiet" label={t('common.cancel')} onPress={() => setMore(null)} testID="document-more-cancel" />
+          </View>
+        )}
+      </Sheet>
     </ScrollView>
   );
 
@@ -460,6 +667,25 @@ export function DocumentDetail(props: { id: string }) {
       ? t('document.versionAddedBy', { when, name: v.uploaded_by_name })
       : t('document.versionAdded', { when });
   }
+}
+
+/** A round button in the header: 40 dp, 44 with its hit slop. */
+function IconButton(props: { testID: string; label: string; icon: LucideIcon; onPress: () => void }) {
+  const colours = useColours();
+  const styles = useStyles(makeStyles);
+  const Icon = props.icon;
+  return (
+    <Pressable
+      testID={props.testID}
+      accessibilityRole="button"
+      accessibilityLabel={props.label}
+      hitSlop={2}
+      onPress={props.onPress}
+      style={({ pressed }) => [styles.iconButton, pressed ? styles.pressed : null]}
+    >
+      <Icon color={colours.ink} size={20} accessibilityElementsHidden importantForAccessibility="no" />
+    </Pressable>
+  );
 }
 
 /**
@@ -491,21 +717,24 @@ function OlderVersion(props: {
       {lines
         .filter(([, value]) => value)
         .map(([label, value]) => (
-          <Text key={label} variant="secondary">
+          <Text key={label} variant="small">
             {label}: {value}
           </Text>
         ))}
       {v.details_kept === false ? (
-        <Text tone="soft" variant="secondary">
+        <Text tone="soft" variant="small">
           {t('document.detailsNotKept')}
         </Text>
       ) : null}
-      <Button
-        testID={`version-${v.version_no}-pages`}
-        kind="quiet"
-        label={t('document.itsPages')}
-        onPress={props.onPages}
-      />
+      <View style={styles.olderActions}>
+        <Button
+          size="small"
+          testID={`version-${v.version_no}-pages`}
+          kind="quiet"
+          label={t('document.itsPages')}
+          onPress={props.onPages}
+        />
+      </View>
     </View>
   );
 }
@@ -542,26 +771,69 @@ function Unneeded(props: { mark: NoLongerNeededView; open: (id: string) => void 
 
 const makeStyles = (colours: Palette) =>
   StyleSheet.create({
-    page: { padding: sp(20), gap: sp(12) },
-    unneeded: { gap: sp(4) },
-    older: { gap: sp(4), marginTop: sp(4) },
-    chip: {
-      alignSelf: 'flex-start',
-      paddingHorizontal: sp(12),
-      paddingVertical: sp(6),
+    page: { padding: sp(20), gap: sp(10) },
+    head: { flexDirection: 'row', gap: sp(12), alignItems: 'flex-start', paddingHorizontal: sp(4) },
+    thumb: {
+      width: 48,
+      height: 64,
+      borderRadius: 8,
+      backgroundColor: colours.accentSoft,
+      borderWidth: 1,
+      borderColor: colours.border,
+      alignItems: 'center',
+      justifyContent: 'center',
+      overflow: 'hidden',
+    },
+    thumbImage: { width: '100%', height: '100%' },
+    headWords: { flex: 1, gap: sp(4) },
+    pills: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: sp(8) },
+    pill: {
+      paddingHorizontal: sp(8),
+      paddingVertical: 2,
       borderRadius: radii.pill,
       backgroundColor: colours.accentSoft,
     },
-    fact: { gap: sp(4) },
-    tags: { flexDirection: 'row', flexWrap: 'wrap', gap: sp(8) },
-    tag: {
-      paddingHorizontal: sp(10),
-      paddingVertical: sp(4),
-      borderRadius: radii.pill,
+    card: {
+      backgroundColor: colours.surface,
+      borderRadius: radii.m,
       borderWidth: 1,
       borderColor: colours.border,
+      overflow: 'hidden',
     },
-    notes: { gap: sp(8) },
-    switchRow: { flexDirection: 'row', alignItems: 'center', gap: sp(12), minHeight: 48 },
+    actions: { flexDirection: 'row', paddingHorizontal: sp(4) },
+    action: { flex: 1, alignItems: 'center', gap: sp(4), paddingVertical: sp(8), minHeight: 64 },
+    actionLabel: { textAlign: 'center' },
+    round: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: colours.accentSoft,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    grid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: sp(12), paddingTop: sp(12), paddingBottom: sp(4) },
+    fact: { width: '50%', paddingRight: sp(8), paddingBottom: sp(10), gap: 2 },
+    factWide: { width: '100%' },
+    line: { flexDirection: 'row', alignItems: 'center', gap: sp(8), minHeight: 44, paddingHorizontal: sp(12), paddingVertical: sp(6) },
+    sep: { height: StyleSheet.hairlineWidth, backgroundColor: colours.border },
     flex: { flex: 1 },
+    value: { flexShrink: 1, textAlign: 'right' },
+    tags: { flex: 1, flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', gap: sp(6) },
+    tag: {
+      paddingHorizontal: sp(8),
+      paddingVertical: 2,
+      borderRadius: radii.pill,
+      borderWidth: 1,
+      borderColor: colours.borderInput,
+    },
+    version: { paddingHorizontal: sp(12), paddingBottom: sp(10), gap: 2 },
+    notes: { padding: sp(12), gap: sp(6) },
+    unneeded: { gap: sp(4) },
+    older: { gap: 2, marginTop: sp(4) },
+    olderActions: { flexDirection: 'row', marginTop: sp(4) },
+    headerButtons: { flexDirection: 'row', alignItems: 'center' },
+    iconButton: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+    pressed: { opacity: 0.8 },
+    menu: { gap: sp(10) },
+    menuRow: { flexDirection: 'row', alignItems: 'center', gap: sp(12), minHeight: 48 },
   });

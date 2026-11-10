@@ -208,7 +208,11 @@ describe('reminders from any date (5.31)', () => {
       return reply(200, answer);
     };
     await unlocked({ ...t, fetch }, <AttentionScreen />);
+    // Later (R6): how long, asked in a sheet.
+    await fireEvent.press(await screen.findByTestId('later-r-bill'));
     await fireEvent.press(await screen.findByTestId('snooze-month-r-bill'));
+    // Put off, it is under Coming up (R6).
+    await fireEvent.press(await screen.findByTestId('attention-tab-coming'));
     expect(await screen.findByTestId('when-r-bill')).toHaveTextContent('Later · 10 Oct');
     expect(screen.getByText('Due date: 10 Oct, in 9 days')).toBeTruthy();
   });
