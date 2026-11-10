@@ -2,7 +2,7 @@ import { REMIND_ONCE, type ReminderView } from '@fdv/shared';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react-native';
 import { useEffect, useRef, useState, type ReactElement } from 'react';
 import { Text } from 'react-native';
-import AttentionScreen from '../app/(tabs)/attention';
+import AttentionScreen from '../app/attention';
 import Home from '../app/(tabs)/index';
 import CaptureScreen from '../app/capture';
 import { fixtureScanner } from '../capture/scanner';

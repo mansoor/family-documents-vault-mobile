@@ -1,7 +1,7 @@
 import type { SearchHit } from '@fdv/shared';
 import { act, fireEvent, screen, waitFor } from '@testing-library/react-native';
 import { StyleSheet } from 'react-native';
-import SearchScreen, { SEARCH_DEBOUNCE_MS } from '../app/(tabs)/search';
+import SearchScreen, { SEARCH_DEBOUNCE_MS } from '../app/(tabs)/documents';
 import { snippetParts } from '../documents/snippet';
 import { audit } from '../test-support/a11y';
 import { unlocked } from '../test-support/lookup';

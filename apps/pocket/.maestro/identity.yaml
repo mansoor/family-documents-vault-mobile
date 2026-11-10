@@ -60,7 +60,7 @@ env:
       - tapOn:
           id: lock-unlock
 
-# People (under More since P6), then the owner's own screen.
+# People (in More: Notes is the tab on this vault, R3), then the owner's own screen.
 - tapOn:
     id: tab-more
 - tapOn:

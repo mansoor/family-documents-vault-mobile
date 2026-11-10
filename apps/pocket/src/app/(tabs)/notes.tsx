@@ -4,17 +4,20 @@ import { NotebookText } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
-import { noteListName } from '../documents/note-write';
-import { on } from '../state/events';
-import { dayWords, useFamilyZone } from '../state/family-time';
-import { useVault } from '../state/vault';
-import { Button, Field, Notice, Text } from '../ui';
-import { sp } from '../ui/space';
-import { LoadFailed, loadFailure, Placeholder } from '../ui/states';
-import { useColours, useStyles, type Palette } from '../ui/theme';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { noteListName } from '../../documents/note-write';
+import { on } from '../../state/events';
+import { dayWords, useFamilyZone } from '../../state/family-time';
+import { useVault } from '../../state/vault';
+import { Button, Field, Notice, Text } from '../../ui';
+import { BellButton } from '../../ui/bell';
+import { sp } from '../../ui/space';
+import { LoadFailed, loadFailure, Placeholder } from '../../ui/states';
+import { useColours, useStyles, type Palette } from '../../ui/theme';
 
 /**
- * Notes (P9; a vault of 0.9.0, `features.notes`): the person's notes kept
+ * Notes (P9; a vault of 0.9.0, `features.notes`; a tab since R3, the
+ * owner's choice of 10 Nov 2026): the person's notes kept
  * on their own, newest words first, each with its first words, when its
  * words last changed, and who can see it when that is not the whole family.
  * Find in notes asks the vault. A note opens as any document does, its
@@ -64,6 +67,7 @@ export default function NotesScreen() {
   useEffect(() => on('documentChanged', () => setAgain((n) => n + 1)), []);
 
   return (
+    <SafeAreaView style={styles.safe} edges={['top']}>
     <FlatList
       testID="notes"
       style={styles.screen}
@@ -82,7 +86,12 @@ export default function NotesScreen() {
       }
       ListHeaderComponent={
         <View style={styles.header}>
-          <Text variant="hero">{t('notesList.title')}</Text>
+          <View style={styles.titleRow}>
+            <Text variant="hero" style={styles.flex}>
+              {t('notesList.title')}
+            </Text>
+            <BellButton />
+          </View>
           {mayAdd && !offline ? (
             <Button testID="notes-new" label={t('notesList.new')} onPress={() => router.push('/new-note')} />
           ) : null}
@@ -117,6 +126,7 @@ export default function NotesScreen() {
         <NoteRow note={item} onPress={() => router.push({ pathname: '/document/[id]', params: { id: item.id } })} />
       )}
     />
+    </SafeAreaView>
   );
 }
 
@@ -163,7 +173,10 @@ function NoteRow(props: { note: NoteSummary; onPress: () => void }) {
 
 const makeStyles = (colours: Palette) =>
   StyleSheet.create({
+    safe: { flex: 1, backgroundColor: colours.bg },
     screen: { backgroundColor: colours.bg },
+    titleRow: { flexDirection: 'row', alignItems: 'center', gap: sp(8) },
+    flex: { flex: 1 },
     page: { padding: sp(20), gap: sp(10) },
     header: { gap: sp(12) },
     row: {

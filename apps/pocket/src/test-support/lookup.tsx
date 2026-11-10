@@ -6,7 +6,7 @@ import CollectionScreen from '../app/collection/[id]';
 import CollectionsScreen from '../app/collections';
 import EditScreen from '../app/edit/[id]';
 import NewNoteScreen from '../app/new-note';
-import NotesScreen from '../app/notes';
+import NotesScreen from '../app/(tabs)/notes';
 import { DocumentDetail } from '../documents/detail';
 import type { Tier } from '../essentials/open';
 import { EssentialPages } from '../essentials/pages';

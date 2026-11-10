@@ -65,16 +65,14 @@ env:
     timeout: 15000
 - waitForAnimationToEnd
 - takeScreenshot: shot-light-home
+# Needs attention behind the bell (R3).
 - tapOn:
-    id: tab-search
-- waitForAnimationToEnd
-- takeScreenshot: shot-light-search
-- tapOn:
-    id: tab-attention
+    id: bell
 - waitForAnimationToEnd
 - takeScreenshot: shot-light-attention
+- back
 
-# More, and All documents sorted by title.
+# More, then Documents (the tab since R3) sorted by title.
 - tapOn:
     id: tab-more
 - extendedWaitUntil:
@@ -82,14 +80,12 @@ env:
       id: more
     timeout: 10000
 - assertVisible:
-    id: more-documents
-- assertVisible:
     id: more-collections
 - assertVisible:
-    id: more-notes
+    id: more-people
 - takeScreenshot: shot-light-more
 - tapOn:
-    id: more-documents
+    id: tab-documents
 - extendedWaitUntil:
     visible:
       id: doc-row-.*
@@ -170,7 +166,9 @@ env:
     visible:
       id: doc-row-.*
     timeout: 15000
-- back
+# Documents is a tab (R3): More is reached by its tab, not by Back.
+- tapOn:
+    id: tab-more
 
 # Collections and Notes, from More.
 - extendedWaitUntil:
@@ -185,14 +183,16 @@ env:
     timeout: 15000
 - takeScreenshot: shot-light-collections
 - back
+# Notes is a tab since R3.
 - tapOn:
-    id: more-notes
+    id: tab-notes
 - extendedWaitUntil:
     visible:
       id: notes-find
     timeout: 15000
 - takeScreenshot: shot-light-notes
-- back
+- tapOn:
+    id: tab-more
 
 # Dark, from Settings: the same lists again.
 - extendedWaitUntil:
@@ -216,27 +216,27 @@ env:
     visible:
       id: more
     timeout: 10000
-- scrollUntilVisible:
-    element:
-      id: more-documents
-    direction: UP
 - takeScreenshot: shot-dark-more
 - tapOn:
-    id: more-documents
+    id: tab-documents
 - extendedWaitUntil:
     visible:
       id: doc-row-.*
     timeout: 15000
 - takeScreenshot: shot-dark-documents
-- back
 - tapOn:
-    id: more-notes
+    id: tab-more
+- extendedWaitUntil:
+    visible:
+      id: more
+    timeout: 10000
+- tapOn:
+    id: tab-notes
 - extendedWaitUntil:
     visible:
       id: notes-find
     timeout: 15000
 - takeScreenshot: shot-dark-notes
-- back
 - tapOn:
     id: tab-home
 - extendedWaitUntil:
@@ -246,6 +246,6 @@ env:
 - waitForAnimationToEnd
 - takeScreenshot: shot-dark-home
 - tapOn:
-    id: tab-attention
+    id: bell
 - waitForAnimationToEnd
 - takeScreenshot: shot-dark-attention

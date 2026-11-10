@@ -2,7 +2,8 @@ import type { DocumentView, SearchHit } from '@fdv/shared';
 import { fireEvent, screen, waitFor } from '@testing-library/react-native';
 import { Text } from 'react-native';
 import MoreScreen from '../app/(tabs)/more';
-import NotesScreen from '../app/notes';
+import NotesScreen from '../app/(tabs)/notes';
+import { TabBar } from '../ui/tab-bar';
 import { SecureTokenStore } from '../session/store';
 import { audit } from '../test-support/a11y';
 import { libraryDoc, unlocked } from '../test-support/lookup';
@@ -113,21 +114,36 @@ function papers(t: TestVault) {
 }
 
 describe('More (P9)', () => {
-  it('offers Collections and Notes where the vault has them', async () => {
+  it('offers Collections, and People where Notes is a tab (R3)', async () => {
     const t = vault();
     await unlocked(t, <MoreScreen />);
     expect(await screen.findByTestId('more-collections')).toBeTruthy();
-    expect(screen.getByTestId('more-notes')).toBeTruthy();
+    expect(screen.getByTestId('more-people')).toBeTruthy();
+    expect(screen.queryByTestId('more-notes')).toBeNull();
     await fireEvent.press(screen.getByTestId('more-collections'));
     expect(routes().at(-1)?.pathname).toBe('/collections');
   });
 
-  it('a viewer is offered no collections; a vault before 0.9.0, no notes', async () => {
+  it('a viewer is offered no collections; a vault before 0.9.0 has People as its tab, not in More', async () => {
     const t = vault({ notes: false });
     await unlocked(t, <MoreScreen />, { before: withRole('viewer') });
-    expect(await screen.findByTestId('more-people')).toBeTruthy();
+    expect(await screen.findByTestId('more-account')).toBeTruthy();
     expect(screen.queryByTestId('more-collections')).toBeNull();
-    expect(screen.queryByTestId('more-notes')).toBeNull();
+    expect(screen.queryByTestId('more-people')).toBeNull();
+  });
+
+  it.each([
+    [true, 'tab-notes', 'tab-people'],
+    [false, 'tab-people', 'tab-notes'],
+  ])('the third tab, with notes %s, is %s (the owner, 10 Nov 2026)', async (notes, shown, hidden) => {
+    const t = vault({ notes });
+    const state = {
+      index: 0,
+      routes: ['index', 'documents', 'notes', 'people', 'more'].map((name) => ({ key: name, name })),
+    };
+    await unlocked(t, <TabBar state={state} navigation={{ navigate: () => undefined }} />);
+    expect(await screen.findByTestId(shown)).toBeTruthy();
+    expect(screen.queryByTestId(hidden)).toBeNull();
   });
 });
 

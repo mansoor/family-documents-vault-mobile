@@ -54,8 +54,8 @@ function expectScaled(before: ReturnType<typeof sizes>, after: ReturnType<typeof
  * here fails the test until it is.
  */
 const FIGTREE: Record<string, number> = {
-  A: 699, H: 750, M: 853, P: 594, S: 610,
-  a: 524, c: 544, e: 551, h: 565, i: 250, l: 236, m: 864, n: 564, o: 581, p: 597, r: 363, t: 393,
+  A: 699, D: 695, H: 750, M: 853, P: 594, S: 610,
+  a: 524, c: 544, e: 551, h: 565, i: 250, l: 236, m: 864, n: 564, o: 581, p: 597, r: 363, s: 466, t: 393, u: 564,
 };
 function drawnWidth(word: string, fontSize: number): number {
   const units = [...word].reduce((sum, c) => {
@@ -68,7 +68,7 @@ function drawnWidth(word: string, fontSize: number): number {
 
 const TAB_STATE = {
   index: 0,
-  routes: ['index', 'search', 'attention', 'more'].map((name) => ({ key: name, name })),
+  routes: ['index', 'documents', 'people', 'more'].map((name) => ({ key: name, name })),
 };
 
 describe('Large text', () => {
@@ -175,7 +175,7 @@ describe('Large text', () => {
       const plus = Number(style('home-add').width);
       expect(plus).toBeGreaterThanOrEqual(44);
       expect(slot).toBeGreaterThanOrEqual(plus + 8);
-      const tabs = ['tab-home', 'tab-search', 'tab-attention', 'tab-more'];
+      const tabs = ['tab-home', 'tab-documents', 'tab-people', 'tab-more'];
       for (const id of tabs) expect(style(id)).toMatchObject({ flex: 1 });
       const edge = Number(style('tab-bar').paddingHorizontal ?? 0);
       const inset = Number(style('tab-home').paddingHorizontal ?? 0);
@@ -189,9 +189,6 @@ describe('Large text', () => {
         expect({ id, word, oneWord: !/\s/.test(word) }).toEqual({ id, word, oneWord: true });
         expect({ id, word, fits: drawnWidth(word, size) <= room }).toEqual({ id, word, fits: true });
       }
-      // The shortened label still says it all to a screen reader.
-      expect(screen.getByTestId('tab-attention').props.accessibilityLabel).toBe('Needs attention');
-      expect(within(screen.getByTestId('tab-attention')).getByText('Attention')).toBeTruthy();
     },
   );
 });

@@ -12,6 +12,7 @@ import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { extra, SPIKE } from '../config';
 import { LockGate } from '../lock/gate';
+import { AttentionProvider } from '../state/attention';
 import { CaptureProvider } from '../state/capture';
 import { saveCopyIo } from '../documents/save-copy';
 import { watchHttpCache } from '../net/http-cache';
@@ -95,11 +96,9 @@ function Gates() {
         <Stack.Screen name="edit/[id]" options={{ title: '' }} />
         <Stack.Screen name="collections" options={{ title: '' }} />
         <Stack.Screen name="collection/[id]" options={{ title: '' }} />
-        <Stack.Screen name="notes" options={{ title: '' }} />
         <Stack.Screen name="new-note" options={{ title: '' }} />
         <Stack.Screen name="person/[id]" options={{ title: '' }} />
-        <Stack.Screen name="people" options={{ title: '' }} />
-        <Stack.Screen name="documents" options={{ title: '' }} />
+        <Stack.Screen name="attention" options={{ title: t('attention.title') }} />
         <Stack.Screen name="account" options={{ title: t('more.account') }} />
         <Stack.Screen name="capture" options={{ title: '', gestureEnabled: false }} />
         <Stack.Screen name="settings" options={{ title: t('settings.title') }} />
@@ -184,6 +183,7 @@ function Root() {
             <LockProvider>
               <EssentialsProvider>
                 <CaptureProvider>
+                  <AttentionProvider>
                   <PushProvider>
                     <StepUpProvider>
                       <View style={styles.root}>
@@ -200,6 +200,7 @@ function Root() {
                       </View>
                     </StepUpProvider>
                   </PushProvider>
+                  </AttentionProvider>
                 </CaptureProvider>
               </EssentialsProvider>
             </LockProvider>

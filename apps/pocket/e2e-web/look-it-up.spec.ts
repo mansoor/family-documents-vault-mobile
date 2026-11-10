@@ -118,7 +118,8 @@ test("search, open, confirm it's you, snooze", async ({ page, baseURL, request }
   expect(reminded.ok(), await reminded.text()).toBe(true);
 
   // Search: found by its name, opened.
-  await page.getByRole('tab', { name: 'Search' }).click();
+  // Search is the Documents tab since R3.
+  await page.getByRole('tab', { name: 'Documents' }).click();
   await page.getByLabel('Search your documents').fill(word);
   // The row itself, not its ⋯ ("Actions for “…”", 5.36), which names it too.
   await page.getByRole('button', { name: new RegExp(`^${title}`) }).click();
@@ -152,7 +153,8 @@ test("search, open, confirm it's you, snooze", async ({ page, baseURL, request }
   // Needs attention: due today; put off a week, it leaves Due for a week.
   await page.goBack();
   await page.goBack();
-  await page.getByRole('tab', { name: 'Needs attention' }).click();
+  // Behind the bell since R3.
+  await page.getByRole('button', { name: /^Needs attention/ }).first().click();
   const id = ((await reminded.json()) as { id: string }).id;
   await expect(page.getByTestId(`snooze-week-${id}`)).toBeVisible();
   await page.getByTestId(`snooze-week-${id}`).click();

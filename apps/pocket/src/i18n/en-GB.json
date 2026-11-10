@@ -416,7 +416,9 @@
     "attentionName": "Needs attention",
     "people": "People",
     "more": "More",
-    "moreName": "More: people, your Inbox, account and settings"
+    "moreName": "More: people, your Inbox, account and settings",
+    "documents": "Documents",
+    "notes": "Notes"
   },
   "more": {
     "title": "More",
@@ -432,7 +434,7 @@
     "notesHint": "Your notes, and a new one"
   },
   "documents": {
-    "title": "All documents",
+    "title": "Documents",
     "sortBy": "Sort by",
     "sort_recent": "Recently added",
     "sort_title": "Title, A to Z",
@@ -815,5 +817,10 @@
     "chosen_other": "{{count}} chosen",
     "more_one": "More choices for {{label}}: 1 more",
     "more_other": "More choices for {{label}}: {{count}} more"
+  },
+  "bell": {
+    "none": "Needs attention: nothing now",
+    "due_one": "Needs attention: 1 thing",
+    "due_other": "Needs attention: {{count}} things"
   }
 }

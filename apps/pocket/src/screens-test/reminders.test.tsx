@@ -1,6 +1,6 @@
 import { addDays, localToday, type ReminderView } from '@fdv/shared';
 import { fireEvent, screen, waitFor } from '@testing-library/react-native';
-import AttentionScreen from '../app/(tabs)/attention';
+import AttentionScreen from '../app/attention';
 import { fixtureScanner } from '../capture/scanner';
 import { MemoryQueueStore } from '../queue/store';
 import { audit } from '../test-support/a11y';

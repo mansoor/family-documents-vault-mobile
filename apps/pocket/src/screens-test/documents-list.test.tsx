@@ -1,6 +1,5 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react-native';
-import MoreScreen from '../app/(tabs)/more';
-import DocumentsScreen from '../app/documents';
+import DocumentsScreen from '../app/(tabs)/documents';
 import Home from '../test-support/home';
 import { unlocked } from '../test-support/lookup';
 import { installed } from '../test-support/render';
@@ -101,15 +100,10 @@ describe('all your documents (P7)', () => {
     await waitFor(() => expect(asked(t).at(-1)?.status).toBeUndefined());
   });
 
-  it('is reached from Home and from More', async () => {
+  it('is reached from Home (and is the Documents tab since R3)', async () => {
     const t = testVault([ORIGIN]);
     await unlocked(t, <Home />);
     await fireEvent.press(await screen.findByTestId('home-all-documents'));
-    expect(routes().at(-1)).toEqual({ pathname: '/documents', params: {} });
-    resetRoutes();
-    const u = testVault([ORIGIN]);
-    await unlocked(u, <MoreScreen />);
-    await fireEvent.press(await screen.findByTestId('more-documents'));
     expect(routes().at(-1)).toEqual({ pathname: '/documents', params: {} });
   });
 });
