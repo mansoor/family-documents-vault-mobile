@@ -1,0 +1,251 @@
+# The polish (P11, app 0.4.0), against the vault the app is pinned to:
+#  - All documents, sorted;
+#  - on the one document (the passport the capture flow sent): Who can see
+#    it changed and changed back, and its name corrected with Edit details,
+#    which the workflow then finds in the vault;
+#  - More, with Collections and Notes;
+#  - the dark theme, from Settings.
+# Screenshots are allowed first (Settings), so each list is captured, in
+# light and in dark (shot-*.png). A document's own pages and the card are
+# never captured, whatever the setting.
+appId: io.github.mansoor.familyvault.e2e
+env:
+  VAULT: 10.0.2.2:8099
+---
+- launchApp:
+    clearState: true
+# Last of the flows, on an emulator busy for a while by then: a cold start
+# after clearing the app's data can take longer than tapOn waits.
+- extendedWaitUntil:
+    visible:
+      id: connect-address
+    timeout: 30000
+- tapOn:
+    id: connect-address
+- inputText: ${VAULT}
+- hideKeyboard
+- tapOn:
+    id: connect-go
+- extendedWaitUntil:
+    visible:
+      id: connect-approve-http
+    timeout: 30000
+- tapOn:
+    id: connect-approve-http
+- tapOn:
+    id: sign-in-email
+- inputText: ${EMAIL}
+- tapOn:
+    id: sign-in-password
+- inputText: ${PASSWORD}
+- hideKeyboard
+- tapOn:
+    id: sign-in-go
+- extendedWaitUntil:
+    visible:
+      id: home-list
+    timeout: 30000
+
+# Screenshots allowed, and the light theme fixed, in Settings.
+- tapOn: Settings
+- scrollUntilVisible:
+    element:
+      id: settings-screenshots
+- tapOn:
+    id: settings-screenshots
+- scrollUntilVisible:
+    element:
+      id: settings-theme-light
+- tapOn:
+    id: settings-theme-light
+- back
+- extendedWaitUntil:
+    visible:
+      id: home-list
+    timeout: 15000
+- waitForAnimationToEnd
+- takeScreenshot: shot-light-home
+- tapOn:
+    id: tab-search
+- waitForAnimationToEnd
+- takeScreenshot: shot-light-search
+- tapOn:
+    id: tab-attention
+- waitForAnimationToEnd
+- takeScreenshot: shot-light-attention
+
+# More, and All documents sorted by title.
+- tapOn:
+    id: tab-more
+- extendedWaitUntil:
+    visible:
+      id: more
+    timeout: 10000
+- assertVisible:
+    id: more-documents
+- assertVisible:
+    id: more-collections
+- assertVisible:
+    id: more-notes
+- takeScreenshot: shot-light-more
+- tapOn:
+    id: more-documents
+- extendedWaitUntil:
+    visible:
+      id: doc-row-.*
+    timeout: 15000
+- tapOn:
+    id: documents-sort-title
+- extendedWaitUntil:
+    visible:
+      id: doc-row-.*
+    timeout: 15000
+- takeScreenshot: shot-light-documents
+
+# The passport's page: Who can see it, Adults only and back.
+- tapOn:
+    id: doc-row-.*
+- extendedWaitUntil:
+    visible:
+      id: document-visibility
+    timeout: 15000
+- tapOn:
+    id: document-visibility
+- extendedWaitUntil:
+    visible:
+      id: visibility-adults
+    timeout: 10000
+- tapOn:
+    id: visibility-adults
+- extendedWaitUntil:
+    visible:
+      id: visibility-said
+    timeout: 15000
+- assertVisible: Adults only.*
+- tapOn:
+    id: document-visibility
+- extendedWaitUntil:
+    visible:
+      id: visibility-household
+    timeout: 10000
+- tapOn:
+    id: visibility-household
+# The sheet closes once the vault has it; the chip says it again.
+- extendedWaitUntil:
+    notVisible:
+      id: visibility-sheet
+    timeout: 15000
+- assertVisible: Everyone in the family.*
+
+# Edit details: its name corrected and saved; the page shows it.
+- scrollUntilVisible:
+    element:
+      id: document-edit
+    timeout: 30000
+- tapOn:
+    id: document-edit
+- extendedWaitUntil:
+    visible:
+      id: edit-name
+    timeout: 15000
+- tapOn:
+    id: edit-name
+- eraseText: 80
+- inputText: Passport (checked)
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      id: edit-save
+    timeout: 30000
+- tapOn:
+    id: edit-save
+- extendedWaitUntil:
+    visible:
+      text: Passport \(checked\)
+    timeout: 20000
+- assertNotVisible:
+    id: edit-save
+- back
+- extendedWaitUntil:
+    visible:
+      id: doc-row-.*
+    timeout: 15000
+- back
+
+# Collections and Notes, from More.
+- extendedWaitUntil:
+    visible:
+      id: more
+    timeout: 10000
+- tapOn:
+    id: more-collections
+- extendedWaitUntil:
+    visible:
+      id: collections-none
+    timeout: 15000
+- takeScreenshot: shot-light-collections
+- back
+- tapOn:
+    id: more-notes
+- extendedWaitUntil:
+    visible:
+      id: notes-find
+    timeout: 15000
+- takeScreenshot: shot-light-notes
+- back
+
+# Dark, from Settings: the same lists again.
+- extendedWaitUntil:
+    visible:
+      id: more
+    timeout: 10000
+- scrollUntilVisible:
+    element:
+      id: more-settings
+- tapOn:
+    id: more-settings
+- scrollUntilVisible:
+    element:
+      id: settings-theme-dark
+- tapOn:
+    id: settings-theme-dark
+- waitForAnimationToEnd
+- takeScreenshot: shot-dark-settings
+- back
+- extendedWaitUntil:
+    visible:
+      id: more
+    timeout: 10000
+- scrollUntilVisible:
+    element:
+      id: more-documents
+    direction: UP
+- takeScreenshot: shot-dark-more
+- tapOn:
+    id: more-documents
+- extendedWaitUntil:
+    visible:
+      id: doc-row-.*
+    timeout: 15000
+- takeScreenshot: shot-dark-documents
+- back
+- tapOn:
+    id: more-notes
+- extendedWaitUntil:
+    visible:
+      id: notes-find
+    timeout: 15000
+- takeScreenshot: shot-dark-notes
+- back
+- tapOn:
+    id: tab-home
+- extendedWaitUntil:
+    visible:
+      id: home-list
+    timeout: 15000
+- waitForAnimationToEnd
+- takeScreenshot: shot-dark-home
+- tapOn:
+    id: tab-attention
+- waitForAnimationToEnd
+- takeScreenshot: shot-dark-attention
