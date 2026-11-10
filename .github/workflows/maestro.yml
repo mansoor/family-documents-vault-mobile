@@ -234,9 +234,8 @@ jobs:
         if: always()
         with:
           name: screenshots
-          path: |
-            shot-*.png
-            apps/pocket/.maestro/shot-*.png
+          # Where Maestro keeps a flow's takeScreenshot files.
+          path: ~/.maestro/tests/*/polish/takeScreenshot/shot-*.png
           if-no-files-found: ignore
           retention-days: 14
       - name: Minutes
