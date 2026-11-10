@@ -14,11 +14,11 @@ env:
     clearState: true
 # Last of the flows, on an emulator by then busy for ten minutes: a cold
 # start after clearing the app's data can take longer than tapOn waits
-# (run 37247590981).
+# (run 37247590981; and R3, which waited 30 s and saw it a moment after).
 - extendedWaitUntil:
     visible:
       id: connect-address
-    timeout: 30000
+    timeout: 60000
 - tapOn:
     id: connect-address
 - inputText: ${VAULT}
