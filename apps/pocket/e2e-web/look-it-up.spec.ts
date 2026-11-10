@@ -137,7 +137,8 @@ test("search, open, confirm it's you, snooze", async ({ page, baseURL, request }
       { timeout: 60_000, intervals: [1_000, 2_000, 3_000] },
     )
     .not.toBeNull();
-  await page.getByRole('button', { name: 'Show the pages' }).click();
+  // A round action on the document's page since R6: Pages.
+  await page.getByRole('button', { name: 'Pages', exact: true }).click();
   // The vault asks to confirm it is you — unless the sign-in a moment ago
   // still counts (its window is five minutes); the sheet itself is tested
   // in document.test.tsx.
@@ -156,7 +157,9 @@ test("search, open, confirm it's you, snooze", async ({ page, baseURL, request }
   // Behind the bell since R3.
   await page.getByRole('button', { name: /^Needs attention/ }).first().click();
   const id = ((await reminded.json()) as { id: string }).id;
-  await expect(page.getByTestId(`snooze-week-${id}`)).toBeVisible();
+  // Later (R6) asks how long, in a sheet: a week.
+  await expect(page.getByTestId(`later-${id}`)).toBeVisible();
+  await page.getByTestId(`later-${id}`).click();
   await page.getByTestId(`snooze-week-${id}`).click();
   await expect
     .poll(async () => {
