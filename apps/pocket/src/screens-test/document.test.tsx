@@ -271,6 +271,8 @@ describe('a document', () => {
     await unlocked(t, <DocumentDetail id="passport" />);
     await screen.findByText('Passport');
     await fireEvent(screen.getByTestId('document-essential'), 'valueChange', false);
+    // Its copies leave the phones that keep them: asked first (R2).
+    await fireEvent.press(await screen.findByTestId('essential-off-yes'));
     expect(await screen.findByTestId('step-up-sheet')).toBeTruthy();
     expect(t.library.documents.get('passport')?.is_essential).toBe(true);
     // Not now: it stays an Essential.
@@ -279,6 +281,8 @@ describe('a document', () => {
     expect(t.library.documents.get('passport')?.is_essential).toBe(true);
     // Asked again, and confirmed: now it is not.
     await fireEvent(screen.getByTestId('document-essential'), 'valueChange', false);
+    // Its copies leave the phones that keep them: asked first (R2).
+    await fireEvent.press(await screen.findByTestId('essential-off-yes'));
     await fireEvent.changeText(await screen.findByTestId('step-up-password'), PASSWORD);
     await fireEvent.press(screen.getByTestId('step-up-go'));
     await waitFor(() => expect(t.library.documents.get('passport')?.is_essential).toBe(false));

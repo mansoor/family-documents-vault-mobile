@@ -3,9 +3,9 @@ import { useTranslation } from 'react-i18next';
 import { StyleSheet, Switch, View } from 'react-native';
 import { day, PasswordSheet } from '../essentials/ui';
 import { useEssentials } from '../state/essentials';
+import { ConfirmSheet } from '../ui/confirm';
 import { useLock } from '../state/lock';
 import { Button, Card, Text } from '../ui';
-import { Sheet } from '../ui/sheet';
 import { sp } from '../ui/space';
 import { useFamilyZone } from '../state/family-time';
 
@@ -107,18 +107,18 @@ export function OfflineCopies() {
           return outcome;
         }}
       />
-      <Sheet visible={removing} onClose={() => setRemoving(false)} testID="settings-offline-remove-question">
-        <Text variant="screen">{t('settings.offlineRemoveTitle')}</Text>
-        <Text>{t('settings.offlineRemoveWords')}</Text>
-        <Button
-          testID="settings-offline-remove-yes"
-          kind="danger"
-          label={t('settings.offlineRemoveYes')}
-          busy={busy}
-          onPress={() => void remove()}
-        />
-        <Button kind="quiet" label={t('common.cancel')} onPress={() => setRemoving(false)} />
-      </Sheet>
+      <ConfirmSheet
+        visible={removing}
+        testID="settings-offline-remove-question"
+        title={t('settings.offlineRemoveTitle')}
+        words={t('settings.offlineRemoveWords')}
+        confirmLabel={t('settings.offlineRemoveYes')}
+        busy={busy}
+        onConfirm={() => void remove()}
+        onCancel={() => setRemoving(false)}
+        confirmID="settings-offline-remove-yes"
+        cancelID="settings-offline-remove-cancel"
+      />
     </Card>
   );
 }

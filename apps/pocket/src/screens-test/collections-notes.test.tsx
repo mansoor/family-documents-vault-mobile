@@ -184,6 +184,13 @@ describe("a collection's page (P9)", () => {
     await unlocked(t, <Text>Collections</Text>);
     await fireEvent.press(await screen.findByTestId('doc-menu-bill'));
     await fireEvent.press(await screen.findByTestId('row-sheet-remove'));
+    // Asked first (R2), with the collection named.
+    expect(await screen.findByText('Remove from “For the accountant”?')).toBeTruthy();
+    // Cancel takes nothing out, and the menu is as it was.
+    await fireEvent.press(screen.getByTestId('row-sheet-remove-cancel'));
+    expect(t.vault.state.collections[0]?.items).toHaveLength(2);
+    await fireEvent.press(await screen.findByTestId('row-sheet-remove'));
+    await fireEvent.press(await screen.findByTestId('row-sheet-remove-yes'));
     expect(await screen.findByTestId('collection-said')).toHaveTextContent(
       '“Water bill” is out of “For the accountant”. It is still in the vault.',
     );

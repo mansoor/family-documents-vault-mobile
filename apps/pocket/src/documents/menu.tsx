@@ -39,6 +39,7 @@ import { Button, Notice, Text } from '../ui';
 import { saveVersion, setEssential, showDocument, type ActionDeps } from './actions';
 import { latestOf } from './online';
 import { warnedAboutCopies } from './save-copy';
+import { ConfirmBody } from '../ui/confirm';
 import { Sheet } from '../ui/sheet';
 import { sp } from '../ui/space';
 import { useColours, useStyles, type Palette } from '../ui/theme';
@@ -59,6 +60,10 @@ export type RowAction = 'open' | 'show' | 'save' | 'version' | 'essential' | 'co
  */
 export interface RemoveFrom {
   onRemove: () => Promise<string | null>;
+  /** The collection's name, for the question asked first (R2). */
+  collection: string;
+  /** Who else stops seeing it: a collection shared outside the family. */
+  warning?: string | null;
 }
 
 /**
@@ -224,6 +229,8 @@ function DocumentMenu(props: {
   const [adding, setAdding] = useState(false);
   const [warning, setWarning] = useState(false);
   const [picking, setPicking] = useState(false);
+  // Asked first (R2): taking it out of a collection, or its copies off phones.
+  const [confirming, setConfirming] = useState<'remove' | 'essential' | null>(null);
   const first = useRef<View>(null);
   const { onDoc } = props;
 
@@ -329,7 +336,29 @@ function DocumentMenu(props: {
         return;
       case 'essential':
         if (!doc) return;
-        void run('essential', async () => {
+        if (doc.is_essential) {
+          setSaid(null);
+          setConfirming('essential');
+          return;
+        }
+        toggleEssential();
+        return;
+      case 'collect':
+        if (offline) return warn(t('document.needsConnection'));
+        setSaid(null);
+        setPicking(true);
+        return;
+      case 'remove':
+        if (offline || !props.remove) return warn(t('document.needsConnection'));
+        setSaid(null);
+        setConfirming('remove');
+        return;
+    }
+  };
+
+  const toggleEssential = () => {
+    if (!doc) return;
+    void run('essential', async () => {
           const value = !doc.is_essential;
           const outcome = await setEssential(deps, doc, value, t);
           if (outcome.kind === 'saved') {
@@ -339,22 +368,7 @@ function DocumentMenu(props: {
             warn(t('document.conflict'));
             await fetchDoc();
           } else if (outcome.kind === 'failed') warn(outcome.words);
-        });
-        return;
-      case 'collect':
-        if (offline) return warn(t('document.needsConnection'));
-        setSaid(null);
-        setPicking(true);
-        return;
-      case 'remove':
-        void run('remove', async () => {
-          if (offline || !props.remove) return warn(t('document.needsConnection'));
-          const problem = await props.remove.onRemove();
-          if (problem) warn(problem);
-          else props.onClose(false);
-        });
-        return;
-    }
+    });
   };
 
   const label = (action: RowAction): string => {
@@ -393,7 +407,43 @@ function DocumentMenu(props: {
             {said.text}
           </Notice>
         ) : null}
-        {picking ? (
+        {confirming === 'remove' && props.remove ? (
+          <ConfirmBody
+            title={t('collection.removeTitle', { name: props.remove.collection })}
+            words={t('collection.removeWords', { title })}
+            warning={props.remove.warning ?? null}
+            icon={FolderMinus}
+            confirmLabel={t('collection.removeYes')}
+            busy={busy === 'remove'}
+            onConfirm={() =>
+              void run('remove', async () => {
+                const problem = await props.remove?.onRemove();
+                if (problem) {
+                  setConfirming(null);
+                  warn(problem);
+                } else props.onClose(false);
+              })
+            }
+            onCancel={() => setConfirming(null)}
+            confirmID="row-sheet-remove-yes"
+            cancelID="row-sheet-remove-cancel"
+          />
+        ) : confirming === 'essential' ? (
+          <ConfirmBody
+            title={t('document.essentialOffTitle')}
+            words={t('document.essentialOffWords')}
+            icon={StarOff}
+            confirmLabel={t('document.essentialOffYes')}
+            busy={busy === 'essential'}
+            onConfirm={() => {
+              setConfirming(null);
+              toggleEssential();
+            }}
+            onCancel={() => setConfirming(null)}
+            confirmID="row-sheet-essential-yes"
+            cancelID="row-sheet-essential-cancel"
+          />
+        ) : picking ? (
           <CollectionPicker
             id={id}
             title={title}

@@ -1,12 +1,12 @@
 import { ApiRequestError } from '@fdv/client';
-import { issuedByLabel, shortTypeLabel, type DocumentView } from '@fdv/shared';
+import { issuedByLabel, type DocumentView } from '@fdv/shared';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ScrollView, StyleSheet, Switch, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { andList, chooseOwner, chooseType, coreAsk, detailError, ownFields, typeOf, type CardCore, type Draft, type FieldErrors, type Household } from '../../capture/draft';
-import { matchTypes, rankTypes } from '../../capture/types';
+import { KindChooser, OwnerChooser } from '../../capture/choose';
 import { Chip, ChipRow, detailInput } from '../../capture/ui';
 import { draftOf, editBody } from '../../documents/edit';
 import { wordsFor } from '../../errors/words';
@@ -44,8 +44,6 @@ export default function EditScreen() {
   const [fields, setFields] = useState<FieldErrors>({});
   const [problem, setProblem] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [moreTypes, setMoreTypes] = useState(false);
-  const [query, setQuery] = useState('');
 
   const load = useCallback(async () => {
     if (!who) return;
@@ -86,8 +84,6 @@ export default function EditScreen() {
   const setDetail = (key: string, v: string | boolean) =>
     setDraft((d) => (d ? { ...d, details: { ...d.details, [key]: v } } : d));
   const type = typeOf(draft, household);
-  const ranked = rankTypes(household.types, []);
-  const typeChips = type && !ranked.top.some((x) => x.key === type.key) ? [...ranked.top, type] : ranked.top;
   const teen = who?.role === 'teen';
   const ask = (key: CardCore) => coreAsk(type, key, household);
   const cardWord: Record<CardCore, string> = {
@@ -147,66 +143,26 @@ export default function EditScreen() {
 
       <View style={styles.section}>
         <Text variant="screen">{t('capture.whatItIs')}</Text>
-        <ChipRow label={t('capture.whatItIs')}>
-          {typeChips.map((ty) => (
-            <Chip
-              key={ty.key}
-              label={shortTypeLabel(ty)}
-              selected={draft.typeKey === ty.key}
-              onPress={() => setDraft((d) => (d ? chooseType(d, d.typeKey === ty.key ? null : ty.key) : d))}
-              testID={`edit-type-${ty.key}`}
-            />
-          ))}
-        </ChipRow>
-        <View style={styles.row}>
-          <Chip label={t('capture.more')} expanded={moreTypes} onPress={() => setMoreTypes((m) => !m)} testID="edit-types-more" />
-        </View>
-        {moreTypes ? (
-          <View style={styles.section}>
-            <Field label={t('capture.search')} value={query} onChangeText={setQuery} testID="edit-types-search" />
-            <ChipRow label={t('capture.search')}>
-              {matchTypes(household.types, query).map((ty) => (
-                <Chip
-                  key={ty.key}
-                  label={ty.label}
-                  selected={draft.typeKey === ty.key}
-                  onPress={() => {
-                    setDraft((d) => (d ? chooseType(d, ty.key) : d));
-                    setMoreTypes(false);
-                    setQuery('');
-                  }}
-                />
-              ))}
-            </ChipRow>
-          </View>
-        ) : null}
+        <KindChooser
+          types={household.types}
+          chosen={draft.typeKey}
+          onChoose={(k) => setDraft((d) => (d ? chooseType(d, k) : d))}
+          label={t('capture.whatItIs')}
+          ids={{ more: 'edit-types-more', find: 'edit-types-search', picker: 'edit-types-picker', chip: 'edit-type' }}
+        />
       </View>
 
       <View style={styles.section}>
         <Text variant="screen">{t('capture.whoseItIs')}</Text>
-        <ChipRow label={t('capture.whoseItIs')}>
-          {household.members
-            .filter((m) => !teen || m.id === who?.member_id)
-            .map((m) => (
-              <Chip
-                key={m.id}
-                label={m.id === who?.member_id ? `${m.display_name} (${t('capture.yours')})` : m.display_name}
-                selected={draft.ownerId === m.id}
-                disabled={teen}
-                onPress={() =>
-                  setDraft((d) => (d ? chooseOwner(d, d.ownerId === m.id ? null : m.id, household) : d))
-                }
-                testID={`edit-owner-${m.id}`}
-              />
-            ))}
-          {teen ? null : (
-            <Chip
-              label={t('capture.nobody')}
-              selected={draft.ownerId === null}
-              onPress={() => setDraft((d) => (d ? chooseOwner(d, null, household) : d))}
-            />
-          )}
-        </ChipRow>
+        <OwnerChooser
+          members={household.members}
+          me={who?.member_id ?? null}
+          teen={teen}
+          chosen={draft.ownerId}
+          onChoose={(id) => setDraft((d) => (d ? chooseOwner(d, id, household) : d))}
+          label={t('capture.whoseItIs')}
+          ids={{ more: 'edit-owners-more', picker: 'edit-owners-picker', chip: 'edit-owner' }}
+        />
       </View>
 
       <View style={styles.section}>

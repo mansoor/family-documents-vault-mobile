@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { StyleSheet, View } from 'react-native';
 import { useVault } from '../state/vault';
+import { ConfirmSheet } from '../ui/confirm';
 import { Button, Card, Notice, Text } from '../ui';
 import { sp } from '../ui/space';
 import { dayWords, useFamilyZone } from '../state/family-time';
@@ -43,6 +44,8 @@ export function SignedInDevices() {
     };
   }, [withToken, t, asked]);
 
+  const confirmingRow = (items ?? []).find((s) => s.id === confirming);
+  const confirmingName = confirmingRow ? (confirmingRow.label ?? confirmingRow.user_agent ?? t('settings.deviceUnknown')) : '';
   const signOutThere = async (id: string) => {
     setBusy(id);
     try {
@@ -70,18 +73,7 @@ export function SignedInDevices() {
               {t('settings.deviceLastUsed', { date: when(s.last_used_at, zone) })}
               {s.offline ? ` · ${t('settings.deviceKeepsEssentials')}` : ''}
             </Text>
-            {s.current ? null : confirming === s.id ? (
-              <View style={styles.row}>
-                <Button
-                  testID={`settings-device-confirm-${s.id}`}
-                  kind="danger"
-                  label={t('settings.deviceSignOutConfirm')}
-                  busy={busy === s.id}
-                  onPress={() => void signOutThere(s.id)}
-                />
-                <Button kind="quiet" label={t('common.cancel')} onPress={() => setConfirming(null)} />
-              </View>
-            ) : (
+            {s.current ? null : (
               <Button
                 testID={`settings-device-sign-out-${s.id}`}
                 kind="quiet"
@@ -93,6 +85,18 @@ export function SignedInDevices() {
           </View>
         );
       })}
+      <ConfirmSheet
+        visible={confirming !== null}
+        testID="settings-device-question"
+        title={t('settings.deviceSignOutTitle', { name: confirmingName })}
+        words={t('settings.deviceSignOutWords')}
+        confirmLabel={t('settings.deviceSignOutConfirm')}
+        busy={busy !== null}
+        onConfirm={() => confirming && void signOutThere(confirming)}
+        onCancel={() => setConfirming(null)}
+        confirmID={`settings-device-confirm-${confirming ?? ''}`}
+        cancelID="settings-device-cancel"
+      />
     </Card>
   );
 }

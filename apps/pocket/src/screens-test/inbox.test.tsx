@@ -458,6 +458,8 @@ describe('Send to my Inbox (I5)', () => {
     await fireEvent.press(await screen.findByTestId('capture-inbox'));
     await waitFor(async () => expect(await store.list()).toHaveLength(1));
     await fireEvent.press(await screen.findByTestId('settings-sign-out'));
+    // Asked first (R2): the answer, when there is no scan waiting to ask about.
+    { const yes = screen.queryByTestId('sign-out-yes'); if (yes) await fireEvent.press(yes); }
     expect(await screen.findByTestId('sign-out-question')).toBeTruthy();
     await fireEvent.press(screen.getByTestId('sign-out-remove'));
     await screen.findByTestId('sign-in-go');

@@ -108,6 +108,8 @@ describe('notifications on this phone (4.14)', () => {
     // A tap not yet followed is not followed for whoever signs in next.
     fake.open = 'needs-attention';
     await fireEvent.press(screen.getByTestId('settings-sign-out'));
+    // Asked first (R2): the answer, when there is no scan waiting to ask about.
+    { const yes = screen.queryByTestId('sign-out-yes'); if (yes) await fireEvent.press(yes); }
     await waitFor(() => expect(t.calls).toContain('POST https://vault.test/api/v1/auth/logout'));
     expect(fake.open).toBeNull();
     const removed = t.calls.indexOf('DELETE https://vault.test/api/v1/devices');
@@ -143,6 +145,8 @@ describe('notifications on this phone (4.14)', () => {
     clock += 3600_000;
     const started = Date.now();
     await fireEvent.press(screen.getByTestId('settings-sign-out'));
+    // Asked first (R2): the answer, when there is no scan waiting to ask about.
+    { const yes = screen.queryByTestId('sign-out-yes'); if (yes) await fireEvent.press(yes); }
     await waitFor(() => expect(screen.queryByTestId('settings-sign-out')).toBeNull(), { timeout: 10_000 });
     expect(Date.now() - started).toBeLessThan(10_000);
     // Signed out here, and unregistered: the vault ends the session (and its device) when it can.
@@ -167,6 +171,8 @@ describe('notifications on this phone (4.14)', () => {
     clock += 3600_000;
     const started = Date.now();
     await fireEvent.press(screen.getByTestId('settings-sign-out'));
+    // Asked first (R2): the answer, when there is no scan waiting to ask about.
+    { const yes = screen.queryByTestId('sign-out-yes'); if (yes) await fireEvent.press(yes); }
     await waitFor(() => expect(screen.queryByTestId('settings-sign-out')).toBeNull(), { timeout: 10_000 });
     expect(Date.now() - started).toBeLessThan(10_000);
   });
@@ -191,6 +197,8 @@ describe('notifications on this phone (4.14)', () => {
     clock += 3600_000;
     await fireEvent.press(screen.getByTestId('push-test'));
     await fireEvent.press(screen.getByTestId('settings-sign-out'));
+    // Asked first (R2): the answer, when there is no scan waiting to ask about.
+    { const yes = screen.queryByTestId('sign-out-yes'); if (yes) await fireEvent.press(yes); }
     await waitFor(() => expect(screen.queryByTestId('settings-sign-out')).toBeNull(), { timeout: 10_000 });
     expect(t.calls).toContain('DELETE https://vault.test/api/v1/devices');
     expect(t.calls).toContain('POST https://vault.test/api/v1/auth/logout');
