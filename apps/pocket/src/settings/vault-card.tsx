@@ -7,7 +7,7 @@ import { useCapture } from '../state/capture';
 import { useVault } from '../state/vault';
 import { forgetVault } from '../state/vaults';
 import { Button, Card, Text } from '../ui';
-import { Sheet } from '../ui/sheet';
+import { ConfirmSheet } from '../ui/confirm';
 
 /**
  * Which vault, and how it is reached (4.15): its address, whether it is
@@ -82,22 +82,23 @@ export function VaultCard() {
         label={t('settings.changeVault')}
         onPress={() => setChanging(true)}
       />
-      <Sheet visible={changing} onClose={() => setChanging(false)} testID="change-vault-question">
-        <Text variant="screen">{t('settings.changeVaultTitle')}</Text>
-        <Text>{t('settings.changeVaultWords')}</Text>
+      <ConfirmSheet
+        visible={changing}
+        testID="change-vault-question"
+        title={t('settings.changeVaultTitle')}
+        words={t('settings.changeVaultWords')}
+        confirmLabel={t('settings.changeVaultYes')}
+        busy={busy}
+        onConfirm={() => void changeVault()}
+        onCancel={() => setChanging(false)}
+        confirmID="change-vault-yes"
+        cancelID="change-vault-cancel"
+      >
         {here.length - hereOnItsWay > 0 ? (
           <Text tone="warn">{t('settings.changeVaultWaiting', { count: here.length - hereOnItsWay })}</Text>
         ) : null}
         {hereOnItsWay > 0 ? <Text tone="soft">{t('settings.onItsWay', { count: hereOnItsWay })}</Text> : null}
-        <Button
-          testID="change-vault-yes"
-          kind="danger"
-          label={t('settings.changeVaultYes')}
-          busy={busy}
-          onPress={() => void changeVault()}
-        />
-        <Button kind="quiet" label={t('common.cancel')} onPress={() => setChanging(false)} />
-      </Sheet>
+      </ConfirmSheet>
     </Card>
   );
 }

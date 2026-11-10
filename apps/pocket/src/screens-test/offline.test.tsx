@@ -183,7 +183,7 @@ describe('the card with no connection', () => {
     await add();
     await fireEvent.press(await screen.findByTestId('types-more'));
     await fireEvent.changeText(screen.getByTestId('types-search'), 'car');
-    await fireEvent.press(screen.getByRole('button', { name: 'Car' }));
+    await fireEvent.press(screen.getByRole('radio', { name: 'Car' }));
     await fireEvent.press(screen.getByRole('button', { name: /\(Yours\)$/ }));
     await fireEvent.press(screen.getByTestId('more-details'));
     expect(screen.getByText('Registration plate * required')).toBeTruthy();
@@ -343,6 +343,8 @@ describe('scans belong to the person who made them', () => {
     }
     await renderApp(<Both />, { fetch: busy, capture: testCapture({ openStore: async () => store }) });
     await fireEvent.press(await screen.findByTestId('settings-sign-out'));
+    // Asked first (R2): the answer, when there is no scan waiting to ask about.
+    { const yes = screen.queryByTestId('sign-out-yes'); if (yes) await fireEvent.press(yes); }
     expect(await screen.findByTestId('sign-out-question')).toHaveTextContent(/A scan hasn't reached the vault yet\./);
     await fireEvent.press(screen.getByTestId('sign-out-keep'));
     // Signed out, the scan is kept — and the sign-in screen says it will go.

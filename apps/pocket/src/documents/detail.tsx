@@ -32,6 +32,7 @@ import { NoteText } from './notes';
 import { latestOf } from './online';
 import { warnedAboutCopies } from './save-copy';
 import { TrashButton } from './trash';
+import { ConfirmSheet } from '../ui/confirm';
 import { VisibilityControl } from './visibility';
 import { sp } from '../ui/space';
 import { useColours, useStyles, type Palette } from '../ui/theme';
@@ -77,6 +78,8 @@ export function DocumentDetail(props: { id: string }) {
   const [preparing, setPreparing] = useState(false);
   const [toggling, setToggling] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  // Essential off: its copies leave the phones that keep them, so it asks first (R2).
+  const [askOff, setAskOff] = useState(false);
   // The collections it is in (P8), of those the person may see.
   const [inCollections, setInCollections] = useState<{ id: string; name: string }[]>([]);
   const warn = useCallback((text: string) => setNotice({ tone: 'warn', text }), []);
@@ -380,7 +383,7 @@ export function DocumentDetail(props: { id: string }) {
             accessibilityLabel={t('document.essential')}
             value={doc.is_essential}
             disabled={offline || toggling}
-            onValueChange={(v) => void setEssential(v)}
+            onValueChange={(v) => (v ? void setEssential(true) : setAskOff(true))}
             trackColor={{ true: colours.accent, false: colours.border }}
           />
         </View>
@@ -417,6 +420,21 @@ export function DocumentDetail(props: { id: string }) {
           onPress={() => void addVersion()}
         />
       ) : null}
+      <ConfirmSheet
+        visible={askOff}
+        testID="essential-off-question"
+        title={t('document.essentialOffTitle')}
+        words={t('document.essentialOffWords')}
+        confirmLabel={t('document.essentialOffYes')}
+        busy={toggling}
+        onConfirm={() => {
+          setAskOff(false);
+          void setEssential(false);
+        }}
+        onCancel={() => setAskOff(false)}
+        confirmID="essential-off-yes"
+        cancelID="essential-off-cancel"
+      />
       {mayTrash && doc && !offline ? (
         <TrashButton id={id} title={documentName(doc, t('document.untitled'))} onGone={() => router.back()} />
       ) : null}

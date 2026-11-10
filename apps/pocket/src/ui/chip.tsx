@@ -31,7 +31,7 @@ export function Chip(props: {
       }
       disabled={disabled}
       onPress={props.onPress}
-      hitSlop={4}
+      hitSlop={6}
       style={({ pressed }) => [
         styles.chip,
         selected ? styles.chipOn : null,
@@ -67,8 +67,9 @@ export function ChipRow(props: { children: ReactNode; label: string; role?: 'rad
 const makeStyles = (colours: Palette) =>
   StyleSheet.create({
     chips: { flexDirection: 'row', flexWrap: 'wrap', gap: sp(8) },
+    // 32 drawn, 44 to press with its slop (R2): a line of them, not a wall.
     chip: {
-      minHeight: TAP_MIN,
+      minHeight: TAP_MIN - 12,
       flexDirection: 'row',
       alignItems: 'center',
       gap: sp(8),

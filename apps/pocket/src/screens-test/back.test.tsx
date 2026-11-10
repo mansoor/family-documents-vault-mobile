@@ -84,6 +84,8 @@ describe('Back', () => {
     await unlocked(t, <Settings />, { capture: testCapture({ openStore: async () => queue }) });
     await waitFor(() => expect(screen.getByTestId('settings-sign-out')).toBeTruthy());
     await fireEvent.press(screen.getByTestId('settings-sign-out'));
+    // Asked first (R2): the answer, when there is no scan waiting to ask about.
+    { const yes = screen.queryByTestId('sign-out-yes'); if (yes) await fireEvent.press(yes); }
     await screen.findByTestId('sign-out-question');
     await back('sign-out-question');
     await waitFor(() => expect(screen.queryByTestId('sign-out-question')).toBeNull());

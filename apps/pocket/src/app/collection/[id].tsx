@@ -214,7 +214,15 @@ export default function CollectionScreen() {
             doc={doc}
             place={rowPlace(index, items.length)}
             thumb={api && token && doc.latest_version_id ? { uri: api.thumbnailUrl(doc.latest_version_id), token } : null}
-            {...(mayChange ? { remove: { onRemove: remove(doc.id, title) } } : {})}
+            {...(mayChange
+              ? {
+                  remove: {
+                    onRemove: remove(doc.id, title),
+                    collection: detail.name,
+                    warning: detail.shared_outside ? t('collection.removeShared') : null,
+                  },
+                }
+              : {})}
           />
         );
       }}

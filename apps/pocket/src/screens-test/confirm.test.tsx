@@ -134,7 +134,8 @@ const signedInAs = (role: 'teen' | 'adult', name: string) => async (t: TestVault
 };
 
 const captures = (t: TestVault) => t.calls.filter((c) => c.startsWith('POST') && c.endsWith('/api/v1/capture'));
-const chip = (name: string | RegExp) => screen.getByRole('button', { name });
+// A kind on the card's line is a button; one in the picker (R2), a choice of one.
+const chip = (name: string | RegExp) => screen.queryByRole('button', { name }) ?? screen.getByRole('radio', { name });
 
 beforeEach(() => {
   installed();

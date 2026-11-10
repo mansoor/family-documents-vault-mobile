@@ -87,7 +87,11 @@ env:
 - tapOn:
     id: capture-save
 - assertVisible: Saved on this phone.*
-- assertVisible: Waiting to send
+# The row says "On its way" until the first try fails with no connection,
+# which on a busy emulator has taken longer than an assertion waits (R1's run).
+- extendedWaitUntil:
+    visible: Waiting to send
+    timeout: 60000
 
 # Stopped for real, then the connection comes back, then opened again.
 - stopApp

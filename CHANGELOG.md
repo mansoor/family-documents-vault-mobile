@@ -6,6 +6,31 @@ app's own, tagged `vX.Y.Z` in this repository.
 
 ## [Unreleased]
 
+## [0.4.2] — choices on one line, and asked before anything is lost (redesign R2)
+
+### Changed
+- **Choices on one line.** On the capture card and in Edit details:
+  - "What it is" shows the three kinds you file most, and "Whose it is"
+    shows you first. What's chosen always sits on the line.
+  - **⋯** opens a sheet with every kind (grouped as in the browser, with
+    a box to find one) or every person.
+  - The rows of chips that ran down the screen are gone.
+- **Smaller chips**: 32 high. They're still easy to press.
+
+### Added
+- **Asked before anything is lost.** One question, the same everywhere,
+  says what will happen, what stays, and who else it touches, with the
+  action in red and Cancel:
+  - **Remove from this collection** (it used to happen at once). It
+    names the collection, and says so when the collection is shared
+    outside the family.
+  - **Stop keeping it as an Essential**, from the document's page or its
+    ⋯: phones that keep it remove their copy.
+  - **Sign out**, now also asked when no scan is waiting.
+  - Signing out another device, switching to another vault, removing the
+    copies kept for no signal, and **Move to the Trash** asked before;
+    they now use the same question.
+
 ## [0.4.1] — more on every screen (redesign R1)
 
 ### Changed

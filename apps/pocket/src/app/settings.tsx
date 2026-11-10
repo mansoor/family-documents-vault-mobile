@@ -13,6 +13,7 @@ import { useLock, type LockTimeout } from '../state/lock';
 import { useVault } from '../state/vault';
 import { Button, Card, Notice, Text } from '../ui';
 import { useTextScale } from '../ui/text-scale';
+import { ConfirmSheet } from '../ui/confirm';
 import { Sheet } from '../ui/sheet';
 import { sp } from '../ui/space';
 import { useStyles, useTheme, type Palette } from '../ui/theme';
@@ -40,10 +41,11 @@ export default function Settings() {
   const capture = useCapture();
   const insets = useSafeAreaInsets();
   const [asking, setAsking] = useState(false);
+  const [confirmOut, setConfirmOut] = useState(false);
   // Signing out with scans still on their way: keep them for next time, or not.
   const leave = () => {
     if (capture.queue.length > 0) setAsking(true);
-    else void signOut();
+    else setConfirmOut(true);
   };
   // One already on its way cannot be called back: it is left to arrive.
   const sending = capture.queue.filter((i) => i.state === 'sending').length;
@@ -156,6 +158,20 @@ export default function Settings() {
       </Card>
       <Button testID="settings-sign-out" kind="quiet" label={t('settings.signOut')} onPress={leave} />
       {SPIKE ? <Button kind="quiet" label={t('settings.spike')} onPress={() => router.push('/spike')} /> : null}
+      <ConfirmSheet
+        visible={confirmOut}
+        testID="sign-out-confirm"
+        title={t('settings.signOutTitle')}
+        words={t('settings.signOutWords')}
+        confirmLabel={t('settings.signOut')}
+        onConfirm={() => {
+          setConfirmOut(false);
+          void signOut();
+        }}
+        onCancel={() => setConfirmOut(false)}
+        confirmID="sign-out-yes"
+        cancelID="sign-out-no"
+      />
       <Sheet visible={asking} onClose={() => setAsking(false)} testID="sign-out-question">
         <Text variant="screen">{t('settings.waiting', { count: capture.queue.length })}</Text>
         {sending > 0 ? <Text tone="soft">{t('settings.onItsWay', { count: sending })}</Text> : null}

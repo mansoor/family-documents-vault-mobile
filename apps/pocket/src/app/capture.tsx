@@ -8,7 +8,6 @@ import {
   REMIND_ONCE,
   reminderOf,
   reminderSentence,
-  shortTypeLabel,
   type DocumentTypeView,
   type TypeField,
 } from '@fdv/shared';
@@ -43,7 +42,7 @@ import {
   type FieldErrors,
   type Household,
 } from '../capture/draft';
-import { matchTypes, rankTypes } from '../capture/types';
+import { KindChooser, OwnerChooser } from '../capture/choose';
 import { Chip, ChipRow, detailInput, FileRow, LeaveQuestion, PageStrip } from '../capture/ui';
 import type { CaptureSource } from '../queue/commit';
 import { useCapture, type CardData, type SaveProblem } from '../state/capture';
@@ -107,10 +106,6 @@ export default function CaptureScreen() {
   return pending ? <Card initial={pending} /> : null;
 }
 
-function initial(name: string): string {
-  return (name.trim()[0] ?? '?').toUpperCase();
-}
-
 function Card(props: { initial: CaptureSource }) {
   const colours = useColours();
   const styles = useStyles(makeStyles);
@@ -151,8 +146,6 @@ function Card(props: { initial: CaptureSource }) {
     },
     [],
   );
-  const [moreTypes, setMoreTypes] = useState(false);
-  const [query, setQuery] = useState('');
   const [details, setDetails] = useState(false);
   const [known, setKnown] = useState<{ value: string; count: number }[]>([]);
   const [busy, setBusy] = useState(false);
@@ -409,8 +402,6 @@ function Card(props: { initial: CaptureSource }) {
   };
 
   const type = household ? typeOf(draft, household) : undefined;
-  const ranked = data ? rankTypes(data.types, data.filed) : { top: [], rest: [] };
-  const typeChips = type && !ranked.top.some((x) => x.key === type.key) ? [...ranked.top, type] : ranked.top;
   const visibility = household ? visibilityOf(draft, household) : 'household';
   const choices = household ? visibilityChoices(draft, household) : { household: true, adults: false, private: false };
   const people = data?.members ?? [];
@@ -523,73 +514,27 @@ function Card(props: { initial: CaptureSource }) {
           <>
             <View style={styles.section}>
               <Text variant="screen">{t('capture.whatItIs')}</Text>
-              <ChipRow label={t('capture.whatItIs')}>
-                {typeChips.map((ty) => (
-                  <Chip
-                    key={ty.key}
-                    label={shortTypeLabel(ty)}
-                    selected={draft.typeKey === ty.key}
-                    onPress={() => setDraft((d) => chooseType(d, d.typeKey === ty.key ? null : ty.key))}
-                  />
-                ))}
-              </ChipRow>
-              <View style={styles.row}>
-                <Chip
-                  label={t('capture.more')}
-                  expanded={moreTypes}
-                  onPress={() => setMoreTypes((m) => !m)}
-                  testID="types-more"
-                />
-              </View>
-              {moreTypes ? (
-                <View style={styles.section}>
-                  <Field label={t('capture.search')} value={query} onChangeText={setQuery} testID="types-search" />
-                  <ChipRow label={t('capture.search')}>
-                    {matchTypes(data?.types ?? [], query).map((ty) => (
-                      <Chip
-                        key={ty.key}
-                        label={ty.label}
-                        selected={draft.typeKey === ty.key}
-                        onPress={() => {
-                          setDraft((d) => chooseType(d, ty.key));
-                          setMoreTypes(false);
-                          setQuery('');
-                        }}
-                      />
-                    ))}
-                  </ChipRow>
-                  {matchTypes(data?.types ?? [], query).length === 0 ? (
-                    <Text tone="soft">{t('capture.noMatch')}</Text>
-                  ) : null}
-                </View>
-              ) : null}
+              <KindChooser
+                types={data?.types ?? []}
+                filed={data?.filed ?? []}
+                chosen={draft.typeKey}
+                onChoose={(k) => setDraft((d) => chooseType(d, k))}
+                label={t('capture.whatItIs')}
+                ids={{ more: 'types-more', find: 'types-search', picker: 'types-picker' }}
+              />
             </View>
 
             <View style={styles.section}>
               <Text variant="screen">{t('capture.whoseItIs')}</Text>
-              <ChipRow label={t('capture.whoseItIs')}>
-                {people
-                  .filter((m) => !teen || m.id === me?.member_id)
-                  .map((m) => (
-                    <Chip
-                      key={m.id}
-                      label={m.id === me?.member_id ? `${m.display_name} (${t('capture.yours')})` : m.display_name}
-                      leading={initial(m.display_name)}
-                      selected={draft.ownerId === m.id}
-                      disabled={teen}
-                      onPress={() =>
-                        household && setDraft((d) => chooseOwner(d, d.ownerId === m.id ? null : m.id, household))
-                      }
-                    />
-                  ))}
-                {teen ? null : (
-                  <Chip
-                    label={t('capture.nobody')}
-                    selected={draft.ownerId === null}
-                    onPress={() => household && setDraft((d) => chooseOwner(d, null, household))}
-                  />
-                )}
-              </ChipRow>
+              <OwnerChooser
+                members={people}
+                me={me?.member_id ?? null}
+                teen={teen}
+                chosen={draft.ownerId}
+                onChoose={(id) => household && setDraft((d) => chooseOwner(d, id, household))}
+                label={t('capture.whoseItIs')}
+                ids={{ more: 'owners-more', picker: 'owners-picker' }}
+              />
             </View>
 
             <View style={styles.section}>

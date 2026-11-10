@@ -202,7 +202,11 @@
     "about": "About",
     "licences": "Licences",
     "licencesLead": "Family Vault is made with {{count}} pieces of open-source software. Each is listed with its licence.",
-    "moreInBrowser": "More settings are in the browser"
+    "moreInBrowser": "More settings are in the browser",
+    "signOutTitle": "Sign out of this vault?",
+    "signOutWords": "This phone shows nothing of the vault until you sign in again, with your password.",
+    "deviceSignOutTitle": "Sign out “{{name}}”?",
+    "deviceSignOutWords": "It needs a password to sign in again, and any Essentials it keeps are removed from it."
   },
   "queue": {
     "sending": "Sending to the vault…",
@@ -501,7 +505,10 @@
     "failed": "That didn't work. Try again.",
     "edit": "Edit details",
     "tags": "Tags",
-    "collections": "In collections"
+    "collections": "In collections",
+    "essentialOffTitle": "Stop keeping it as an Essential?",
+    "essentialOffWords": "It stays in the vault. Phones that keep Essentials remove their copy, so it no longer opens with no signal or in Show.",
+    "essentialOffYes": "Stop keeping it"
   },
   "search": {
     "title": "Search",
@@ -772,7 +779,11 @@
     "addCount_other": "Add {{count}} documents",
     "added_one": "1 document is in “{{name}}” now.",
     "added_other": "{{count}} documents are in “{{name}}” now.",
-    "removed": "“{{title}}” is out of “{{name}}”. It is still in the vault."
+    "removed": "“{{title}}” is out of “{{name}}”. It is still in the vault.",
+    "removeTitle": "Remove from “{{name}}”?",
+    "removeWords": "“{{title}}” leaves this collection. The document stays in the vault, and in any other collection it is in.",
+    "removeYes": "Remove from collection",
+    "removeShared": "This collection is shared outside the family: they stop seeing this document too."
   },
   "notesList": {
     "title": "Notes",
@@ -794,5 +805,15 @@
     "tooLong": "Too long to save: {{count}} characters.",
     "secret": "This looks like a password or a PIN. Everyone who can see this note can read and search it: keep passwords and PINs in a password manager, or make the note Only me.",
     "secretOnlyMe": "This looks like a password or a PIN. A note is not a password manager: keep them in one if you can."
+  },
+  "picker": {
+    "find": "Find",
+    "none": "Nothing matches those words.",
+    "clear": "Clear",
+    "done": "Done",
+    "chosen_one": "1 chosen",
+    "chosen_other": "{{count}} chosen",
+    "more_one": "More choices for {{label}}: 1 more",
+    "more_other": "More choices for {{label}}: {{count}} more"
   }
 }
