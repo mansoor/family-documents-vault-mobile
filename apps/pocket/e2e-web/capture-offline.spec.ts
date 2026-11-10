@@ -54,7 +54,10 @@ test('saved with no connection, sent once when it is back', async ({ page, conte
   await page.getByRole('button', { name: 'Add a document' }).click();
   await page.getByRole('menuitem', { name: 'Add a file' }).click();
   await (await chooser).setFiles({ name: 'insurance.pdf', mimeType: 'application/pdf', buffer: PDF });
-  await page.getByRole('button', { name: 'Insurance policy' }).click();
+  // Not one of the three on the line (R2): found in the picker behind the ⋯.
+  await page.getByTestId('types-more').click();
+  await page.getByTestId('types-search').fill('insurance');
+  await page.getByRole('radio', { name: 'Insurance policy' }).click();
   await page.getByRole('button', { name: 'More details' }).click();
   await page.getByLabel('Name', { exact: true }).fill(title);
   await page.getByRole('button', { name: 'Save' }).click();
