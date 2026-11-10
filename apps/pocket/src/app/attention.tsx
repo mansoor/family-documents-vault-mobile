@@ -1,22 +1,22 @@
 import { NetworkError } from '@fdv/client';
-import { wordsFor } from '../../errors/words';
+import { wordsFor } from '../errors/words';
 import { addDays, can, localToday, type ReminderView } from '@fdv/shared';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { renewWords } from '../../capture/renew-words';
-import { offersNewScan, reminderHeadline } from '../../documents/reminders';
-import { useCapture } from '../../state/capture';
-import { emit, on } from '../../state/events';
-import { useVault } from '../../state/vault';
-import { Button, Card, Notice, Text } from '../../ui';
-import { feel } from '../../ui/feel';
-import { sp } from '../../ui/space';
-import { useStyles, type Palette } from '../../ui/theme';
-import { familyZoneNow } from '../../state/family-time';
-import { LoadFailed, loadFailure, Placeholder } from '../../ui/states';
+import { renewWords } from '../capture/renew-words';
+import { offersNewScan, reminderHeadline } from '../documents/reminders';
+import { useCapture } from '../state/capture';
+import { emit, on } from '../state/events';
+import { useVault } from '../state/vault';
+import { Button, Card, Notice, Text } from '../ui';
+import { feel } from '../ui/feel';
+import { sp } from '../ui/space';
+import { useStyles, type Palette } from '../ui/theme';
+import { familyZoneNow } from '../state/family-time';
+import { LoadFailed, loadFailure, Placeholder } from '../ui/states';
 
 /** Today, as the family's calendar has it (P5): snoozes are whole days. */
 function today(): string {
@@ -163,7 +163,7 @@ export default function AttentionScreen() {
   );
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
+    <SafeAreaView style={styles.safe} edges={[]}>
       <ScrollView
         testID="attention"
         contentContainerStyle={styles.page}

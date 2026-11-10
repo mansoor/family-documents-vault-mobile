@@ -2,15 +2,16 @@ import { radii, type Member } from '@fdv/shared';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, RefreshControl, ScrollView, StyleSheet } from 'react-native';
+import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useVault } from '../state/vault';
-import { Notice, Text } from '../ui';
-import { sp } from '../ui/space';
-import { useStyles, type Palette } from '../ui/theme';
-import { LoadFailed, loadFailure, Placeholder } from '../ui/states';
+import { useVault } from '../../state/vault';
+import { Notice, Text } from '../../ui';
+import { BellButton } from '../../ui/bell';
+import { sp } from '../../ui/space';
+import { useStyles, type Palette } from '../../ui/theme';
+import { LoadFailed, loadFailure, Placeholder } from '../../ui/states';
 
-/** People (4.12): the family, read-only; each leads to their documents. */
+/** People (4.12; a tab since R3): the family, read-only; each leads to their documents. */
 export default function PeopleScreen() {
   const styles = useStyles(makeStyles);
   const { t } = useTranslation();
@@ -39,7 +40,7 @@ export default function PeopleScreen() {
   }, [load, offline]);
 
   return (
-    <SafeAreaView style={styles.safe} edges={[]}>
+    <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView
         testID="people"
         contentContainerStyle={styles.page}
@@ -53,7 +54,12 @@ export default function PeopleScreen() {
           />
         }
       >
-        <Text variant="hero">{t('people.title')}</Text>
+        <View style={styles.titleRow}>
+          <Text variant="hero" style={styles.flex}>
+            {t('people.title')}
+          </Text>
+          <BellButton />
+        </View>
         {offline && !members ? (
           <Notice tone="warn" testID="people-offline">
             {t('people.needsConnection')}
@@ -88,6 +94,8 @@ const makeStyles = (colours: Palette) =>
   StyleSheet.create({
     safe: { flex: 1, backgroundColor: colours.bg },
     page: { padding: sp(20), gap: sp(10) },
+    titleRow: { flexDirection: 'row', alignItems: 'center', gap: sp(8) },
+    flex: { flex: 1 },
     row: {
       gap: sp(4),
       backgroundColor: colours.surface,

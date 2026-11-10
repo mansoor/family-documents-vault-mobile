@@ -31,6 +31,7 @@ import { useStepUp } from '../../state/step-up';
 import { useVault } from '../../state/vault';
 import { Button, Card, Notice, Text } from '../../ui';
 import { DocumentRow, rowPlace } from '../../documents/row';
+import { BellButton } from '../../ui/bell';
 import { sp } from '../../ui/space';
 import { VaultRead } from '../../capture/vault-read';
 import { useColours, useStyles, type Palette } from '../../ui/theme';
@@ -235,6 +236,7 @@ export default function Home() {
               <Text variant="hero" style={styles.flex}>
                 {name}
               </Text>
+              <BellButton />
               <Link href="/settings" asChild>
                 <Pressable
                   accessibilityRole="button"
@@ -624,7 +626,7 @@ const makeStyles = (colours: Palette) =>
     queue: { gap: sp(8) },
     pressed: { opacity: 0.8 },
     header: { gap: sp(12), marginBottom: sp(10) },
-    titleRow: { flexDirection: 'row', alignItems: 'center', gap: sp(12) },
+    titleRow: { flexDirection: 'row', alignItems: 'center', gap: sp(4) },
     flex: { flex: 1 },
     iconButton: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
     dueCard: { gap: sp(4), borderColor: colours.warn },

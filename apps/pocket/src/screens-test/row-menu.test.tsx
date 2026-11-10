@@ -1,7 +1,7 @@
 import { sharedOutsideWords, type DocumentView, type SearchHit } from '@fdv/shared';
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react-native';
 import Home from '../app/(tabs)/index';
-import SearchScreen from '../app/(tabs)/search';
+import SearchScreen from '../app/(tabs)/documents';
 import { copySettings, saveCopyIo } from '../documents/save-copy';
 import { audit } from '../test-support/a11y';
 import { addGuest, GUEST, signedInAs } from '../test-support/guest';

@@ -3,7 +3,7 @@ import type { ReactElement } from 'react';
 import { AccessibilityInfo } from 'react-native';
 import Home from '../app/(tabs)/index';
 import MoreScreen from '../app/(tabs)/more';
-import PeopleScreen from '../app/people';
+import PeopleScreen from '../app/(tabs)/people';
 import * as Linking from 'expo-linking';
 import { SecureTokenStore } from '../session/store';
 import { audit } from '../test-support/a11y';
@@ -26,7 +26,7 @@ jest.mock('expo-linking', () => ({ openURL: jest.fn(async () => true), createURL
 const ORIGIN = 'https://vault.test';
 const STATE = {
   index: 0,
-  routes: ['index', 'search', 'attention', 'more'].map((name) => ({ key: name, name })),
+  routes: ['index', 'documents', 'people', 'more'].map((name) => ({ key: name, name })),
 };
 
 /**
@@ -76,25 +76,42 @@ describe('the tab bar', () => {
     }
   });
 
-  it('Home, Search, the +, Needs attention, More — each a named tab, in that order', async () => {
+  it('Home, Documents, the +, People, More — each a named tab, in that order (R3)', async () => {
     const navigated = await as('owner');
-    const order = ['tab-home', 'tab-search', 'home-add', 'tab-attention', 'tab-more'];
+    const order = ['tab-home', 'tab-documents', 'home-add', 'tab-people', 'tab-more'];
     await screen.findByTestId('tab-more');
     const shown = screen.root
       ?.queryAll((n) => order.includes(String(n.props.testID)) && typeof n.type === 'string')
       .map((n) => String(n.props.testID));
     expect([...new Set(shown)]).toEqual(order);
     expect(screen.getByTestId('tab-home').props.accessibilityState).toEqual({ selected: true });
-    await fireEvent.press(screen.getByTestId('tab-attention'));
-    expect(navigated).toEqual(['attention']);
+    await fireEvent.press(screen.getByTestId('tab-people'));
+    expect(navigated).toEqual(['people']);
     expect(audit()).toEqual([]);
   });
 
-  it('Needs attention is "Attention" on its tab, and its whole name to a screen reader', async () => {
-    await as('owner');
-    const tab = await screen.findByTestId('tab-attention');
-    expect(within(tab).getByText('Attention')).toBeTruthy();
-    expect(tab.props.accessibilityLabel).toBe('Needs attention');
+  it('Needs attention is the bell on Home (R3): no number when nothing is due, and it opens the list', async () => {
+    installed();
+    resetRoutes();
+    const t = testVault([ORIGIN]);
+    await unlocked(t, <Home />);
+    const bell = await screen.findByTestId('bell');
+    expect(bell.props.accessibilityLabel).toBe('Needs attention: nothing now');
+    expect(screen.queryByTestId('bell-count')).toBeNull();
+    await fireEvent.press(bell);
+    expect(routes().at(-1)).toEqual({ pathname: '/attention', params: {} });
+  });
+
+  it('…and the number of what is due, said in words to a screen reader', async () => {
+    installed();
+    resetRoutes();
+    const t = testVault([ORIGIN]);
+    t.reminders = [{ id: 'r1', document_id: 'd1', document_title: 'Passport', kind: 'derived', fire_at: '2026-09-20T00:00:00Z', lead_days: 90, note: null, recurrence: null, status: 'due', snoozed_until: null, label: 'Expires soon' }, { id: 'r2', document_id: 'd2', document_title: 'Licence', kind: 'derived', fire_at: '2026-09-20T00:00:00Z', lead_days: 90, note: null, recurrence: null, status: 'due', snoozed_until: null, label: 'Expires soon' }] as never;
+    await unlocked(t, <Home />);
+    // The number is drawn for the eye; a screen reader hears it in the bell's name.
+    expect(await screen.findByTestId('bell-count', { includeHiddenElements: true })).toHaveTextContent('2');
+    expect(screen.getByTestId('bell').props.accessibilityLabel).toBe('Needs attention: 2 things');
+    expect(audit()).toEqual([]);
   });
 
   it('People lists the family, each leading to their documents', async () => {
@@ -109,7 +126,7 @@ describe('the tab bar', () => {
 });
 
 describe("More, in People's place (P6)", () => {
-  it('leads to People, Account and Settings, each a named button', async () => {
+  it('leads to Account and Settings, each a named button (People is a tab since R3)', async () => {
     installed();
     resetRoutes();
     const t = testVault([ORIGIN]);
@@ -118,7 +135,6 @@ describe("More, in People's place (P6)", () => {
     expect(audit()).toEqual([]);
     expect(screen.queryByTestId('more-inbox')).toBeNull();
     for (const [id, to] of [
-      ['more-people', '/people'],
       ['more-account', '/account'],
       ['more-settings', '/settings'],
     ] as const) {

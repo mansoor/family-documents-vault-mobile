@@ -8,6 +8,7 @@ import { writePrefs } from '../platform/prefs';
 import { PushProvider, type PushDeps } from '../push/push';
 import { MemoryQueueStore } from '../queue/store';
 import { installationId, SecureTokenStore } from '../session/store';
+import { AttentionProvider } from '../state/attention';
 import { CaptureProvider, type CaptureDeps } from '../state/capture';
 import { EssentialsProvider, type EssentialsDeps } from '../state/essentials';
 import { LockProvider, type LockDeps } from '../state/lock';
@@ -150,18 +151,24 @@ export async function renderApp(
                     {opts.essentials ? (
                       <EssentialsProvider deps={opts.essentials}>
                         <CaptureProvider deps={capture}>
-                          <StepUpProvider>{ui}</StepUpProvider>
+                          <AttentionProvider>
+                            <StepUpProvider>{ui}</StepUpProvider>
+                          </AttentionProvider>
                         </CaptureProvider>
                       </EssentialsProvider>
                     ) : (
                       <CaptureProvider deps={capture}>
-                        <StepUpProvider>{ui}</StepUpProvider>
+                        <AttentionProvider>
+                            <StepUpProvider>{ui}</StepUpProvider>
+                          </AttentionProvider>
                       </CaptureProvider>
                     )}
                   </LockProvider>
                 ) : (
                   <CaptureProvider deps={capture}>
-                    <StepUpProvider>{ui}</StepUpProvider>
+                    <AttentionProvider>
+                            <StepUpProvider>{ui}</StepUpProvider>
+                          </AttentionProvider>
                   </CaptureProvider>
                 )}
               </PushProvider>

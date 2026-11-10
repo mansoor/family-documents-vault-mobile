@@ -6,6 +6,25 @@ app's own, tagged `vX.Y.Z` in this repository.
 
 ## [Unreleased]
 
+## [0.4.3] — Documents, Notes, and the bell (redesign R3)
+
+### Changed
+- **The tabs are Home, Documents, +, Notes and More.**
+  - **Documents** is one place for finding things. With the search box
+    empty, it lists every document, 50 at a time, sorted and narrowed as
+    All documents was. Type words, and it finds them as Search did,
+    including the second look through your own Only me documents.
+    Sorting, status and who can see it wait until the box is empty.
+  - **Notes** has its own tab, instead of a row in More. People is now
+    the row in More. On a vault without notes (before 0.9.0), People is
+    the tab instead.
+- **Needs attention is a bell** at the top of Home, Documents, Notes,
+  People and More, instead of a tab. When something is due, the bell shows how
+  many; when nothing is, it shows no number. A screen reader says it in
+  words. The bell opens Needs attention, and Back comes back.
+- Tab names are a little smaller, so "Documents" fits its tab at Large
+  text.
+
 ## [0.4.2] — choices on one line, and asked before anything is lost (redesign R2)
 
 ### Changed

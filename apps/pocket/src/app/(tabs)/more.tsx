@@ -4,10 +4,8 @@ import { useRouter } from 'expo-router';
 import {
   ChevronRight,
   ExternalLink,
-  Files,
   FolderOpen,
   Inbox,
-  NotebookText,
   Settings,
   UserRound,
   Users,
@@ -21,13 +19,14 @@ import { collectionsOffered } from '../../collections/rules';
 import { waitingInInbox } from '../../queue/inbox';
 import { useVault } from '../../state/vault';
 import { Text } from '../../ui';
+import { BellButton } from '../../ui/bell';
 import { sp } from '../../ui/space';
 import { useColours, useStyles, type Palette } from '../../ui/theme';
 
 /**
  * More (P6; the owner's choice of 7 Nov 2026: a More tab in People's
- * place): everything that is not Home, Search, the + or Needs attention.
- * The family; the person's Inbox, which is finished in the browser;
+ * place): everything that is not a tab (R3: Home, Documents, the +,
+ * Notes). People, where Notes is the tab; the person's Inbox, which is finished in the browser;
  * Account (the vault, what a guest may see, signed-in devices); and
  * Settings. Collections and notes since P9, where the vault has them.
  */
@@ -40,7 +39,8 @@ export default function MoreScreen() {
   // a viewer, and so a guest, has none.
   const inboxOn = caps?.features.batches === true && !!who && can(who.role, 'document.add');
   const [waiting, setWaiting] = useState<number | null>(null);
-  // Collections for whoever makes them, as the web offers them (a viewer, none); notes on a vault of 0.9.0.
+  // Collections for whoever makes them, as the web offers them (a viewer, none). Notes is a
+  // tab where the vault has them, and People a row here; on an older vault, People is the tab.
   const collectionsOn = collectionsOffered(caps, who?.role);
   const notesOn = caps?.features.notes === true;
   useEffect(() => {
@@ -59,15 +59,13 @@ export default function MoreScreen() {
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView testID="more" contentContainerStyle={styles.page}>
-        <Text variant="hero">{t('more.title')}</Text>
+        <View style={styles.titleRow}>
+          <Text variant="hero" style={styles.flex}>
+            {t('more.title')}
+          </Text>
+          <BellButton />
+        </View>
         <View style={styles.group}>
-          <Row
-            testID="more-documents"
-            icon={Files}
-            label={t('documents.title')}
-            hint={t('more.documentsHint')}
-            onPress={() => router.push('/documents')}
-          />
           {collectionsOn ? (
             <Row
               testID="more-collections"
@@ -79,20 +77,13 @@ export default function MoreScreen() {
           ) : null}
           {notesOn ? (
             <Row
-              testID="more-notes"
-              icon={NotebookText}
-              label={t('notesList.title')}
-              hint={t('more.notesHint')}
-              onPress={() => router.push('/notes')}
+              testID="more-people"
+              icon={Users}
+              label={t('more.people')}
+              hint={t('more.peopleHint')}
+              onPress={() => router.push('/people')}
             />
           ) : null}
-          <Row
-            testID="more-people"
-            icon={Users}
-            label={t('more.people')}
-            hint={t('more.peopleHint')}
-            onPress={() => router.push('/people')}
-          />
           {inboxOn && vault ? (
             <Row
               testID="more-inbox"
@@ -165,6 +156,8 @@ const makeStyles = (colours: Palette) =>
   StyleSheet.create({
     safe: { flex: 1, backgroundColor: colours.bg },
     page: { padding: sp(20), gap: sp(16) },
+    titleRow: { flexDirection: 'row', alignItems: 'center', gap: sp(8) },
+    flex: { flex: 1 },
     group: {
       backgroundColor: colours.surface,
       borderRadius: radii.l,
