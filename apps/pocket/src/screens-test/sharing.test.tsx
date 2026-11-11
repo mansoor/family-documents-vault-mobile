@@ -161,6 +161,7 @@ describe('Share, from a collection’s page', () => {
     });
     push({ pathname: '/collection/[id]', params: { id: 'hol' } });
     await unlocked(t, <CollectionScreen />);
+    await fireEvent.press(await screen.findByTestId('collection-more'));
     await fireEvent.press(await screen.findByTestId('collection-share'));
     const passport = await screen.findByTestId('share-item-p1');
     expect(passport.props.accessibilityState).toEqual(expect.objectContaining({ checked: true }));

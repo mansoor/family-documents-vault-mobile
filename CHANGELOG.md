@@ -6,6 +6,36 @@ app's own, tagged `vX.Y.Z` in this repository.
 
 ## [Unreleased]
 
+## [0.5.4] — a tidier phone
+
+The owner's list of 11 Nov 2026.
+
+### Changed
+- **Home** counts your notes too, beside documents, expiring soon and need
+  details: four on one row, two rows of two when the text is large. A tap
+  opens Notes.
+- **A row's ⋯ has Share instead of Open**: a tap on the row opens it
+  already. The order is Show, Share, Save a copy, then the rest.
+- **Documents keeps to documents**: notes are under Notes, so they are
+  not listed, counted or offered as a kind there (a vault of
+  0.9.0-dev.28 or later; an older one lists them as before).
+- **Notes**: each shows only the first line of its words, and has a ⋯
+  with Edit, Share and Add to a collection. New note is a small **+**
+  beside the bell.
+- **A note's page** is laid out as a document's: its words first, who can
+  see it below them, and when it was edited, and by whom, at the foot.
+- **Collections**: the **+** beside the title makes one, and a row has no
+  › (its name says there is more in it).
+- **A collection's page** has ✎ Edit and ⋯ in its header, as a
+  document's: Share and Delete are in the ⋯. Who sees what in it is
+  behind the ⓘ beside who it is for.
+
+### Added
+- **Tags** in Documents' filters: the most used as chips, the rest under
+  More, several at once, any of them (a vault of 0.9.0-dev.28 or later).
+- Pinned to the vault of 0.9.0-dev.28, which leaves the notes out of
+  Documents and filters by several tags.
+
 ## [0.5.3] — reminders you set yourself, and sharing
 
 ### Added

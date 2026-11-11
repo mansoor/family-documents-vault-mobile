@@ -55,6 +55,7 @@ import { NoteText } from './notes';
 import { latestOf } from './online';
 import { warnedAboutCopies } from './save-copy';
 import { TrashConfirm } from './trash';
+import { MenuRow } from '../ui/menu-row';
 import { ShareSheet } from '../sharing/share-sheet';
 import { Chip, ChipRow } from '../ui/chip';
 import { ConfirmSheet } from '../ui/confirm';
@@ -327,6 +328,32 @@ export function DocumentDetail(props: { id: string }) {
             ? [{ key: 'version', testID: 'document-add-version', label: t('document.newVersionShort'), icon: FilePlus, onPress: () => void addVersion() }]
             : []),
         ];
+
+  // When its words were last changed, and by whom: in a document's note card; at a note's foot.
+  const edited = shown.notes_updated_at ? (
+    <Text tone="soft" variant="small" testID="document-notes-edited">
+      {shown.notes_updated_by_name
+        ? t('document.notesEditedBy', {
+            when: exactWords(shown.notes_updated_at, zone),
+            name: shown.notes_updated_by_name,
+          })
+        : t('document.notesEdited', { when: exactWords(shown.notes_updated_at, zone) })}
+    </Text>
+  ) : null;
+  // Its note (5.35), read only, from a vault that has notes you can
+  // write: an older one says nothing of when a note last changed.
+  const notesCard =
+    shown.notes_updated_at !== undefined && shown.notes ? (
+      <View style={[styles.card, styles.notes]} testID="document-notes">
+        {note ? null : (
+          <Text variant="secondary" weight="700">
+            {type?.core?.notes?.label?.trim() || t('document.notes')}
+          </Text>
+        )}
+        <NoteText source={shown.notes} />
+        {note ? null : edited}
+      </View>
+    ) : null;
 
   // The lines of the card under the details, each with a hairline above all but the first.
   const lines: { key: string; node: ReactNode }[] = [
@@ -602,6 +629,11 @@ export function DocumentDetail(props: { id: string }) {
         </View>
       ) : null}
 
+      {/* A note's words come first, as a document's pages do; who can see
+          it below them, and when they were edited at the foot (the owner's
+          tidy-up of 11 Nov 2026). */}
+      {note ? notesCard : null}
+
       <View style={styles.card}>
         {lines.map((l, i) => (
           <Fragment key={l.key}>
@@ -611,28 +643,8 @@ export function DocumentDetail(props: { id: string }) {
         ))}
       </View>
 
-      {/* Its note (5.35), read only, from a vault that has notes you can
-          write: an older one says nothing of when a note last changed. */}
-      {shown.notes_updated_at !== undefined && shown.notes ? (
-        <View style={[styles.card, styles.notes]} testID="document-notes">
-          {note ? null : (
-            <Text variant="secondary" weight="700">
-              {type?.core?.notes?.label?.trim() || t('document.notes')}
-            </Text>
-          )}
-          <NoteText source={shown.notes} />
-          {shown.notes_updated_at ? (
-            <Text tone="soft" variant="small" testID="document-notes-edited">
-              {shown.notes_updated_by_name
-                ? t('document.notesEditedBy', {
-                    when: exactWords(shown.notes_updated_at, zone),
-                    name: shown.notes_updated_by_name,
-                  })
-                : t('document.notesEdited', { when: exactWords(shown.notes_updated_at, zone) })}
-            </Text>
-          ) : null}
-        </View>
-      ) : null}
+      {note ? null : notesCard}
+      {note ? edited : null}
 
       {first && !note ? (
         <Text variant="small" tone="soft" testID="document-added">
@@ -885,40 +897,6 @@ export function DocumentDetail(props: { id: string }) {
 }
 
 /** One choice in the header's ⋯: its icon and its words, red for the Trash. */
-function MenuRow(props: {
-  testID: string;
-  icon: LucideIcon;
-  label: string;
-  danger?: boolean;
-  busy?: boolean;
-  onPress: () => void;
-}) {
-  const colours = useColours();
-  const styles = useStyles(makeStyles);
-  const Icon = props.icon;
-  return (
-    <Pressable
-      testID={props.testID}
-      accessibilityRole="button"
-      accessibilityLabel={props.label}
-      accessibilityState={{ busy: props.busy === true, disabled: props.busy === true }}
-      disabled={props.busy === true}
-      onPress={props.onPress}
-      style={({ pressed }) => [styles.menuRow, pressed ? styles.pressed : null]}
-    >
-      <Icon
-        color={props.danger ? colours.danger : colours.accent}
-        size={20}
-        accessibilityElementsHidden
-        importantForAccessibility="no"
-      />
-      <Text tone={props.danger ? 'danger' : 'ink'} weight="600">
-        {props.label}
-      </Text>
-    </Pressable>
-  );
-}
-
 /**
  * An older version in the history (P2): its own details, as they were when
  * a newer one replaced it (a vault of 0.9.0 keeps them), or that they were
@@ -1065,5 +1043,4 @@ const makeStyles = (colours: Palette) =>
     headerButtons: { flexDirection: 'row', alignItems: 'center' },
     pressed: { opacity: 0.8 },
     menu: { gap: sp(10) },
-    menuRow: { flexDirection: 'row', alignItems: 'center', gap: sp(12), minHeight: 48 },
   });

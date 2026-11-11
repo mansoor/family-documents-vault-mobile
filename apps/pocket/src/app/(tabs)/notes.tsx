@@ -1,16 +1,18 @@
 import { can, radii, type NoteSummary } from '@fdv/shared';
 import { useRouter } from 'expo-router';
-import { NotebookText } from 'lucide-react-native';
+import { NotebookText, Plus } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useDocumentMenu } from '../../documents/menu';
 import { noteListName } from '../../documents/note-write';
 import { on } from '../../state/events';
 import { dayWords, useFamilyZone } from '../../state/family-time';
 import { useVault } from '../../state/vault';
-import { Button, Field, Notice, Text } from '../../ui';
+import { Field, Notice, Text } from '../../ui';
 import { BellButton } from '../../ui/bell';
+import { IconButton } from '../../ui/icon-button';
 import { sp } from '../../ui/space';
 import { LoadFailed, loadFailure, Placeholder } from '../../ui/states';
 import { useColours, useStyles, type Palette } from '../../ui/theme';
@@ -21,7 +23,11 @@ import { useColours, useStyles, type Palette } from '../../ui/theme';
  * on their own, newest words first, each with its first words, when its
  * words last changed, and who can see it when that is not the whole family.
  * Find in notes asks the vault. A note opens as any document does, its
- * words on its page; New note writes one.
+ * words on its page; the + beside the bell writes one.
+ *
+ * The owner's tidy-up of 11 Nov 2026: a row shows only the first line of
+ * its words (the rest is on its page), and has a ⋯ — Edit, Share, Add to
+ * a collection; New note is a small + beside the bell, not a wide button.
  */
 export default function NotesScreen() {
   const styles = useStyles(makeStyles);
@@ -91,10 +97,16 @@ export default function NotesScreen() {
               {t('notesList.title')}
             </Text>
             <BellButton />
+            {mayAdd && !offline ? (
+              <IconButton
+                testID="notes-new"
+                label={t('notesList.new')}
+                icon={Plus}
+                filled
+                onPress={() => router.push('/new-note')}
+              />
+            ) : null}
           </View>
-          {mayAdd && !offline ? (
-            <Button testID="notes-new" label={t('notesList.new')} onPress={() => router.push('/new-note')} />
-          ) : null}
           <Field
             label={t('notesList.find')}
             value={q}
@@ -141,23 +153,28 @@ function NoteRow(props: { note: NoteSummary; onPress: () => void }) {
   const line = [when, n.visibility !== 'household' ? t(`document.visibility_${n.visibility}`) : null]
     .filter(Boolean)
     .join(' · ');
-  // The first words, unless they are what names it.
-  const preview = n.title?.trim() ? n.preview.trim() : '';
+  // The first words, unless they are what names it: one line of them, the rest on its page.
+  const preview = n.title?.trim() ? (n.preview.trim().split('\n')[0] ?? '') : '';
+  const menu = useDocumentMenu({ id: n.id, title: name, edit: true });
   return (
+    <View style={styles.row}>
     <Pressable
       testID={`note-${n.id}`}
       accessibilityRole="button"
       accessibilityLabel={[name, preview, line].filter(Boolean).join('. ')}
       onPress={props.onPress}
-      style={({ pressed }) => [styles.row, pressed ? styles.pressed : null]}
+      onLongPress={menu.open}
+      style={({ pressed }) => [styles.main, pressed ? styles.pressed : null]}
     >
       <View style={styles.icon}>
         <NotebookText color={colours.accent} size={22} accessibilityElementsHidden importantForAccessibility="no" />
       </View>
       <View style={styles.words}>
-        <Text weight="600">{name}</Text>
+        <Text weight="600" numberOfLines={2}>
+          {name}
+        </Text>
         {preview ? (
-          <Text variant="secondary" tone="soft">
+          <Text variant="secondary" tone="soft" numberOfLines={1} testID={`note-preview-${n.id}`}>
             {preview}
           </Text>
         ) : null}
@@ -168,6 +185,9 @@ function NoteRow(props: { note: NoteSummary; onPress: () => void }) {
         ) : null}
       </View>
     </Pressable>
+    {menu.button}
+    {menu.sheet}
+    </View>
   );
 }
 
@@ -181,15 +201,14 @@ const makeStyles = (colours: Palette) =>
     header: { gap: sp(12) },
     row: {
       flexDirection: 'row',
-      alignItems: 'flex-start',
-      gap: sp(12),
-      padding: sp(12),
-      minHeight: 52,
+      alignItems: 'center',
       backgroundColor: colours.surface,
       borderRadius: radii.l,
       borderWidth: 1,
       borderColor: colours.border,
+      paddingRight: sp(4),
     },
+    main: { flex: 1, flexDirection: 'row', alignItems: 'flex-start', gap: sp(12), padding: sp(12), minHeight: 52 },
     pressed: { opacity: 0.8 },
     icon: {
       width: 40,

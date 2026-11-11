@@ -1,5 +1,5 @@
 import type { DocumentView } from '@fdv/shared';
-import { fireEvent, screen, waitFor } from '@testing-library/react-native';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react-native';
 import CollectionsScreen from '../app/collections';
 import CollectionScreen from '../app/collection/[id]';
 import MoreScreen from '../app/(tabs)/more';
@@ -257,11 +257,20 @@ describe('collections made, changed and deleted (the gaps review)', () => {
     expect(await screen.findByTestId('collection-said')).toHaveTextContent('Saved.');
     expect(screen.getByText('Summer holiday')).toBeTruthy();
 
-    await fireEvent.press(screen.getByTestId('collection-delete'));
+    // Who sees what, behind the ⓘ beside who it is for (the owner's tidy-up of 11 Nov 2026).
+    expect(screen.queryByText(/could see already/)).toBeNull();
+    await fireEvent.press(screen.getByTestId('collection-about'));
+    expect(within(await screen.findByTestId('collection-about-sheet')).getByText(/could see already/)).toBeTruthy();
+    await fireEvent.press(screen.getByTestId('collection-about-done'));
+
+    // Delete is in its ⋯, beside the pencil.
+    await fireEvent.press(screen.getByTestId('collection-more'));
+    await fireEvent.press(await screen.findByTestId('collection-delete'));
     expect(await screen.findByText('Delete this collection?')).toBeTruthy();
     await fireEvent.press(screen.getByTestId('collection-delete-cancel'));
     expect(t.vault.state.collections.find((c) => c.id === 'hol')?.deleted).toBe(false);
-    await fireEvent.press(screen.getByTestId('collection-delete'));
+    await fireEvent.press(screen.getByTestId('collection-more'));
+    await fireEvent.press(await screen.findByTestId('collection-delete'));
     await fireEvent.press(await screen.findByTestId('collection-delete-yes'));
     await waitFor(() => expect(t.vault.state.collections.find((c) => c.id === 'hol')?.deleted).toBe(true));
     await waitFor(() => expect(routes()).toEqual([]));

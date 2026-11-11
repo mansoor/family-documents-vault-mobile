@@ -106,7 +106,8 @@ const offered = () =>
     .map((i) => String(i.props.accessibilityLabel));
 
 describe('a menu on every row (5.36)', () => {
-  it("a viewer's sheet has Open and Save a copy only", async () => {
+  // No Open since the owner's tidy-up of 11 Nov 2026: a tap on the row opens it, and Share takes its place.
+  it("a viewer's sheet has Save a copy only", async () => {
     const t = vault();
     t.vault.state.role = 'viewer';
     const bill = libraryDoc(t, { id: 'bill', title: 'Water bill' });
@@ -115,14 +116,14 @@ describe('a menu on every row (5.36)', () => {
     // From the ⋯: what a search hit is, asked of the vault as the sheet opens.
     await fromSearch(t, [bill, passport], 'bill');
     await waitFor(() => expect(offered()).toContain('Save a copy'));
-    expect(offered()).toEqual(['Open', 'Save a copy']);
+    expect(offered()).toEqual(['Save a copy']);
     expect(audit()).toEqual([]);
     await fireEvent.press(screen.getByTestId('row-sheet-cancel'));
     // An Essential too: the menu offers a viewer what they came for.
     await fireEvent.press(screen.getByTestId('doc-menu-passport'));
     await screen.findByTestId('row-sheet');
     await waitFor(() => expect(offered()).toContain('Save a copy'));
-    expect(offered()).toEqual(['Open', 'Save a copy']);
+    expect(offered()).toEqual(['Save a copy']);
   });
 
   it("an owner's sheet has the rest, in order", async () => {
@@ -132,8 +133,8 @@ describe('a menu on every row (5.36)', () => {
     await fromSearch(t, [passport], 'passport');
     await waitFor(() => expect(offered()).toContain('Show'));
     expect(offered()).toEqual([
-      'Open',
       'Show',
+      'Share…',
       'Save a copy',
       'Add a new version',
       'Stop it being Essential',
@@ -166,7 +167,7 @@ describe('a menu on every row (5.36)', () => {
     await fireEvent.press(screen.getByTestId('doc-menu-note'));
     await screen.findByTestId('row-sheet');
     await waitFor(() => expect(offered()).toContain('Add to a collection'));
-    expect(offered()).toEqual(['Open', 'Add to a collection']);
+    expect(offered()).toEqual(['Share…', 'Add to a collection']);
   });
 
   it("a teen's sheet for somebody else's document: nothing that changes it", async () => {
@@ -177,13 +178,13 @@ describe('a menu on every row (5.36)', () => {
     await unlocked(t, <SearchScreen />);
     await fromSearch(t, [deed, mine], 'deed');
     await waitFor(() => expect(offered()).toContain('Save a copy'));
-    expect(offered()).toEqual(['Open', 'Save a copy', 'Add to a collection']);
+    expect(offered()).toEqual(['Save a copy', 'Add to a collection']);
     await fireEvent.press(screen.getByTestId('row-sheet-cancel'));
     // Their own, from a long press on its row.
     await fireEvent(screen.getByTestId('doc-row-mine'), 'longPress');
     await screen.findByTestId('row-sheet');
     await waitFor(() => expect(offered()).toContain('Make it Essential'));
-    expect(offered()).toEqual(['Open', 'Save a copy', 'Add a new version', 'Make it Essential', 'Add to a collection']);
+    expect(offered()).toEqual(['Save a copy', 'Add a new version', 'Make it Essential', 'Add to a collection']);
   });
 
   it("a guest's sheet has no Keep offline / Essential", async () => {
@@ -195,12 +196,12 @@ describe('a menu on every row (5.36)', () => {
     await fireEvent(await screen.findByTestId(`doc-row-${passport.id}`), 'longPress');
     await screen.findByTestId('row-sheet');
     await waitFor(() => expect(offered()).toContain('Save a copy'));
-    expect(offered()).toEqual(['Open', 'Save a copy']);
+    expect(offered()).toEqual(['Save a copy']);
     expect(screen.queryByTestId('row-sheet-essential')).toBeNull();
     expect(screen.queryByText(/Essential/)).toBeNull();
   });
 
-  it('opens from the ⋯ and from a long press on Home, and Open goes to the document', async () => {
+  it('opens from the ⋯ and from a long press on Home, and Share opens its own sheet', async () => {
     const t = vault();
     const bill = listed(t, libraryDoc(t, { id: 'bill', title: 'Water bill' }));
     await unlocked(t, <Home />);
@@ -214,7 +215,12 @@ describe('a menu on every row (5.36)', () => {
     await fireEvent(screen.getByTestId(`doc-row-${bill.id}`), 'longPress');
     await screen.findByTestId('row-sheet');
     expect(routes()).toEqual([]);
-    await fireEvent.press(screen.getByTestId('row-sheet-open'));
+    expect(screen.queryByTestId('row-sheet-open')).toBeNull();
+    await fireEvent.press(await ready('row-sheet-share'));
+    await waitFor(() => expect(screen.queryByTestId('row-sheet')).toBeNull());
+    expect(await screen.findByTestId('share-sheet')).toBeTruthy();
+    expect(await screen.findByTestId('share-label')).toBeTruthy();
+    await fireEvent.press(screen.getByTestId(`doc-row-${bill.id}`));
     expect(routes().at(-1)).toEqual({ pathname: '/document/[id]', params: { id: 'bill' } });
   });
 
@@ -255,8 +261,8 @@ describe('a menu on every row (5.36)', () => {
     await fireEvent.press(screen.getByTestId(`doc-menu-${bill.id}`));
     await screen.findByTestId('row-sheet');
     expect(offered()).toEqual([
-      'Open',
       'Show',
+      'Share…',
       'Save a copy',
       'Add a new version',
       'Stop it being Essential',
@@ -392,7 +398,7 @@ describe('a menu on every row (5.36)', () => {
     await unlocked(t, <SearchScreen />);
     await fromSearch(t, [bill], 'bill');
     await waitFor(() => expect(offered()).toContain('Make it Essential'));
-    expect(offered()).toEqual(['Open', 'Save a copy', 'Add a new version', 'Make it Essential']);
+    expect(offered()).toEqual(['Share…', 'Save a copy', 'Add a new version', 'Make it Essential']);
     await act(async () => undefined);
   });
 });

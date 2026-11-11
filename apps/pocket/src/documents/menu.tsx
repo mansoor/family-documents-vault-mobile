@@ -16,16 +16,17 @@ import {
   Ellipsis,
   Eye,
   FilePlus,
-  FileText,
   FolderMinus,
   FolderPlus,
+  Pencil,
+  Share2,
   Star,
   StarOff,
   type LucideIcon,
 } from 'lucide-react-native';
 import { useCallback, useEffect, useRef, useState, type ReactNode, type Ref } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { focusOn } from '../capture/add-button';
 import { renewWords } from '../capture/renew-words';
 import { wordsFor } from '../errors/words';
@@ -43,6 +44,7 @@ import { ConfirmBody } from '../ui/confirm';
 import { Sheet } from '../ui/sheet';
 import { sp } from '../ui/space';
 import { useColours, useStyles, type Palette } from '../ui/theme';
+import { ShareSheet } from '../sharing/share-sheet';
 
 /**
  * A menu on every row (5.36): a ⋯ beside each document in a list, and a
@@ -51,7 +53,7 @@ import { useColours, useStyles, type Palette } from '../ui/theme';
  * decides regardless.
  */
 
-export type RowAction = 'open' | 'show' | 'save' | 'version' | 'essential' | 'collect' | 'remove';
+export type RowAction = 'edit' | 'show' | 'share' | 'save' | 'version' | 'essential' | 'collect' | 'remove';
 
 /**
  * On a collection's page, for its maker (P9, as the web's 0.9.0): Remove
@@ -68,8 +70,12 @@ export interface RemoveFrom {
 
 /**
  * What the ⋯ offers for one document (A14), in order. With no document yet
- * (a search hit's is still on its way), Open.
+ * (a search hit's is still on its way), nothing until it comes.
  *
+ *  - No Open: a tap on the row opens it (the owner's tidy-up of 11 Nov
+ *    2026). Share takes its place, just below Show, for whoever may share.
+ *  - Edit, first, where the list asks for it (Notes): for whoever may
+ *    change it.
  *  - Show (Show mode) for an Essential, Save a copy for anything with a file.
  *  - Somebody who changes nothing — a viewer, and so a guest — is given
  *    what they came for, as on the web: Open and Save a copy. They keep
@@ -88,18 +94,21 @@ export function rowActions(
         type_key?: string | null;
       })
     | null,
-  opts: { collections: boolean; renewing: boolean },
+  opts: { collections: boolean; renewing: boolean; edit?: boolean },
 ): RowAction[] {
-  const actions: RowAction[] = ['open'];
+  const actions: RowAction[] = [];
   if (!who || !doc) return actions;
   // A file a restore found removed for good is none to show or save (5.24).
-  const hasFile = doc.latest_version_id !== null && doc.file_removed !== true;
+  const note = doc.type_key === NOTE_KIND;
+  // A note has no file, whatever a list says of its versions.
+  const hasFile = doc.latest_version_id !== null && doc.file_removed !== true && !note;
   const changes = can(who.role, 'document.edit');
+  const mayChange = who.role !== 'teen' || doc.owner_member_id === who.member_id;
+  if (opts.edit && changes && mayChange) actions.push('edit');
   if (hasFile && changes && doc.is_essential) actions.push('show');
+  if (can(who.role, 'document.share')) actions.push('share');
   if (hasFile) actions.push('save');
   if (!changes) return actions;
-  const mayChange = who.role !== 'teen' || doc.owner_member_id === who.member_id;
-  const note = doc.type_key === NOTE_KIND;
   if (mayChange && can(who.role, 'document.add') && !opts.renewing && !note) actions.push('version');
   if (mayChange && !note) actions.push('essential');
   if (opts.collections && can(who.role, 'collection.manage')) actions.push('collect');
@@ -127,9 +136,13 @@ export function useDocumentMenu(props: {
   title: string;
   doc?: DocumentView | null;
   remove?: RemoveFrom | undefined;
+  /** Edit offered first (Notes' ⋯). */
+  edit?: boolean;
 }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
+  // Share opens its own sheet once the menu's has gone: one sheet at a time.
+  const [sharing, setSharing] = useState<DocumentView | null>(null);
   const [latest, setLatest] = useState<DocumentView | null>(null);
   const button = useRef<View>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -172,15 +185,35 @@ export function useDocumentMenu(props: {
       doc={newer(props.doc ?? null, latest)}
       onDoc={setLatest}
       remove={props.remove}
+      edit={props.edit === true}
+      onShare={(d) => {
+        close(false);
+        setSharing(d);
+      }}
       onClose={close}
+    />
+  ) : sharing ? (
+    <ShareSheet
+      target={{
+        kind: 'document',
+        id: props.id,
+        title: props.title,
+        note: sharing.type_key === NOTE_KIND,
+        onlyMe: sharing.visibility === 'private',
+      }}
+      onClose={() => {
+        setSharing(null);
+        close(true);
+      }}
     />
   ) : null;
   return { open: show, button: menuButton, sheet };
 }
 
 const ICONS: Record<RowAction, LucideIcon> = {
-  open: FileText,
+  edit: Pencil,
   show: Eye,
+  share: Share2,
   save: Download,
   version: FilePlus,
   essential: Star,
@@ -206,6 +239,9 @@ function DocumentMenu(props: {
   /** The vault's newest copy, as the sheet fetched or saved it. */
   onDoc: (doc: DocumentView) => void;
   remove?: RemoveFrom | undefined;
+  edit: boolean;
+  /** Share chosen: the menu closes, and the share sheet opens for this document. */
+  onShare: (doc: DocumentView) => void;
   /** `back`: the focus goes back to the ⋯ (nothing else took it). */
   onClose: (back: boolean) => void;
 }) {
@@ -259,7 +295,7 @@ function DocumentMenu(props: {
 
   const renewing = capture.queue.some((i) => i.kind === 'version' && i.target === id);
   const actions: RowAction[] = [
-    ...rowActions(who, doc, { collections: caps?.features.collections === true, renewing }),
+    ...rowActions(who, doc, { collections: caps?.features.collections === true, renewing, edit: props.edit }),
     ...(props.remove ? (['remove'] as const) : []),
   ];
   const deps: ActionDeps = {
@@ -306,9 +342,14 @@ function DocumentMenu(props: {
 
   const choose = (action: RowAction) => {
     switch (action) {
-      case 'open':
+      case 'edit':
+        if (offline) return warn(t('document.needsConnection'));
         props.onClose(false);
-        router.push({ pathname: '/document/[id]', params: { id } });
+        router.push({ pathname: '/edit/[id]', params: { id } });
+        return;
+      case 'share':
+        if (offline || !doc) return warn(t('document.needsConnection'));
+        props.onShare(doc);
         return;
       case 'show':
         void run('show', async () => {
@@ -373,10 +414,12 @@ function DocumentMenu(props: {
 
   const label = (action: RowAction): string => {
     switch (action) {
-      case 'open':
-        return t('row.open');
+      case 'edit':
+        return t('row.edit');
       case 'show':
         return t('document.show');
+      case 'share':
+        return t('share.menu');
       case 'save':
         return t('document.saveCopy');
       case 'version':
@@ -451,6 +494,15 @@ function DocumentMenu(props: {
             onBusy={setAdding}
             onAdded={(s) => setSaid(s)}
           />
+        ) : actions.length === 0 ? (
+          // A search hit's document is on its way: what it offers depends on it.
+          fetched ? (
+            <Text tone="soft" testID="row-sheet-nothing">
+              {t('document.needsConnection')}
+            </Text>
+          ) : (
+            <ActivityIndicator color={colours.accent} accessibilityLabel={t('common.loading')} testID="row-sheet-loading" />
+          )
         ) : (
           <View accessibilityRole="menu" accessibilityLabel={title} style={styles.choices}>
             {actions.map((action, i) => {
