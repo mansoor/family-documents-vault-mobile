@@ -23,6 +23,7 @@ import {
   Download,
   ArchiveRestore,
   Archive,
+  Share2,
   BellPlus,
   Ellipsis,
   Eye,
@@ -54,6 +55,7 @@ import { NoteText } from './notes';
 import { latestOf } from './online';
 import { warnedAboutCopies } from './save-copy';
 import { TrashConfirm } from './trash';
+import { ShareSheet } from '../sharing/share-sheet';
 import { Chip, ChipRow } from '../ui/chip';
 import { ConfirmSheet } from '../ui/confirm';
 import { IconButton } from '../ui/icon-button';
@@ -114,6 +116,8 @@ export function DocumentDetail(props: { id: string }) {
   const [versionsOpen, setVersionsOpen] = useState(false);
   // The header's ⋯: its choices, then the question Move to the Trash asks, in the same sheet.
   const [more, setMore] = useState<'menu' | 'trash' | 'unneeded' | 'remind' | null>(null);
+  // Share (the owner's ask of 11 Nov 2026): its own sheet, opened from the ⋯.
+  const [sharing, setSharing] = useState(false);
   // Remind me (a reminder set by the person themselves), asked in the same sheet: a day, and a note if they like.
   const [remindDay, setRemindDay] = useState('');
   const [remindNote, setRemindNote] = useState('');
@@ -304,7 +308,9 @@ export function DocumentDetail(props: { id: string }) {
   const mayUnneed = caps?.features.no_longer_needed === true && mayChange && !note;
   // Remind me (the gaps review): for whoever manages reminders, never on a document no longer needed.
   const mayRemind = !!who && can(who.role, 'reminder.manage') && !shown?.no_longer_needed;
-  const hasMore = (mayTrash || mayUnneed || mayRemind) && !!doc && !offline;
+  // Shared outside the family by whoever may (owners and adults), as on the web.
+  const mayShare = !!who && can(who.role, 'document.share');
+  const hasMore = (mayTrash || mayUnneed || mayRemind || mayShare) && !!doc && !offline;
   // Two columns, until the text is so large that one reads better.
   const oneColumn = scale > 1.2;
 
@@ -649,6 +655,12 @@ export function DocumentDetail(props: { id: string }) {
         confirmID="essential-off-yes"
         cancelID="essential-off-cancel"
       />
+      {sharing && doc ? (
+        <ShareSheet
+          target={{ kind: 'document', id, title: name, note, onlyMe: doc.visibility === 'private' }}
+          onClose={() => setSharing(false)}
+        />
+      ) : null}
       <Sheet visible={more !== null} onClose={() => setMore(null)} {...(more === 'menu' ? { outside: true as const } : {})} testID="document-more-sheet">
         {more === 'trash' && doc ? (
           <TrashConfirm id={id} title={name} onGone={() => router.back()} onCancel={() => setMore(null)} />
@@ -729,6 +741,17 @@ export function DocumentDetail(props: { id: string }) {
         ) : (
           <View style={styles.menu}>
             <Text variant="screen">{name}</Text>
+            {mayShare ? (
+              <MenuRow
+                testID="document-share"
+                icon={Share2}
+                label={t('share.menu')}
+                onPress={() => {
+                  setMore(null);
+                  setSharing(true);
+                }}
+              />
+            ) : null}
             {mayRemind ? (
               <MenuRow
                 testID="document-remind"

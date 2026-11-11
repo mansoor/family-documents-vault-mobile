@@ -6,7 +6,7 @@ app's own, tagged `vX.Y.Z` in this repository.
 
 ## [Unreleased]
 
-## [0.5.3] — reminders you set yourself
+## [0.5.3] — reminders you set yourself, and sharing
 
 ### Added
 - **Remind me**, in a document's ⋯: in a week, a month or 3 months, or on
@@ -14,6 +14,19 @@ app's own, tagged `vX.Y.Z` in this repository.
   its day comes, and under Coming up until then.
 - In Needs attention, a reminder you set yourself shows its note and has
   **Delete**, asked first. Those made from a document's dates stay.
+- **Share**, from the phone (the owner's ask of 11 Nov 2026): one sheet for
+  a document (from its ⋯), a note, or a collection (from its page). Whom
+  the link is for; when it stops (Tonight, Friday 5 pm, In a week, or a
+  day and time); view only or download; how often it opens; and a PIN or
+  a password the vault makes up. A collection's says which of its
+  documents go, ticked as the web ticks them, and whether the link keeps
+  up with it, and always asks to confirm it is you. The link, and its PIN
+  or password, are shown once: **Send** opens the phone's share menu, and
+  **Copy** keeps it on the clipboard for a minute. An Only me document is
+  shared only where the household allows it.
+- **Sharing**, in More: every link that still works, newest first, with
+  whom it is for, when it stops and how often it was opened, each with
+  **End this link**, asked first.
 
 ### Changed
 - Pinned to the vault of 0.9.0-dev.27, whose client sets and removes

@@ -44,6 +44,8 @@ export function Text(props: {
   style?: StyleProp<TextStyle>;
   role?: 'header' | 'text' | 'alert';
   testID?: string;
+  /** Long-pressed to select and copy (a link to send). */
+  selectable?: boolean;
 }) {
   const colours = useColours();
   const { scale } = useTextScale();
@@ -62,6 +64,7 @@ export function Text(props: {
   return (
     <RNText
       testID={props.testID}
+      {...(props.selectable ? { selectable: true } : {})}
       accessibilityRole={props.role ?? (display ? 'header' : 'text')}
       style={[
         {
