@@ -895,7 +895,13 @@
     "documentsCount_one": "1 document",
     "documentsCount_other": "{{count}} documents",
     "notes_one": "note",
-    "notes_other": "notes"
+    "notes_other": "notes",
+    "people_one": "person",
+    "people_other": "people",
+    "collections_one": "collection",
+    "collections_other": "collections",
+    "seeAll": "See all",
+    "seeAllEssentials": "See all Essentials"
   },
   "filters": {
     "title": "Filters",
@@ -948,7 +954,8 @@
     "chipDays_added": "Added {{from}} – {{to}}",
     "chipDays_issued": "Issued {{from}} – {{to}}",
     "chipDays_expires": "Expires {{from}} – {{to}}",
-    "tags": "Tags"
+    "tags": "Tags",
+    "essentials": "Essentials"
   },
   "tags": {
     "none": "No tags yet.",

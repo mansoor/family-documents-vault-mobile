@@ -4,6 +4,7 @@ import { FolderOpen, Plus } from 'lucide-react-native';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { CollectionForm } from '../collections/collection-form';
 import { audienceKey, collectionsOffered } from '../collections/rules';
 import { emit, on } from '../state/events';
@@ -53,6 +54,7 @@ export default function CollectionsScreen() {
   useEffect(() => on('collectionChanged', () => void load()), [load]);
 
   return (
+    <SafeAreaView style={styles.safe} edges={['top']}>
     <FlatList
       testID="collections"
       style={styles.screen}
@@ -115,6 +117,7 @@ export default function CollectionsScreen() {
         />
       )}
     />
+    </SafeAreaView>
   );
 }
 
@@ -157,6 +160,7 @@ function CollectionRow(props: { collection: CollectionView; onPress: () => void 
 
 const makeStyles = (colours: Palette) =>
   StyleSheet.create({
+    safe: { flex: 1, backgroundColor: colours.bg },
     screen: { backgroundColor: colours.bg },
     page: { padding: sp(20), gap: sp(10) },
     header: { gap: sp(12) },

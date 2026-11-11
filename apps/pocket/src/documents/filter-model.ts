@@ -44,6 +44,8 @@ export interface Filters {
   visibilities: Visibility[];
   /** Tags, any of them, whatever their case (`tag_filters`). */
   tags: string[];
+  /** Essentials only: Home's Essentials, See all (the owner's ask of 11 Nov 2026). */
+  essential?: boolean;
   date: DateRange | null;
 }
 
@@ -105,6 +107,7 @@ export function countOn(f: Filters): number {
     (f.statuses.length > 0 ? 1 : 0) +
     (f.visibilities.length > 0 ? 1 : 0) +
     (f.tags.length > 0 ? 1 : 0) +
+    (f.essential ? 1 : 0) +
     (f.date ? 1 : 0)
   );
 }
@@ -156,6 +159,7 @@ export function listQuery(
     ...(visibilities ? { visibility: visibilities as Visibility } : {}),
     ...(opts.several ? days(f) : {}),
     ...apartOf(f, opts.apart),
+    ...(f.essential ? { essential: true } : {}),
   };
 }
 

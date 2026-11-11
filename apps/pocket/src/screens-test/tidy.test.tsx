@@ -3,12 +3,13 @@ import Home from '../app/(tabs)/index';
 import DocumentsScreen from '../app/(tabs)/documents';
 import NotesScreen from '../app/(tabs)/notes';
 import CollectionsScreen from '../app/collections';
+import EditScreen from '../app/edit/[id]';
 import { DocumentDetail } from '../documents/detail';
 import { listQuery, NO_FILTERS, searchQuery } from '../documents/filter-model';
 import { audit } from '../test-support/a11y';
 import { libraryDoc, unlocked } from '../test-support/lookup';
 import { installed } from '../test-support/render';
-import { resetRoutes, routes } from '../test-support/router';
+import { push, resetRoutes, routes } from '../test-support/router';
 import { caps0519, capabilities, testVault, type TestVault } from '../test-support/vault';
 
 jest.mock(
@@ -73,8 +74,8 @@ const asked = (t: TestVault) =>
     .map((c) => new URL(c.slice(4)).searchParams)
     .filter((q) => q.get('limit') !== '1');
 
-describe('Home: a Notes count beside the three', () => {
-  it('four on a row, the notes opening Notes; documents counted without them', async () => {
+describe('Home: the counts, three or six', () => {
+  it('six, three to a row: notes, people and collections below; the notes open Notes; documents counted without them', async () => {
     const t = vault();
     doc(t, 'p1', 'Passport', 'passport');
     doc(t, 'n1', 'Boiler', 'note', [], 'Serviced in March.');
@@ -83,17 +84,85 @@ describe('Home: a Notes count beside the three', () => {
     const notes = await screen.findByTestId('home-count-notes');
     expect(notes).toHaveTextContent('2notes');
     expect(screen.getByTestId('home-count-documents')).toHaveTextContent('1document');
+    expect(screen.getByTestId('home-count-people')).toHaveTextContent(/^\d+(person|people)$/);
+    expect(screen.getByTestId('home-count-collections')).toHaveTextContent(/^0collections$/);
     expect(audit()).toEqual([]);
     await fireEvent.press(notes);
     expect(routes().at(-1)).toEqual({ pathname: '/notes', params: {} });
   });
 
-  it('an older vault, without notes: the three, as before', async () => {
+  it('an older vault, without notes: the three, as before (never four)', async () => {
     const t = vault();
     t.caps = capabilities({ features: { ...caps0519().features, document_table: true } });
     await unlocked(t, <Home />);
     await screen.findByTestId('home-count-documents');
     expect(screen.queryByTestId('home-count-notes')).toBeNull();
+    expect(screen.queryByTestId('home-count-people')).toBeNull();
+  });
+});
+
+describe('Home: the Essentials, above Recently added', () => {
+  it('a section of their own, five at most, See all opening Documents narrowed to them', async () => {
+    const t = vault();
+    for (let i = 1; i <= 6; i += 1) {
+      doc(t, `e${i}`, `Essential ${i}`, 'passport');
+      (t.vault.state.documents.at(-1) as unknown as { is_essential: boolean }).is_essential = true;
+    }
+    doc(t, 'bill', 'Water bill', 'bank_statement');
+    await unlocked(t, <Home />);
+    const section = await screen.findByTestId('home-essentials');
+    expect(within(section).getAllByTestId(/^doc-row-/)).toHaveLength(5);
+    expect(within(section).queryByTestId('doc-row-bill')).toBeNull();
+    expect(audit()).toEqual([]);
+    await fireEvent.press(screen.getByTestId('home-essentials-all'));
+    expect(routes().at(-1)).toEqual({ pathname: '/documents', params: { essential: '1' } });
+  });
+
+  it('none: no section', async () => {
+    const t = vault();
+    doc(t, 'bill', 'Water bill', 'bank_statement');
+    await unlocked(t, <Home />);
+    await screen.findByTestId('home-count-documents');
+    expect(screen.queryByTestId('home-essentials')).toBeNull();
+  });
+});
+
+describe('Documents: Essentials only, from Home', () => {
+  it('asks the vault for the Essentials, says so in a chip, and the chip takes it off', async () => {
+    const t = vault();
+    doc(t, 'p1', 'Passport', 'passport');
+    (t.vault.state.documents.at(-1) as unknown as { is_essential: boolean }).is_essential = true;
+    doc(t, 'b1', 'Bank', 'bank_statement');
+    push({ pathname: '/documents', params: { essential: '1' } });
+    await unlocked(t, <DocumentsScreen />);
+    await screen.findByTestId('documents-chip-essential');
+    await waitFor(() => expect(asked(t).at(-1)?.get('essential')).toBe('true'));
+    await fireEvent.press(screen.getByTestId('documents-chip-essential'));
+    await waitFor(() => expect(asked(t).at(-1)?.get('essential')).toBeNull());
+  });
+});
+
+describe('a note’s tags, edited with its words', () => {
+  it('added on the note’s edit page and sent with it', async () => {
+    const t = vault();
+    libraryDoc(t, {
+      id: 'n1',
+      title: 'Boiler',
+      type_key: 'note',
+      notes: 'Serviced in March.',
+      notes_updated_at: '2026-11-11T07:34:00Z',
+      tags: [],
+      versions: 0,
+      latest_version_id: null,
+    } as never);
+    t.library.versions.set('n1', []);
+    push({ pathname: '/edit/[id]', params: { id: 'n1' } });
+    await unlocked(t, <EditScreen />);
+    await screen.findByTestId('edit-note-words');
+    await fireEvent.changeText(screen.getByTestId('edit-tag-new'), 'House');
+    await fireEvent.press(screen.getByTestId('edit-tag-add'));
+    await fireEvent.press(screen.getByTestId('edit-save'));
+    await waitFor(() => expect(t.library.documents.get('n1')?.tags).toEqual(['house']));
   });
 });
 

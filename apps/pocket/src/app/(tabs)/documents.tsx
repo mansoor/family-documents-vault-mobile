@@ -68,7 +68,7 @@ export default function DocumentsScreen() {
   const [tags, setTags] = useState<string[]>([]);
 
   // Opened from Home's numbers or an alert (R4): narrowed to that status.
-  const { status: asked } = useLocalSearchParams<{ status?: string }>();
+  const { status: asked, essential: essentialAsked } = useLocalSearchParams<{ status?: string; essential?: string }>();
   const [q, setQ] = useState('');
   const searching = q.trim() !== '';
   const [sort, setSort] = useState<Sort>('recent');
@@ -85,6 +85,14 @@ export default function DocumentsScreen() {
       setQ('');
     }
   }, [asked]);
+  // Home's Essentials, See all: the Essentials, and nothing else asked.
+  useEffect(() => {
+    if (essentialAsked === '1') {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setFilters({ ...NO_FILTERS, essential: true });
+      setQ('');
+    }
+  }, [essentialAsked]);
 
   const [docs, setDocs] = useState<DocumentView[] | null>(null);
   const [cursor, setCursor] = useState<string | null>(null);
@@ -270,6 +278,7 @@ export default function DocumentsScreen() {
       ? [{ id: 'statuses', label: named(filters.statuses, (s) => t(`documents.status_${s}`)), clear: { statuses: [] } }]
       : []),
     ...(filters.tags.length > 0 ? [{ id: 'tags', label: named(filters.tags, (x) => x), clear: { tags: [] } }] : []),
+    ...(filters.essential ? [{ id: 'essential', label: t('filters.essentials'), clear: { essential: false } }] : []),
     ...(filters.visibilities.length > 0
       ? [
           {
