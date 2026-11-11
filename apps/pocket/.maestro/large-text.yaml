@@ -195,9 +195,12 @@ env:
     visible:
       id: more
     timeout: 10000
+# More keeps where it was scrolled to (Settings, above), and Collections is
+# its first row: looked for upwards.
 - scrollUntilVisible:
     element:
       id: more-collections
+    direction: UP
 - tapOn:
     id: more-collections
 - extendedWaitUntil:
