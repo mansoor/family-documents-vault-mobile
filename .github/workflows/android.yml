@@ -16,6 +16,10 @@ on:
         description: Publish to the rolling pre-release (off keeps the APK a private run artifact)
         type: boolean
         default: true
+      banner:
+        description: The TEST BUILD banner on a preview (off for the owner's own phone, 11 Nov 2026)
+        type: boolean
+        default: true
   push:
     tags: ['v*']
     branches: [develop]
@@ -44,6 +48,8 @@ jobs:
       # Every step, Gradle's included: its bundling step reads app.config.ts
       # and babel.config.js again, and without this they would say dev.
       APP_VARIANT: ${{ inputs.variant || (startsWith(github.ref, 'refs/tags/') && 'preview') || 'dev' }}
+      # The banner is on unless a manual run turns it off; the file says so in its name.
+      TEST_BANNER: ${{ inputs.banner == false && 'off' || 'on' }}
       NDK_VERSION: 27.1.12297006
     steps:
       - name: Start the clock
@@ -88,8 +94,9 @@ jobs:
           APK=$(find . -name '*.apk' | head -1)
           "$ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)/apksigner" verify --print-certs "$APK" | head -5
           SHORT=$(git rev-parse --short HEAD)
-          cp "$APK" "$GITHUB_WORKSPACE/fv-$VARIANT-$SHORT.apk"
-          echo "APK=fv-$VARIANT-$SHORT.apk" >> "$GITHUB_ENV"
+          NAME="fv-$VARIANT-$SHORT$([ "$TEST_BANNER" = off ] && echo -nobanner).apk"
+          cp "$APK" "$GITHUB_WORKSPACE/$NAME"
+          echo "APK=$NAME" >> "$GITHUB_ENV"
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ env.APK }}

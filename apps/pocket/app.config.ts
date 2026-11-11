@@ -126,7 +126,8 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     experiments: { typedRoutes: true },
     extra: {
       variant,
-      testBanner: variant === 'preview',
+      // A preview says it is a test build, unless built for the owner's own phone (TEST_BANNER=off).
+      testBanner: variant === 'preview' && process.env.TEST_BANNER !== 'off',
       fixtures: variant === 'e2e',
       fakeAuth: variant === 'e2e',
     },
