@@ -188,9 +188,103 @@ env:
       id: document-tags
     timeout: 30000
 - assertVisible: .*renew.*
+# A reminder set yourself (0.5.3): in a week, with a note, from the ⋯.
+- tapOn:
+    id: document-more
+- extendedWaitUntil:
+    visible:
+      id: document-remind
+    timeout: 10000
+- tapOn:
+    id: document-remind
+- tapOn:
+    id: remind-in-week
+- tapOn:
+    id: remind-note
+- inputText: Book the renewal
+- hideKeyboard
+- tapOn:
+    id: remind-yes
+- scrollUntilVisible:
+    element:
+      id: document-notice
+    direction: UP
+    timeout: 15000
+- assertVisible: You will be reminded on.*
+# Share (0.5.3): a link to the passport, made from its ⋯ and shown once.
+- tapOn:
+    id: document-more
+- extendedWaitUntil:
+    visible:
+      id: document-share
+    timeout: 10000
+- tapOn:
+    id: document-share
+- extendedWaitUntil:
+    visible:
+      id: share-label
+    timeout: 15000
+- tapOn:
+    id: share-label
+- inputText: Dr Patel
+- hideKeyboard
+- tapOn:
+    id: share-protect-pin
+- scrollUntilVisible:
+    element:
+      id: share-make
+- tapOn:
+    id: share-make
+# An Essential's link may ask to confirm it is you.
+- runFlow:
+    when:
+      visible:
+        id: step-up-password
+    commands:
+      - tapOn:
+          id: step-up-password
+      - inputText: ${PASSWORD}
+      - hideKeyboard
+      - tapOn:
+          id: step-up-go
+- extendedWaitUntil:
+    visible:
+      id: share-link
+    timeout: 20000
+- assertVisible:
+    id: share-secret
+- takeScreenshot: shot-light-share
+- scrollUntilVisible:
+    element:
+      id: share-done
+- tapOn:
+    id: share-done
 - back
 - tapOn:
     id: tab-more
+# Sharing in More: the link just made, ended after asking.
+- scrollUntilVisible:
+    element:
+      id: more-sharing
+- tapOn:
+    id: more-sharing
+- extendedWaitUntil:
+    visible:
+      id: sharing-end-.*
+    timeout: 15000
+- takeScreenshot: shot-light-sharing
+- tapOn:
+    id: sharing-end-.*
+- tapOn:
+    id: sharing-end-yes
+- extendedWaitUntil:
+    visible:
+      id: sharing-said
+    timeout: 15000
+- back
+- scrollUntilVisible:
+    element:
+      id: more-trash
 - tapOn:
     id: more-trash
 - extendedWaitUntil:

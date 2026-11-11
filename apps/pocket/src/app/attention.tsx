@@ -8,11 +8,13 @@ import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-n
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { renewWords } from '../capture/renew-words';
 import { offersNewScan, reminderHeadline } from '../documents/reminders';
+import { Trash2 } from 'lucide-react-native';
 import { useCapture } from '../state/capture';
 import { emit, on } from '../state/events';
 import { useVault } from '../state/vault';
 import { Button, Notice, Text } from '../ui';
 import { feel } from '../ui/feel';
+import { ConfirmSheet } from '../ui/confirm';
 import { Sheet } from '../ui/sheet';
 import { sp } from '../ui/space';
 import { useColours, useStyles, type Palette } from '../ui/theme';
@@ -51,6 +53,10 @@ export default function AttentionScreen() {
   const [details, setDetails] = useState<number | null>(null);
   const [chosen, setChosen] = useState<Tab | null>(null);
   const [later, setLater] = useState<ReminderView | null>(null);
+  // One somebody set themselves, removed: asked first.
+  const [removing, setRemoving] = useState<ReminderView | null>(null);
+  const [removeBusy, setRemoveBusy] = useState(false);
+  const [removeProblem, setRemoveProblem] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [problem, setProblem] = useState<{ tone: 'ok' | 'warn'; text: string } | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
@@ -119,6 +125,21 @@ export default function AttentionScreen() {
     void act((a, token) => a.snoozeReminder(token, r.id, addDays(today(), days)));
   };
   const done = (r: ReminderView) => act((a, token) => a.acknowledgeReminder(token, r.id), true);
+  const removeIt = async () => {
+    if (!removing) return;
+    setRemoveBusy(true);
+    setRemoveProblem(null);
+    try {
+      await withToken((a, token) => a.deleteReminder(token, removing.id));
+      setRemoving(null);
+      await load();
+      emit('remindersChanged');
+    } catch (err) {
+      setRemoveProblem(wordsFor(err, t));
+    } finally {
+      setRemoveBusy(false);
+    }
+  };
   const scanNew = async (r: ReminderView) => {
     setProblem(null);
     const outcome = await capture.renew(r.document_id);
@@ -166,6 +187,12 @@ export default function AttentionScreen() {
                   {r.label}
                 </Text>
               ) : null}
+              {/* One the person set themselves: its note, as they wrote it. */}
+              {r.kind === 'manual' && r.note ? (
+                <Text variant="secondary" tone="soft" testID={`note-${r.id}`}>
+                  {r.note}
+                </Text>
+              ) : null}
             </Pressable>
             {(isDue && canRenew(r)) || canManage ? (
               <View style={styles.actions}>
@@ -185,6 +212,20 @@ export default function AttentionScreen() {
                     disabled={offline}
                     onPress={() => void done(r)}
                     testID={`done-${r.id}`}
+                  />
+                ) : null}
+                {canManage && r.kind === 'manual' ? (
+                  <Button
+                    size="small"
+                    kind="quiet"
+                    label={t('attention.remove')}
+                    accessibilityLabel={t('attention.removeFor', { title })}
+                    disabled={offline}
+                    onPress={() => {
+                      setRemoveProblem(null);
+                      setRemoving(r);
+                    }}
+                    testID={`remove-${r.id}`}
                   />
                 ) : null}
                 {canManage ? (
@@ -293,6 +334,21 @@ export default function AttentionScreen() {
           </View>
         ) : null}
       </ScrollView>
+      <ConfirmSheet
+        visible={removing !== null}
+        testID="remove-question"
+        icon={Trash2}
+        title={t('attention.removeTitle')}
+        words={t('attention.removeWords', { title: removing?.document_title ?? t('document.untitled') })}
+        confirmLabel={t('attention.removeYes')}
+        busy={removeBusy}
+        problem={removeProblem}
+        onConfirm={() => void removeIt()}
+        onCancel={() => setRemoving(null)}
+        confirmID="remove-yes"
+        cancelID="remove-cancel"
+        problemID="remove-problem"
+      />
       <Sheet visible={later !== null} onClose={() => setLater(null)} outside testID="later-sheet">
         {later ? (
           <View style={styles.laterBody}>

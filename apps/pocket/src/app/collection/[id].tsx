@@ -1,7 +1,7 @@
 import { ApiRequestError } from '@fdv/client';
-import { documentName, sharedOutsideWords, type CollectionDetail, type CollectionItemView } from '@fdv/shared';
+import { can, documentName, sharedOutsideWords, type CollectionDetail, type CollectionItemView } from '@fdv/shared';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { Pencil, Trash2 } from 'lucide-react-native';
+import { Pencil, Share2, Trash2 } from 'lucide-react-native';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, View } from 'react-native';
@@ -9,6 +9,7 @@ import { AddDocuments } from '../../collections/add';
 import { CollectionForm } from '../../collections/collection-form';
 import { ConfirmSheet } from '../../ui/confirm';
 import { IconButton } from '../../ui/icon-button';
+import { ShareSheet } from '../../sharing/share-sheet';
 import { audienceKey, mayChangeCollection } from '../../collections/rules';
 import { DocumentRow, rowPlace } from '../../documents/row';
 import { wordsFor } from '../../errors/words';
@@ -34,7 +35,7 @@ export default function CollectionScreen() {
   const colours = useColours();
   const { t } = useTranslation();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { withToken, offline, who, api } = useVault();
+  const { withToken, offline, who, api, caps } = useVault();
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -110,6 +111,10 @@ export default function CollectionScreen() {
   const mayChange = !!detail && mayChangeCollection(who?.role, detail);
   // Deleted by its maker, whatever their role now.
   const mayDelete = !!detail && detail.mine;
+  // Shared outside the family (5.19), by an owner or an adult, never an Only me collection.
+  const mayShare =
+    !!detail && !!who && can(who.role, 'document.share') && caps?.features.collection_shares === true && detail.audience !== 'only_me';
+  const [sharing, setSharing] = useState(false);
 
   const deleteIt = async () => {
     setDeleteBusy(true);
@@ -187,6 +192,14 @@ export default function CollectionScreen() {
                       onPress={() => setEditing(true)}
                     />
                   ) : null}
+                  {mayShare && !offline ? (
+                    <IconButton
+                      testID="collection-share"
+                      label={t('share.collectionLabel', { name: detail.name })}
+                      icon={Share2}
+                      onPress={() => setSharing(true)}
+                    />
+                  ) : null}
                   {mayDelete && !offline ? (
                     <IconButton
                       testID="collection-delete"
@@ -202,6 +215,9 @@ export default function CollectionScreen() {
               ),
             }}
           />
+          {sharing ? (
+            <ShareSheet target={{ kind: 'collection', id: detail.id, name: detail.name }} onClose={() => setSharing(false)} />
+          ) : null}
           {editing ? (
             <CollectionForm
               editing={detail}

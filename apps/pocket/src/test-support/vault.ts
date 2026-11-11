@@ -2,11 +2,13 @@ import type { FetchLike } from '@fdv/client';
 import { createFakeVault } from '@fdv/client/testing';
 import type {
   Capabilities,
+  CollectionSharePreview,
   DetailSuggestions,
   DocumentView,
   ReminderView,
   SearchHit,
   SessionRow,
+  Share,
   VersionView,
 } from '@fdv/shared';
 
@@ -165,6 +167,16 @@ export interface Library {
   collections: Map<string, { id: string; name: string }[]>;
   /** Moved to the Trash (DELETE /documents/{id}), in order. */
   trashed: string[];
+  /**
+   * Links outside the family (sharing from the phone): GET /shares lists
+   * them; each one made is kept with what the phone sent for it.
+   */
+  shares: Share[];
+  shareBodies: { to: string; body: Record<string, unknown> }[];
+  /** Whether Only me documents may be shared (GET /household/sharing); null: an older vault, which says nothing. */
+  onlyMeShareable: boolean | null;
+  /** What a collection's share sheet offers (GET /collections/{id}/share-preview), by collection. */
+  sharePreviews: Map<string, CollectionSharePreview>;
 }
 
 const JPEG = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x02, 0xff, 0xd9]);
@@ -238,6 +250,10 @@ export function testVault(origins: string[] = ['https://vault.test']): TestVault
       ownLinks: new Map(),
       collections: new Map(),
       trashed: [],
+      shares: [],
+      shareBodies: [],
+      onlyMeShareable: null,
+      sharePreviews: new Map(),
     },
     fetch: async (url, init) => {
       t.calls.push(`${init.method} ${url}`);
@@ -414,6 +430,62 @@ async function library(t: TestVault, path: string, init: Parameters<FetchLike>[1
     lib.documents.delete(m[1]);
     return { ...json(null), status: 204, text: async () => '' } as Reply;
   }
+  // Sharing outside the family, as the vault of 0.9.0 answers it: a link
+  // made (its token, and a PIN or a password made up, here once), listed,
+  // and ended; a collection's always confirms it is you first.
+  if (q === '/api/v1/household/sharing' && init.method === 'GET') {
+    if (lib.onlyMeShareable === null) return failure(404, 'not_found', 'No such route.');
+    return json({ only_me_shareable: lib.onlyMeShareable, can_change: true });
+  }
+  m = /^\/api\/v1\/collections\/([^/]+)\/share-preview$/.exec(q);
+  if (m?.[1] && init.method === 'GET') {
+    const preview = lib.sharePreviews.get(m[1]);
+    return preview ? json(preview) : failure(404, 'not_found', 'There is no such collection.');
+  }
+  const shareAt = /^\/api\/v1\/documents\/([^/]+)\/share$/.exec(q) ?? /^\/api\/v1\/collections\/([^/]+)\/shares$/.exec(q);
+  if (shareAt?.[1] && init.method === 'POST') {
+    const collection = q.startsWith('/api/v1/collections/');
+    if (collection && !lib.verified) {
+      return failure(403, 'step_up_required', 'Please confirm it is you to share a collection.', 'share_collection');
+    }
+    lib.shareBodies.push({ to: shareAt[1], body });
+    const n = lib.shares.length + 1;
+    const share = {
+      id: `share-${n}`,
+      document_id: collection ? null : shareAt[1],
+      document_title: collection ? null : (lib.documents.get(shareAt[1])?.title ?? null),
+      collection_id: collection ? shareAt[1] : null,
+      collection_name: collection ? (lib.sharePreviews.get(shareAt[1])?.collection_name ?? null) : null,
+      recipient_label: (body.recipient_label as string | undefined) ?? null,
+      created_by_name: 'Fake Owner',
+      created_at: new Date(Date.now() + n).toISOString(),
+      expires_at: (body.expires_at as string | undefined) ?? new Date(Date.now() + 7 * 864e5).toISOString(),
+      has_pin: body.with_pin === true,
+      open_count: 0,
+      last_opened_at: null,
+      state: 'active',
+      permission: (body.permission as 'view' | 'download' | undefined) ?? 'download',
+      max_opens: (body.max_opens as number | undefined) ?? null,
+      summary: 'A link',
+    } as Share;
+    lib.shares.push(share);
+    return json({
+      share,
+      link_token: `tok-${n}`,
+      link_url: `https://share.vault.test/s#tok-${n}`,
+      ...(body.with_pin === true ? { pin: '4821' } : {}),
+      ...(body.with_password === true ? { password: 'amber-otter-41' } : {}),
+    });
+  }
+  if (q === '/api/v1/shares' && init.method === 'GET') return json({ items: lib.shares });
+  m = /^\/api\/v1\/shares\/([^/]+)$/.exec(q);
+  if (m?.[1] && init.method === 'DELETE') {
+    const id = m[1];
+    const share = lib.shares.find((x) => x.id === id);
+    if (!share) return failure(404, 'not_found', 'There is no such link.');
+    share.state = 'revoked';
+    return { ...json(null), status: 204, text: async () => '' } as Reply;
+  }
   // No longer needed, and needed again (0.9.0), on a document the library keeps.
   m = /^\/api\/v1\/documents\/([^/]+)\/no-longer-needed$/.exec(q);
   if (m?.[1] && lib.documents.has(m[1]) && (init.method === 'POST' || init.method === 'DELETE')) {
@@ -536,6 +608,39 @@ async function library(t: TestVault, path: string, init: Parameters<FetchLike>[1
       );
     }
     return null;
+  }
+  // A reminder somebody sets themselves (0.9.0-dev.27): due when its day has come, else coming up.
+  if (q === '/api/v1/reminders' && init.method === 'POST') {
+    const today = new Date().toISOString().slice(0, 10);
+    const fire = String(body.fire_at);
+    const doc = lib.documents.get(String(body.document_id));
+    const made = {
+      id: `mine-${t.reminders.length + t.upcoming.length + 1}`,
+      document_id: String(body.document_id),
+      document_title: doc?.title ?? null,
+      kind: 'manual',
+      fire_at: fire,
+      lead_days: null,
+      note: (body.note as string | null | undefined) ?? null,
+      recurrence: null,
+      status: fire <= today ? 'due' : 'scheduled',
+      snoozed_until: null,
+      label: fire <= today ? 'Due today' : `In some days · ${fire}`,
+      source: null,
+      about: null,
+    } as ReminderView;
+    if (fire <= today) t.reminders.push(made);
+    else t.upcoming.push(made);
+    return { ...json(made), status: 201 } as Reply;
+  }
+  m = /^\/api\/v1\/reminders\/([^/]+)$/.exec(q);
+  if (m?.[1] && init.method === 'DELETE') {
+    const id = m[1];
+    const r = [...t.reminders, ...t.upcoming].find((x) => x.id === id && x.kind === 'manual');
+    if (!r) return failure(404, 'not_found', 'Only reminders you set yourself can be removed.');
+    t.reminders = t.reminders.filter((x) => x.id !== id);
+    t.upcoming = t.upcoming.filter((x) => x.id !== id);
+    return { ...json(null), status: 204, text: async () => '' } as Reply;
   }
   m = /^\/api\/v1\/reminders\/([^/]+)\/(snooze|acknowledge)$/.exec(q);
   if (m?.[1] && init.method === 'POST') {

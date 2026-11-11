@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import {
   ChevronRight,
   ExternalLink,
+  Share2,
   FolderOpen,
   Inbox,
   Settings,
@@ -45,6 +46,8 @@ export default function MoreScreen() {
   const collectionsOn = collectionsOffered(caps, who?.role);
   // The Trash, for whoever may move things there (the gaps review, 11 Nov 2026).
   const trashOn = !!who && can(who.role, 'document.delete');
+  // Sharing (the owner's ask of 11 Nov 2026): the links that still work, for whoever may share.
+  const sharingOn = !!who && can(who.role, 'document.share');
   const notesOn = caps?.features.notes === true;
   useEffect(() => {
     if (!inboxOn || offline) return;
@@ -85,6 +88,15 @@ export default function MoreScreen() {
               label={t('more.people')}
               hint={t('more.peopleHint')}
               onPress={() => router.push('/people')}
+            />
+          ) : null}
+          {sharingOn ? (
+            <Row
+              testID="more-sharing"
+              icon={Share2}
+              label={t('sharing.title')}
+              hint={t('more.sharingHint')}
+              onPress={() => router.push('/sharing')}
             />
           ) : null}
           {trashOn ? (

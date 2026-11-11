@@ -1,11 +1,15 @@
 import { ApiRequestError, NetworkError } from '@fdv/client';
 import {
+  addDays,
+  addMonths,
   ANOTHER_DOCUMENT,
   NO_LONGER_NEEDED_REASON_MAX,
   can,
   documentName,
   formatDate,
+  localToday,
   NOTE_KIND,
+  parseDateInput,
   radii,
   type DocumentTypeView,
   type DocumentView,
@@ -19,6 +23,8 @@ import {
   Download,
   ArchiveRestore,
   Archive,
+  Share2,
+  BellPlus,
   Ellipsis,
   Eye,
   FilePlus,
@@ -49,6 +55,8 @@ import { NoteText } from './notes';
 import { latestOf } from './online';
 import { warnedAboutCopies } from './save-copy';
 import { TrashConfirm } from './trash';
+import { ShareSheet } from '../sharing/share-sheet';
+import { Chip, ChipRow } from '../ui/chip';
 import { ConfirmSheet } from '../ui/confirm';
 import { IconButton } from '../ui/icon-button';
 import { Sheet } from '../ui/sheet';
@@ -56,7 +64,7 @@ import { useTextScale } from '../ui/text-scale';
 import { VisibilityControl } from './visibility';
 import { sp } from '../ui/space';
 import { useColours, useStyles, type Palette } from '../ui/theme';
-import { dayWords, exactWords, relativeWords, useFamilyZone } from '../state/family-time';
+import { dayWords, exactWords, familyZoneNow, relativeWords, useFamilyZone } from '../state/family-time';
 import { LoadFailed, loadFailure, Placeholder } from '../ui/states';
 
 type Problem = 'offline' | 'not_found' | 'failed' | null;
@@ -107,7 +115,14 @@ export function DocumentDetail(props: { id: string }) {
   const [refreshing, setRefreshing] = useState(false);
   const [versionsOpen, setVersionsOpen] = useState(false);
   // The header's ⋯: its choices, then the question Move to the Trash asks, in the same sheet.
-  const [more, setMore] = useState<'menu' | 'trash' | 'unneeded' | null>(null);
+  const [more, setMore] = useState<'menu' | 'trash' | 'unneeded' | 'remind' | null>(null);
+  // Share (the owner's ask of 11 Nov 2026): its own sheet, opened from the ⋯.
+  const [sharing, setSharing] = useState(false);
+  // Remind me (a reminder set by the person themselves), asked in the same sheet: a day, and a note if they like.
+  const [remindDay, setRemindDay] = useState('');
+  const [remindNote, setRemindNote] = useState('');
+  const [reminding, setReminding] = useState(false);
+  const [remindProblem, setRemindProblem] = useState<string | null>(null);
   // No longer needed (0.9.0), asked in the same sheet: why, if the person says.
   const [reason, setReason] = useState('');
   const [marking, setMarking] = useState(false);
@@ -291,7 +306,11 @@ export function DocumentDetail(props: { id: string }) {
   const mayEdit = mayChange && !!doc && !offline;
   // No longer needed, and needed again, from the phone (the gaps review), where the vault has it.
   const mayUnneed = caps?.features.no_longer_needed === true && mayChange && !note;
-  const hasMore = (mayTrash || mayUnneed) && !!doc && !offline;
+  // Remind me (the gaps review): for whoever manages reminders, never on a document no longer needed.
+  const mayRemind = !!who && can(who.role, 'reminder.manage') && !shown?.no_longer_needed;
+  // Shared outside the family by whoever may (owners and adults), as on the web.
+  const mayShare = !!who && can(who.role, 'document.share');
+  const hasMore = (mayTrash || mayUnneed || mayRemind || mayShare) && !!doc && !offline;
   // Two columns, until the text is so large that one reads better.
   const oneColumn = scale > 1.2;
 
@@ -636,9 +655,67 @@ export function DocumentDetail(props: { id: string }) {
         confirmID="essential-off-yes"
         cancelID="essential-off-cancel"
       />
+      {sharing && doc ? (
+        <ShareSheet
+          target={{ kind: 'document', id, title: name, note, onlyMe: doc.visibility === 'private' }}
+          onClose={() => setSharing(false)}
+        />
+      ) : null}
       <Sheet visible={more !== null} onClose={() => setMore(null)} {...(more === 'menu' ? { outside: true as const } : {})} testID="document-more-sheet">
         {more === 'trash' && doc ? (
           <TrashConfirm id={id} title={name} onGone={() => router.back()} onCancel={() => setMore(null)} />
+        ) : more === 'remind' && doc ? (
+          <View style={styles.menu} testID="remind-question">
+            <Text variant="screen">{t('remind.title')}</Text>
+            <ChipRow label={t('remind.quick')} role="none">
+              {([
+                ['week', () => addDays(remindToday(), 7)],
+                ['month', () => addMonths(remindToday(), 1)],
+                ['months3', () => addMonths(remindToday(), 3)],
+              ] as const).map(([key, day]) => (
+                <Chip
+                  key={key}
+                  label={t(`remind.in_${key}`)}
+                  onPress={() => {
+                    setRemindProblem(null);
+                    setRemindDay(formatDate({ date: day(), precision: 'day' }));
+                  }}
+                  testID={`remind-in-${key}`}
+                />
+              ))}
+            </ChipRow>
+            <Field
+              label={t('remind.day')}
+              value={remindDay}
+              onChangeText={(v) => {
+                setRemindDay(v);
+                setRemindProblem(null);
+              }}
+              placeholder={formatDate({ date: addDays(remindToday(), 7), precision: 'day' })}
+              testID="remind-day"
+            />
+            <Field
+              label={t('remind.note')}
+              value={remindNote}
+              onChangeText={setRemindNote}
+              maxLength={500}
+              autoCapitalize="sentences"
+              testID="remind-note"
+            />
+            {remindProblem ? (
+              <Notice tone="warn" testID="remind-problem">
+                {remindProblem}
+              </Notice>
+            ) : null}
+            <Button
+              label={t('remind.yes')}
+              busy={reminding}
+              disabled={remindDay.trim() === ''}
+              onPress={() => void remindMe()}
+              testID="remind-yes"
+            />
+            <Button kind="quiet" label={t('common.cancel')} disabled={reminding} onPress={() => setMore(null)} testID="remind-cancel" />
+          </View>
         ) : more === 'unneeded' && doc ? (
           <View style={styles.menu} testID="unneeded-question">
             <Text variant="screen">{t('unneeded.title')}</Text>
@@ -664,6 +741,30 @@ export function DocumentDetail(props: { id: string }) {
         ) : (
           <View style={styles.menu}>
             <Text variant="screen">{name}</Text>
+            {mayShare ? (
+              <MenuRow
+                testID="document-share"
+                icon={Share2}
+                label={t('share.menu')}
+                onPress={() => {
+                  setMore(null);
+                  setSharing(true);
+                }}
+              />
+            ) : null}
+            {mayRemind ? (
+              <MenuRow
+                testID="document-remind"
+                icon={BellPlus}
+                label={t('remind.menu')}
+                onPress={() => {
+                  setRemindDay('');
+                  setRemindNote('');
+                  setRemindProblem(null);
+                  setMore('remind');
+                }}
+              />
+            ) : null}
             {mayUnneed && shown.no_longer_needed ? (
               <MenuRow
                 testID="document-needed-again"
@@ -693,6 +794,36 @@ export function DocumentDetail(props: { id: string }) {
       </Sheet>
     </ScrollView>
   );
+
+  /** Today on the family's calendar: where Remind me's quick choices count from. */
+  function remindToday(): string {
+    return localToday(familyZoneNow());
+  }
+
+  /** A reminder the person sets themselves, on the day they typed or chose. */
+  async function remindMe() {
+    if (reminding) return;
+    const day = parseDateInput(remindDay);
+    if (!day) {
+      setRemindProblem(t('remind.badDay', { example: formatDate({ date: addDays(remindToday(), 7), precision: 'day' }) }));
+      return;
+    }
+    setReminding(true);
+    setRemindProblem(null);
+    try {
+      await withToken((a, tk) =>
+        a.createReminder(tk, { document_id: id, fire_at: day.date, note: remindNote.trim() || null }),
+      );
+      setMore(null);
+      feel('done');
+      setNotice({ tone: 'ok', text: t('remind.done', { day: formatDate({ date: day.date, precision: 'day' }) }) });
+      emit('remindersChanged');
+    } catch (err) {
+      setRemindProblem(wordsFor(err, t));
+    } finally {
+      setReminding(false);
+    }
+  }
 
   /** Kept, but no longer needed: its reminders stop, and its status says so. */
   async function markUnneeded() {

@@ -96,6 +96,7 @@ function Gates() {
         <Stack.Screen name="edit/[id]" options={{ title: '' }} />
         <Stack.Screen name="collections" options={{ title: '' }} />
         <Stack.Screen name="trash" options={{ title: t('trashList.title') }} />
+        <Stack.Screen name="sharing" options={{ title: t('sharing.title') }} />
         <Stack.Screen name="collection/[id]" options={{ title: '' }} />
         <Stack.Screen name="new-note" options={{ title: '' }} />
         <Stack.Screen name="person/[id]" options={{ title: '' }} />

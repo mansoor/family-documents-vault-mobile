@@ -58,6 +58,8 @@ export const CATALOGUE: Readonly<Record<string, string>> = {
   version_changed: 'errors.changedElsewhere',
   renewal_undo_open: 'renewal.undoOpen',
   renewal_kept: 'renewal.kept',
+  // A collection for Only me is never shared outside the family (5.19): the share sheet says so.
+  collection_only_me: 'share.collectionOnlyMe',
   renewal_not_undoable: 'renewal.notUndoable',
   // Into Only me with share links of the person's own (P8): Who can see it asks what becomes of them.
   links_choice_needed: 'errors.linksChoice',

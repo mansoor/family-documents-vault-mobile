@@ -16,6 +16,8 @@ interface Events {
   documentChanged: [id: string];
   /** Documents put in a collection or taken out of it on the phone (P9): its list and its page look again. */
   collectionChanged: [id: string];
+  /** A link made or ended on the phone: Sharing looks again. */
+  sharesChanged: [];
 }
 
 type Listener<K extends keyof Events> = (...args: Events[K]) => void;
@@ -28,6 +30,7 @@ const listeners: { [K in keyof Events]: Set<Listener<K>> } = {
   noticesChanged: new Set(),
   documentChanged: new Set(),
   collectionChanged: new Set(),
+  sharesChanged: new Set(),
 };
 
 export function on<K extends keyof Events>(event: K, fn: Listener<K>): () => void {
