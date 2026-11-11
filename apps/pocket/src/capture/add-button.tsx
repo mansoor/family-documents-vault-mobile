@@ -313,13 +313,14 @@ export function AddMenu(props: {
                   onPress={() => props.onChoose(c.how)}
                   style={({ pressed }) => [styles.choice, pressed ? styles.pressed : null]}
                 >
-                  <View style={styles.round}>
-                    <Icon color={colours.accent} size={24} accessibilityElementsHidden importantForAccessibility="no" />
-                  </View>
-                  <View style={styles.tag}>
-                    <Text variant="small" weight="600" role="text" style={styles.label}>
-                      {c.label}
-                    </Text>
+                  <Icon color={colours.accent} size={24} accessibilityElementsHidden importantForAccessibility="no" />
+                  {/* Its words above it, clear of the tab bar under the arc. */}
+                  <View style={styles.above} pointerEvents="none">
+                    <View style={styles.tag}>
+                      <Text variant="small" weight="600" role="text" style={styles.label}>
+                        {c.label}
+                      </Text>
+                    </View>
                   </View>
                 </Pressable>
               </Animated.View>
@@ -375,10 +376,9 @@ const makeStyles = (colours: Palette) =>
     over: { position: 'absolute', elevation: 6 },
     pressed: { opacity: 0.8 },
     shade: { backgroundColor: colours.scrim },
-    // Each choice: a round button and its words under it, centred on its place on the arc.
-    place: { position: 'absolute', width: LABEL, alignItems: 'center' },
-    choice: { alignItems: 'center', gap: 4, minWidth: ITEM, minHeight: ITEM },
-    round: {
+    // Each choice: a round button centred on its place on the arc, its words above it.
+    place: { position: 'absolute', width: LABEL, height: ITEM, alignItems: 'center' },
+    choice: {
       width: ITEM,
       height: ITEM,
       borderRadius: ITEM / 2,
@@ -387,6 +387,7 @@ const makeStyles = (colours: Palette) =>
       backgroundColor: colours.surface,
       elevation: 4,
     },
+    above: { position: 'absolute', bottom: ITEM + 4, left: (ITEM - LABEL) / 2, width: LABEL, alignItems: 'center' },
     tag: {
       maxWidth: LABEL,
       paddingHorizontal: 8,
