@@ -566,7 +566,12 @@
     "details_one": "1 document needs details",
     "details_other": "{{count}} documents need details",
     "detailsWhy": "A number or a date is missing, so no reminder can be set.",
-    "review": "Review them"
+    "review": "Review them",
+    "remove": "Delete",
+    "removeFor": "Delete the reminder: {{title}}",
+    "removeTitle": "Delete this reminder?",
+    "removeWords": "The reminder you set on “{{title}}” is deleted. The document stays, and so do the reminders made from its dates.",
+    "removeYes": "Delete the reminder"
   },
   "people": {
     "title": "People",
@@ -977,5 +982,18 @@
     "deleteTitle": "Delete this collection?",
     "deleteWords": "“{{name}}” is deleted for everybody. Its documents stay where they are; only the collection goes, and it cannot be brought back.",
     "deleteYes": "Delete the collection"
+  },
+  "remind": {
+    "menu": "Remind me…",
+    "title": "Remind me",
+    "quick": "When",
+    "in_week": "In a week",
+    "in_month": "In a month",
+    "in_months3": "In 3 months",
+    "day": "On",
+    "note": "Note (if you like)",
+    "yes": "Set the reminder",
+    "badDay": "Not a date: write it as {{example}}",
+    "done": "You will be reminded on {{day}}."
   }
 }

@@ -537,6 +537,39 @@ async function library(t: TestVault, path: string, init: Parameters<FetchLike>[1
     }
     return null;
   }
+  // A reminder somebody sets themselves (0.9.0-dev.27): due when its day has come, else coming up.
+  if (q === '/api/v1/reminders' && init.method === 'POST') {
+    const today = new Date().toISOString().slice(0, 10);
+    const fire = String(body.fire_at);
+    const doc = lib.documents.get(String(body.document_id));
+    const made = {
+      id: `mine-${t.reminders.length + t.upcoming.length + 1}`,
+      document_id: String(body.document_id),
+      document_title: doc?.title ?? null,
+      kind: 'manual',
+      fire_at: fire,
+      lead_days: null,
+      note: (body.note as string | null | undefined) ?? null,
+      recurrence: null,
+      status: fire <= today ? 'due' : 'scheduled',
+      snoozed_until: null,
+      label: fire <= today ? 'Due today' : `In some days · ${fire}`,
+      source: null,
+      about: null,
+    } as ReminderView;
+    if (fire <= today) t.reminders.push(made);
+    else t.upcoming.push(made);
+    return { ...json(made), status: 201 } as Reply;
+  }
+  m = /^\/api\/v1\/reminders\/([^/]+)$/.exec(q);
+  if (m?.[1] && init.method === 'DELETE') {
+    const id = m[1];
+    const r = [...t.reminders, ...t.upcoming].find((x) => x.id === id && x.kind === 'manual');
+    if (!r) return failure(404, 'not_found', 'Only reminders you set yourself can be removed.');
+    t.reminders = t.reminders.filter((x) => x.id !== id);
+    t.upcoming = t.upcoming.filter((x) => x.id !== id);
+    return { ...json(null), status: 204, text: async () => '' } as Reply;
+  }
   m = /^\/api\/v1\/reminders\/([^/]+)\/(snooze|acknowledge)$/.exec(q);
   if (m?.[1] && init.method === 'POST') {
     const id = m[1];

@@ -6,6 +6,19 @@ app's own, tagged `vX.Y.Z` in this repository.
 
 ## [Unreleased]
 
+## [0.5.3] — reminders you set yourself
+
+### Added
+- **Remind me**, in a document's ⋯: in a week, a month or 3 months, or on
+  a day you type, with a note if you like. It is in Needs attention when
+  its day comes, and under Coming up until then.
+- In Needs attention, a reminder you set yourself shows its note and has
+  **Delete**, asked first. Those made from a document's dates stay.
+
+### Changed
+- Pinned to the vault of 0.9.0-dev.27, whose client sets and removes
+  these reminders.
+
 ## [0.5.2] — what could be made or seen, now changed too
 
 The owner's review of 11 Nov 2026: a note could be made on the phone but

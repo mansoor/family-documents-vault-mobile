@@ -188,6 +188,29 @@ env:
       id: document-tags
     timeout: 30000
 - assertVisible: .*renew.*
+# A reminder set yourself (0.5.3): in a week, with a note, from the ⋯.
+- tapOn:
+    id: document-more
+- extendedWaitUntil:
+    visible:
+      id: document-remind
+    timeout: 10000
+- tapOn:
+    id: document-remind
+- tapOn:
+    id: remind-in-week
+- tapOn:
+    id: remind-note
+- inputText: Book the renewal
+- hideKeyboard
+- tapOn:
+    id: remind-yes
+- scrollUntilVisible:
+    element:
+      id: document-notice
+    direction: UP
+    timeout: 15000
+- assertVisible: You will be reminded on.*
 - back
 - tapOn:
     id: tab-more
