@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ScrollView, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { TagsEditor } from './tags-edit';
 import { wordsFor } from '../errors/words';
 import { emit } from '../state/events';
 import { useStepUp } from '../state/step-up';
@@ -35,6 +36,9 @@ export function NoteEdit(props: { doc: DocumentView; onStale: () => Promise<void
   const own = !!who && doc.owner_member_id === who.member_id;
   const [title, setTitle] = useState(doc.title ?? '');
   const [words, setWords] = useState(doc.notes ?? '');
+  // Its tags, as a document's are (the owner's tidy-up of 11 Nov 2026): sent only when changed.
+  const [tags, setTags] = useState<string[]>(doc.tags ?? []);
+  const tagsChanged = JSON.stringify(tags) !== JSON.stringify(doc.tags ?? []);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const tooLong = words.length > NOTES_MAX;
@@ -50,6 +54,7 @@ export function NoteEdit(props: { doc: DocumentView; onStale: () => Promise<void
       const body = {
         notes: words.trim() || null,
         ...(own && titleChanged ? { title: title.trim() || null } : {}),
+        ...(tagsChanged ? { tags } : {}),
       };
       const saved = await guarded((a, tk) => a.updateDocument(tk, doc.id, body, doc.etag));
       if (saved === null) return;
@@ -103,6 +108,7 @@ export function NoteEdit(props: { doc: DocumentView; onStale: () => Promise<void
       <Text variant="secondary" tone={tooLong ? 'danger' : 'muted'} testID="edit-note-count">
         {tooLong ? t('newNote.tooLong', { count: words.length }) : t('newNote.notFor')}
       </Text>
+      <TagsEditor tags={tags} onChange={setTags} />
       {secret ? (
         <Notice tone="warn" testID="edit-note-secret">
           {t(secret)}

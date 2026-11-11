@@ -33,7 +33,7 @@ import { DocumentRow, rowPlace } from '../../documents/row';
 import { BellButton } from '../../ui/bell';
 import { countAlert, reminderAlert, type HomeAlert } from '../../home/alerts';
 import { AlertCards } from '../../home/alert-cards';
-import { Counts, EssentialsLine, type HomeCounts } from '../../home/glance';
+import { Counts, ESSENTIALS_SHOWN, EssentialsLine, EssentialsSection, type HomeCounts } from '../../home/glance';
 import { sp } from '../../ui/space';
 import { VaultRead } from '../../capture/vault-read';
 import { useColours, useStyles, type Palette } from '../../ui/theme';
@@ -54,6 +54,8 @@ interface HomeData {
   access: MyAccess | null;
   /** At a glance (R4), where the vault counts: a vault with the Documents table. */
   counts: HomeCounts | null;
+  /** The family's Essentials, above Recently added (the owner's ask of 11 Nov 2026). */
+  essentials: DocumentView[];
 }
 
 /**
@@ -145,21 +147,33 @@ export default function Home() {
         };
         const glance = async (): Promise<HomeCounts | null> => {
           if (!counted) return null;
-          const [all, expiring, details, notes] = await Promise.all([
+          const [all, expiring, details, notes, people, collections] = await Promise.all([
             total(),
             total('expiring_soon'),
             total('needs_info'),
             noteCount().catch(() => null),
+            a.members(token).then(
+              (r) => r.items.length,
+              () => null,
+            ),
+            caps?.features.collections === true
+              ? a.collections(token).then(
+                  (r) => r.items.length,
+                  () => null,
+                )
+              : Promise.resolve(null),
           ]);
-          return { total: all, expiring, details, notes };
+          return { total: all, expiring, details, notes, people, collections };
         };
-        const [due, recent, unnamed, me, audience, counts] = await Promise.all([
+        const [due, recent, unnamed, me, audience, counts, essentials] = await Promise.all([
           a.reminders(token, 'due'),
           a.documents(token, { limit: 5 }),
           unnamedCount(),
           optional(a.me(token)),
           identityOn ? optional(a.identityAudience(token)) : Promise.resolve(null),
           optional(glance()),
+          // The Essentials, newest first: six at most, and See all for the rest.
+          optional(a.documents(token, { essential: true, limit: ESSENTIALS_SHOWN + 1 })),
         ]);
         return {
           due: due.items,
@@ -171,6 +185,8 @@ export default function Home() {
           // A guest's end is said on the family's clock, which the profile knows.
           access: await myAccess(me, async () => (await optional(a.profile(token)))?.timezone),
           counts,
+          // Only what says it is one: a vault that does not narrow by it lists everything.
+          essentials: (essentials?.items ?? []).filter((d) => d.is_essential),
         };
       });
       setData(next);
@@ -179,7 +195,7 @@ export default function Home() {
       // Offline or signed out: the banner or the sign-in screen says so. Anything else, here.
       setFailed(loadFailure('home', err, t));
     }
-  }, [withTokenQuick, identityOn, counted, caps?.features.notes, caps?.features.notes_apart, t]);
+  }, [withTokenQuick, identityOn, counted, caps?.features.notes, caps?.features.notes_apart, caps?.features.collections, t]);
 
   useEffect(() => {
     // Loading on arrival, and again each time the vault takes a capture:
@@ -390,7 +406,12 @@ export default function Home() {
             ) : null}
             <OnThisPhone />
             {data?.counts ? <Counts counts={data.counts} /> : null}
-            <EssentialsLine />
+            {/* The Essentials, from the vault; without a connection, those kept on this phone. */}
+            {data ? (
+              <EssentialsSection docs={data.essentials} token={data.token} />
+            ) : (
+              <EssentialsLine />
+            )}
             {/* Home has what it asked for: what a test or a flow waits for, now that
                 nothing says "nothing to do" (R4). */}
             <View style={styles.recentHead} {...(data ? { testID: 'home-ready' } : {})}>

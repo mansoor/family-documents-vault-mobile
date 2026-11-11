@@ -6,6 +6,25 @@ app's own, tagged `vX.Y.Z` in this repository.
 
 ## [Unreleased]
 
+## [0.5.5] — Essentials on Home, and the counts in threes
+
+The owner's notes on 0.5.4 (11 Nov 2026).
+
+### Added
+- **Essentials** on Home, a section of their own above Recently added:
+  five at most, each a row (a tap opens it, its ⋯ the rest), and **See
+  all**, which opens Documents narrowed to the Essentials (a chip takes
+  that off). Without a connection, those kept on this phone, as before.
+- **Tags on a note**, on its edit page, as a document's.
+
+### Changed
+- **Home's counts are three or six**: four did not fit a large phone.
+  Where the vault keeps notes and collections, a second row of three:
+  notes, people and collections, each opening its page; otherwise the
+  three, as before. Two to a row at the largest text.
+- **Collections** has no bar above its title, as Notes and the other
+  pages have none: its title, with the + beside it, is the page's.
+
 ## [0.5.4] — a tidier phone
 
 The owner's list of 11 Nov 2026.
