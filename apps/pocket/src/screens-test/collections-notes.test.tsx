@@ -171,7 +171,7 @@ describe('Collections (P9)', () => {
     const t = vault();
     push('/collections');
     await unlocked(t, <Text>More</Text>);
-    expect(await screen.findByTestId('collections-none')).toHaveTextContent(/^No collections yet\. Collections are made in the browser/);
+    expect(await screen.findByTestId('collections-none')).toHaveTextContent(/^No collections yet\. Make one with New collection/);
   });
 });
 

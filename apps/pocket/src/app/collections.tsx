@@ -4,10 +4,11 @@ import { ChevronRight, FolderOpen } from 'lucide-react-native';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
-import { audienceKey } from '../collections/rules';
-import { on } from '../state/events';
+import { CollectionForm } from '../collections/collection-form';
+import { audienceKey, collectionsOffered } from '../collections/rules';
+import { emit, on } from '../state/events';
 import { useVault } from '../state/vault';
-import { Notice, Text } from '../ui';
+import { Button, Notice, Text } from '../ui';
 import { sp } from '../ui/space';
 import { LoadFailed, loadFailure, Placeholder } from '../ui/states';
 import { useColours, useStyles, type Palette } from '../ui/theme';
@@ -15,14 +16,16 @@ import { useColours, useStyles, type Palette } from '../ui/theme';
 /**
  * Collections (P9): every collection the person may see, as the vault
  * lists them, each with how many of its documents they can see and who it
- * is for. One opens its page. Collections are made, shared and given a
- * checklist in the browser; the phone reads them and puts documents in.
+ * is for. One opens its page. New collection makes one (the owner's gaps
+ * review, 11 Nov 2026); sharing one and its checklist stay in the browser.
  */
 export default function CollectionsScreen() {
   const styles = useStyles(makeStyles);
   const { t } = useTranslation();
   const router = useRouter();
-  const { withToken, offline } = useVault();
+  const { withToken, offline, caps, who } = useVault();
+  const [making, setMaking] = useState(false);
+  const mayMake = collectionsOffered(caps, who?.role);
   const [items, setItems] = useState<CollectionView[] | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -71,6 +74,19 @@ export default function CollectionsScreen() {
             </Notice>
           ) : null}
           {failed ? <LoadFailed words={failed} onRetry={() => void load()} /> : null}
+          {mayMake && !offline ? (
+            <Button kind="quiet" label={t('collectionForm.new')} onPress={() => setMaking(true)} testID="collections-new" />
+          ) : null}
+          {making ? (
+            <CollectionForm
+              onClose={() => setMaking(false)}
+              onSaved={(made) => {
+                setMaking(false);
+                emit('collectionChanged', made.id);
+                router.push({ pathname: '/collection/[id]', params: { id: made.id } });
+              }}
+            />
+          ) : null}
           {!items && !failed && !offline ? <Placeholder rows={3} /> : null}
           {items && items.length === 0 ? (
             <Text tone="soft" testID="collections-none">

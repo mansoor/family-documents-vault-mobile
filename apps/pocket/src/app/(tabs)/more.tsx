@@ -7,6 +7,7 @@ import {
   FolderOpen,
   Inbox,
   Settings,
+  Trash2,
   UserRound,
   Users,
   type LucideIcon,
@@ -42,6 +43,8 @@ export default function MoreScreen() {
   // Collections for whoever makes them, as the web offers them (a viewer, none). Notes is a
   // tab where the vault has them, and People a row here; on an older vault, People is the tab.
   const collectionsOn = collectionsOffered(caps, who?.role);
+  // The Trash, for whoever may move things there (the gaps review, 11 Nov 2026).
+  const trashOn = !!who && can(who.role, 'document.delete');
   const notesOn = caps?.features.notes === true;
   useEffect(() => {
     if (!inboxOn || offline) return;
@@ -82,6 +85,15 @@ export default function MoreScreen() {
               label={t('more.people')}
               hint={t('more.peopleHint')}
               onPress={() => router.push('/people')}
+            />
+          ) : null}
+          {trashOn ? (
+            <Row
+              testID="more-trash"
+              icon={Trash2}
+              label={t('trashList.title')}
+              hint={t('more.trashHint')}
+              onPress={() => router.push('/trash')}
             />
           ) : null}
           {inboxOn && vault ? (

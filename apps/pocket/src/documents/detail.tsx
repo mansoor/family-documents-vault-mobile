@@ -1,6 +1,7 @@
 import { ApiRequestError, NetworkError } from '@fdv/client';
 import {
   ANOTHER_DOCUMENT,
+  NO_LONGER_NEEDED_REASON_MAX,
   can,
   documentName,
   formatDate,
@@ -16,6 +17,8 @@ import { Image } from 'expo-image';
 import { Stack, useRouter } from 'expo-router';
 import {
   Download,
+  ArchiveRestore,
+  Archive,
   Ellipsis,
   Eye,
   FilePlus,
@@ -31,13 +34,15 @@ import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, S
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { renewWords } from '../capture/renew-words';
 import { useCapture } from '../state/capture';
-import { on } from '../state/events';
+import { emit, on } from '../state/events';
 import { useEssentials } from '../state/essentials';
 import { useLock } from '../state/lock';
 import { useStepUp } from '../state/step-up';
+import { wordsFor } from '../errors/words';
+import { feel } from '../ui/feel';
 import { NewVersionSays } from './renewal';
 import { useVault } from '../state/vault';
-import { Button, Notice, StatusLine, Text } from '../ui';
+import { Button, Field, Notice, StatusLine, Text } from '../ui';
 import { keptIsCurrent, saveVersion, setEssential as changeEssential, showDocument, type ActionDeps } from './actions';
 import { detailFacts } from './details';
 import { NoteText } from './notes';
@@ -45,6 +50,7 @@ import { latestOf } from './online';
 import { warnedAboutCopies } from './save-copy';
 import { TrashConfirm } from './trash';
 import { ConfirmSheet } from '../ui/confirm';
+import { IconButton } from '../ui/icon-button';
 import { Sheet } from '../ui/sheet';
 import { useTextScale } from '../ui/text-scale';
 import { VisibilityControl } from './visibility';
@@ -101,7 +107,11 @@ export function DocumentDetail(props: { id: string }) {
   const [refreshing, setRefreshing] = useState(false);
   const [versionsOpen, setVersionsOpen] = useState(false);
   // The header's ⋯: its choices, then the question Move to the Trash asks, in the same sheet.
-  const [more, setMore] = useState<'menu' | 'trash' | null>(null);
+  const [more, setMore] = useState<'menu' | 'trash' | 'unneeded' | null>(null);
+  // No longer needed (0.9.0), asked in the same sheet: why, if the person says.
+  const [reason, setReason] = useState('');
+  const [marking, setMarking] = useState(false);
+  const [markProblem, setMarkProblem] = useState<string | null>(null);
   // Essential off: its copies leave the phones that keep them, so it asks first (R2).
   const [askOff, setAskOff] = useState(false);
   // The collections it is in (P8), of those the person may see.
@@ -277,8 +287,11 @@ export function DocumentDetail(props: { id: string }) {
   const ordered = [...versions].sort((x, y) => y.version_no - x.version_no);
   const first = ordered[ordered.length - 1];
   const thumb = api && token && latest && !note ? api.thumbnailUrl(latest.id) : null;
-  const mayEdit = mayChange && !!doc && !note && !offline;
-  const hasMore = mayTrash && !!doc && !offline;
+  // A note is edited too (the gaps review, 11 Nov 2026): its title and its words.
+  const mayEdit = mayChange && !!doc && !offline;
+  // No longer needed, and needed again, from the phone (the gaps review), where the vault has it.
+  const mayUnneed = caps?.features.no_longer_needed === true && mayChange && !note;
+  const hasMore = (mayTrash || mayUnneed) && !!doc && !offline;
   // Two columns, until the text is so large that one reads better.
   const oneColumn = scale > 1.2;
 
@@ -626,27 +639,98 @@ export function DocumentDetail(props: { id: string }) {
       <Sheet visible={more !== null} onClose={() => setMore(null)} {...(more === 'menu' ? { outside: true as const } : {})} testID="document-more-sheet">
         {more === 'trash' && doc ? (
           <TrashConfirm id={id} title={name} onGone={() => router.back()} onCancel={() => setMore(null)} />
+        ) : more === 'unneeded' && doc ? (
+          <View style={styles.menu} testID="unneeded-question">
+            <Text variant="screen">{t('unneeded.title')}</Text>
+            <Text variant="secondary" tone="soft">
+              {t('unneeded.words', { title: name })}
+            </Text>
+            <Field
+              label={t('unneeded.reason')}
+              value={reason}
+              onChangeText={setReason}
+              maxLength={NO_LONGER_NEEDED_REASON_MAX}
+              autoCapitalize="sentences"
+              testID="unneeded-reason"
+            />
+            {markProblem ? (
+              <Notice tone="warn" testID="unneeded-problem">
+                {markProblem}
+              </Notice>
+            ) : null}
+            <Button label={t('unneeded.yes')} busy={marking} onPress={() => void markUnneeded()} testID="unneeded-yes" />
+            <Button kind="quiet" label={t('common.cancel')} disabled={marking} onPress={() => setMore(null)} testID="unneeded-cancel" />
+          </View>
         ) : (
           <View style={styles.menu}>
             <Text variant="screen">{name}</Text>
-            <Pressable
-              testID="document-trash"
-              accessibilityRole="button"
-              accessibilityLabel={t('trash.button')}
-              onPress={() => setMore('trash')}
-              style={({ pressed }) => [styles.menuRow, pressed ? styles.pressed : null]}
-            >
-              <Trash2 color={colours.danger} size={20} accessibilityElementsHidden importantForAccessibility="no" />
-              <Text tone="danger" weight="600">
-                {t('trash.button')}
-              </Text>
-            </Pressable>
+            {mayUnneed && shown.no_longer_needed ? (
+              <MenuRow
+                testID="document-needed-again"
+                icon={ArchiveRestore}
+                label={t('unneeded.again')}
+                busy={marking}
+                onPress={() => void neededAgain()}
+              />
+            ) : mayUnneed ? (
+              <MenuRow
+                testID="document-unneeded-mark"
+                icon={Archive}
+                label={t('unneeded.mark')}
+                onPress={() => {
+                  setReason('');
+                  setMarkProblem(null);
+                  setMore('unneeded');
+                }}
+              />
+            ) : null}
+            {mayTrash ? (
+              <MenuRow testID="document-trash" icon={Trash2} label={t('trash.button')} danger onPress={() => setMore('trash')} />
+            ) : null}
             <Button kind="quiet" label={t('common.cancel')} onPress={() => setMore(null)} testID="document-more-cancel" />
           </View>
         )}
       </Sheet>
     </ScrollView>
   );
+
+  /** Kept, but no longer needed: its reminders stop, and its status says so. */
+  async function markUnneeded() {
+    if (marking) return;
+    setMarking(true);
+    setMarkProblem(null);
+    try {
+      const saved = await withToken((a, tk) => a.markNoLongerNeeded(tk, id, { reason: reason.trim() || null }));
+      setDoc(saved);
+      setMore(null);
+      feel('done');
+      setNotice({ tone: 'ok', text: t('unneeded.done') });
+      emit('documentChanged', id);
+    } catch (err) {
+      setMarkProblem(wordsFor(err, t));
+    } finally {
+      setMarking(false);
+    }
+  }
+
+  /** Needed again: its reminders come back as its date warrants now. */
+  async function neededAgain() {
+    if (marking) return;
+    setMarking(true);
+    try {
+      const saved = await withToken((a, tk) => a.markNeededAgain(tk, id));
+      setDoc(saved);
+      setMore(null);
+      feel('done');
+      setNotice({ tone: 'ok', text: t('unneeded.againDone') });
+      emit('documentChanged', id);
+    } catch (err) {
+      setMore(null);
+      warn(wordsFor(err, t));
+    } finally {
+      setMarking(false);
+    }
+  }
 
   async function refreshNow() {
     setRefreshing(true);
@@ -669,8 +753,15 @@ export function DocumentDetail(props: { id: string }) {
   }
 }
 
-/** A round button in the header: 40 dp, 44 with its hit slop. */
-function IconButton(props: { testID: string; label: string; icon: LucideIcon; onPress: () => void }) {
+/** One choice in the header's ⋯: its icon and its words, red for the Trash. */
+function MenuRow(props: {
+  testID: string;
+  icon: LucideIcon;
+  label: string;
+  danger?: boolean;
+  busy?: boolean;
+  onPress: () => void;
+}) {
   const colours = useColours();
   const styles = useStyles(makeStyles);
   const Icon = props.icon;
@@ -679,11 +770,20 @@ function IconButton(props: { testID: string; label: string; icon: LucideIcon; on
       testID={props.testID}
       accessibilityRole="button"
       accessibilityLabel={props.label}
-      hitSlop={2}
+      accessibilityState={{ busy: props.busy === true, disabled: props.busy === true }}
+      disabled={props.busy === true}
       onPress={props.onPress}
-      style={({ pressed }) => [styles.iconButton, pressed ? styles.pressed : null]}
+      style={({ pressed }) => [styles.menuRow, pressed ? styles.pressed : null]}
     >
-      <Icon color={colours.ink} size={20} accessibilityElementsHidden importantForAccessibility="no" />
+      <Icon
+        color={props.danger ? colours.danger : colours.accent}
+        size={20}
+        accessibilityElementsHidden
+        importantForAccessibility="no"
+      />
+      <Text tone={props.danger ? 'danger' : 'ink'} weight="600">
+        {props.label}
+      </Text>
     </Pressable>
   );
 }
@@ -832,7 +932,6 @@ const makeStyles = (colours: Palette) =>
     older: { gap: 2, marginTop: sp(4) },
     olderActions: { flexDirection: 'row', marginTop: sp(4) },
     headerButtons: { flexDirection: 'row', alignItems: 'center' },
-    iconButton: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
     pressed: { opacity: 0.8 },
     menu: { gap: sp(10) },
     menuRow: { flexDirection: 'row', alignItems: 'center', gap: sp(12), minHeight: 48 },

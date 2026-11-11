@@ -414,6 +414,27 @@ async function library(t: TestVault, path: string, init: Parameters<FetchLike>[1
     lib.documents.delete(m[1]);
     return { ...json(null), status: 204, text: async () => '' } as Reply;
   }
+  // No longer needed, and needed again (0.9.0), on a document the library keeps.
+  m = /^\/api\/v1\/documents\/([^/]+)\/no-longer-needed$/.exec(q);
+  if (m?.[1] && lib.documents.has(m[1]) && (init.method === 'POST' || init.method === 'DELETE')) {
+    const doc = lib.documents.get(m[1]) as DocumentView;
+    const next = (
+      init.method === 'POST'
+        ? {
+            ...doc,
+            no_longer_needed: {
+              at: new Date().toISOString(),
+              by_name: 'Fake Owner',
+              reason: (body.reason as string | null | undefined) ?? null,
+              replaced_by: null,
+            },
+            status: { value: 'no_longer_needed', label: 'No longer needed' },
+          }
+        : { ...doc, no_longer_needed: null, status: { value: 'valid', label: '' } }
+    ) as DocumentView;
+    lib.documents.set(doc.id, { ...next, etag: nextEtag() });
+    return json(lib.documents.get(doc.id));
+  }
   // Who can see it (P8), as the vault of 0.9.0 answers it.
   m = /^\/api\/v1\/documents\/([^/]+)\/visibility$/.exec(q);
   if (m?.[1] && init.method === 'POST' && lib.documents.has(m[1])) {

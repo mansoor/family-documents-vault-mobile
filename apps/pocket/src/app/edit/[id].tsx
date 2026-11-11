@@ -1,5 +1,5 @@
 import { ApiRequestError } from '@fdv/client';
-import { issuedByLabel, type DocumentView } from '@fdv/shared';
+import { issuedByLabel, NOTE_KIND, NOTES_MAX, type DocumentView } from '@fdv/shared';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -9,6 +9,8 @@ import { andList, chooseOwner, chooseType, coreAsk, detailError, ownFields, type
 import { KindChooser, OwnerChooser } from '../../capture/choose';
 import { Chip, ChipRow, detailInput } from '../../capture/ui';
 import { draftOf, editBody } from '../../documents/edit';
+import { NoteEdit } from '../../documents/note-edit';
+import { TagsEditor } from '../../documents/tags-edit';
 import { wordsFor } from '../../errors/words';
 import { emit } from '../../state/events';
 import { feel } from '../../ui/feel';
@@ -27,6 +29,11 @@ import { useColours, useStyles, type Palette } from '../../ui/theme';
  * and sends the whole card; a vault that keeps each version's details is
  * told they are now confirmed for the newest version. Changed somewhere
  * else since it was opened: nothing is saved, and it says so.
+ *
+ * Since the gaps review (11 Nov 2026) it also writes the document's own
+ * note, where the vault keeps one that can be written (5.35), and its
+ * tags; each is sent only when it was changed. A note kept on its own is
+ * edited as a note: its title and its words (`NoteEdit`).
  */
 export default function EditScreen() {
   const styles = useStyles(makeStyles);
@@ -44,6 +51,9 @@ export default function EditScreen() {
   const [fields, setFields] = useState<FieldErrors>({});
   const [problem, setProblem] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // Its note and its tags, beside the card's questions.
+  const [notes, setNotes] = useState('');
+  const [tags, setTags] = useState<string[]>([]);
 
   const load = useCallback(async () => {
     if (!who) return;
@@ -53,6 +63,8 @@ export default function EditScreen() {
       );
       setDoc(d);
       setDraft(draftOf(d));
+      setNotes(d.notes ?? '');
+      setTags(d.tags ?? []);
       setHousehold({
         types: ty.items,
         members: m.items,
@@ -80,6 +92,9 @@ export default function EditScreen() {
     );
   }
 
+  // A note kept on its own: its title and its words.
+  if (doc.type_key === NOTE_KIND) return <NoteEdit doc={doc} onStale={load} />;
+
   const set = (patch: Partial<Draft>) => setDraft((d) => (d ? { ...d, ...patch } : d));
   const setDetail = (key: string, v: string | boolean) =>
     setDraft((d) => (d ? { ...d, details: { ...d.details, [key]: v } } : d));
@@ -101,6 +116,11 @@ export default function EditScreen() {
       ? coreLabel(key as CardCore)
       : (own.find((f) => f.key === key)?.label ?? key);
 
+  // Its note can be written where the vault says when a note last changed (5.35).
+  const writesNotes = doc.notes_updated_at !== undefined;
+  const notesLabel = type?.core?.notes?.label?.trim() || t('document.notes');
+  const notesTooLong = notes.length > NOTES_MAX;
+
   const save = async () => {
     if (busy) return;
     const out = editBody(draft, household, { confirm: caps?.features.version_details === true });
@@ -112,6 +132,13 @@ export default function EditScreen() {
       );
       return;
     }
+    if (notesTooLong) {
+      setProblem(t('newNote.tooLong', { count: notes.length }));
+      return;
+    }
+    // The note and the tags only when changed: an edit of the card never puts back what somebody wrote meanwhile.
+    if (writesNotes && notes.trim() !== (doc.notes ?? '').trim()) out.body.notes = notes.trim() || null;
+    if (JSON.stringify(tags) !== JSON.stringify(doc.tags ?? [])) out.body.tags = tags;
     setBusy(true);
     setProblem(null);
     try {
@@ -279,6 +306,23 @@ export default function EditScreen() {
             />
           );
         })}
+      </View>
+
+      <View style={styles.section}>
+        {writesNotes ? (
+          <Field
+            label={notesLabel}
+            value={notes}
+            onChangeText={setNotes}
+            multiline
+            numberOfLines={5}
+            textAlignVertical="top"
+            autoCapitalize="sentences"
+            error={notesTooLong ? t('newNote.tooLong', { count: notes.length }) : null}
+            testID="edit-notes"
+          />
+        ) : null}
+        <TagsEditor tags={tags} onChange={setTags} />
       </View>
 
       {problem ? (

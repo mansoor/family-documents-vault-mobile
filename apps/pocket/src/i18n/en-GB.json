@@ -432,7 +432,8 @@
     "accountHint": "This vault, who is signed in, and signed-in devices",
     "settingsHint": "Large text, light or dark, the lock, offline copies, notifications",
     "collectionsHint": "Documents gathered for a purpose, and what is in each",
-    "notesHint": "Your notes, and a new one"
+    "notesHint": "Your notes, and a new one",
+    "trashHint": "What was moved to the Trash, to bring back"
   },
   "documents": {
     "title": "Documents",
@@ -731,7 +732,7 @@
     "collect": "Add to a collection",
     "collectTitle": "Add “{{title}}” to a collection",
     "collectLoading": "Finding your collections…",
-    "collectNone": "You haven't made a collection yet. Only the person who made a collection can put documents in it, and collections are made in the browser.",
+    "collectNone": "You haven't made a collection yet. Only the person who made a collection can put documents in it: make one in More, Collections.",
     "collectOutgrown_one": "The collection you made is for people you are no longer one of: you can still delete it, but not put documents in it.",
     "collectOutgrown_other": "The {{count}} collections you made are for people you are no longer one of: you can still delete them, but not put documents in them.",
     "collectAdd": "Add",
@@ -757,7 +758,9 @@
     "title": "Edit details",
     "save": "Save",
     "stillNeeded": "Still needed: {{fields}}.",
-    "changed": "Someone changed this document while you were editing. Here it is as it is now: check it and save again."
+    "changed": "Someone changed this document while you were editing. Here it is as it is now: check it and save again.",
+    "noteTitle": "Edit note",
+    "changedNote": "Someone changed this note since you opened it. What you typed is still here: Save again to replace their change."
   },
   "visibility": {
     "title": "Who can see it",
@@ -776,7 +779,7 @@
   "trash": {
     "button": "Move to the Trash",
     "title": "Move to the Trash?",
-    "words": "“{{title}}” leaves every list, search and reminder. You can bring it back from the Trash in the browser.",
+    "words": "“{{title}}” leaves every list, search and reminder. You can bring it back from the Trash, in More.",
     "yes": "Move to the Trash"
   },
   "collections": {
@@ -790,7 +793,7 @@
     "audience_teens": "Teens and up",
     "audience_only_me": "Only me",
     "audience_some": "Some of the family",
-    "none": "No collections yet. Collections are made in the browser; then Add to a collection, in the ⋯ beside any document, puts documents in one you made.",
+    "none": "No collections yet. Make one with New collection; then Add to a collection, in the ⋯ beside any document, puts documents in it.",
     "needsConnection": "Collections need a connection to the vault."
   },
   "collection": {
@@ -933,5 +936,46 @@
     "chipDays_added": "Added {{from}} – {{to}}",
     "chipDays_issued": "Issued {{from}} – {{to}}",
     "chipDays_expires": "Expires {{from}} – {{to}}"
+  },
+  "tags": {
+    "none": "No tags yet.",
+    "add": "Add a tag",
+    "addButton": "Add",
+    "remove": "Remove the tag {{tag}}"
+  },
+  "unneeded": {
+    "mark": "No longer needed…",
+    "title": "No longer needed",
+    "words": "“{{title}}” is kept, but nothing reminds you of it and its status says no longer needed. You can mark it needed again at any time.",
+    "reason": "Why (if you like)",
+    "yes": "Mark as no longer needed",
+    "done": "Marked as no longer needed. Its reminders have stopped.",
+    "again": "Needed again",
+    "againDone": "Needed again: its reminders are back as its dates say."
+  },
+  "trashList": {
+    "title": "Trash",
+    "words": "What was moved to the Trash, newest first. Restore puts it back where it was; removing anything for good is done in the browser.",
+    "empty": "Nothing in the Trash.",
+    "when": "Moved to the Trash {{when}}",
+    "restore": "Restore",
+    "restoreLabel": "Restore “{{title}}”",
+    "restored": "“{{title}}” is back.",
+    "needsConnection": "The Trash needs a connection to the vault."
+  },
+  "collectionForm": {
+    "new": "New collection",
+    "newTitle": "New collection",
+    "editTitle": "Change the collection",
+    "name": "Name",
+    "description": "What it is for (if you like)",
+    "forWhom": "Who it is for",
+    "make": "Make the collection",
+    "saved": "Saved.",
+    "changed": "Someone changed this collection since you opened it. Close this and look again.",
+    "delete": "Delete “{{name}}”",
+    "deleteTitle": "Delete this collection?",
+    "deleteWords": "“{{name}}” is deleted for everybody. Its documents stay where they are; only the collection goes, and it cannot be brought back.",
+    "deleteYes": "Delete the collection"
   }
 }

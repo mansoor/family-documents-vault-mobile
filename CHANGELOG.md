@@ -6,6 +6,31 @@ app's own, tagged `vX.Y.Z` in this repository.
 
 ## [Unreleased]
 
+## [0.5.2] — what could be made or seen, now changed too
+
+The owner's review of 11 Nov 2026: a note could be made on the phone but
+never edited. The rest of the app was checked for the same kind of gap,
+and these are filled in:
+
+### Added
+- **Edit a note:** the pencil on a note opens its title and its words.
+  The title is changed only by the note's owner, and only when it was
+  changed; anybody else who may change the note changes its words.
+- **A document's own note**, written and changed in Edit details.
+- **Tags**, added and taken off in Edit details.
+- **No longer needed**, from a document's ⋯, with why if you like; and
+  **Needed again**, which brings its reminders back.
+- **The Trash**, in More: what was moved there, newest first, each with
+  **Restore**. Removing anything for good stays in the browser.
+- **Collections:** **New collection** (a name, what it is for, who it is
+  for), and on a collection you made, the pencil to change it and the bin
+  to delete it, asked first; its documents stay where they are.
+
+### Not on the phone yet
+- Reminders you set yourself, which need the vault's client to offer them
+  first; adding or changing people; and passwords, passkeys and two-step,
+  which stay in the browser.
+
 ## [0.5.1] — the + fans out
 
 ### Changed

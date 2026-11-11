@@ -147,6 +147,65 @@ env:
       id: bell-count
     timeout: 15000
 
+# The gaps review (11 Nov 2026): a tag added to the passport in Edit
+# details, and the Trash in More.
+- tapOn:
+    id: tab-documents
+- extendedWaitUntil:
+    visible:
+      id: doc-row-.*
+    timeout: 15000
+- tapOn:
+    id: doc-row-.*
+- extendedWaitUntil:
+    visible:
+      id: document-edit
+    timeout: 15000
+- tapOn:
+    id: document-edit
+- scrollUntilVisible:
+    element:
+      id: edit-tag-new
+    timeout: 30000
+- tapOn:
+    id: edit-tag-new
+- inputText: renew
+- hideKeyboard
+- tapOn:
+    id: edit-tag-add
+- extendedWaitUntil:
+    visible:
+      id: edit-tag-renew
+    timeout: 10000
+- takeScreenshot: shot-light-edit-tags
+- scrollUntilVisible:
+    element:
+      id: edit-save
+- tapOn:
+    id: edit-save
+- scrollUntilVisible:
+    element:
+      id: document-tags
+    timeout: 30000
+- assertVisible: .*renew.*
+- back
+- tapOn:
+    id: tab-more
+- tapOn:
+    id: more-trash
+- extendedWaitUntil:
+    visible:
+      id: trash
+    timeout: 15000
+- takeScreenshot: shot-light-trash
+- back
+- tapOn:
+    id: tab-home
+- extendedWaitUntil:
+    visible:
+      id: home-list
+    timeout: 15000
+
 # Dark: the filters, the passport's page, and Needs attention.
 - tapOn: Settings
 - scrollUntilVisible:
