@@ -8,7 +8,7 @@ import {
   type CollectionShareItem,
   type CreatedShare,
 } from '@fdv/shared';
-import { Check } from 'lucide-react-native';
+import { Check, Eye, EyeOff } from 'lucide-react-native';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, Share as SystemShare, StyleSheet, Switch, View } from 'react-native';
@@ -20,6 +20,7 @@ import { useStepUp } from '../state/step-up';
 import { useVault } from '../state/vault';
 import { Button, Field, Notice, Text } from '../ui';
 import { Chip, ChipRow } from '../ui/chip';
+import { IconButton } from '../ui/icon-button';
 import { feel } from '../ui/feel';
 import { Sheet } from '../ui/sheet';
 import { sp } from '../ui/space';
@@ -61,6 +62,8 @@ export function ShareSheet(props: { target: ShareTarget; onClose: () => void }) 
   const [failed, setFailed] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
+  // The link and its PIN or password, shown when asked for (the owner's ask of 11 Nov 2026): Send and Copy need neither.
+  const [shown, setShown] = useState(false);
   const [made, setMade] = useState<CreatedShare | null>(null);
   const [copied, setCopied] = useState<'link' | 'secret' | null>(null);
   const set = (change: Partial<ShareOptions>) => setOpts((o) => ({ ...o, ...change }));
@@ -155,25 +158,6 @@ export function ShareSheet(props: { target: ShareTarget; onClose: () => void }) 
           <Text variant="secondary" tone="soft">
             {t('share.madeWords', { name, end: shareEndWords(new Date(made.share.expires_at), zone) })}
           </Text>
-          <View style={styles.linkBox}>
-            <Text selectable testID="share-link">
-              {link}
-            </Text>
-          </View>
-          {secret ? (
-            <View style={styles.secret}>
-              <Text variant="secondary" weight="600" tone="soft">
-                {made.pin ? t('share.pin') : t('share.password')}
-              </Text>
-              <Text variant="title" selectable testID="share-secret">
-                {secret}
-              </Text>
-              <Text variant="small" tone="soft">
-                {t('share.secretApart')}
-              </Text>
-            </View>
-          ) : null}
-          <Notice tone="warn">{t('share.onlyNow')}</Notice>
           <Button
             label={t('share.send')}
             onPress={() => void SystemShare.share({ message: link })}
@@ -195,6 +179,43 @@ export function ShareSheet(props: { target: ShareTarget; onClose: () => void }) 
               testID="share-copy-secret"
             />
           ) : null}
+          {secret ? (
+            <Text variant="small" tone="soft">
+              {t('share.secretApart')}
+            </Text>
+          ) : null}
+          {/* What was made, behind the eye: Send and Copy above need none of it. */}
+          <View style={styles.revealRow}>
+            <Text variant="secondary" weight="600" style={styles.flex}>
+              {secret ? (made.pin ? t('share.linkAndPin') : t('share.linkAndPassword')) : t('share.theLink')}
+            </Text>
+            <IconButton
+              testID="share-reveal"
+              label={shown ? t('share.hide') : t('share.reveal')}
+              icon={shown ? EyeOff : Eye}
+              onPress={() => setShown((s) => !s)}
+            />
+          </View>
+          {shown ? (
+            <>
+              <View style={styles.linkBox}>
+                <Text selectable testID="share-link">
+                  {link}
+                </Text>
+              </View>
+              {secret ? (
+                <View style={styles.secret}>
+                  <Text variant="secondary" weight="600" tone="soft">
+                    {made.pin ? t('share.pin') : t('share.password')}
+                  </Text>
+                  <Text variant="title" selectable testID="share-secret">
+                    {secret}
+                  </Text>
+                </View>
+              ) : null}
+            </>
+          ) : null}
+          <Notice tone="warn">{t('share.onlyNow')}</Notice>
           <Button kind="quiet" label={t('share.done')} onPress={props.onClose} testID="share-done" />
         </ScrollView>
       </Sheet>
@@ -423,6 +444,7 @@ const makeStyles = (colours: Palette) =>
     row: { flexDirection: 'row', gap: sp(8) },
     flex: { flex: 1 },
     time: { width: 104 },
+    revealRow: { flexDirection: 'row', alignItems: 'center', gap: sp(8) },
     linkBox: {
       padding: sp(12),
       borderRadius: radii.m,

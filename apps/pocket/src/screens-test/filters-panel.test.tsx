@@ -3,7 +3,7 @@ import { fireEvent, screen, waitFor } from '@testing-library/react-native';
 import DocumentsScreen from '../app/(tabs)/documents';
 import { listQuery, NO_FILTERS, quickRange, searchQuery, toggle } from '../documents/filter-model';
 import { audit } from '../test-support/a11y';
-import { unlocked } from '../test-support/lookup';
+import { unlocked, openSearch } from '../test-support/lookup';
 import { installed } from '../test-support/render';
 import { resetRoutes } from '../test-support/router';
 import { capabilities, testVault, type TestVault } from '../test-support/vault';
@@ -42,6 +42,7 @@ function vault(several = true): TestVault {
 }
 
 async function openPanel() {
+  await openSearch();
   await fireEvent.press(await screen.findByTestId('documents-filters'));
   return screen.findByTestId('filter-status-expired');
 }
@@ -133,6 +134,7 @@ describe('the filter panel (R5)', () => {
       ),
     );
     expect(asked(t).at(-1)?.expires_to).toBe(addDays(asked(t).at(-1)?.expires_from as string, 90));
+    await openSearch();
     expect(screen.getByTestId('documents-filters').props.accessibilityLabel).toBe('Filters: 4 on');
     expect(screen.getByTestId('documents-chip-people')).toHaveTextContent(/^Fake Owner/);
     expect(screen.getByTestId('documents-chip-date')).toHaveTextContent('Expires in 90 days');
@@ -196,6 +198,7 @@ describe('the filter panel (R5)', () => {
     await openPanel();
     await fireEvent.press(screen.getByTestId('filter-kind-passport'));
     await fireEvent.press(screen.getByTestId('filters-apply'));
+    await openSearch();
     await fireEvent.changeText(screen.getByTestId('search-field'), 'renew');
     await waitFor(() =>
       expect(t.calls.some((c) => c.includes('/api/v1/search?') && c.includes('q=renew') && c.includes('type_key=passport'))).toBe(

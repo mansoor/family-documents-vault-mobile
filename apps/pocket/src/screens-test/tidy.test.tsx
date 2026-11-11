@@ -1,13 +1,14 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react-native';
 import Home from '../app/(tabs)/index';
 import DocumentsScreen from '../app/(tabs)/documents';
-import NotesScreen from '../app/(tabs)/notes';
+import NotesScreen, { remembered } from '../app/(tabs)/notes';
+import { readPrefs } from '../platform/prefs';
 import CollectionsScreen from '../app/collections';
 import EditScreen from '../app/edit/[id]';
 import { DocumentDetail } from '../documents/detail';
 import { listQuery, NO_FILTERS, searchQuery } from '../documents/filter-model';
 import { audit } from '../test-support/a11y';
-import { libraryDoc, unlocked } from '../test-support/lookup';
+import { libraryDoc, unlocked, openSearch } from '../test-support/lookup';
 import { installed } from '../test-support/render';
 import { push, resetRoutes, routes } from '../test-support/router';
 import { caps0519, capabilities, testVault, type TestVault } from '../test-support/vault';
@@ -194,6 +195,7 @@ describe('Documents: without the notes, and tags among the filters', () => {
     expect(screen.queryByTestId('doc-row-n1')).toBeNull();
     expect(asked(t).at(-1)?.get('notes')).toBe('exclude');
 
+    await openSearch();
     await fireEvent.press(screen.getByTestId('documents-filters'));
     const travel = await screen.findByTestId('filter-tag-Travel');
     // No Note among the kinds: notes have their own tab.
@@ -214,6 +216,7 @@ describe('Documents: without the notes, and tags among the filters', () => {
     doc(t, 'n1', 'Gate code', 'note', [], '4821');
     await unlocked(t, <DocumentsScreen />);
     await screen.findByTestId('doc-row-n1');
+    await openSearch();
     await fireEvent.press(screen.getByTestId('documents-filters'));
     await screen.findByTestId('filter-status-expired');
     expect(screen.queryByTestId('filter-tag-Travel')).toBeNull();
@@ -297,5 +300,80 @@ describe('Collections: a + beside the title, and no › on a row', () => {
     expect(add.props.accessibilityLabel).toBe('New collection');
     await fireEvent.press(add);
     expect(await screen.findByTestId('collection-form-name')).toBeTruthy();
+  });
+});
+
+describe('Documents: the search box behind the magnifier', () => {
+  it('hidden until asked for; closed, what was typed goes', async () => {
+    const t = vault();
+    doc(t, 'p1', 'Passport', 'passport');
+    await unlocked(t, <DocumentsScreen />);
+    await screen.findByTestId('doc-row-p1');
+    expect(screen.queryByTestId('search-field')).toBeNull();
+    expect(screen.queryByTestId('documents-filters')).toBeNull();
+    await fireEvent.press(screen.getByTestId('documents-search'));
+    await fireEvent.changeText(await screen.findByTestId('search-field'), 'pass');
+    expect(screen.getByTestId('documents-filters')).toBeTruthy();
+    expect(audit()).toEqual([]);
+    await fireEvent.press(screen.getByTestId('documents-search'));
+    expect(screen.queryByTestId('search-field')).toBeNull();
+  });
+});
+
+describe('Notes: three layouts, one button going round them', () => {
+  it('Detailed, then Sticky, List and Detailed again; remembered on this phone', async () => {
+    const t = vault();
+    doc(t, 'n1', 'A rather long name for a note about the boiler and the man who services it', 'note', [], 'Serviced in March.');
+    await unlocked(t, <NotesScreen />);
+    await screen.findByTestId('note-n1');
+    const button = screen.getByTestId('notes-layout');
+    expect(button.props.accessibilityLabel).toBe('Shown as Detailed. Show as Sticky notes');
+    await fireEvent.press(button);
+    expect(screen.getByTestId('notes-layout').props.accessibilityLabel).toBe('Shown as Sticky notes. Show as List');
+    expect(readPrefs('notes-layout', '')).toBe('sticky');
+    expect(screen.getByTestId('note-preview-n1')).toHaveTextContent('Serviced in March.');
+    expect(screen.getByTestId('doc-menu-n1')).toBeTruthy();
+    expect(audit()).toEqual([]);
+    await fireEvent.press(screen.getByTestId('notes-layout'));
+    // List: the name on one line, nothing else.
+    expect(screen.getByTestId('note-name-n1').props.numberOfLines).toBe(1);
+    expect(screen.queryByTestId('note-preview-n1')).toBeNull();
+    expect(screen.queryByText(/^Changed/)).toBeNull();
+    await fireEvent.press(screen.getByTestId('notes-layout'));
+    expect(screen.getByTestId('notes-layout').props.accessibilityLabel).toBe('Shown as Detailed. Show as Sticky notes');
+  });
+});
+
+describe('Notes: what was looked for, remembered on this phone', () => {
+  it('kept newest first; one looked for again; forgotten after asking', async () => {
+    const t = vault();
+    doc(t, 'n1', 'Boiler', 'note', [], 'Serviced in March.');
+    await unlocked(t, <NotesScreen />);
+    const find = await screen.findByTestId('notes-find');
+    await fireEvent.changeText(find, 'boiler');
+    await fireEvent(find, 'submitEditing');
+    await fireEvent.changeText(find, 'wifi');
+    await fireEvent(find, 'submitEditing');
+    await fireEvent.changeText(find, '');
+    await fireEvent.press(screen.getByTestId('notes-history'));
+    const sheet = await screen.findByTestId('notes-history-sheet');
+    expect(within(sheet).getByTestId('notes-history-0')).toHaveTextContent('wifi');
+    expect(within(sheet).getByTestId('notes-history-1')).toHaveTextContent('boiler');
+    expect(audit()).toEqual([]);
+    await fireEvent.press(screen.getByTestId('notes-history-1'));
+    expect(screen.getByTestId('notes-find').props.value).toBe('boiler');
+
+    await fireEvent.press(screen.getByTestId('notes-history'));
+    await fireEvent.press(await screen.findByTestId('notes-history-forget'));
+    expect(await screen.findByText('Forget these searches?')).toBeTruthy();
+    await fireEvent.press(screen.getByTestId('notes-history-forget-yes'));
+    expect(await screen.findByTestId('notes-history-none')).toBeTruthy();
+  });
+
+  it('the newest first, each once whatever its case, fifteen at most', () => {
+    let h: string[] = [];
+    for (let i = 0; i < 20; i += 1) h = remembered(h, `w${i}`);
+    expect(h).toHaveLength(15);
+    expect(remembered(['Boiler', 'wifi'], 'boiler ')).toEqual(['boiler', 'wifi']);
   });
 });

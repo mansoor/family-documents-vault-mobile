@@ -8,12 +8,11 @@ import {
   type ReminderView,
   type ResetNotice,
 } from '@fdv/shared';
-import { Link, useNavigation, useRouter } from 'expo-router';
-import { Settings as SettingsIcon } from 'lucide-react-native';
+import { useNavigation, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
-import { AppState, FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
+import { AppState, FlatList, RefreshControl, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AccessNotice, myAccess, type MyAccess } from '../../access/access';
 import { QueueRow, withoutWords } from '../../capture/queue-row';
@@ -30,13 +29,12 @@ import { useStepUp } from '../../state/step-up';
 import { useVault } from '../../state/vault';
 import { Button, Notice, Text } from '../../ui';
 import { DocumentRow, rowPlace } from '../../documents/row';
-import { BellButton } from '../../ui/bell';
 import { countAlert, reminderAlert, type HomeAlert } from '../../home/alerts';
 import { AlertCards } from '../../home/alert-cards';
 import { Counts, ESSENTIALS_SHOWN, EssentialsLine, EssentialsSection, type HomeCounts } from '../../home/glance';
 import { sp } from '../../ui/space';
 import { VaultRead } from '../../capture/vault-read';
-import { useColours, useStyles, type Palette } from '../../ui/theme';
+import { useStyles, type Palette } from '../../ui/theme';
 import { dayWords, endWords, useFamilyZone } from '../../state/family-time';
 import { LoadFailed, loadFailure, Placeholder } from '../../ui/states';
 
@@ -83,7 +81,6 @@ const optional = <T,>(p: Promise<T>): Promise<T | null> =>
  * see, when an owner limited it, and a guest's end (5.36).
  */
 export default function Home() {
-  const colours = useColours();
   const styles = useStyles(makeStyles);
   const { t } = useTranslation();
   const router = useRouter();
@@ -270,7 +267,6 @@ export default function Home() {
     setRefreshing(false);
   };
 
-  const name = caps?.branding.display_name ?? vault?.displayName ?? '';
   // What needs doing, as alerts (R4): due reminders, documents with no name, files in the Inbox.
   const due = data?.due ?? [];
   const recent = (data?.recent ?? []).slice(0, 5);
@@ -285,7 +281,7 @@ export default function Home() {
   };
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
+    <SafeAreaView style={styles.safe} edges={[]}>
       <FlatList
         testID="home-list"
         // The five added last (R4); See all opens Documents.
@@ -295,22 +291,6 @@ export default function Home() {
         contentContainerStyle={styles.page}
         ListHeaderComponent={
           <View style={styles.header}>
-            <View style={styles.titleRow}>
-              <Text variant="hero" style={styles.flex}>
-                {name}
-              </Text>
-              <BellButton />
-              <Link href="/settings" asChild>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={t('home.settings')}
-                  hitSlop={12}
-                  style={styles.iconButton}
-                >
-                  <SettingsIcon color={colours.inkSoft} size={24} />
-                </Pressable>
-              </Link>
-            </View>
             {notice === 'stranger' ? (
               <Notice tone="danger" testID="home-stranger">
                 {t('connect.stranger', { host: vault?.origin.replace(/^https?:\/\//, '') ?? '' })}

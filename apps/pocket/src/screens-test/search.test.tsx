@@ -4,7 +4,7 @@ import { StyleSheet } from 'react-native';
 import SearchScreen, { SEARCH_DEBOUNCE_MS } from '../app/(tabs)/documents';
 import { snippetParts } from '../documents/snippet';
 import { audit } from '../test-support/a11y';
-import { unlocked } from '../test-support/lookup';
+import { unlocked, openSearch } from '../test-support/lookup';
 import { installed } from '../test-support/render';
 import { resetRoutes, routes } from '../test-support/router';
 import { testVault } from '../test-support/vault';
@@ -48,6 +48,7 @@ describe('Search', () => {
       sealed: 0,
     });
     await unlocked(t, <SearchScreen />);
+    await openSearch();
     await fireEvent.changeText(await screen.findByTestId('search-field'), '123456');
     const snippet = await screen.findByTestId('snippet-passport');
     // The match is a bold run; the rest is text, whatever it looks like.
@@ -66,6 +67,7 @@ describe('Search', () => {
     const t = testVault([ORIGIN]);
     t.library.search = () => ({ items: [], sealed: 0 });
     await unlocked(t, <SearchScreen />);
+    await openSearch();
     const field = await screen.findByTestId('search-field');
     for (const q of ['p', 'pa', 'pas', 'pass']) await fireEvent.changeText(field, q);
     expect(await screen.findByTestId('search-nothing')).toHaveTextContent(
@@ -79,6 +81,7 @@ describe('Search', () => {
     t.library.search = () => ({ items: [hit({ document_id: 'passport' })], sealed: 2 });
     t.library.sealed = [hit({ document_id: 'diary', title: 'Diary', snippet: 'the <em>pass</em> code' })];
     await unlocked(t, <SearchScreen />);
+    await openSearch();
     await fireEvent.changeText(await screen.findByTestId('search-field'), 'pass');
     expect(await screen.findByTestId('doc-row-diary')).toBeTruthy();
     await waitFor(() => expect(screen.getByTestId('search-count')).toHaveTextContent('2 documents'));
@@ -88,6 +91,7 @@ describe('Search', () => {
     const t = testVault([ORIGIN]);
     await unlocked(t, <SearchScreen />);
     t.reachable.delete(ORIGIN);
+    await openSearch();
     await fireEvent.changeText(await screen.findByTestId('search-field'), 'passport');
     expect(await screen.findByTestId('search-offline')).toHaveTextContent(
       'Search needs a connection. Your Essentials are under On this phone.',
@@ -99,6 +103,7 @@ describe('Search', () => {
     t.library.search = () => ({ items: [hit({ document_id: 'passport' })], sealed: 0 });
     await unlocked(t, <SearchScreen />);
     t.reachable.delete(ORIGIN);
+    await openSearch();
     await fireEvent.changeText(await screen.findByTestId('search-field'), 'passport');
     expect(await screen.findByTestId('search-offline')).toBeTruthy();
     t.reachable.add(ORIGIN);
@@ -113,6 +118,7 @@ describe('Search', () => {
     const t = testVault([ORIGIN]);
     t.library.search = () => ({ items: [hit({ document_id: 'passport', snippet: '<em>pass</em>port' })], sealed: 0 });
     await unlocked(t, <SearchScreen />);
+    await openSearch();
     await fireEvent.changeText(await screen.findByTestId('search-field'), 'pass');
     await screen.findByTestId('doc-row-passport');
     await act(async () => undefined);

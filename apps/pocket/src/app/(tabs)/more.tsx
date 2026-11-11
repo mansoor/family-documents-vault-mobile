@@ -21,7 +21,6 @@ import { collectionsOffered } from '../../collections/rules';
 import { waitingInInbox } from '../../queue/inbox';
 import { useVault } from '../../state/vault';
 import { Text } from '../../ui';
-import { BellButton } from '../../ui/bell';
 import { sp } from '../../ui/space';
 import { useColours, useStyles, type Palette } from '../../ui/theme';
 
@@ -63,13 +62,12 @@ export default function MoreScreen() {
   }, [inboxOn, offline, withTokenQuick]);
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
+    <SafeAreaView style={styles.safe} edges={[]}>
       <ScrollView testID="more" contentContainerStyle={styles.page}>
         <View style={styles.titleRow}>
           <Text variant="hero" style={styles.flex}>
             {t('more.title')}
           </Text>
-          <BellButton />
         </View>
         <View style={styles.group}>
           {collectionsOn ? (

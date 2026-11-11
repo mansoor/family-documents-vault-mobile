@@ -103,6 +103,9 @@ env:
 
 # The filters, from the side (R5): In date (the passport, valid for years),
 # shown as a chip under the box, and taken off again with it.
+# The search box and its filters open from the title row's magnifier (0.5.6).
+- tapOn:
+    id: documents-search
 - tapOn:
     id: documents-filters
 - extendedWaitUntil:

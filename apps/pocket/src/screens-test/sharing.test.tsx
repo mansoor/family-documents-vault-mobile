@@ -95,6 +95,10 @@ describe('Share, from a document’s ⋯', () => {
     expect(audit()).toEqual([]);
     await fireEvent.press(screen.getByTestId('share-make'));
 
+    // Send and Copy up front; the link and its PIN behind the eye (11 Nov 2026).
+    expect(await screen.findByTestId('share-send')).toBeTruthy();
+    expect(screen.queryByTestId('share-link')).toBeNull();
+    await fireEvent.press(screen.getByTestId('share-reveal'));
     expect(await screen.findByTestId('share-link')).toHaveTextContent('https://share.vault.test/s#tok-1');
     expect(screen.getByTestId('share-secret')).toHaveTextContent('4821');
     expect(screen.getByTestId('share-send')).toBeTruthy();
@@ -172,7 +176,7 @@ describe('Share, from a collection’s page', () => {
     await fireEvent.press(screen.getByTestId('share-make'));
     await fireEvent.changeText(await screen.findByTestId('step-up-password'), PASSWORD);
     await fireEvent.press(screen.getByTestId('step-up-go'));
-    expect(await screen.findByTestId('share-link')).toBeTruthy();
+    expect(await screen.findByTestId('share-reveal')).toBeTruthy();
     expect(t.library.shareBodies[0]).toEqual({
       to: 'hol',
       body: expect.objectContaining({ document_ids: ['p1'], left_out_ids: ['w1'] }),
