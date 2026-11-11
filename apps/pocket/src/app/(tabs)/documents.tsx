@@ -372,7 +372,6 @@ export default function DocumentsScreen() {
                   onChangeText={setQ}
                   returnKeyType="search"
                   clearButtonMode="while-editing"
-                  autoFocus
                 />
               </View>
               <Pressable

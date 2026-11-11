@@ -458,7 +458,7 @@
     "noneMatch": "Nothing matches these choices. Try fewer of them.",
     "needsConnection": "Showing your documents needs a connection to your vault.",
     "sortNow": "Sort: {{sort}}",
-    "searchOpen": "Search your documents",
+    "searchOpen": "Search",
     "searchClose": "Close the search"
   },
   "document": {

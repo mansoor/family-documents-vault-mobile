@@ -120,6 +120,8 @@ test("search, open, confirm it's you, snooze", async ({ page, baseURL, request }
   // Search: found by its name, opened.
   // Search is the Documents tab since R3.
   await page.getByRole('tab', { name: 'Documents' }).click();
+  // The search box opens from the magnifier beside the title (0.5.6).
+  await page.getByTestId('documents-search').click();
   await page.getByLabel('Search your documents').fill(word);
   // The row itself, not its ⋯ ("Actions for “…”", 5.36), which names it too.
   await page.getByRole('button', { name: new RegExp(`^${title}`) }).click();
