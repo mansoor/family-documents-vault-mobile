@@ -1,6 +1,6 @@
 import { radii, type CollectionView } from '@fdv/shared';
 import { useRouter } from 'expo-router';
-import { ChevronRight, FolderOpen } from 'lucide-react-native';
+import { FolderOpen, Plus } from 'lucide-react-native';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
@@ -8,7 +8,8 @@ import { CollectionForm } from '../collections/collection-form';
 import { audienceKey, collectionsOffered } from '../collections/rules';
 import { emit, on } from '../state/events';
 import { useVault } from '../state/vault';
-import { Button, Notice, Text } from '../ui';
+import { Notice, Text } from '../ui';
+import { IconButton } from '../ui/icon-button';
 import { sp } from '../ui/space';
 import { LoadFailed, loadFailure, Placeholder } from '../ui/states';
 import { useColours, useStyles, type Palette } from '../ui/theme';
@@ -16,8 +17,10 @@ import { useColours, useStyles, type Palette } from '../ui/theme';
 /**
  * Collections (P9): every collection the person may see, as the vault
  * lists them, each with how many of its documents they can see and who it
- * is for. One opens its page. New collection makes one (the owner's gaps
- * review, 11 Nov 2026); sharing one and its checklist stay in the browser.
+ * is for. One opens its page. The + beside the title makes one (the
+ * owner's gaps review, then tidy-up, 11 Nov 2026: as Notes' +, and no >
+ * on a row, whose name says there is more in it). Its checklist stays in
+ * the browser.
  */
 export default function CollectionsScreen() {
   const styles = useStyles(makeStyles);
@@ -67,16 +70,26 @@ export default function CollectionsScreen() {
       }
       ListHeaderComponent={
         <View style={styles.header}>
-          <Text variant="hero">{t('collections.title')}</Text>
+          <View style={styles.titleRow}>
+            <Text variant="hero" style={styles.flex}>
+              {t('collections.title')}
+            </Text>
+            {mayMake && !offline ? (
+              <IconButton
+                testID="collections-new"
+                label={t('collectionForm.new')}
+                icon={Plus}
+                filled
+                onPress={() => setMaking(true)}
+              />
+            ) : null}
+          </View>
           {offline && !items ? (
             <Notice tone="warn" testID="collections-offline">
               {t('collections.needsConnection')}
             </Notice>
           ) : null}
           {failed ? <LoadFailed words={failed} onRetry={() => void load()} /> : null}
-          {mayMake && !offline ? (
-            <Button kind="quiet" label={t('collectionForm.new')} onPress={() => setMaking(true)} testID="collections-new" />
-          ) : null}
           {making ? (
             <CollectionForm
               onClose={() => setMaking(false)}
@@ -138,7 +151,6 @@ function CollectionRow(props: { collection: CollectionView; onPress: () => void 
           </Text>
         ) : null}
       </View>
-      <ChevronRight color={colours.inkMuted} size={20} accessibilityElementsHidden importantForAccessibility="no" />
     </Pressable>
   );
 }
@@ -148,6 +160,8 @@ const makeStyles = (colours: Palette) =>
     screen: { backgroundColor: colours.bg },
     page: { padding: sp(20), gap: sp(10) },
     header: { gap: sp(12) },
+    titleRow: { flexDirection: 'row', alignItems: 'center', gap: sp(8) },
+    flex: { flex: 1 },
     row: {
       flexDirection: 'row',
       alignItems: 'center',

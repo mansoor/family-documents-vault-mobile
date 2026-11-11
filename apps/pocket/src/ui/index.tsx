@@ -46,6 +46,8 @@ export function Text(props: {
   testID?: string;
   /** Long-pressed to select and copy (a link to send). */
   selectable?: boolean;
+  /** Cut to this many lines, the rest left for its page (a note's first line in Notes). */
+  numberOfLines?: number;
 }) {
   const colours = useColours();
   const { scale } = useTextScale();
@@ -65,6 +67,7 @@ export function Text(props: {
     <RNText
       testID={props.testID}
       {...(props.selectable ? { selectable: true } : {})}
+      {...(props.numberOfLines ? { numberOfLines: props.numberOfLines } : {})}
       accessibilityRole={props.role ?? (display ? 'header' : 'text')}
       style={[
         {

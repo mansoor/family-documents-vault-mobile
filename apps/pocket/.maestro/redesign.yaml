@@ -293,12 +293,25 @@ env:
     timeout: 15000
 - takeScreenshot: shot-light-trash
 - back
+# The tidy-up (0.5.4): Notes with its + beside the bell; Home's four counts.
+- tapOn:
+    id: tab-notes
+- extendedWaitUntil:
+    visible:
+      id: notes-new
+    timeout: 15000
+- takeScreenshot: shot-light-notes
 - tapOn:
     id: tab-home
 - extendedWaitUntil:
     visible:
       id: home-list
     timeout: 15000
+- extendedWaitUntil:
+    visible:
+      id: home-count-notes
+    timeout: 15000
+- takeScreenshot: shot-light-home-counts
 
 # Dark: the filters, the passport's page, and Needs attention.
 - tapOn: Settings

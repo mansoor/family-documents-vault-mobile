@@ -131,13 +131,27 @@ export default function Home() {
           }
           return n;
         };
-        // How many: the table's total for a column sort, one row asked for (0.6.0).
+        // How many: the table's total for a column sort, one row asked for (0.6.0);
+        // documents without the notes where the vault leaves them out (the owner's tidy-up of 11 Nov 2026).
+        const apart = caps?.features.notes_apart === true ? { notes: 'exclude' as const } : {};
         const total = async (status?: 'expiring_soon' | 'needs_info') =>
-          (await a.documents(token, { sort: 'title', direction: 'asc', limit: 1, ...(status ? { status } : {}) })).total ?? 0;
+          (await a.documents(token, { sort: 'title', direction: 'asc', limit: 1, ...apart, ...(status ? { status } : {}) }))
+            .total ?? 0;
+        // And how many notes, where the vault keeps them: the newest it lists, and more when it says so.
+        const noteCount = async (): Promise<HomeCounts['notes']> => {
+          if (caps?.features.notes !== true) return null;
+          const r = await a.notes(token);
+          return { n: r.items.length, more: r.truncated };
+        };
         const glance = async (): Promise<HomeCounts | null> => {
           if (!counted) return null;
-          const [all, expiring, details] = await Promise.all([total(), total('expiring_soon'), total('needs_info')]);
-          return { total: all, expiring, details };
+          const [all, expiring, details, notes] = await Promise.all([
+            total(),
+            total('expiring_soon'),
+            total('needs_info'),
+            noteCount().catch(() => null),
+          ]);
+          return { total: all, expiring, details, notes };
         };
         const [due, recent, unnamed, me, audience, counts] = await Promise.all([
           a.reminders(token, 'due'),
@@ -165,7 +179,7 @@ export default function Home() {
       // Offline or signed out: the banner or the sign-in screen says so. Anything else, here.
       setFailed(loadFailure('home', err, t));
     }
-  }, [withTokenQuick, identityOn, counted, t]);
+  }, [withTokenQuick, identityOn, counted, caps?.features.notes, caps?.features.notes_apart, t]);
 
   useEffect(() => {
     // Loading on arrival, and again each time the vault takes a capture:

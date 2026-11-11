@@ -9,6 +9,10 @@ import { addDays, type DocumentListParams, type StatusValue, type Visibility } f
  * A vault with `document_filters` (0.9.0, V1) takes several of each and the
  * days; an older one, one of each and no days — the panel then chooses one,
  * and has no dates.
+ *
+ * The owner's tidy-up of 11 Nov 2026: tags too, several, where the vault
+ * takes them (`tag_filters`); and Documents without the notes, which have
+ * their own tab, where the vault leaves them out (`notes_apart`).
  */
 
 export type DateWhich = 'added' | 'issued' | 'expires';
@@ -38,10 +42,26 @@ export interface Filters {
   kinds: string[];
   statuses: StatusValue[];
   visibilities: Visibility[];
+  /** Tags, any of them, whatever their case (`tag_filters`). */
+  tags: string[];
   date: DateRange | null;
 }
 
-export const NO_FILTERS: Filters = { people: [], kinds: [], statuses: [], visibilities: [], date: null };
+export const NO_FILTERS: Filters = { people: [], kinds: [], statuses: [], visibilities: [], tags: [], date: null };
+
+/** What else the vault takes: several tags, and the notes left out. */
+export interface Apart {
+  tags: boolean;
+  notes: boolean;
+}
+
+/** The tags and the notes, as the vault takes them; nothing for an older one. */
+function apartOf(f: Filters, apart: Apart | undefined): { tag?: string[]; notes?: 'exclude' } {
+  return {
+    ...(apart?.tags && f.tags.length > 0 ? { tag: f.tags } : {}),
+    ...(apart?.notes ? { notes: 'exclude' as const } : {}),
+  };
+}
 
 /** The quick ranges each date offers, most asked for first. */
 export const QUICK: Record<DateWhich, Quick[]> = {
@@ -84,6 +104,7 @@ export function countOn(f: Filters): number {
     (f.kinds.length > 0 ? 1 : 0) +
     (f.statuses.length > 0 ? 1 : 0) +
     (f.visibilities.length > 0 ? 1 : 0) +
+    (f.tags.length > 0 ? 1 : 0) +
     (f.date ? 1 : 0)
   );
 }
@@ -116,7 +137,7 @@ export type Sort = 'recent' | 'title' | 'expires';
  */
 export function listQuery(
   f: Filters,
-  opts: { sort: Sort; table: boolean; several: boolean },
+  opts: { sort: Sort; table: boolean; several: boolean; apart?: Apart },
 ): DocumentListParams {
   const people = asked(f.people, opts.several);
   const kinds = asked(f.kinds, opts.several);
@@ -134,6 +155,7 @@ export function listQuery(
     ...(statuses ? { status: statuses as StatusValue } : {}),
     ...(visibilities ? { visibility: visibilities as Visibility } : {}),
     ...(opts.several ? days(f) : {}),
+    ...apartOf(f, opts.apart),
   };
 }
 
@@ -144,10 +166,10 @@ export function listQuery(
  */
 export function searchQuery(
   f: Filters,
-  opts: { several: boolean; categoryOf: (kind: string) => string | null },
-): Record<string, string> {
+  opts: { several: boolean; categoryOf: (kind: string) => string | null; apart?: Apart },
+): Record<string, string | string[]> {
   if (opts.several) {
-    const out: Record<string, string> = { ...days(f) };
+    const out: Record<string, string | string[]> = { ...days(f), ...apartOf(f, opts.apart) };
     const people = asked(f.people.filter((p) => p !== 'none'), true);
     if (people) out.member_id = people;
     for (const [name, values] of [

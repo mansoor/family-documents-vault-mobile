@@ -3,28 +3,35 @@ import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { useEssentials } from '../state/essentials';
+import { useTextScale } from '../ui/text-scale';
 import { Text } from '../ui';
 import { Chip } from '../ui/chip';
 import { sp } from '../ui/space';
 import { useStyles, type Palette } from '../ui/theme';
 
-/** How many documents, how many expire soon, and how many need details. */
+/** How many documents, how many expire soon, how many need details, and how many notes. */
 export interface HomeCounts {
   total: number;
   expiring: number;
   details: number;
+  /** Where the vault keeps notes: as many as it lists, and whether there are more. */
+  notes?: { n: number; more: boolean } | null | undefined;
 }
 
 /**
  * Three numbers at a glance (R4): every document the person may see, those
  * expiring soon and those needing details — each opening Documents,
  * narrowed to them. Only where the vault counts (the Documents table, 0.6.0).
+ * And a fourth, the notes, opening Notes (the owner's tidy-up of 11 Nov
+ * 2026): four on one row, two rows of two when the text is large.
  */
 export function Counts(props: { counts: HomeCounts }) {
   const styles = useStyles(makeStyles);
   const { t } = useTranslation();
   const router = useRouter();
-  const tiles: { id: string; n: number; words: string; status?: string; warn?: boolean }[] = [
+  const { scale } = useTextScale();
+  const notes = props.counts.notes;
+  const tiles: { id: string; n: number; shown?: string; words: string; status?: string; warn?: boolean; to?: string }[] = [
     { id: 'documents', n: props.counts.total, words: t('glance.documents', { count: props.counts.total }) },
     {
       id: 'expiring',
@@ -39,22 +46,41 @@ export function Counts(props: { counts: HomeCounts }) {
       words: t('glance.details', { count: props.counts.details }),
       status: 'needs_info',
     },
+    ...(notes
+      ? [
+          {
+            id: 'notes',
+            n: notes.n,
+            shown: notes.more ? `${notes.n}+` : String(notes.n),
+            words: t('glance.notes', { count: notes.n }),
+            to: '/notes',
+          },
+        ]
+      : []),
   ];
+  // Two rows of two when the text is large: four would squeeze their words.
+  const twoRows = tiles.length > 3 && scale > 1.2;
   return (
-    <View style={styles.tiles}>
+    <View style={[styles.tiles, twoRows ? styles.wrap : null]}>
       {tiles.map((x) => (
         <Pressable
           key={x.id}
           testID={`home-count-${x.id}`}
           accessibilityRole="button"
-          accessibilityLabel={`${x.n} ${x.words}`}
+          accessibilityLabel={`${x.shown ?? x.n} ${x.words}`}
           onPress={() =>
-            router.push(x.status ? { pathname: '/documents', params: { status: x.status } } : '/documents')
+            router.push(
+              x.to === '/notes'
+                ? '/notes'
+                : x.status
+                  ? { pathname: '/documents', params: { status: x.status } }
+                  : '/documents',
+            )
           }
-          style={({ pressed }) => [styles.tile, pressed ? styles.pressed : null]}
+          style={({ pressed }) => [styles.tile, twoRows ? styles.half : null, pressed ? styles.pressed : null]}
         >
           <Text variant="title" weight="700" tone={x.warn ? 'warn' : 'ink'}>
-            {String(x.n)}
+            {x.shown ?? String(x.n)}
           </Text>
           <Text variant="small" tone="soft">
             {x.words}
@@ -108,6 +134,9 @@ export function EssentialsLine() {
 const makeStyles = (colours: Palette) =>
   StyleSheet.create({
     tiles: { flexDirection: 'row', gap: sp(8) },
+    wrap: { flexWrap: 'wrap' },
+    // Two to a row: half, less half the gap.
+    half: { flexBasis: '45%', flexGrow: 1 },
     tile: {
       flex: 1,
       minHeight: 56,

@@ -52,6 +52,9 @@ const shown = (day: string | null) => (day ? formatDate({ date: day, precision: 
  * "Clear all" at the top. Nothing applies until Show: the list behind is
  * as it was.
  */
+/** How many of the most used tags are offered as chips; the rest are under More. */
+const TAGS_SHOWN = 6;
+
 export function FilterPanel(props: {
   visible: boolean;
   value: Filters;
@@ -66,6 +69,8 @@ export function FilterPanel(props: {
   today: string;
   /** How many the filters would give; null when the vault cannot say. */
   count: (f: Filters) => Promise<number | null>;
+  /** The tags there are, most used first, where the vault filters by several (`tag_filters`); null otherwise. */
+  tags?: readonly string[] | null;
 }) {
   const styles = useStyles(makeStyles);
   const colours = useColours();
@@ -76,6 +81,7 @@ export function FilterPanel(props: {
   const [toText, setToText] = useState('');
   const [allPeople, setAllPeople] = useState(false);
   const [kindsOpen, setKindsOpen] = useState(false);
+  const [tagsOpen, setTagsOpen] = useState(false);
   const [n, setN] = useState<number | null>(null);
   const several = props.several;
 
@@ -295,6 +301,24 @@ export function FilterPanel(props: {
           </View>
         </Section>
 
+        {props.tags && props.tags.length > 0 ? (
+          <Section title={t('filters.tags')} chosen={draft.tags.length}>
+            <ChipLine
+              label={t('filters.tags')}
+              options={[...new Set([...draft.tags, ...props.tags.slice(0, TAGS_SHOWN)])].map((tag) => ({
+                value: tag,
+                label: tag,
+              }))}
+              chosen={draft.tags}
+              onToggle={(tag) => set({ tags: toggle(draft.tags, tag, true) })}
+              onMore={() => setTagsOpen(true)}
+              moreID="filter-tags-more"
+              expanded={tagsOpen}
+              chipID="filter-tag"
+            />
+          </Section>
+        ) : null}
+
         <Section title={t('filters.whoCanSee')} chosen={draft.visibilities.length}>
           <View style={styles.chips}>
             {VISIBILITIES.map((v) => (
@@ -338,6 +362,21 @@ export function FilterPanel(props: {
         testID="filter-kinds"
         findID="filter-kinds-find"
         optionID="filter-kinds-pick"
+      />
+      <PickerSheet
+        visible={tagsOpen}
+        title={t('filters.tags')}
+        options={(props.tags ?? []).map((tag) => ({ value: tag, label: tag }))}
+        chosen={draft.tags}
+        multi
+        onDone={(v) => {
+          setTagsOpen(false);
+          set({ tags: v });
+        }}
+        onClose={() => setTagsOpen(false)}
+        testID="filter-tags"
+        findID="filter-tags-find"
+        optionID="filter-tags-pick"
       />
     </SideSheet>
   );

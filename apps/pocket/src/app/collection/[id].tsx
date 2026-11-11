@@ -1,13 +1,15 @@
 import { ApiRequestError } from '@fdv/client';
 import { can, documentName, sharedOutsideWords, type CollectionDetail, type CollectionItemView } from '@fdv/shared';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { Pencil, Share2, Trash2 } from 'lucide-react-native';
+import { Ellipsis, Info, Pencil, Share2, Trash2 } from 'lucide-react-native';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, View } from 'react-native';
 import { AddDocuments } from '../../collections/add';
 import { CollectionForm } from '../../collections/collection-form';
 import { ConfirmSheet } from '../../ui/confirm';
+import { MenuRow } from '../../ui/menu-row';
+import { Sheet } from '../../ui/sheet';
 import { IconButton } from '../../ui/icon-button';
 import { ShareSheet } from '../../sharing/share-sheet';
 import { audienceKey, mayChangeCollection } from '../../collections/rules';
@@ -115,6 +117,10 @@ export default function CollectionScreen() {
   const mayShare =
     !!detail && !!who && can(who.role, 'document.share') && caps?.features.collection_shares === true && detail.audience !== 'only_me';
   const [sharing, setSharing] = useState(false);
+  // The ⋯ (Share, Delete) and the ⓘ beside who it is for (the owner's tidy-up of 11 Nov 2026).
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [about, setAbout] = useState(false);
+  const hasMenu = (mayShare || mayDelete) && !offline;
 
   const deleteIt = async () => {
     setDeleteBusy(true);
@@ -192,29 +198,60 @@ export default function CollectionScreen() {
                       onPress={() => setEditing(true)}
                     />
                   ) : null}
-                  {mayShare && !offline ? (
+                  {hasMenu ? (
                     <IconButton
-                      testID="collection-share"
-                      label={t('share.collectionLabel', { name: detail.name })}
-                      icon={Share2}
-                      onPress={() => setSharing(true)}
-                    />
-                  ) : null}
-                  {mayDelete && !offline ? (
-                    <IconButton
-                      testID="collection-delete"
-                      label={t('collectionForm.delete', { name: detail.name })}
-                      icon={Trash2}
-                      onPress={() => {
-                        setDeleteProblem(null);
-                        setDeleting(true);
-                      }}
+                      testID="collection-more"
+                      label={t('collection.menu', { name: detail.name })}
+                      icon={Ellipsis}
+                      onPress={() => setMenuOpen(true)}
                     />
                   ) : null}
                 </View>
               ),
             }}
           />
+          <Sheet visible={menuOpen} onClose={() => setMenuOpen(false)} outside testID="collection-more-sheet">
+            <View style={styles.menu}>
+              <Text variant="screen">{detail.name}</Text>
+              {mayShare ? (
+                <MenuRow
+                  testID="collection-share"
+                  icon={Share2}
+                  label={t('share.menu')}
+                  onPress={() => {
+                    setMenuOpen(false);
+                    setSharing(true);
+                  }}
+                />
+              ) : null}
+              {mayDelete ? (
+                <MenuRow
+                  testID="collection-delete"
+                  icon={Trash2}
+                  label={t('collection.deleteMenu')}
+                  danger
+                  onPress={() => {
+                    setMenuOpen(false);
+                    setDeleteProblem(null);
+                    setDeleting(true);
+                  }}
+                />
+              ) : null}
+              <Button
+                kind="quiet"
+                label={t('common.cancel')}
+                onPress={() => setMenuOpen(false)}
+                testID="collection-more-cancel"
+              />
+            </View>
+          </Sheet>
+          <Sheet visible={about} onClose={() => setAbout(false)} outside testID="collection-about-sheet">
+            <View style={styles.menu}>
+              <Text variant="screen">{t('collection.forWhom', { audience })}</Text>
+              <Text>{t('collection.neverWidens')}</Text>
+              <Button kind="quiet" label={t('row.done')} onPress={() => setAbout(false)} testID="collection-about-done" />
+            </View>
+          </Sheet>
           {sharing ? (
             <ShareSheet target={{ kind: 'collection', id: detail.id, name: detail.name }} onClose={() => setSharing(false)} />
           ) : null}
@@ -247,19 +284,24 @@ export default function CollectionScreen() {
           />
           <Text variant="hero">{detail.name}</Text>
           {detail.description ? <Text testID="collection-description">{detail.description}</Text> : null}
-          <Text variant="secondary" tone="soft" testID="collection-line">
-            {[t('collections.documents', { count: detail.item_count }), t('collection.forWhom', { audience })].join(
-              ' · ',
-            )}
-          </Text>
+          <View style={styles.lineRow}>
+            <Text variant="secondary" tone="soft" testID="collection-line" style={styles.flex}>
+              {[t('collections.documents', { count: detail.item_count }), t('collection.forWhom', { audience })].join(
+                ' · ',
+              )}
+            </Text>
+            <IconButton
+              testID="collection-about"
+              label={t('collection.about')}
+              icon={Info}
+              onPress={() => setAbout(true)}
+            />
+          </View>
           {detail.shared_outside ? (
             <Notice tone="warn" testID="collection-shared">
               {sharedOutsideWords(detail.shared_outside, who?.role ?? null)}
             </Notice>
           ) : null}
-          <Text variant="secondary" tone="muted">
-            {t('collection.neverWidens')}
-          </Text>
           {said ? (
             <Notice tone={said.tone} testID="collection-said">
               {said.text}
@@ -340,4 +382,7 @@ const makeStyles = (colours: Palette) =>
     page: { padding: sp(20) },
     headerButtons: { flexDirection: 'row', alignItems: 'center' },
     header: { gap: sp(12), marginBottom: sp(10) },
+    menu: { gap: sp(10) },
+    lineRow: { flexDirection: 'row', alignItems: 'center', gap: sp(4) },
+    flex: { flex: 1 },
   });

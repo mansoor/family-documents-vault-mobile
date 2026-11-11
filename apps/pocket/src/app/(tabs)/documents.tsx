@@ -2,6 +2,7 @@ import { NetworkError } from '@fdv/client';
 import {
   formatDate,
   localToday,
+  NOTE_KIND,
   type DocumentTypeView,
   type DocumentView,
   type Member,
@@ -10,7 +11,7 @@ import {
 } from '@fdv/shared';
 import { useLocalSearchParams } from 'expo-router';
 import { ArrowUpDown, SlidersHorizontal, X } from 'lucide-react-native';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -60,6 +61,11 @@ export default function DocumentsScreen() {
   const { withToken, offline, caps, api } = useVault();
   const table = caps?.features.document_table === true;
   const several = caps?.features.document_filters === true;
+  // Several tags, and the notes left out: they have their own tab (the owner's tidy-up of 11 Nov 2026).
+  const tagsOn = caps?.features.tag_filters === true;
+  const notesApart = caps?.features.notes_apart === true;
+  const apart = useMemo(() => ({ tags: tagsOn, notes: notesApart }), [tagsOn, notesApart]);
+  const [tags, setTags] = useState<string[]>([]);
 
   // Opened from Home's numbers or an alert (R4): narrowed to that status.
   const { status: asked } = useLocalSearchParams<{ status?: string }>();
@@ -102,26 +108,33 @@ export default function DocumentsScreen() {
   useEffect(() => {
     if (offline || members.length > 0) return;
     let stopped = false;
-    withToken((a, tk) => Promise.all([a.members(tk), a.documentTypes(tk)]))
-      .then(([m, ty]) => {
+    withToken((a, tk) =>
+      Promise.all([
+        a.members(tk),
+        a.documentTypes(tk),
+        tagsOn ? a.tags(tk, undefined, { limit: 1000 }).catch(() => ({ items: [] })) : Promise.resolve({ items: [] }),
+      ]),
+    )
+      .then(([m, ty, tg]) => {
         if (stopped) return;
         setMembers(m.items);
         setTypes(ty.items);
+        setTags([...new Set(tg.items.map((x) => x.tag))]);
       })
       .catch(() => undefined);
     return () => {
       stopped = true;
     };
-  }, [withToken, offline, members.length]);
+  }, [withToken, offline, members.length, tagsOn]);
 
   const categoryOf = useCallback((kind: string) => types.find((ty) => ty.key === kind)?.category ?? null, [types]);
   const params = useCallback(
     (f: Filters, after: string | null) => ({
-      ...listQuery(f, { sort, table, several }),
+      ...listQuery(f, { sort, table, several, apart }),
       limit: PAGE,
       ...(after ? { cursor: after } : {}),
     }),
-    [sort, table, several],
+    [sort, table, several, apart],
   );
 
   /** The first page, for the choices as they are now. */
@@ -165,7 +178,7 @@ export default function DocumentsScreen() {
     // The box emptied: the list is shown, and what was found waits, unshown, for the next words.
     if (!searching) return;
     let cancelled = false;
-    const narrowed = searchQuery(filters, { several, categoryOf });
+    const narrowed = searchQuery(filters, { several, categoryOf, apart });
     const run = async () => {
       try {
         const r = await withToken((a, tk) => a.search(tk, q.trim(), narrowed));
@@ -195,7 +208,7 @@ export default function DocumentsScreen() {
       clearTimeout(timer);
     };
     // The connection coming back asks again; so does Try again (P5).
-  }, [q, searching, filters, several, categoryOf, withToken, offline, again, t]);
+  }, [q, searching, filters, several, categoryOf, apart, withToken, offline, again, t]);
 
   /** The next 50, as the person scrolls to the end. */
   const loadMore = async () => {
@@ -219,17 +232,17 @@ export default function DocumentsScreen() {
   const countFor = useCallback(
     async (f: Filters): Promise<number | null> => {
       if (searching) {
-        const r = await withToken((a, tk) => a.search(tk, q.trim(), searchQuery(f, { several, categoryOf })));
+        const r = await withToken((a, tk) => a.search(tk, q.trim(), searchQuery(f, { several, categoryOf, apart })));
         return r.items.length;
       }
       if (!table) return null;
       // Counted with a column sort, whichever the list has: only the table counts.
       const page = await withToken((a, tk) =>
-        a.documents(tk, { ...listQuery(f, { sort: 'title', table, several }), limit: 1 }),
+        a.documents(tk, { ...listQuery(f, { sort: 'title', table, several, apart }), limit: 1 }),
       );
       return page.total ?? null;
     },
-    [searching, q, withToken, several, categoryOf, table],
+    [searching, q, withToken, several, categoryOf, table, apart],
   );
 
   const on_ = countOn(filters);
@@ -256,6 +269,7 @@ export default function DocumentsScreen() {
     ...(filters.statuses.length > 0
       ? [{ id: 'statuses', label: named(filters.statuses, (s) => t(`documents.status_${s}`)), clear: { statuses: [] } }]
       : []),
+    ...(filters.tags.length > 0 ? [{ id: 'tags', label: named(filters.tags, (x) => x), clear: { tags: [] } }] : []),
     ...(filters.visibilities.length > 0
       ? [
           {
@@ -514,7 +528,9 @@ export default function DocumentsScreen() {
         }}
         onClose={() => setPanel(false)}
         members={members}
-        types={types}
+        // Notes have their own tab: no Note among Documents' kinds where the vault leaves them out.
+        types={notesApart ? types.filter((ty) => ty.key !== NOTE_KIND) : types}
+        tags={tagsOn ? tags : null}
         several={several}
         // Nobody's goes with a column sort only, and the list's first sort is not one.
         nobody={false}

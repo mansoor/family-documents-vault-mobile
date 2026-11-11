@@ -2,8 +2,10 @@
 # the vault the app is pinned to. .github/scripts/notes-seed.sh gave the
 # one document (the passport the capture flow sent) a note in the vault's
 # small Markdown. On Home, the row's ⋯ opens what may be done with it, and
-# so does a long press on the row; Open goes to the document, where the
-# note is drawn: its heading, its words, its checklist and its link.
+# so does a long press on the row; a tap on the row goes to the document,
+# where the note is drawn: its heading, its words, its checklist and its
+# link. Since the owner's tidy-up of 11 Nov 2026 the ⋯ has no Open (a tap
+# opens it): Share takes its place.
 appId: io.github.mansoor.familyvault.e2e
 env:
   VAULT: 10.0.2.2:8099
@@ -42,7 +44,7 @@ env:
       id: home-list
     timeout: 30000
 
-# The row's ⋯: the sheet, Open first; Back closes it.
+# The row's ⋯: the sheet, with Share and Save a copy; Back closes it.
 - scrollUntilVisible:
     element:
       id: doc-menu-.*
@@ -53,23 +55,28 @@ env:
     visible:
       id: row-sheet
     timeout: 15000
-- assertVisible:
-    id: row-sheet-open
+- extendedWaitUntil:
+    visible:
+      id: row-sheet-share
+    timeout: 15000
 - assertVisible:
     id: row-sheet-save
 - back
 - assertNotVisible:
     id: row-sheet
 
-# A long press on the row opens it too; Open goes to the document.
+# A long press on the row opens it too; a tap on the row goes to the document.
 - longPressOn:
     id: doc-row-.*
 - extendedWaitUntil:
     visible:
       id: row-sheet
     timeout: 15000
+- back
+- assertNotVisible:
+    id: row-sheet
 - tapOn:
-    id: row-sheet-open
+    id: doc-row-.*
 - extendedWaitUntil:
     visible:
       id: document

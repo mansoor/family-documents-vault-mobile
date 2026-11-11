@@ -749,7 +749,8 @@
     "documents_one": "1 document",
     "documents_other": "{{count}} documents",
     "done": "Done",
-    "removeFrom": "Remove from this collection"
+    "removeFrom": "Remove from this collection",
+    "edit": "Edit"
   },
   "notes": {
     "done": "Done",
@@ -822,7 +823,10 @@
     "removeTitle": "Remove from “{{name}}”?",
     "removeWords": "“{{title}}” leaves this collection. The document stays in the vault, and in any other collection it is in.",
     "removeYes": "Remove from collection",
-    "removeShared": "This collection is shared outside the family: they stop seeing this document too."
+    "removeShared": "This collection is shared outside the family: they stop seeing this document too.",
+    "menu": "More for “{{name}}”",
+    "deleteMenu": "Delete this collection",
+    "about": "Who sees what in it"
   },
   "notesList": {
     "title": "Notes",
@@ -889,7 +893,9 @@
     "essentials": "Essentials",
     "kept": "Kept on this phone",
     "documentsCount_one": "1 document",
-    "documentsCount_other": "{{count}} documents"
+    "documentsCount_other": "{{count}} documents",
+    "notes_one": "note",
+    "notes_other": "notes"
   },
   "filters": {
     "title": "Filters",
@@ -941,7 +947,8 @@
     "chip_added_thisYear": "Added this year",
     "chipDays_added": "Added {{from}} – {{to}}",
     "chipDays_issued": "Issued {{from}} – {{to}}",
-    "chipDays_expires": "Expires {{from}} – {{to}}"
+    "chipDays_expires": "Expires {{from}} – {{to}}",
+    "tags": "Tags"
   },
   "tags": {
     "none": "No tags yet.",
