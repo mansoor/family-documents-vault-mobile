@@ -6,6 +6,56 @@ app's own, tagged `vX.Y.Z` in this repository.
 
 ## [Unreleased]
 
+## [0.5.0] — the redesign (redesign R7)
+
+The phone app, redesigned from the ground up (0.4.1 to 0.4.6): compact,
+with more on every screen. In short:
+- **Smaller type and less empty space** on every screen: a list is one
+  card with hairlines between its rows. Large text and 200% system text
+  still work.
+- **Tabs: Home · Documents · + · Notes · More.** People moved to More (it
+  stays a tab on a vault without notes). **Needs attention** is behind a
+  **bell**, which shows a count when something is due.
+- **Home, at a glance:**
+  - alerts you can hide for a day, a week, 30 days or until something
+    changes;
+  - how many documents, how many are expiring soon and how many need
+    details, each opening Documents filtered to them;
+  - the Essentials on one line;
+  - the five most recently added.
+
+  Nothing on Home says "nothing to do".
+- **Documents:** search and sorting in one place, and **filters that slide
+  out from the side**:
+  - whose, kind, dates (added, issued or expires), status and who can see
+    it;
+  - several at once on a vault of 0.9.0-dev.26 or later;
+  - "Show N documents" before you leave the panel;
+  - the filters that are on, as chips you can take off one by one.
+- **Long lists of choices on one line**, with ⋯ opening a picker you can
+  search.
+- **Asked before anything is lost:** every destructive action has a
+  confirmation that says what will happen.
+- **Needs attention:** Now and Coming up, with Scan the new one, Done and
+  Later on each row.
+- **A document's page:** the actions in one row, its details in two
+  columns and the rest in one card; Edit details and ⋯ in the header.
+- **Dark theme** throughout, following the phone.
+
+### Added
+- An emulator run for this release, against the vault the app is pinned
+  to, after a reminder is set on the passport for today:
+  - Home shows it as an alert, hidden for a week from its ✕;
+  - the bell counts it;
+  - in Needs attention it is under Now, is put off a week from Later, and
+    is then under Coming up;
+  - the bell has no number afterwards;
+  - the filters, the document's page and Needs attention are captured in
+    dark.
+
+  With the filter walk of 0.4.5, the run takes screenshots of every
+  redesigned screen in light and dark.
+
 ## [0.4.6] — Needs attention and a document, compact (redesign R6)
 
 ### Changed

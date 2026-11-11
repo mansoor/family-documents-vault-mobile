@@ -172,7 +172,10 @@ jobs:
             $HOME/.maestro/bin/maestro test -e EMAIL="$EMAIL" -e PASSWORD="$PASSWORD" --format junit --output maestro-inbox.xml apps/pocket/.maestro/send-to-inbox.yaml || sh .github/scripts/on-flow-failure.sh inbox
             # The polish (P11): All documents, Who can see it and Edit details on the passport, More, and dark; the lists' screenshots, light and dark.
             $HOME/.maestro/bin/maestro test -e EMAIL="$EMAIL" -e PASSWORD="$PASSWORD" --format junit --output maestro-polish.xml apps/pocket/.maestro/polish.yaml || sh .github/scripts/on-flow-failure.sh polish
-            sh -c 'for f in capture-failed lock-failed cache-check-failed essentials-seed-failed essentials-failed show-failed back-failed large-text-failed essentials-kept-failed essentials-revoke-failed revoked-failed essentials-gone-failed identity-seed-failed identity-failed notes-seed-failed row-menu-failed inbox-failed polish-failed; do if [ -f "$f" ]; then echo "failed: $f"; exit 1; fi; done'
+            # The redesign (R7): a reminder due today on Home, hidden for a week; the bell and Needs attention (Now, Later, Coming up); the filters, a document and Needs attention in dark.
+            sh .github/scripts/attention-seed.sh || touch attention-seed-failed
+            $HOME/.maestro/bin/maestro test -e EMAIL="$EMAIL" -e PASSWORD="$PASSWORD" --format junit --output maestro-redesign.xml apps/pocket/.maestro/redesign.yaml || sh .github/scripts/on-flow-failure.sh redesign
+            sh -c 'for f in capture-failed lock-failed cache-check-failed essentials-seed-failed essentials-failed show-failed back-failed large-text-failed essentials-kept-failed essentials-revoke-failed revoked-failed essentials-gone-failed identity-seed-failed identity-failed notes-seed-failed row-menu-failed inbox-failed polish-failed attention-seed-failed redesign-failed; do if [ -f "$f" ]; then echo "failed: $f"; exit 1; fi; done'
 
       - name: Exactly one document, carrying the card's fields
         run: |
@@ -223,19 +226,20 @@ jobs:
             maestro-row-menu.xml
             maestro-inbox.xml
             maestro-polish.xml
+            maestro-redesign.xml
             app-files.txt
             essentials-files.txt
             ui-*.xml
             rn-*.log
             ~/.maestro/tests/
           retention-days: 3
-      # The lists as the emulator drew them, light and dark (P11): the screenshots for the release.
+      # The screens as the emulator drew them, light and dark (P11, R7): the screenshots for the release.
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: screenshots
           # Where Maestro keeps a flow's takeScreenshot files.
-          path: ~/.maestro/tests/*/polish/takeScreenshot/shot-*.png
+          path: ~/.maestro/tests/*/*/takeScreenshot/shot-*.png
           if-no-files-found: ignore
           retention-days: 14
       - name: Minutes

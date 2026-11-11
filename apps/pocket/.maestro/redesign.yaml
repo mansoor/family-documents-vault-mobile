@@ -1,0 +1,182 @@
+# The redesign (R7, app 0.5.0), against the vault the app is pinned to,
+# after attention-seed.sh has given the passport a reminder due today:
+#  - Home: the reminder as an alert, hidden for a week from its ✕;
+#  - the bell, counting it; Needs attention under Now, put off a week
+#    from Later, and then under Coming up; the bell without a number;
+#  - dark: the filters, the passport's page and Needs attention.
+# Screenshots are allowed first (Settings), so each screen is captured
+# (shot-*.png). A document's own pages are never captured.
+appId: io.github.mansoor.familyvault.e2e
+env:
+  VAULT: 10.0.2.2:8099
+---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible:
+      id: connect-address
+    timeout: 60000
+- tapOn:
+    id: connect-address
+- inputText: ${VAULT}
+- hideKeyboard
+- tapOn:
+    id: connect-go
+- extendedWaitUntil:
+    visible:
+      id: connect-approve-http
+    timeout: 30000
+- tapOn:
+    id: connect-approve-http
+- tapOn:
+    id: sign-in-email
+- inputText: ${EMAIL}
+- tapOn:
+    id: sign-in-password
+- inputText: ${PASSWORD}
+- hideKeyboard
+- tapOn:
+    id: sign-in-go
+- extendedWaitUntil:
+    visible:
+      id: home-list
+    timeout: 30000
+
+# Screenshots allowed, and the light theme fixed, in Settings.
+- tapOn: Settings
+- scrollUntilVisible:
+    element:
+      id: settings-screenshots
+- tapOn:
+    id: settings-screenshots
+- scrollUntilVisible:
+    element:
+      id: settings-theme-light
+- tapOn:
+    id: settings-theme-light
+- back
+- extendedWaitUntil:
+    visible:
+      id: home-list
+    timeout: 15000
+
+# Home: the reminder as an alert, and the bell counting it.
+- extendedWaitUntil:
+    visible:
+      id: home-alert-.*-hide
+    timeout: 30000
+- assertVisible:
+    id: bell-count
+- waitForAnimationToEnd
+- takeScreenshot: shot-light-home-alert
+# Its ✕: hidden for a week, and Undo offered.
+- tapOn:
+    id: home-alert-.*-hide
+- extendedWaitUntil:
+    visible:
+      id: alert-hide-7
+    timeout: 10000
+- tapOn:
+    id: alert-hide-7
+- extendedWaitUntil:
+    visible:
+      id: home-alert-hidden
+    timeout: 10000
+- assertNotVisible:
+    id: home-alert-.*-hide
+
+# The bell: Needs attention, under Now; Later, a week; then under Coming up.
+- tapOn:
+    id: bell
+- extendedWaitUntil:
+    visible:
+      id: attention-now
+    timeout: 15000
+- waitForAnimationToEnd
+- takeScreenshot: shot-light-attention-now
+- tapOn:
+    id: later-.*
+- extendedWaitUntil:
+    visible:
+      id: snooze-week-.*
+    timeout: 10000
+- tapOn:
+    id: snooze-week-.*
+# Put off, it leaves Now (which says so) and is under Coming up.
+- extendedWaitUntil:
+    notVisible:
+      id: later-sheet
+    timeout: 10000
+- tapOn:
+    id: attention-tab-coming
+- extendedWaitUntil:
+    visible:
+      id: attention-coming
+    timeout: 15000
+- waitForAnimationToEnd
+- takeScreenshot: shot-light-attention-coming
+- back
+- extendedWaitUntil:
+    visible:
+      id: home-list
+    timeout: 15000
+# Nothing due: the bell has no number.
+- extendedWaitUntil:
+    notVisible:
+      id: bell-count
+    timeout: 15000
+
+# Dark: the filters, the passport's page, and Needs attention.
+- tapOn: Settings
+- scrollUntilVisible:
+    element:
+      id: settings-theme-dark
+- tapOn:
+    id: settings-theme-dark
+- back
+- extendedWaitUntil:
+    visible:
+      id: home-list
+    timeout: 15000
+- tapOn:
+    id: tab-documents
+- extendedWaitUntil:
+    visible:
+      id: doc-row-.*
+    timeout: 15000
+- tapOn:
+    id: documents-filters
+- extendedWaitUntil:
+    visible:
+      id: filter-status-active
+    timeout: 10000
+- waitForAnimationToEnd
+- takeScreenshot: shot-dark-filters
+- tapOn:
+    id: filters-close
+- extendedWaitUntil:
+    notVisible:
+      id: filter-status-active
+    timeout: 10000
+- tapOn:
+    id: doc-row-.*
+- extendedWaitUntil:
+    visible:
+      id: document-visibility
+    timeout: 15000
+- waitForAnimationToEnd
+- takeScreenshot: shot-dark-document
+- back
+- extendedWaitUntil:
+    visible:
+      id: doc-row-.*
+    timeout: 15000
+- tapOn:
+    id: bell
+- extendedWaitUntil:
+    visible:
+      id: attention-coming
+    timeout: 15000
+- waitForAnimationToEnd
+- takeScreenshot: shot-dark-attention-coming
+- back
