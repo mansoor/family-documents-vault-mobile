@@ -119,7 +119,7 @@ describe('Large text', () => {
     expect(screen.getByTestId('settings-large-text').props.value).toBe(true);
   });
 
-  it("the +'s menu: every word is 1.3 times the size, nothing is cut short, and the choices scroll", async () => {
+  it("the +'s menu: every word is 1.3 times the size, nothing is cut short, and every choice is there", async () => {
     const t = testVault();
     await signedIn(t);
     const open = async (large: boolean) => {
@@ -137,11 +137,11 @@ describe('Large text', () => {
     await normal.unmount();
 
     await open(true);
-    // The title, three choices and Cancel.
-    expect(before.length).toBeGreaterThanOrEqual(5);
+    // The three choices' words (the fan has no title, and its ✕ no words).
+    expect(before.length).toBeGreaterThanOrEqual(3);
     expectScaled(before, sizes());
-    // At the phone's largest text the choices scroll rather than run off the screen.
-    expect(within(screen.getByTestId('add-menu-scroll')).getAllByRole('menuitem')).toHaveLength(3);
+    // Every choice is there at the largest text, each label wrapping within its own width.
+    expect(within(screen.getByTestId('add-menu-choices')).getAllByRole('menuitem')).toHaveLength(3);
   });
 
   it.each([false, true])(

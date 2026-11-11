@@ -60,6 +60,27 @@ env:
       id: home-list
     timeout: 15000
 
+# The +: its three choices fanned out above it, and the + an ✕ (11 Nov
+# 2026); the ✕ closes it.
+- tapOn:
+    id: home-add
+- extendedWaitUntil:
+    visible:
+      id: add-picture
+    timeout: 10000
+- assertVisible:
+    id: add-file
+- assertVisible:
+    id: add-camera
+- waitForAnimationToEnd
+- takeScreenshot: shot-light-add
+- tapOn:
+    id: add-cancel
+- extendedWaitUntil:
+    notVisible:
+      id: add-menu
+    timeout: 10000
+
 # Home: the reminder as an alert, and the bell counting it.
 - extendedWaitUntil:
     visible:

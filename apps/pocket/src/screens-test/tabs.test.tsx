@@ -1,6 +1,6 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react-native';
 import type { ReactElement } from 'react';
-import { AccessibilityInfo } from 'react-native';
+import { AccessibilityInfo, StyleSheet } from 'react-native';
 import Home from '../app/(tabs)/index';
 import MoreScreen from '../app/(tabs)/more';
 import PeopleScreen from '../app/(tabs)/people';
@@ -209,6 +209,32 @@ describe('the + and its menu', () => {
     expect(focus.mock.calls[0]?.[1]).toBe('focus');
   });
 
+  it('fans out above the +, which becomes an ✕ that closes it', async () => {
+    await as('owner');
+    await fireEvent.press(await screen.findByTestId('home-add'));
+    await screen.findByTestId('add-menu');
+    const x = screen.getByTestId('add-cancel');
+    expect(x.props.accessibilityLabel).toBe('Close the menu');
+    // The choices sit above the +, left to right: Add a file, Camera, Add a picture.
+    const plusTop = Number(StyleSheet.flatten(x.props.style).top);
+    for (const id of ['add-file', 'add-camera', 'add-picture']) {
+      const place = screen.getByTestId(id).parent?.parent;
+      expect(Number(StyleSheet.flatten(place?.props.style).top)).toBeLessThanOrEqual(plusTop);
+    }
+    await fireEvent.press(x);
+    await waitFor(() => expect(screen.queryByTestId('add-menu')).toBeNull());
+  });
+
+  it('with Remove animations on, it is there and gone at once', async () => {
+    const still = jest.spyOn(AccessibilityInfo, 'isReduceMotionEnabled').mockResolvedValue(true);
+    await as('owner');
+    await fireEvent.press(await screen.findByTestId('home-add'));
+    await screen.findByTestId('add-menu');
+    await fireEvent.press(screen.getByTestId('add-cancel'));
+    expect(screen.queryByTestId('add-menu')).toBeNull();
+    still.mockResolvedValue(false);
+  });
+
   it('on a phone without a scanner there is no Camera', async () => {
     await as('owner', fixtureScanner([], false));
     const plus = await screen.findByTestId('home-add');
@@ -230,7 +256,8 @@ describe('the + and its menu', () => {
     await fireEvent.press(await screen.findByTestId(choice));
     await waitFor(() => expect(routes()).toEqual([{ pathname: '/capture', params: {} }]));
     expect(scanner.asked).toEqual([asked]);
-    expect(screen.queryByTestId('add-menu')).toBeNull();
+    // It folds back into the + (the fan, 11 Nov 2026), then is gone.
+    await waitFor(() => expect(screen.queryByTestId('add-menu')).toBeNull());
   });
 
   it('Camera with a scanner that cannot start says so, where the + is', async () => {
@@ -239,7 +266,8 @@ describe('the + and its menu', () => {
     await fireEvent.press(await screen.findByTestId('home-add'));
     await fireEvent.press(await screen.findByTestId('add-camera'));
     expect(await screen.findByTestId('home-scanner-failed')).toHaveTextContent(/The scanner couldn't start/);
-    expect(screen.queryByTestId('add-menu')).toBeNull();
+    // It folds back into the + (the fan, 11 Nov 2026), then is gone.
+    await waitFor(() => expect(screen.queryByTestId('add-menu')).toBeNull());
     expect(routes()).toEqual([]);
   });
 
@@ -254,7 +282,8 @@ describe('the + and its menu', () => {
     await fireEvent.press(await screen.findByTestId('home-add'));
     await screen.findByTestId('add-menu');
     await close();
-    expect(screen.queryByTestId('add-menu')).toBeNull();
+    // It folds back into the + (the fan, 11 Nov 2026), then is gone.
+    await waitFor(() => expect(screen.queryByTestId('add-menu')).toBeNull());
     expect(screen.getByTestId('home-add').props.accessibilityState).toEqual({ expanded: false });
     expect(scanner.asked).toEqual([]);
     await waitFor(() => expect(focus).toHaveBeenCalledWith(expect.anything(), 'focus'));
