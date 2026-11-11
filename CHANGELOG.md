@@ -6,6 +6,15 @@ app's own, tagged `vX.Y.Z` in this repository.
 
 ## [Unreleased]
 
+## [0.5.1] — the + fans out
+
+### Changed
+- **The + opens its choices around it:** Add a file, Camera and Add a
+  picture fan out in a semicircle above it, and the + turns into an ✕
+  that closes them (as do Back and a tap anywhere else). They spring out
+  of the + and fold back into it; with Remove animations on, they appear
+  and go at once.
+
 ## [0.5.0] — the redesign (redesign R7)
 
 The phone app, redesigned from the ground up (0.4.1 to 0.4.6): compact,

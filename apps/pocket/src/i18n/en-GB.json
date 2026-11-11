@@ -140,7 +140,8 @@
     "camera": "Camera",
     "cameraHint": "Opens the camera, to scan the pages.",
     "picture": "Add a picture",
-    "pictureHint": "Opens your photos, to choose one."
+    "pictureHint": "Opens your photos, to choose one.",
+    "close": "Close the menu"
   },
   "settings": {
     "title": "Settings",
