@@ -1,10 +1,14 @@
 import { ApiRequestError } from '@fdv/client';
 import { documentName, sharedOutsideWords, type CollectionDetail, type CollectionItemView } from '@fdv/shared';
-import { useLocalSearchParams } from 'expo-router';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { Pencil, Trash2 } from 'lucide-react-native';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, View } from 'react-native';
 import { AddDocuments } from '../../collections/add';
+import { CollectionForm } from '../../collections/collection-form';
+import { ConfirmSheet } from '../../ui/confirm';
+import { IconButton } from '../../ui/icon-button';
 import { audienceKey, mayChangeCollection } from '../../collections/rules';
 import { DocumentRow, rowPlace } from '../../documents/row';
 import { wordsFor } from '../../errors/words';
@@ -21,6 +25,9 @@ import { useColours, useStyles, type Palette } from '../../ui/theme';
  * order they were put there. Its maker puts more in with Add documents and
  * takes one out with Remove from this collection in the row's ⋯. A
  * collection never widens who sees a document, and the page says so.
+ * Its maker changes its name, words and audience with the pencil in the
+ * header, and deletes it with the bin there, asked first (the gaps review,
+ * 11 Nov 2026): its documents stay where they are.
  */
 export default function CollectionScreen() {
   const styles = useStyles(makeStyles);
@@ -28,6 +35,11 @@ export default function CollectionScreen() {
   const { t } = useTranslation();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { withToken, offline, who, api } = useVault();
+  const router = useRouter();
+  const [editing, setEditing] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteProblem, setDeleteProblem] = useState<string | null>(null);
   const [detail, setDetail] = useState<CollectionDetail | null>(null);
   const [items, setItems] = useState<CollectionItemView[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
@@ -96,6 +108,23 @@ export default function CollectionScreen() {
   };
 
   const mayChange = !!detail && mayChangeCollection(who?.role, detail);
+  // Deleted by its maker, whatever their role now.
+  const mayDelete = !!detail && detail.mine;
+
+  const deleteIt = async () => {
+    setDeleteBusy(true);
+    setDeleteProblem(null);
+    try {
+      await withToken((a, tk) => a.deleteCollection(tk, id));
+      setDeleting(false);
+      emit('collectionChanged', id);
+      router.back();
+    } catch (err) {
+      setDeleteProblem(wordsFor(err, t));
+    } finally {
+      setDeleteBusy(false);
+    }
+  };
 
   const remove = (docId: string, title: string) => async (): Promise<string | null> => {
     try {
@@ -146,6 +175,60 @@ export default function CollectionScreen() {
       }
       ListHeaderComponent={
         <View style={styles.header}>
+          <Stack.Screen
+            options={{
+              headerRight: () => (
+                <View style={styles.headerButtons}>
+                  {mayChange && !offline ? (
+                    <IconButton
+                      testID="collection-edit"
+                      label={t('collectionForm.editTitle')}
+                      icon={Pencil}
+                      onPress={() => setEditing(true)}
+                    />
+                  ) : null}
+                  {mayDelete && !offline ? (
+                    <IconButton
+                      testID="collection-delete"
+                      label={t('collectionForm.delete', { name: detail.name })}
+                      icon={Trash2}
+                      onPress={() => {
+                        setDeleteProblem(null);
+                        setDeleting(true);
+                      }}
+                    />
+                  ) : null}
+                </View>
+              ),
+            }}
+          />
+          {editing ? (
+            <CollectionForm
+              editing={detail}
+              onClose={() => setEditing(false)}
+              onSaved={(d) => {
+                setEditing(false);
+                setDetail((had) => (had ? { ...had, ...d, items: had.items } : d));
+                setSaid({ tone: 'ok', text: t('collectionForm.saved') });
+                emit('collectionChanged', id);
+              }}
+            />
+          ) : null}
+          <ConfirmSheet
+            visible={deleting}
+            testID="collection-delete-question"
+            icon={Trash2}
+            title={t('collectionForm.deleteTitle')}
+            words={t('collectionForm.deleteWords', { name: detail.name })}
+            confirmLabel={t('collectionForm.deleteYes')}
+            busy={deleteBusy}
+            problem={deleteProblem}
+            onConfirm={() => void deleteIt()}
+            onCancel={() => setDeleting(false)}
+            confirmID="collection-delete-yes"
+            cancelID="collection-delete-cancel"
+            problemID="collection-delete-problem"
+          />
           <Text variant="hero">{detail.name}</Text>
           {detail.description ? <Text testID="collection-description">{detail.description}</Text> : null}
           <Text variant="secondary" tone="soft" testID="collection-line">
@@ -239,5 +322,6 @@ const makeStyles = (colours: Palette) =>
   StyleSheet.create({
     screen: { backgroundColor: colours.bg },
     page: { padding: sp(20) },
+    headerButtons: { flexDirection: 'row', alignItems: 'center' },
     header: { gap: sp(12), marginBottom: sp(10) },
   });

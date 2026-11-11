@@ -146,7 +146,7 @@ describe('a document, compact (R6)', () => {
     expect(screen.queryByTestId('version-1')).toBeNull();
   });
 
-  it('a note has no actions row, no versions line and no pencil', async () => {
+  it('a note has no actions row and no versions line; its pencil edits it (the gaps review)', async () => {
     const t = testVault([ORIGIN]);
     libraryDoc(t, {
       id: 'n1',
@@ -159,6 +159,6 @@ describe('a document, compact (R6)', () => {
     expect(await screen.findByTestId('document-notes')).toHaveTextContent(/Under the blue pot\./);
     expect(screen.queryByTestId('document-actions')).toBeNull();
     expect(screen.queryByTestId('document-versions')).toBeNull();
-    expect(screen.queryByTestId('document-edit')).toBeNull();
+    expect(screen.getByTestId('document-edit')).toBeTruthy();
   });
 });
