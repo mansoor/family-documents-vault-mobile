@@ -1,3 +1,5 @@
+import { X } from 'lucide-react-native';
+import { useRouter } from 'expo-router';
 import { radii } from '@fdv/shared';
 import { Image } from 'expo-image';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -9,6 +11,7 @@ import { useScreenGuard } from '../state/lock';
 import { useStepUp } from '../state/step-up';
 import { useVault } from '../state/vault';
 import { Button, Notice, StatusLine, Text } from '../ui';
+import { IconButton } from '../ui/icon-button';
 import { sp } from '../ui/space';
 import { useStyles, type Palette } from '../ui/theme';
 import { relativeWords, useFamilyZone } from '../state/family-time';
@@ -22,6 +25,9 @@ const ZOOMS = [1, 1.5, 2, 3];
  * and zoom; so do a swipe and a pinch. Never captured.
  */
 export function EssentialPages(props: { id: string; mode?: string; online?: boolean; version?: string }) {
+  const router = useRouter();
+  // Closed: back where it was opened from; opened on its own, Home.
+  const close = () => (router.canGoBack() ? router.back() : router.replace('/'));
   const styles = useStyles(makeStyles);
   const { id, mode, online, version } = props;
   const { t } = useTranslation();
@@ -135,6 +141,13 @@ export function EssentialPages(props: { id: string; mode?: string; online?: bool
 
   return (
     <View style={styles.page} testID="essential-viewer">
+      {/* Its name, and ✕ in the corner the screen left empty (the owner's ask of 12 Nov 2026). */}
+      <View style={styles.top}>
+        <Text variant="title" style={styles.flex} numberOfLines={2}>
+          {pages > 0 ? title : ''}
+        </Text>
+        <IconButton testID="essential-close" label={t('essentials.close')} icon={X} onPress={close} />
+      </View>
       {offline && e.checked ? (
         <Notice tone="warn" testID="essential-offline">
           {t('essentials.offlineBanner', { when: relativeWords(new Date(e.checked.at).toISOString(), zone) })}
@@ -162,7 +175,6 @@ export function EssentialPages(props: { id: string; mode?: string; online?: bool
       ) : null}
       {pages > 0 ? (
         <>
-          <Text variant="title">{title}</Text>
           {/* Worked out for today on the phone: the vault's may be days old. */}
           {ready?.status ? <StatusLine status={ready.status} /> : null}
           <View style={styles.tools}>
@@ -228,6 +240,8 @@ export function EssentialPages(props: { id: string; mode?: string; online?: bool
 const makeStyles = (colours: Palette) =>
   StyleSheet.create({
     page: { flex: 1, padding: sp(16), gap: sp(12), backgroundColor: colours.bg },
+    top: { flexDirection: 'row', alignItems: 'center', gap: sp(8) },
+    flex: { flex: 1 },
     tools: { flexDirection: 'row', alignItems: 'center', gap: sp(8) },
     gap: { flex: 1 },
     frame: { flex: 1, borderRadius: radii.m, backgroundColor: colours.paper, overflow: 'hidden' },
