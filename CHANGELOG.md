@@ -6,6 +6,41 @@ app's own, tagged `vX.Y.Z` in this repository.
 
 ## [Unreleased]
 
+## [0.6.0] — texts: your mobile number, codes by text, and texts you choose
+
+SMS4, the phone's side of the vault's text messages (SMS1–SMS3), with a
+vault of 0.9.0-dev.33. Each part is offered only where the vault has it
+and an owner has set up texts (SMS Gate, on the web).
+
+### Added
+- **Account → Mobile number**: add yours, and confirm it with the code
+  texted to it. Nothing else is sent to a number before that. Change it
+  (it is confirmed again), or remove it after a question.
+- **Account → Codes by text**: a code by text when you sign in, and when
+  you set a new password, each turned on after confirming it's you. The
+  vault's own warning is beside them: a text is the weakest way to prove
+  it's you, so use it as well as a passkey or an authenticator app, not
+  instead. An owner without one is told why it can't be turned on.
+- **Settings → Texts**: the day's reminders (one text with a count),
+  alerts about your account, and a link you shared being opened, each off
+  until you turn it on, and **quiet hours** (21:00–08:00 until you choose).
+  Until your number is confirmed, it says where to add one.
+- **Sign in**: where your second step is a text, the code goes as the
+  password is accepted ("We've texted a code to •••456"), with **Text me
+  a new code**. Where you have both a text and an authenticator app,
+  either one works.
+- **Confirm it's you**: **Text a code to •••456** beside the password,
+  for an adult or teen who turned on the sign-in code (never an owner's,
+  and never for what takes an authenticator code alone).
+- **Share → Code by text**: the person's mobile number, and the link's code
+  is texted to them when they open it. It is never shown back in full.
+- Every texted code's box is marked as a one-time code, so Android offers
+  the code from the message as it arrives. There is no SMS permission and
+  no reading of messages.
+
+### Changed
+- Re-pinned to the vault's **v0.9.0-dev.33**.
+
 ## [0.5.11] — the notes editor, scan text, and smoother choosing
 
 The owner's asks of 12 Nov 2026.

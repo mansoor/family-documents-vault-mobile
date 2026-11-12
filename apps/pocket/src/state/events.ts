@@ -18,6 +18,8 @@ interface Events {
   collectionChanged: [id: string];
   /** A link made or ended on the phone: Sharing looks again. */
   sharesChanged: [];
+  /** The person's mobile number added, confirmed or removed (SMS4): what hangs on it looks again. */
+  phoneChanged: [];
 }
 
 type Listener<K extends keyof Events> = (...args: Events[K]) => void;
@@ -28,6 +30,7 @@ const listeners: { [K in keyof Events]: Set<Listener<K>> } = {
   sessionEnded: new Set(),
   remindersChanged: new Set(),
   noticesChanged: new Set(),
+  phoneChanged: new Set(),
   documentChanged: new Set(),
   collectionChanged: new Set(),
   sharesChanged: new Set(),

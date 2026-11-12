@@ -13,7 +13,9 @@ import { sp } from '../ui/space';
 
 /**
  * Sign in: email and password, then the six-digit code if the account has
- * two-step sign-in. A wrong password shows the vault's own words. A
+ * two-step sign-in — from the authenticator app, or texted to the person's
+ * own number where they turned that on (0.9.0-dev.33, SMS3), either way
+ * where both are. A wrong password shows the vault's own words. A
  * sign-in an owner paused — locked, or waiting after a restore (5.28) —
  * says so plainly, whether the vault ended the session or refused the
  * sign-in: nothing went wrong, and the person is told whom to ask. So does
@@ -21,7 +23,7 @@ import { sp } from '../ui/space';
  */
 export default function SignIn() {
   const { t } = useTranslation();
-  const { vault, caps, notice, signIn, signInCode, chooseAnotherVault, api } = useVault();
+  const { vault, caps, notice, signIn, signInCode, sendSignInText, chooseAnotherVault, api } = useVault();
   const { waitingHere } = useCapture();
   const essentials = useEssentials();
   // Kept until the sign-in completes (past the code step): it renews the
@@ -31,6 +33,27 @@ export default function SignIn() {
   const [password, setPassword] = useState('');
   const [code, setCode] = useState('');
   const [step, setStep] = useState<'password' | 'code'>('password');
+  // The second step's ways (SMS3), and which one this code is.
+  const [second, setSecond] = useState<Extract<SignInResult, { kind: 'code' }> | null>(null);
+  const [method, setMethod] = useState<'totp' | 'text'>('totp');
+  const [textedTo, setTextedTo] = useState<string | null>(null);
+  const [textProblem, setTextProblem] = useState<string | null>(null);
+  const [texting, setTexting] = useState(false);
+  const sendText = async () => {
+    if (texting) return;
+    setTexting(true);
+    setTextProblem(null);
+    try {
+      const r = await sendSignInText();
+      if ('sentTo' in r) {
+        setTextedTo(r.sentTo);
+        setMethod('text');
+        setCode('');
+      } else setTextProblem(r.problem);
+    } finally {
+      setTexting(false);
+    }
+  };
   // Forgot your password? (the owner's ask of 12 Nov 2026): a link by email, as the web sends it.
   const [forgetting, setForgetting] = useState(false);
   const [forgotEmail, setForgotEmail] = useState('');
@@ -60,10 +83,16 @@ export default function SignIn() {
     setFailure(null);
     try {
       if (step === 'password') typed.current = password;
-      const r = step === 'password' ? await signIn(email, password) : await signInCode(code);
+      const r = step === 'password' ? await signIn(email, password) : await signInCode(code, second ? method : undefined);
       if (r.kind === 'code') {
         setStep('code');
         setPassword('');
+        setSecond(r);
+        // A text already gone, or a text the only way: the code is the text's.
+        const byText = r.textSent || !r.methods.includes('totp');
+        setMethod(byText ? 'text' : 'totp');
+        setTextedTo(r.textSent ? r.textTo : null);
+        setTextProblem(null);
       } else if (r.kind === 'ok') {
         void essentials.signedInWith(typed.current);
         typed.current = '';
@@ -124,19 +153,58 @@ export default function SignIn() {
               </>
             ) : (
               <>
-                <Text>{t('signIn.codeStep')}</Text>
-                <Field
-                  testID="sign-in-code"
-                  label={t('signIn.code')}
-                  value={code}
-                  onChangeText={setCode}
-                  keyboardType="number-pad"
-                  textContentType="oneTimeCode"
-                  autoComplete="one-time-code"
-                  maxLength={9}
-                  returnKeyType="go"
-                  onSubmitEditing={() => void submit()}
-                />
+                {method === 'totp' ? (
+                  <Text testID="sign-in-code-app">{t('signIn.codeStep')}</Text>
+                ) : textedTo ? (
+                  <Text testID="sign-in-code-texted">{t('signIn.codeTexted', { to: textedTo })}</Text>
+                ) : (
+                  <Text testID="sign-in-code-text-offer">{t('signIn.codeTextOffer', { to: second?.textTo ?? '' })}</Text>
+                )}
+                {method === 'text' && !textedTo ? (
+                  <Button testID="sign-in-text-send" label={t('signIn.textMe')} busy={texting} onPress={() => void sendText()} />
+                ) : (
+                  <Field
+                    testID="sign-in-code"
+                    label={t('signIn.code')}
+                    value={code}
+                    onChangeText={setCode}
+                    keyboardType="number-pad"
+                    textContentType="oneTimeCode"
+                    // A texted code: Android offers it from the message as it comes.
+                    autoComplete={method === 'text' ? 'sms-otp' : 'one-time-code'}
+                    maxLength={9}
+                    returnKeyType="go"
+                    onSubmitEditing={() => void submit()}
+                  />
+                )}
+                {textProblem ? (
+                  <Notice tone="warn" testID="sign-in-text-problem">
+                    {textProblem}
+                  </Notice>
+                ) : null}
+                {method === 'text' && textedTo ? (
+                  <Button
+                    testID="sign-in-text-again"
+                    kind="quiet"
+                    size="small"
+                    label={t('signIn.textAgain')}
+                    busy={texting}
+                    onPress={() => void sendText()}
+                  />
+                ) : null}
+                {second && second.methods.includes('text') && second.methods.includes('totp') ? (
+                  <Button
+                    testID="sign-in-code-switch"
+                    kind="quiet"
+                    size="small"
+                    label={method === 'totp' ? t('signIn.useText') : t('signIn.useApp')}
+                    onPress={() => {
+                      setCode('');
+                      setTextProblem(null);
+                      setMethod(method === 'totp' ? 'text' : 'totp');
+                    }}
+                  />
+                ) : null}
               </>
             )}
             {step === 'password' ? (
@@ -158,7 +226,11 @@ export default function SignIn() {
               label={step === 'password' ? t('signIn.signIn') : t('signIn.confirm')}
               onPress={() => void submit()}
               busy={busy}
-              disabled={step === 'password' ? !email.trim() || !password : code.replace(/\s/g, '').length < 6}
+              disabled={
+                step === 'password'
+                  ? !email.trim() || !password
+                  : code.replace(/\s/g, '').length < 6 || (method === 'text' && !textedTo)
+              }
             />
           </Card>
           {failure?.kind === 'refused' ? (

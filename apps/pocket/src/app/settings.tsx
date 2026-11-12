@@ -7,6 +7,7 @@ import { Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { APP_VERSION, SPIKE } from '../config';
 import { NotificationsCard } from '../push/card';
+import { TextNotificationsCard } from '../push/texts-card';
 import { OfflineCopies } from '../settings/offline';
 import { useCapture } from '../state/capture';
 import { useLock, type LockTimeout } from '../state/lock';
@@ -138,6 +139,7 @@ export default function Settings() {
       </Card>
       <OfflineCopies />
       <NotificationsCard />
+      <TextNotificationsCard />
       <Card>
         <Text variant="title">{t('settings.about')}</Text>
         <Text tone="soft">{version}</Text>

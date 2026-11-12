@@ -20,7 +20,7 @@ import {
  * tested without drawing the sheet.
  */
 export type EndChoice = ShareQuickPick['key'] | 'other';
-export type Protection = 'none' | 'pin' | 'password';
+export type Protection = 'none' | 'pin' | 'password' | 'text';
 
 export interface ShareOptions {
   label: string;
@@ -32,6 +32,8 @@ export interface ShareOptions {
   permission: SharePermission;
   opens: string;
   protection: Protection;
+  /** The recipient's mobile number, for a code by text (SMS4): as typed. */
+  phone: string;
 }
 
 export const NO_SHARE_OPTIONS: ShareOptions = {
@@ -42,6 +44,7 @@ export const NO_SHARE_OPTIONS: ShareOptions = {
   permission: 'download',
   opens: '',
   protection: 'none',
+  phone: '',
 };
 
 export interface ShareContext {
@@ -56,6 +59,8 @@ export interface ShareContext {
   options: boolean;
   /** The vault makes up a password (5.20, `features.share_second_factor`). */
   passwords: boolean;
+  /** The vault texts a link's code (0.9.0-dev.33, `features.sms_codes`) and its texts are set up. */
+  texts?: boolean;
   now?: Date;
 }
 
@@ -88,10 +93,13 @@ export function readShareOptions(v: ShareOptions, ctx: ShareContext) {
   const opensProblem =
     opens !== null && (!Number.isInteger(opens) || opens < 1 || opens > SHARE_LIMIT_MAX) ? 'opens' : null;
   const password = ctx.passwords && v.protection === 'password';
+  // A code by text needs the number it goes to: one that is not even a number is said here, the rest by the vault.
+  const text = ctx.texts === true && v.protection === 'text';
+  const phoneProblem = text && v.phone.replace(/[^0-9]/g, '').length < 6 ? 'phone' : null;
   const permission: SharePermission = ctx.note ? 'view' : ctx.viewable ? v.permission : 'download';
 
   let body: ShareInput | null = null;
-  if (endAt && !endProblem && !opensProblem) {
+  if (endAt && !endProblem && !opensProblem && !phoneProblem) {
     body = {
       ...(v.label.trim() ? { recipient_label: v.label.trim() } : {}),
       // An older vault takes days only: the end, rounded up to a whole day.
@@ -104,7 +112,8 @@ export function readShareOptions(v: ShareOptions, ctx: ShareContext) {
         : { expires_in_days: Math.max(1, Math.ceil((endAt.getTime() - now.getTime()) / 864e5)) }),
       with_pin: v.protection === 'pin',
       ...(password ? { with_password: true } : {}),
+      ...(text ? { second_factor: 'sms' as const, recipient_phone: v.phone.trim() } : {}),
     };
   }
-  return { picks, end, endAt, endProblem, opensProblem, body, fallback };
+  return { picks, end, endAt, endProblem, opensProblem, phoneProblem, body, fallback };
 }

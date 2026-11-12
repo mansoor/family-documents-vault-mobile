@@ -172,7 +172,14 @@ export interface Library {
    * sign-in on or not, each password change asked, and each forgotten
    * password's address.
    */
-  account: { totp: boolean; changes: Record<string, unknown>[]; forgot: string[]; required?: boolean };
+  account: {
+    totp: boolean;
+    changes: Record<string, unknown>[];
+    forgot: string[];
+    required?: boolean;
+    /** Where a step-up's code can be texted (`StepUpState.text_to`, SMS3), masked: GET /auth/step-up says it. */
+    stepUpTextTo?: string;
+  };
   /**
    * Links outside the family (sharing from the phone): GET /shares lists
    * them; each one made is kept with what the phone sent for it.
@@ -410,6 +417,18 @@ async function library(t: TestVault, path: string, init: Parameters<FetchLike>[1
     if (!t.sessions.some((x) => x.id === s[1])) return failure(404, 'not_found', 'There is no such session.');
     t.sessions = t.sessions.filter((x) => x.id !== s[1]);
     return { ...json(null), status: 204, text: async () => '' } as Reply;
+  }
+  if (q === '/api/v1/auth/step-up' && init.method === 'GET' && lib.account.stepUpTextTo) {
+    return json({ verified_at: null, expires_in: 0, text_to: lib.account.stepUpTextTo });
+  }
+  if (q === '/api/v1/auth/step-up' && init.method === 'POST' && body.text_code !== undefined) {
+    // A code by text (SMS3): the client's fake keeps the codes it texted, and checks it.
+    const res = (await t.vault.fetch(`https://vault.test${path}`, init)) as Reply;
+    if (res.status === 200) {
+      lib.verified = true;
+      lib.stepUps.push(`text:${String(body.text_code)}`);
+    }
+    return res;
   }
   if (q === '/api/v1/auth/step-up' && init.method === 'POST') {
     const ok = body.password === t.vault.state.password || body.code === '123456';
