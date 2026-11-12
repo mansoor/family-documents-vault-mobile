@@ -108,6 +108,12 @@ export function EssentialPages(props: { id: string; mode?: string; online?: bool
       // eslint-disable-next-line react-hooks/refs
       PanResponder.create({
         onMoveShouldSetPanResponder: (_evt, g) => Math.abs(g.dx) > 20 || g.numberActiveTouches > 1,
+        // A sideways swipe at the page's own size is taken before the picture
+        // underneath can keep it (the owner's ask of 12 Nov 2026: left and
+        // right turn the page, as ‹ and › do); zoomed in, the picture scrolls.
+        onMoveShouldSetPanResponderCapture: (_evt, g) =>
+          g.numberActiveTouches > 1 ||
+          (gesture.current.zoom === 0 && Math.abs(g.dx) > 20 && Math.abs(g.dx) > Math.abs(g.dy) * 1.5),
         onPanResponderMove: (evt) => {
           const touches = evt.nativeEvent.touches;
           if (touches.length === 2) {
@@ -127,8 +133,9 @@ export function EssentialPages(props: { id: string; mode?: string; online?: bool
           const pinched = gesture.current.spread !== 0;
           gesture.current.spread = 0;
           if (pinched || gesture.current.zoom !== 0) return;
-          if (g.dx < -60) go(gesture.current.n + 1);
-          else if (g.dx > 60) go(gesture.current.n - 1);
+          if (Math.abs(g.dx) < Math.abs(g.dy)) return;
+          if (g.dx < -50) go(gesture.current.n + 1);
+          else if (g.dx > 50) go(gesture.current.n - 1);
         },
       }),
     // go reads gesture.current; nothing else changes the responder.

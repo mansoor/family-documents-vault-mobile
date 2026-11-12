@@ -6,6 +6,27 @@ app's own, tagged `vX.Y.Z` in this repository.
 
 ## [Unreleased]
 
+## [0.5.11] — the notes editor, scan text, and smoother choosing
+
+The owner's asks of 12 Nov 2026.
+
+### Added
+- **The notes editor matches the web's**: a toolbar — bold, italic,
+  underline, struck through, headings 1 to 3, bulleted and numbered lists,
+  a checklist, a quote, a link and Clear formatting — acting where the
+  cursor is, and **Write / Preview**, the preview drawn as the note's page
+  draws it. In New note and a note's Edit.
+- **Scan text** into a note: a page through the phone's scanner, its words
+  read by the phone's own text recognition (ML Kit, on the phone: nothing
+  is sent anywhere) and put where the cursor is. The scan is not kept.
+
+### Changed
+- **What it is** and **Whose it is** scroll sideways, smoothly, with ⋯
+  always in sight: past the screen's edge they were cut off, and a drag
+  could land as a tap on another choice.
+- **The pages turn with a swipe** left or right (as ‹ and › do), the swipe
+  taken before the picture can keep it; zoomed in, the picture scrolls.
+
 ## [0.5.10] — your password and two-step sign-in, from the phone
 
 The owner's ask of 12 Nov 2026.

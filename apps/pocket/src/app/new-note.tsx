@@ -9,6 +9,7 @@ import { wordsFor } from '../errors/words';
 import { emit } from '../state/events';
 import { feel } from '../ui/feel';
 import { useVault } from '../state/vault';
+import { NoteEditor } from '../documents/note-editor';
 import { Button, Field, Notice, Text } from '../ui';
 import { Chip, ChipRow } from '../ui/chip';
 import { sp } from '../ui/space';
@@ -99,16 +100,7 @@ export default function NewNoteScreen() {
           ))}
         </ChipRow>
       </View>
-      <Field
-        label={t('newNote.words')}
-        value={words}
-        onChangeText={setWords}
-        multiline
-        numberOfLines={8}
-        textAlignVertical="top"
-        autoCapitalize="sentences"
-        testID="new-note-words"
-      />
+      <NoteEditor label={t('newNote.words')} value={words} onChange={setWords} testID="new-note-words" />
       <Text variant="secondary" tone={tooLong ? 'danger' : 'muted'} testID="new-note-count">
         {tooLong ? t('newNote.tooLong', { count: words.length }) : t('newNote.notFor')}
       </Text>

@@ -12,7 +12,7 @@ module.exports = {
   // pnpm keeps packages under node_modules/.pnpm, so it has to be let
   // through for anything that ships untranspiled code.
   transformIgnorePatterns: [
-    'node_modules/(?!(\\.pnpm|((jest-)?react-native|@react-native(-community)?)|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|@preeternal/.*|lucide-react-native|pdf-lib))',
+    'node_modules/(?!(\\.pnpm|((jest-)?react-native|@react-native(-community)?)|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|@preeternal/.*|@react-native-ml-kit/.*|lucide-react-native|pdf-lib))',
   ],
   // e2e-web holds the Playwright specs, which run in a browser, not here.
   testPathIgnorePatterns: ['/node_modules/', '/android/', '/ios/', '/e2e-web/'],

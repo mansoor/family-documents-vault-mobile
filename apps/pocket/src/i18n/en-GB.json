@@ -1135,5 +1135,28 @@
     "offTitle": "Turn off two-step sign-in?",
     "offWords": "Your password alone will sign you in. Type a code from your authenticator app to turn it off.",
     "offYes": "Turn it off"
+  },
+  "notesEditor": {
+    "toolbar": "Formatting",
+    "bold": "Bold",
+    "italic": "Italic",
+    "underline": "Underline",
+    "strike": "Strikethrough",
+    "heading1": "Heading 1",
+    "heading2": "Heading 2",
+    "heading3": "Heading 3",
+    "bullet": "Bulleted list",
+    "numbered": "Numbered list",
+    "checklist": "Checklist",
+    "quote": "Quote",
+    "link": "Link",
+    "clear": "Clear formatting",
+    "write": "Write",
+    "preview": "Preview",
+    "empty": "Nothing written yet.",
+    "scan": "Scan text into the note",
+    "scanShort": "Scan text",
+    "scanNothing": "No words were found on that page. Try again with the page flat and in good light.",
+    "scanFailed": "The page could not be read on this phone."
   }
 }

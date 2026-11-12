@@ -98,6 +98,11 @@ jest.mock('@preeternal/react-native-document-scanner-plugin', () => ({
   ResponseType: { ImageFilePath: 'imageFilePath', Base64: 'base64' },
   ScanDocumentResponseStatus: { Success: 'success', Cancel: 'cancel' },
 }));
+// The phone's text recognition, for Scan text in a note (12 Nov 2026): a test says what it reads.
+jest.mock('@react-native-ml-kit/text-recognition', () => ({
+  __esModule: true,
+  default: { recognize: jest.fn(async () => ({ text: '', blocks: [] })) },
+}));
 jest.mock('expo-document-picker', () => ({ getDocumentAsync: jest.fn(async () => ({ canceled: true, assets: null })) }));
 jest.mock('expo-image-picker', () => ({ launchImageLibraryAsync: jest.fn(async () => ({ canceled: true, assets: null })) }));
 jest.mock('expo-sqlite', () => ({
