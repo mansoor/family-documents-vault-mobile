@@ -1,11 +1,12 @@
-import { Link } from 'expo-router';
-import { Settings as SettingsIcon } from 'lucide-react-native';
+import { Link, useRouter } from 'expo-router';
+import { ArrowLeft, Settings as SettingsIcon } from 'lucide-react-native';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useVault } from '../state/vault';
 import { BellButton } from './bell';
+import { IconButton } from './icon-button';
 import { Text } from '.';
 import { sp } from './space';
 import { useColours, useStyles, type Palette } from './theme';
@@ -14,11 +15,16 @@ import { useColours, useStyles, type Palette } from './theme';
  * The bar at the top of every screen (the owner's ask of 11 Nov 2026):
  * the family's vault by name, Needs attention's bell and Settings, the same
  * on every page, close to the top. A page's own title, and what may be done
- * there (Edit, ⋯), go below it; a tab's page draws its title itself. No
- * back arrow anywhere: Android's back goes back. Show mode, the pages, the
- * camera and the edit pages have the whole screen, and no bar.
+ * there (Edit, ⋯), go below it; a tab's page draws its title itself. Show
+ * mode, the pages, the camera and the edit pages have the whole screen, and
+ * no bar.
+ *
+ * `back`: a ← at the left of the page's row, before its title or its
+ * buttons, for a page opened from a list and left again — a document's or
+ * a note's, a collection's (the owner's ask of 12 Nov 2026). Android's
+ * back does the same.
  */
-export function AppHeader(props: { title?: string | undefined; right?: ReactNode }) {
+export function AppHeader(props: { title?: string | undefined; right?: ReactNode; back?: boolean }) {
   const styles = useStyles(makeStyles);
   const colours = useColours();
   const insets = useSafeAreaInsets();
@@ -26,6 +32,15 @@ export function AppHeader(props: { title?: string | undefined; right?: ReactNode
   const { caps, vault } = useVault();
   const name = caps?.branding.display_name ?? vault?.displayName ?? '';
   const title = props.title?.trim() ? props.title : null;
+  const router = useRouter();
+  const back = props.back ? (
+    <IconButton
+      testID="app-header-back"
+      label={t('common.back')}
+      icon={ArrowLeft}
+      onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))}
+    />
+  ) : null;
   return (
     <View style={[styles.wrap, { paddingTop: insets.top + sp(4) }]} testID="app-header">
       <View style={styles.bar}>
@@ -45,8 +60,9 @@ export function AppHeader(props: { title?: string | undefined; right?: ReactNode
           </Pressable>
         </Link>
       </View>
-      {title || props.right ? (
+      {title || props.right || back ? (
         <View style={styles.titleRow}>
+          {back}
           {title ? (
             <Text variant="hero" style={styles.flex} testID="app-header-title">
               {title}
@@ -61,17 +77,24 @@ export function AppHeader(props: { title?: string | undefined; right?: ReactNode
   );
 }
 
-/** What a navigator hands its header: the screen's title and its own buttons. */
+/** What a navigator hands its header: the screen's title, its own buttons, and whether it has a ←. */
 export interface HeaderOptions {
   title?: string | undefined;
   headerTitle?: unknown;
+  headerBackVisible?: boolean | undefined;
   headerRight?: ((p: { tintColor?: string; canGoBack: boolean }) => ReactNode) | undefined;
 }
 
 /** The header for a navigator's screens: its title (unless `headerTitle` is ''), and its buttons. */
 export function headerFor(options: HeaderOptions) {
   const title = typeof options.headerTitle === 'string' ? options.headerTitle : options.title;
-  return <AppHeader title={title} right={options.headerRight?.({ canGoBack: true })} />;
+  return (
+    <AppHeader
+      title={title}
+      right={options.headerRight?.({ canGoBack: true })}
+      back={options.headerBackVisible === true}
+    />
+  );
 }
 
 const makeStyles = (colours: Palette) =>

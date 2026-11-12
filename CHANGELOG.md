@@ -6,6 +6,17 @@ app's own, tagged `vX.Y.Z` in this repository.
 
 ## [Unreleased]
 
+## [0.5.9] — back, and close
+
+The owner's ask of 12 Nov 2026.
+
+### Added
+- A **←** at the left of the row with ✎ and ⋯, on a document's page (a
+  note's too) and a collection's: back where it was opened from.
+  Android's back still does the same.
+- A **✕** on the pages, in the top corner beside the document's name:
+  closes them, back where they were opened from.
+
 ## [0.5.8] — The household
 
 The owner's decision of 11 Nov 2026, with a vault of 0.9.0-dev.32.

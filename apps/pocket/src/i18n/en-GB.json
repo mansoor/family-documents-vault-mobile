@@ -10,7 +10,8 @@
     "cancel": "Cancel",
     "tryAgain": "Try again",
     "openInBrowser": "Open in browser",
-    "working": "Working…"
+    "working": "Working…",
+    "back": "Back"
   },
   "connect": {
     "title": "Your vault",
@@ -381,7 +382,8 @@
     "privateChanged": "A fingerprint or face was added or changed on this phone, so your Only me copies were removed. They'll be kept again when you're online.",
     "privateUnavailable": "This phone's fingerprint or face unlock can't open your Only me copies.",
     "dismiss": "Dismiss",
-    "pending": "The vault is still preparing this document's pages. They'll be kept here the next time the phone is online."
+    "pending": "The vault is still preparing this document's pages. They'll be kept here the next time the phone is online.",
+    "close": "Close the pages"
   },
   "show": {
     "hint": "Tap Done, or press back, to finish.",
