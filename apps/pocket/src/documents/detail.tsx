@@ -297,7 +297,9 @@ export function DocumentDetail(props: { id: string }) {
     ] as [string, string | null][]
   ).filter((f): f is [string, string] => !!f[1]);
   // Whose · what kind · who can see it: what the old page said in three places, on one line.
-  const subline = [owner?.display_name, note ? null : type?.label, t(`document.visibility_${shown.visibility}`)]
+  // Whose: a person, or the household's (0.9.0-dev.32); Not sure yet says nothing here (its status does).
+  const whose = owner?.display_name ?? (shown.household_owned ? t('capture.household') : null);
+  const subline = [whose, note ? null : type?.label, t(`document.visibility_${shown.visibility}`)]
     .filter(Boolean)
     .join(' · ');
   const ordered = [...versions].sort((x, y) => y.version_no - x.version_no);

@@ -42,6 +42,7 @@ export function draftOf(doc: DocumentView): Draft {
     source: NO_PAGES,
     typeKey: doc.type_key ?? null,
     ownerId: doc.owner_member_id ?? null,
+    household: doc.household_owned === true,
     visibility: doc.visibility,
     essential: doc.is_essential,
     title: doc.title ?? '',
@@ -73,6 +74,8 @@ export function editBody(
     type_key: m.type_key ?? null,
     owner_member_id: m.owner_member_id ?? null,
     title: m.title ?? null,
+    // The household's, or not (Not sure yet, or a person's): said either way where the vault keeps it.
+    ...(h.householdOwner ? { household_owned: !m.owner_member_id && d.household } : {}),
   };
   for (const key of CARD_CORE) {
     if (!coreAsk(type, key, h).shown) continue;

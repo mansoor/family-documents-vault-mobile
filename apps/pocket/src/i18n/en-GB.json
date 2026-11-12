@@ -304,7 +304,8 @@
     "toInboxHint": "The vault reads it and suggests its details. You finish it in the browser.",
     "stillNeededInbox_one": "Still needed: {{fields}}. Fill it in, or send it to your Inbox for now.",
     "stillNeededInbox_other": "Still needed: {{fields}}. Fill them in, or send it to your Inbox for now.",
-    "offlineInbox": "No connection, and this phone hasn't seen the vault's choices yet. Send to my Inbox keeps the scan: it goes when you're back online, and you finish it in the browser."
+    "offlineInbox": "No connection, and this phone hasn't seen the vault's choices yet. Send to my Inbox keeps the scan: it goes when you're back online, and you finish it in the browser.",
+    "household": "The household"
   },
   "timings": {
     "title": "Timings",
