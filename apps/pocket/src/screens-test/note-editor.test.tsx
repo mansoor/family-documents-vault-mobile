@@ -1,4 +1,4 @@
-import TextRecognition from '@react-native-ml-kit/text-recognition';
+import { extractTextFromImage } from 'expo-text-extractor';
 import { scanDocument } from '@preeternal/react-native-document-scanner-plugin';
 import { fireEvent, screen } from '@testing-library/react-native';
 import { useState } from 'react';
@@ -38,18 +38,18 @@ describe('the notes editor', () => {
 
   it('Scan text: a page read on the phone, its words put in where the cursor is', async () => {
     jest.mocked(scanDocument).mockResolvedValueOnce({ status: 'success', scannedImages: ['/tmp/page.jpg'] } as never);
-    jest.mocked(TextRecognition.recognize).mockResolvedValueOnce({ text: 'Gate code 4821\n', blocks: [] } as never);
+    jest.mocked(extractTextFromImage).mockResolvedValueOnce(['Gate code 4821', '']);
     await renderApp(<Harness start="Where things are" />);
     const box = await screen.findByTestId('words');
     await fireEvent(box, 'selectionChange', { nativeEvent: { selection: { start: 16, end: 16 } } });
     await fireEvent.press(screen.getByTestId('words-scan'));
     await screen.findByDisplayValue('Where things are\nGate code 4821');
-    expect(TextRecognition.recognize).toHaveBeenCalledWith('file:///tmp/page.jpg');
+    expect(extractTextFromImage).toHaveBeenCalledWith('file:///tmp/page.jpg');
   });
 
   it('a page with no words on it: said, and nothing put in', async () => {
     jest.mocked(scanDocument).mockResolvedValueOnce({ status: 'success', scannedImages: ['file:///tmp/blank.jpg'] } as never);
-    jest.mocked(TextRecognition.recognize).mockResolvedValueOnce({ text: '  ', blocks: [] } as never);
+    jest.mocked(extractTextFromImage).mockResolvedValueOnce(['  ']);
     await renderApp(<Harness start="x" />);
     await fireEvent.press(await screen.findByTestId('words-scan'));
     expect(await screen.findByTestId('words-scan-said')).toHaveTextContent(/No words were found/);

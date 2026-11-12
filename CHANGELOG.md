@@ -17,7 +17,8 @@ The owner's asks of 12 Nov 2026.
   cursor is, and **Write / Preview**, the preview drawn as the note's page
   draws it. In New note and a note's Edit.
 - **Scan text** into a note: a page through the phone's scanner, its words
-  read by the phone's own text recognition (ML Kit, on the phone: nothing
+  read by the phone's own text recognition (ML Kit, through
+  expo-text-extractor, on the phone: nothing
   is sent anywhere) and put where the cursor is. The scan is not kept.
 
 ### Changed

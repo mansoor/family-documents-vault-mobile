@@ -1,4 +1,4 @@
-import TextRecognition from '@react-native-ml-kit/text-recognition';
+import { extractTextFromImage, isSupported } from 'expo-text-extractor';
 import {
   ResponseType,
   scanDocument,
@@ -8,7 +8,7 @@ import {
 /**
  * Scan text into a note, on the phone (the owner's ask of 12 Nov 2026): a
  * page through ML Kit's document scanner (its edges found, flattened), then
- * ML Kit's on-device text recognition — the words read on the phone itself,
+ * the phone's own text recognition (expo-text-extractor: ML Kit on Android) — the words read on the phone itself,
  * never sent anywhere — and put where the cursor is in the note. The scan
  * is not kept: only the words, in the note being written.
  *
@@ -18,7 +18,7 @@ import {
 
 export type ScannedText = { kind: 'text'; text: string } | { kind: 'nothing' } | { kind: 'cancelled' } | { kind: 'failed' };
 
-export const textScanOffered = (): boolean => true;
+export const textScanOffered = (): boolean => isSupported;
 
 export async function scanTextOnPhone(): Promise<ScannedText> {
   let uri: string | undefined;
@@ -37,8 +37,8 @@ export async function scanTextOnPhone(): Promise<ScannedText> {
   }
   if (!uri) return { kind: 'cancelled' };
   try {
-    const read = await TextRecognition.recognize(uri.startsWith('file://') || uri.startsWith('content://') ? uri : `file://${uri}`);
-    const text = read.text.trim();
+    const lines = await extractTextFromImage(uri.startsWith('file://') || uri.startsWith('content://') ? uri : `file://${uri}`);
+    const text = lines.join('\n').trim();
     return text ? { kind: 'text', text } : { kind: 'nothing' };
   } catch {
     return { kind: 'failed' };
