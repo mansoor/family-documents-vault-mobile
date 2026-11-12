@@ -82,7 +82,7 @@ async function signIn(page: Page, address: string) {
   await page.getByRole('button', { name: 'Connect' }).click();
   await page.getByRole('button', { name: 'Use it on this Wi-Fi' }).click();
   await page.getByLabel('Email').fill(EMAIL);
-  await page.getByLabel('Password').fill(PASSWORD);
+  await page.getByLabel('Password', { exact: true }).fill(PASSWORD);
   await page.getByRole('button', { name: 'Sign in' }).click();
   await expect(page.getByTestId('home-ready')).toBeVisible();
 }
