@@ -278,6 +278,32 @@ env:
       id: sharing-end-.*
     timeout: 15000
 - takeScreenshot: shot-light-sharing
+# Show the link (0.5.7, a vault of 0.9.0-dev.30): shown again after confirming it is you.
+- tapOn:
+    id: sharing-show-.*
+- runFlow:
+    when:
+      visible:
+        id: step-up-password
+    commands:
+      - tapOn:
+          id: step-up-password
+      - inputText: ${PASSWORD}
+      - hideKeyboard
+      - tapOn:
+          id: step-up-go
+- extendedWaitUntil:
+    visible:
+      id: sharing-shown-link
+    timeout: 20000
+- assertVisible:
+    id: sharing-shown-secret
+- takeScreenshot: shot-light-shown
+- scrollUntilVisible:
+    element:
+      id: sharing-shown-done
+- tapOn:
+    id: sharing-shown-done
 - tapOn:
     id: sharing-end-.*
 - tapOn:

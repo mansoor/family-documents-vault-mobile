@@ -6,6 +6,22 @@ app's own, tagged `vX.Y.Z` in this repository.
 
 ## [Unreleased]
 
+## [0.5.7] — a link shown again
+
+The owner's choice of 11 Nov 2026, with a vault of 0.9.0-dev.30.
+
+### Added
+- **Show the link**, in More → Sharing: a link you made, and its PIN or
+  the password the vault made up, shown again after confirming it is you,
+  with Send and Copy. Links made before your vault kept a copy are shown
+  once only, and have no Show the link.
+- A link just made says it can be seen again in Sharing, where the vault
+  keeps it.
+
+### Changed
+- Pinned to the vault of 0.9.0-dev.30 (its client reads `libphonenumber-js`,
+  now in the app's licences).
+
 ## [0.5.6] — the vault's name on every page, and notes three ways
 
 The owner's notes of 11 Nov 2026.

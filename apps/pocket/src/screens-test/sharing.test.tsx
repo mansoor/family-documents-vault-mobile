@@ -35,6 +35,7 @@ function vault(): TestVault {
       share_options: true,
       share_second_factor: true,
       collection_shares: true,
+      share_reveal: true,
     },
   });
   return t;
@@ -227,5 +228,55 @@ describe('Sharing, in More', () => {
     const t = vault();
     await unlocked(t, <SharingScreen />);
     expect(await screen.findByTestId('sharing-none')).toHaveTextContent('Nothing is shared outside the family.');
+  });
+});
+
+describe('Show the link, in Sharing (0.9.0-dev.30)', () => {
+  it('a link made here: said it can be seen again, then shown again after confirming it is you, to send or copy', async () => {
+    const t = vault();
+    libraryDoc(t, { id: 'passport', title: 'Passport' });
+    await unlocked(t, <DocumentDetail id="passport" />);
+    await fireEvent.press(await screen.findByTestId('document-more'));
+    await fireEvent.press(await screen.findByTestId('document-share'));
+    await fireEvent.changeText(await screen.findByTestId('share-label'), 'Dr Patel');
+    await fireEvent.press(screen.getByTestId('share-protect-pin'));
+    await fireEvent.press(screen.getByTestId('share-make'));
+    expect(await screen.findByTestId('share-again-later')).toHaveTextContent(/again in More → Sharing/);
+
+    await unlocked(t, <SharingScreen />);
+    const show = await screen.findByTestId('sharing-show-share-1');
+    expect(show.props.accessibilityLabel).toBe('Show the link to Passport');
+    expect(audit()).toEqual([]);
+    await fireEvent.press(show);
+    await fireEvent.changeText(await screen.findByTestId('step-up-password'), PASSWORD);
+    await fireEvent.press(screen.getByTestId('step-up-go'));
+    expect(await screen.findByTestId('sharing-shown-link')).toHaveTextContent('https://share.vault.test/s#tok-1');
+    expect(screen.getByTestId('sharing-shown-secret')).toHaveTextContent('4821');
+    expect(screen.getByTestId('sharing-shown-send')).toBeTruthy();
+    await fireEvent.press(screen.getByTestId('sharing-shown-done'));
+    await waitFor(() => expect(screen.queryByTestId('sharing-shown-link')).toBeNull());
+  });
+
+  it('a link made before: no Show the link; an older vault: none at all', async () => {
+    const t = vault();
+    libraryDoc(t, { id: 'passport', title: 'Passport' });
+    t.library.shares.push({
+      id: 'old',
+      document_id: 'passport',
+      document_title: 'Passport',
+      recipient_label: null,
+      created_by_name: 'Fake Owner',
+      created_at: '2026-11-10T10:00:00Z',
+      expires_at: '2030-11-17T10:00:00Z',
+      has_pin: false,
+      open_count: 0,
+      last_opened_at: null,
+      state: 'active',
+      summary: 'A link',
+      revealable: false,
+    } as never);
+    await unlocked(t, <SharingScreen />);
+    await screen.findByTestId('sharing-old');
+    expect(screen.queryByTestId('sharing-show-old')).toBeNull();
   });
 });

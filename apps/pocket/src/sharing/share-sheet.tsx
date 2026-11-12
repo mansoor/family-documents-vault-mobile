@@ -215,7 +215,14 @@ export function ShareSheet(props: { target: ShareTarget; onClose: () => void }) 
               ) : null}
             </>
           ) : null}
-          <Notice tone="warn">{t('share.onlyNow')}</Notice>
+          {/* A vault of 0.9.0-dev.30 keeps it, to show its maker again from Sharing. */}
+          {made.share.revealable ? (
+            <Notice tone="info" testID="share-again-later">
+              {t('share.againLater')}
+            </Notice>
+          ) : (
+            <Notice tone="warn">{t('share.onlyNow')}</Notice>
+          )}
           <Button kind="quiet" label={t('share.done')} onPress={props.onClose} testID="share-done" />
         </ScrollView>
       </Sheet>

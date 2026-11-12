@@ -468,6 +468,7 @@
 {"name":"kleur","versions":["3.0.3"],"licence":"MIT"},
 {"name":"lan-network","versions":["0.2.1"],"licence":"MIT"},
 {"name":"leven","versions":["3.1.0"],"licence":"MIT"},
+{"name":"libphonenumber-js","versions":["1.13.16"],"licence":"MIT"},
 {"name":"lighthouse-logger","versions":["1.4.2"],"licence":"Apache-2.0"},
 {"name":"lightningcss","versions":["1.33.0"],"licence":"MPL-2.0"},
 {"name":"lines-and-columns","versions":["1.2.4"],"licence":"MIT"},
