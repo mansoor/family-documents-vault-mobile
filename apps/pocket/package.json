@@ -1,6 +1,6 @@
 {
   "name": "@fdv/pocket",
-  "version": "0.5.10",
+  "version": "0.5.11",
   "main": "expo-router/entry",
   "dependencies": {
     "@expo-google-fonts/figtree": "^0.4.1",
@@ -38,6 +38,7 @@
     "expo-sqlite": "~57.0.5",
     "expo-status-bar": "~57.0.1",
     "expo-system-ui": "~57.0.4",
+    "expo-text-extractor": "2.0.0",
     "i18next": "^26.4.2",
     "lucide-react-native": "^1.47.0",
     "pdf-lib": "1.17.1",

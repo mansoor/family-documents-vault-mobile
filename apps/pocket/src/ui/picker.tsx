@@ -194,8 +194,20 @@ export function ChipLine(props: {
   const rest = props.options.filter((o) => !props.chosen.includes(o.value));
   const shown = [...chosen, ...rest].slice(0, Math.max(max, chosen.length));
   const hidden = props.options.length - shown.length;
+  // The chips scroll sideways, smoothly, and the ⋯ stays in sight at the end
+  // (the owner's ask of 12 Nov 2026: past the edge they were cut off, and a
+  // drag landed as a tap on whichever was under the finger).
   return (
-    <View style={styles.line} accessibilityRole="radiogroup" accessibilityLabel={props.label}>
+    <View style={styles.lineWrap}>
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      keyboardShouldPersistTaps="handled"
+      style={styles.flex}
+      contentContainerStyle={styles.line}
+      accessibilityRole="radiogroup"
+      accessibilityLabel={props.label}
+    >
       {shown.map((o) => (
         <Chip
           key={o.value}
@@ -207,6 +219,7 @@ export function ChipLine(props: {
           {...(props.chipID ? { testID: `${props.chipID}-${o.value}` } : {})}
         />
       ))}
+    </ScrollView>
       {hidden > 0 || props.options.length > max ? (
         <Pressable
           testID={props.moreID}
@@ -246,7 +259,8 @@ const makeStyles = (colours: Palette) =>
     },
     pressed: { opacity: 0.7 },
     foot: { flexDirection: 'row', alignItems: 'center', gap: sp(8) },
-    line: { flexDirection: 'row', flexWrap: 'nowrap', alignItems: 'center', gap: sp(8), overflow: 'hidden' },
+    line: { flexDirection: 'row', flexWrap: 'nowrap', alignItems: 'center', gap: sp(8), paddingRight: sp(4) },
+    lineWrap: { flexDirection: 'row', alignItems: 'center', gap: sp(8) },
     more: {
       flexDirection: 'row',
       alignItems: 'center',

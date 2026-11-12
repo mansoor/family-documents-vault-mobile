@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ScrollView, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { NoteEditor } from './note-editor';
 import { TagsEditor } from './tags-edit';
 import { wordsFor } from '../errors/words';
 import { emit } from '../state/events';
@@ -95,16 +96,7 @@ export function NoteEdit(props: { doc: DocumentView; onStale: () => Promise<void
           {doc.title ?? t('document.untitled')}
         </Text>
       )}
-      <Field
-        label={t('newNote.words')}
-        value={words}
-        onChangeText={setWords}
-        multiline
-        numberOfLines={10}
-        textAlignVertical="top"
-        autoCapitalize="sentences"
-        testID="edit-note-words"
-      />
+      <NoteEditor label={t('newNote.words')} value={words} onChange={setWords} testID="edit-note-words" />
       <Text variant="secondary" tone={tooLong ? 'danger' : 'muted'} testID="edit-note-count">
         {tooLong ? t('newNote.tooLong', { count: words.length }) : t('newNote.notFor')}
       </Text>
