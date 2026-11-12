@@ -168,6 +168,12 @@ export interface Library {
   /** Moved to the Trash (DELETE /documents/{id}), in order. */
   trashed: string[];
   /**
+   * The person's own sign-in, changed from the phone (12 Nov 2026): two-step
+   * sign-in on or not, each password change asked, and each forgotten
+   * password's address.
+   */
+  account: { totp: boolean; changes: Record<string, unknown>[]; forgot: string[]; required?: boolean };
+  /**
    * Links outside the family (sharing from the phone): GET /shares lists
    * them; each one made is kept with what the phone sent for it.
    */
@@ -252,6 +258,7 @@ export function testVault(origins: string[] = ['https://vault.test']): TestVault
       ownLinks: new Map(),
       collections: new Map(),
       trashed: [],
+      account: { totp: false, changes: [], forgot: [] },
       shares: [],
       shareBodies: [],
       shareSecrets: new Map(),
@@ -411,6 +418,45 @@ async function library(t: TestVault, path: string, init: Parameters<FetchLike>[1
     if (body.code !== undefined) lib.factorVerified = true;
     lib.stepUps.push(String(body.password ?? body.code));
     return json({ verified_at: new Date().toISOString(), expires_in: 300 });
+  }
+  // Two-step sign-in and passwords, as the vault answers them: setting it up asks who it is first.
+  const done = () => ({ ...json(null), status: 204, text: async () => '' }) as Reply;
+  if (q === '/api/v1/auth/totp/enrol' && init.method === 'POST') {
+    if (!lib.verified) return failure(403, 'step_up_required', 'Please confirm it is you.', 'change_sign_in');
+    return json({ secret: 'JBSWY3DPEHPK3PXP', otpauth_url: 'otpauth://totp/Family%20Vault:me?secret=JBSWY3DPEHPK3PXP' });
+  }
+  if (q === '/api/v1/auth/totp/confirm' && init.method === 'POST') {
+    if (!lib.verified) return failure(403, 'step_up_required', 'Please confirm it is you.', 'change_sign_in');
+    if (body.code !== '123456') return failure(422, 'invalid_code', "That code isn't right.");
+    lib.account.totp = true;
+    return done();
+  }
+  if (q === '/api/v1/auth/totp/disable' && init.method === 'POST') {
+    if (body.code !== '123456') return failure(422, 'invalid_code', "That code isn't right.");
+    lib.account.totp = false;
+    return done();
+  }
+  if (q === '/api/v1/auth/password/change' && init.method === 'POST') {
+    if (body.current_password === undefined && !lib.verified) {
+      return failure(403, 'step_up_required', 'Please confirm it is you.', 'change_password');
+    }
+    if (body.current_password !== undefined && body.current_password !== t.vault.state.password) {
+      return failure(401, 'invalid_credentials', "That password isn't right.");
+    }
+    lib.account.changes.push(body);
+    return done();
+  }
+  if (q === '/api/v1/auth/password/forgot' && init.method === 'POST') {
+    lib.account.forgot.push(String(body.email));
+    return { ...json({ message: 'If that address has a sign-in here, a link is on its way to it.' }), status: 202 } as Reply;
+  }
+  if (q === '/api/v1/me' && init.method === 'GET' && (lib.account.totp || lib.account.required !== undefined)) {
+    const res = await t.vault.fetch(`https://vault.test${path}`, init);
+    return json({
+      ...((await res.json()) as object),
+      totp_enabled: lib.account.totp,
+      ...(lib.account.required !== undefined ? { totp_required: lib.account.required } : {}),
+    });
   }
   let m = /^\/api\/v1\/documents\/([^/]+)$/.exec(q);
   if (m?.[1] && lib.documents.has(m[1])) {

@@ -55,7 +55,7 @@ async function signIn(page: Page, address: string) {
   await page.getByRole('button', { name: 'Connect' }).click();
   await page.getByRole('button', { name: 'Use it on this Wi-Fi' }).click();
   await page.getByLabel('Email').fill(EMAIL);
-  await page.getByLabel('Password').fill(PASSWORD);
+  await page.getByLabel('Password', { exact: true }).fill(PASSWORD);
   await page.getByRole('button', { name: 'Sign in' }).click();
   await expect(page.getByTestId('home-ready')).toBeVisible();
 }
@@ -148,7 +148,7 @@ test("search, open, confirm it's you, snooze", async ({ page, baseURL, request }
   const shown = page.getByRole('img', { name: `Page 1 of ${title}` });
   await expect(asked.or(shown)).toBeVisible({ timeout: 30_000 });
   if (await asked.isVisible()) {
-    await page.getByLabel('Password').fill(PASSWORD);
+    await page.getByLabel('Password', { exact: true }).fill(PASSWORD);
     await page.getByRole('button', { name: 'Confirm' }).click();
   }
   await expect(shown).toBeVisible({ timeout: 30_000 });

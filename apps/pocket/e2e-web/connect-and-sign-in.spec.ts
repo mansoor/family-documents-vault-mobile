@@ -46,11 +46,11 @@ test('connect over http after saying yes, sign in, stay signed in', async ({ pag
   await expect(page.getByText(`to ${family}`)).toBeVisible();
 
   await page.getByLabel('Email').fill(EMAIL);
-  await page.getByLabel('Password').fill('not the password');
+  await page.getByLabel('Password', { exact: true }).fill('not the password');
   await page.getByRole('button', { name: 'Sign in' }).click();
   await expect(page.getByText("That email and password don't match.")).toBeVisible();
 
-  await page.getByLabel('Password').fill(PASSWORD);
+  await page.getByLabel('Password', { exact: true }).fill(PASSWORD);
   await page.getByRole('button', { name: 'Sign in' }).click();
   await expect(page.getByRole('heading', { name: family })).toBeVisible();
   await expect(page.getByTestId('home-ready')).toBeVisible();

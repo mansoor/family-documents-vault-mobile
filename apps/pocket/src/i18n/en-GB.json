@@ -66,7 +66,12 @@
     "accessEnded": "Your access to this family's vault has ended. Ask them to renew it if you still need it.",
     "otherVault": "Use a different vault",
     "waiting_one": "A scan is waiting on this phone. It goes to the vault when the person who made it signs in.",
-    "waiting_other": "{{count}} scans are waiting on this phone. Each goes to the vault when the person who made it signs in."
+    "waiting_other": "{{count}} scans are waiting on this phone. Each goes to the vault when the person who made it signs in.",
+    "forgot": "Forgot your password?",
+    "forgotTitle": "Forgot your password?",
+    "forgotWords": "Say the email address you sign in with: a link to set a new password goes to it, if it has a sign-in here. The link opens in the browser.",
+    "forgotSend": "Send me a link",
+    "forgotSent": "If that address has a sign-in here, a link is on its way to it."
   },
   "home": {
     "attentionTitle": "Needs attention",
@@ -1099,5 +1104,36 @@
     "show": "Show the link",
     "showFor": "Show the link to {{what}}",
     "shownTitle": "The link to “{{what}}”"
+  },
+  "password": {
+    "title": "Your password",
+    "open": "Change your password",
+    "current": "Your password now",
+    "currentHint": "Leave this empty if you sign in with a passkey and have never set one.",
+    "next": "Your new password",
+    "nextHint": "At least {{count}} characters. A few words you will remember work best.",
+    "onlyMe": "This also unlocks your own Only me documents, so they come with it. Every other device you are signed in on will be signed out.",
+    "save": "Change it",
+    "done": "Your password is changed, and your other devices have been signed out."
+  },
+  "twoStep": {
+    "title": "Two-step sign-in",
+    "isOn": "On: a code from your authenticator app is asked for after your password.",
+    "isOff": "Off. With it on, a code from an authenticator app is asked for after your password.",
+    "begin": "Set up two-step sign-in",
+    "setupWords": "Add your vault to an authenticator app (Google Authenticator, Microsoft Authenticator, 1Password…), then type the six-digit code it shows.",
+    "openApp": "Open in my authenticator app",
+    "noApp": "No authenticator app on this phone opened it. Type the key below into one instead.",
+    "orType": "Or type this key into the app:",
+    "copy": "Copy the key",
+    "code": "Six-digit code",
+    "confirm": "Turn it on",
+    "on": "Two-step sign-in is on.",
+    "off": "Two-step sign-in is off.",
+    "required": "Your household asks owners to keep it on.",
+    "turnOff": "Turn off two-step sign-in",
+    "offTitle": "Turn off two-step sign-in?",
+    "offWords": "Your password alone will sign you in. Type a code from your authenticator app to turn it off.",
+    "offYes": "Turn it off"
   }
 }
