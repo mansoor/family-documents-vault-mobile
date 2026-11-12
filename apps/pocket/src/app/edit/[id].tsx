@@ -71,6 +71,7 @@ export default function EditScreen() {
         me: { member_id: who.member_id, role: who.role },
         issuedBy: caps?.features.issued_by === true,
         details: caps?.features.custom_types === true,
+        householdOwner: caps?.features.household_owner === true,
       });
       setFailed(null);
     } catch (err) {
@@ -173,7 +174,7 @@ export default function EditScreen() {
         <KindChooser
           types={household.types}
           chosen={draft.typeKey}
-          onChoose={(k) => setDraft((d) => (d ? chooseType(d, k) : d))}
+          onChoose={(k) => setDraft((d) => (d ? chooseType(d, k, household) : d))}
           label={t('capture.whatItIs')}
           ids={{ more: 'edit-types-more', find: 'edit-types-search', picker: 'edit-types-picker', chip: 'edit-type' }}
         />
@@ -186,6 +187,8 @@ export default function EditScreen() {
           me={who?.member_id ?? null}
           teen={teen}
           chosen={draft.ownerId}
+          household={draft.household}
+          householdOn={household.householdOwner === true}
           onChoose={(id) => setDraft((d) => (d ? chooseOwner(d, id, household) : d))}
           label={t('capture.whoseItIs')}
           ids={{ more: 'edit-owners-more', picker: 'edit-owners-picker', chip: 'edit-owner' }}

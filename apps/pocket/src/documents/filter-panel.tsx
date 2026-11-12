@@ -66,6 +66,8 @@ export function FilterPanel(props: {
   several: boolean;
   /** Nobody's may be asked for: a column sort (the Documents table). */
   nobody: boolean;
+  /** The household's may be asked for (`household_owner`, 0.9.0-dev.32). */
+  household?: boolean;
   today: string;
   /** How many the filters would give; null when the vault cannot say. */
   count: (f: Filters) => Promise<number | null>;
@@ -126,6 +128,7 @@ export function FilterPanel(props: {
 
   const people = [
     ...props.members.map((m) => ({ id: m.id, name: m.display_name })),
+    ...(props.household ? [{ id: 'household', name: t('capture.household') }] : []),
     ...(props.nobody && several ? [{ id: 'none', name: t('filters.nobody') }] : []),
   ];
   const ranked = rankTypes(props.types, []).top;

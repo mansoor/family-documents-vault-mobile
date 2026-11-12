@@ -13,6 +13,7 @@ import {
   type TypeField,
   type Visibility,
 } from '@fdv/shared';
+import { belongsTo } from '@fdv/shared';
 import { MAX_PAGES, type CaptureSource, type PageRef } from '../queue/commit';
 import i18n from '../i18n';
 
@@ -25,6 +26,12 @@ export interface Draft {
   source: CaptureSource;
   typeKey: string | null;
   ownerId: string | null;
+  /**
+   * The household's, not a person's (a vault with `household_owner`,
+   * 0.9.0-dev.32; the owner's decision of 11 Nov 2026): with no person.
+   * Neither: Not sure yet.
+   */
+  household: boolean;
   /** Null: the type's default, as the vault would choose it. */
   visibility: Visibility | null;
   /** Null: the type's usual. */
@@ -61,7 +68,12 @@ export interface Household {
    * Save waits for the required ones. Without it the card is as in 0.2.0.
    */
   details: boolean;
+  /** The vault keeps The household as whose a document is, and each kind's belongs_to. */
+  householdOwner?: boolean;
 }
+
+/** The household, as a value a chip can carry: never a person's id. */
+export const HOUSEHOLD = '+household';
 
 /** The app speaks en-GB: 14/03/2031 is the fourteenth of March. */
 export const DATE_ORDER = 'dmy' as const;
@@ -72,6 +84,7 @@ export function newDraft(source: CaptureSource, me: Me): Draft {
     typeKey: null,
     // A teen's scans are theirs; anyone else says whose it is.
     ownerId: me.role === 'teen' ? me.member_id : null,
+    household: false,
     visibility: null,
     essential: null,
     title: '',
@@ -152,10 +165,18 @@ export function visibilityChoices(d: Draft, h: Household): Record<Visibility, bo
   };
 }
 
-export function chooseType(d: Draft, key: string | null): Draft {
+export function chooseType(d: Draft, key: string | null, h?: Pick<Household, 'types' | 'householdOwner' | 'me'>): Draft {
+  // Whose it is, while nobody has said: the household's for a kind that
+  // usually is (a utility bill), Not sure yet for one that is a person's.
+  const kind = h?.types.find((ty) => ty.key === key);
+  const household =
+    h?.householdOwner === true && h.me.role !== 'teen' && d.ownerId === null
+      ? belongsTo(kind) === 'household'
+      : d.household;
   // The type decides the defaults, so a choice made for another type goes.
   return {
     ...d,
+    household,
     typeKey: key,
     visibility: null,
     essential: null,
@@ -165,9 +186,12 @@ export function chooseType(d: Draft, key: string | null): Draft {
   };
 }
 
-export function chooseOwner(d: Draft, ownerId: string | null, h: Household): Draft {
+export function chooseOwner(d: Draft, chosen: string | null, h: Household): Draft {
   if (h.me.role === 'teen') return d;
-  const next = { ...d, ownerId };
+  // The household is nobody's, said so; Not sure yet is nobody's, unsaid.
+  const household = chosen === HOUSEHOLD;
+  const ownerId = household ? null : chosen;
+  const next = { ...d, ownerId, household };
   // Only me is for your own documents: given to someone else, it becomes
   // the closest thing that is not.
   if (visibilityOf(next, h) === 'private' && ownerId !== h.me.member_id) {
@@ -327,6 +351,7 @@ export function toMetadata(
   const m: CaptureMetadata = {};
   if (d.typeKey) m.type_key = d.typeKey;
   if (d.ownerId) m.owner_member_id = d.ownerId;
+  else if (d.household && h.householdOwner) m.household_owned = true;
   m.visibility = visibilityOf(d, h);
   m.is_essential = essentialOf(d, h);
   const title = text(d.title) ?? suggestedTitle(d, h);

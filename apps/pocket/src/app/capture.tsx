@@ -208,12 +208,21 @@ function Card(props: { initial: CaptureSource }) {
     };
   }, [issuedByOn, data, draft.typeKey, withToken]);
 
+  // The household as whose a document is (0.9.0-dev.32).
+  const householdOn = caps?.features.household_owner === true;
   const household = useMemo<Household | null>(
     () =>
       data && me
-        ? { types: data.types, members: data.members, me, issuedBy: issuedByOn, details: detailsOn }
+        ? {
+            types: data.types,
+            members: data.members,
+            me,
+            issuedBy: issuedByOn,
+            details: detailsOn,
+            householdOwner: householdOn,
+          }
         : null,
-    [data, me, issuedByOn, detailsOn],
+    [data, me, issuedByOn, detailsOn, householdOn],
   );
 
   // The card can be used once its choices are in: that is when it counts as shown.
@@ -518,7 +527,7 @@ function Card(props: { initial: CaptureSource }) {
                 types={data?.types ?? []}
                 filed={data?.filed ?? []}
                 chosen={draft.typeKey}
-                onChoose={(k) => setDraft((d) => chooseType(d, k))}
+                onChoose={(k) => setDraft((d) => chooseType(d, k, household ?? undefined))}
                 label={t('capture.whatItIs')}
                 ids={{ more: 'types-more', find: 'types-search', picker: 'types-picker' }}
               />
@@ -531,6 +540,8 @@ function Card(props: { initial: CaptureSource }) {
                 me={me?.member_id ?? null}
                 teen={teen}
                 chosen={draft.ownerId}
+                household={draft.household}
+                householdOn={household?.householdOwner === true}
                 onChoose={(id) => household && setDraft((d) => chooseOwner(d, id, household))}
                 label={t('capture.whoseItIs')}
                 ids={{ more: 'owners-more', picker: 'owners-picker' }}

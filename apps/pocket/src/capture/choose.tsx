@@ -2,6 +2,7 @@ import { categoryLabel, shortTypeLabel, type DocumentTypeView, type Member } fro
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ChipLine, PickerSheet, type PickOption } from '../ui/picker';
+import { HOUSEHOLD } from './draft';
 import { matchTypes, rankTypes } from './types';
 
 /** "Nobody's", as a value a chip can carry. */
@@ -67,14 +68,20 @@ export function KindChooser(props: {
 
 /**
  * Whose it is (R2): the person on the line first (the one filing it), then
- * ⋯ for the rest of the family and Nobody's. A teen files only their own,
- * so the line is shown and not changed.
+ * ⋯ for the rest of the family, The household (where the vault keeps it,
+ * 0.9.0-dev.32) and Not sure yet. A teen files only their own, so the line
+ * is shown and not changed.
  */
 export function OwnerChooser(props: {
   members: readonly Pick<Member, 'id' | 'display_name'>[];
   me: string | null;
   teen: boolean;
   chosen: string | null;
+  /** The household's: shown chosen, with no person. */
+  household?: boolean;
+  /** The vault keeps The household as whose a document is: offered. */
+  householdOn?: boolean;
+  /** A person's id, HOUSEHOLD, or null for Not sure yet. */
   onChoose: (id: string | null) => void;
   label: string;
   ids: { more: string; picker: string; chip?: string };
@@ -87,9 +94,10 @@ export function OwnerChooser(props: {
     ...[...people]
       .sort((a, b) => Number(b.id === props.me) - Number(a.id === props.me))
       .map((m) => ({ value: m.id, label: mine(m), leading: initial(m.display_name) })),
+    ...(props.teen || !props.householdOn ? [] : [{ value: HOUSEHOLD, label: t('capture.household') }]),
     ...(props.teen ? [] : [{ value: NOBODY, label: t('capture.nobody') }]),
   ];
-  const chosen = [props.chosen ?? NOBODY];
+  const chosen = [props.household ? HOUSEHOLD : (props.chosen ?? NOBODY)];
   const choose = (v: string) => props.onChoose(v === NOBODY ? null : v);
   return (
     <>

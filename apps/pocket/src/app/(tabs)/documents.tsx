@@ -259,7 +259,11 @@ export default function DocumentsScreen() {
   const named = (ids: string[], name: (id: string) => string) =>
     ids.length === 1 ? name(ids[0] as string) : t('filters.chipMany', { first: name(ids[0] as string), count: ids.length - 1 });
   const person = (id: string) =>
-    id === 'none' ? t('filters.nobody') : (members.find((m) => m.id === id)?.display_name ?? '');
+    id === 'none'
+      ? t('filters.nobody')
+      : id === 'household'
+        ? t('capture.household')
+        : (members.find((m) => m.id === id)?.display_name ?? '');
   const kind = (key: string) => types.find((ty) => ty.key === key)?.label ?? key;
   const day = (d: string | null) => (d ? formatDate({ date: d, precision: 'day' }) : '…');
   const chips: { id: string; label: string; clear: Partial<Filters> }[] = [
@@ -556,6 +560,7 @@ export default function DocumentsScreen() {
         several={several}
         // Nobody's goes with a column sort only, and the list's first sort is not one.
         nobody={false}
+        household={caps?.features.household_owner === true}
         today={localToday(zone)}
         count={countFor}
       />
