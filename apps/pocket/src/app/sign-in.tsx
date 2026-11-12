@@ -6,7 +6,9 @@ import { EssentialsNotice, KeptWhileSignedOut } from '../essentials/ui';
 import { useCapture } from '../state/capture';
 import { useEssentials } from '../state/essentials';
 import { useVault, type SignInResult } from '../state/vault';
+import { wordsFor } from '../errors/words';
 import { Button, Card, Field, Notice, Text } from '../ui';
+import { Sheet } from '../ui/sheet';
 import { sp } from '../ui/space';
 
 /**
@@ -19,7 +21,7 @@ import { sp } from '../ui/space';
  */
 export default function SignIn() {
   const { t } = useTranslation();
-  const { vault, caps, notice, signIn, signInCode, chooseAnotherVault } = useVault();
+  const { vault, caps, notice, signIn, signInCode, chooseAnotherVault, api } = useVault();
   const { waitingHere } = useCapture();
   const essentials = useEssentials();
   // Kept until the sign-in completes (past the code step): it renews the
@@ -29,6 +31,25 @@ export default function SignIn() {
   const [password, setPassword] = useState('');
   const [code, setCode] = useState('');
   const [step, setStep] = useState<'password' | 'code'>('password');
+  // Forgot your password? (the owner's ask of 12 Nov 2026): a link by email, as the web sends it.
+  const [forgetting, setForgetting] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotSaid, setForgotSaid] = useState<string | null>(null);
+  const [forgotProblem, setForgotProblem] = useState<string | null>(null);
+  const [forgotBusy, setForgotBusy] = useState(false);
+  const sendLink = async () => {
+    if (!api || forgotBusy || !forgotEmail.trim()) return;
+    setForgotBusy(true);
+    setForgotProblem(null);
+    try {
+      const r = await api.forgotPassword(forgotEmail.trim());
+      setForgotSaid(r.message || t('signIn.forgotSent'));
+    } catch (err) {
+      setForgotProblem(wordsFor(err, t));
+    } finally {
+      setForgotBusy(false);
+    }
+  };
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<Exclude<SignInResult, { kind: 'ok' } | { kind: 'code' }> | null>(null);
 
@@ -118,6 +139,20 @@ export default function SignIn() {
                 />
               </>
             )}
+            {step === 'password' ? (
+              <Button
+                testID="sign-in-forgot"
+                kind="quiet"
+                size="small"
+                label={t('signIn.forgot')}
+                onPress={() => {
+                  setForgotEmail(email);
+                  setForgotSaid(null);
+                  setForgotProblem(null);
+                  setForgetting(true);
+                }}
+              />
+            ) : null}
             <Button
               testID="sign-in-go"
               label={step === 'password' ? t('signIn.signIn') : t('signIn.confirm')}
@@ -161,6 +196,48 @@ export default function SignIn() {
           <Button kind="quiet" label={t('signIn.otherVault')} onPress={() => void chooseAnotherVault()} />
         </ScrollView>
       </KeyboardAvoidingView>
+      <Sheet visible={forgetting} onClose={() => setForgetting(false)} testID="forgot-sheet" keyboard>
+        <Text variant="screen">{t('signIn.forgotTitle')}</Text>
+        <Text>{t('signIn.forgotWords')}</Text>
+        {forgotSaid ? (
+          <Notice tone="ok" testID="forgot-said">
+            {forgotSaid}
+          </Notice>
+        ) : (
+          <>
+            <Field
+              testID="forgot-email"
+              label={t('signIn.email')}
+              value={forgotEmail}
+              onChangeText={setForgotEmail}
+              autoCapitalize="none"
+              keyboardType="email-address"
+              textContentType="emailAddress"
+              autoComplete="email"
+              returnKeyType="send"
+              onSubmitEditing={() => void sendLink()}
+            />
+            {forgotProblem ? (
+              <Notice tone="warn" testID="forgot-problem">
+                {forgotProblem}
+              </Notice>
+            ) : null}
+            <Button
+              testID="forgot-send"
+              label={t('signIn.forgotSend')}
+              busy={forgotBusy}
+              disabled={!forgotEmail.trim()}
+              onPress={() => void sendLink()}
+            />
+          </>
+        )}
+        <Button
+          testID="forgot-close"
+          kind="quiet"
+          label={forgotSaid ? t('row.done') : t('common.cancel')}
+          onPress={() => setForgetting(false)}
+        />
+      </Sheet>
     </SafeAreaView>
   );
 }

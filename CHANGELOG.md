@@ -6,6 +6,21 @@ app's own, tagged `vX.Y.Z` in this repository.
 
 ## [Unreleased]
 
+## [0.5.10] — your password and two-step sign-in, from the phone
+
+The owner's ask of 12 Nov 2026.
+
+### Added
+- **Account → Your password**: change it from the phone (the password now,
+  and the new one, ten characters at least). Your Only me documents come
+  with it; your other devices are signed out.
+- **Account → Two-step sign-in**: set it up from the phone, after
+  confirming it is you — open your vault in the authenticator app on this
+  phone (or copy its key), then type the code it shows. Turned off with a
+  code, unless your household asks you to keep it (owners).
+- **Sign in → Forgot your password?**: the address you sign in with, and a
+  link to set a new one comes by email, as from the web.
+
 ## [0.5.9] — back, and close
 
 The owner's ask of 12 Nov 2026.
