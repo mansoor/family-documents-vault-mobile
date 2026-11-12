@@ -66,9 +66,17 @@ export function ShareSheet(props: { target: ShareTarget; onClose: () => void }) 
   const [shown, setShown] = useState(false);
   const [made, setMade] = useState<CreatedShare | null>(null);
   const [copied, setCopied] = useState<'link' | 'secret' | null>(null);
+  // A code by text can be offered (SMS4): the vault texts links' codes and its texts are set up.
+  const [texts, setTexts] = useState(false);
   const set = (change: Partial<ShareOptions>) => setOpts((o) => ({ ...o, ...change }));
 
   const load = useCallback(async () => {
+    if (caps?.features.sms_codes === true) {
+      withToken((a, tk) => a.smsStatus(tk)).then(
+        (st) => setTexts(st.ready),
+        () => setTexts(false),
+      );
+    }
     try {
       if (target.kind === 'document') {
         const [versions, rule] = await withToken((a, tk) =>
@@ -94,7 +102,7 @@ export function ShareSheet(props: { target: ShareTarget; onClose: () => void }) 
       else setFailed(loadFailure('share', err, t) ?? wordsFor(err, t));
       setReady(true);
     }
-  }, [withToken, target, t]);
+  }, [withToken, target, t, caps]);
 
   useEffect(() => {
     // Asked once, as the sheet opens; set once the vault answers.
@@ -110,6 +118,7 @@ export function ShareSheet(props: { target: ShareTarget; onClose: () => void }) 
     note: target.kind === 'document' && target.note,
     options: caps?.features.share_options === true,
     passwords: caps?.features.share_second_factor === true,
+    texts,
   });
   const nothingTicked = target.kind === 'collection' && ticked.size === 0 && !follow;
 
@@ -183,6 +192,11 @@ export function ShareSheet(props: { target: ShareTarget; onClose: () => void }) 
             <Text variant="small" tone="soft">
               {t('share.secretApart')}
             </Text>
+          ) : null}
+          {made.share.second_factor === 'sms' && made.share.code_to ? (
+            <Notice tone="info" testID="share-code-by-text">
+              {t('share.codeByText', { to: made.share.code_to })}
+            </Notice>
           ) : null}
           {/* What was made, behind the eye: Send and Copy above need none of it. */}
           <View style={styles.revealRow}>
@@ -345,7 +359,14 @@ export function ShareSheet(props: { target: ShareTarget; onClose: () => void }) 
                 {t('share.protect')}
               </Text>
               <ChipRow label={t('share.protect')}>
-                {(['none', 'pin', ...(caps?.features.share_second_factor === true ? (['password'] as const) : [])] as Protection[]).map(
+                {(
+                  [
+                    'none',
+                    'pin',
+                    ...(caps?.features.share_second_factor === true ? (['password'] as const) : []),
+                    ...(texts ? (['text'] as const) : []),
+                  ] as Protection[]
+                ).map(
                   (p) => (
                     <Chip
                       key={p}
@@ -357,6 +378,23 @@ export function ShareSheet(props: { target: ShareTarget; onClose: () => void }) 
                   ),
                 )}
               </ChipRow>
+              {texts && opts.protection === 'text' ? (
+                <>
+                  <Field
+                    label={t('share.phone')}
+                    value={opts.phone}
+                    onChangeText={(phone) => set({ phone })}
+                    keyboardType="phone-pad"
+                    textContentType="telephoneNumber"
+                    autoComplete="tel"
+                    error={opts.phone.trim() && read.phoneProblem ? t('share.phoneProblem') : null}
+                    testID="share-phone"
+                  />
+                  <Text variant="small" tone="soft">
+                    {t('share.phoneHint')}
+                  </Text>
+                </>
+              ) : null}
             </View>
 
             {target.kind === 'collection' && items ? (

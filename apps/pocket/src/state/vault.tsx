@@ -63,7 +63,12 @@ const toldWhy = (reason: string | undefined) => reason === 'suspended' || reason
 
 export type SignInResult =
   | { kind: 'ok' }
-  | { kind: 'code' }
+  /**
+   * The second step (0.9.0-dev.33, SMS3): which ways the vault takes a code
+   * — the authenticator app's, a text, or both — the number a text goes to
+   * (masked), and whether one already went as the password was accepted.
+   */
+  | { kind: 'code'; methods: ('totp' | 'text')[]; textTo: string | null; textSent: boolean }
   | { kind: 'refused'; message: string; passkeyHint: boolean }
   /**
    * The password (and code) were right, but an owner has locked this
@@ -121,7 +126,9 @@ interface VaultValue {
   sessionOwner: () => { origin: string; member_id: string } | null;
   chooseVault: (outcome: Extract<ConnectOutcome, { kind: 'ok' | 'reinstalled' }>) => Promise<void>;
   signIn: (email: string, password: string) => Promise<SignInResult>;
-  signInCode: (code: string) => Promise<SignInResult>;
+  signInCode: (code: string, method?: 'totp' | 'text') => Promise<SignInResult>;
+  /** A code texted for the second step (SMS3): to the number the vault has, masked. */
+  sendSignInText: () => Promise<{ sentTo: string } | { problem: string }>;
   signOut: () => Promise<void>;
   chooseAnotherVault: () => Promise<void>;
   withToken: <T>(fn: (api: Api, token: string) => Promise<T>) => Promise<T>;
@@ -725,7 +732,9 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
         if ('mfa_required' in r) {
           mfaToken.current = r.mfa_token;
           pendingEmail.current = email.trim();
-          return { kind: 'code' };
+          // An older vault says nothing of the ways: the authenticator's, as before.
+          const methods = r.methods && r.methods.length > 0 ? r.methods : (['totp'] as const);
+          return { kind: 'code', methods: [...methods], textTo: r.text_to ?? null, textSent: r.text_sent === true };
         }
         await accepted(r, email.trim());
         return { kind: 'ok' };
@@ -737,12 +746,12 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
   );
 
   const signInCode = useCallback(
-    async (code: string): Promise<SignInResult> => {
+    async (code: string, method?: 'totp' | 'text'): Promise<SignInResult> => {
       if (!api || !mfaToken.current)
         return { kind: 'refused', message: i18n.t('signIn.startAgain'), passkeyHint: false };
       try {
         await gate();
-        const tokens = await api.signInMfa(mfaToken.current, code.replace(/\s/g, ''));
+        const tokens = await api.signInMfa(mfaToken.current, code.replace(/\s/g, ''), method);
         await accepted(tokens, pendingEmail.current);
         return { kind: 'ok' };
       } catch (err) {
@@ -751,6 +760,17 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
     },
     [api, gate, accepted],
   );
+
+  const sendSignInText = useCallback(async (): Promise<{ sentTo: string } | { problem: string }> => {
+    if (!api || !mfaToken.current) return { problem: i18n.t('signIn.startAgain') };
+    try {
+      await gate();
+      const sent = await api.signInTextCode(mfaToken.current);
+      return { sentTo: sent.sent_to };
+    } catch (err) {
+      return { problem: wordsFor(err, i18n.t.bind(i18n)) };
+    }
+  }, [api, gate]);
 
   const beforeSignOut = useRef(new Set<() => Promise<void>>());
   const onBeforeSignOut = useCallback((fn: () => Promise<void>) => {
@@ -837,6 +857,7 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
       chooseVault,
       signIn,
       signInCode,
+      sendSignInText,
       signOut,
       chooseAnotherVault,
       withToken,
@@ -859,6 +880,7 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
       chooseVault,
       signIn,
       signInCode,
+      sendSignInText,
       signOut,
       chooseAnotherVault,
       withToken,

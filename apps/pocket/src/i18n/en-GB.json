@@ -71,7 +71,13 @@
     "forgotTitle": "Forgot your password?",
     "forgotWords": "Say the email address you sign in with: a link to set a new password goes to it, if it has a sign-in here. The link opens in the browser.",
     "forgotSend": "Send me a link",
-    "forgotSent": "If that address has a sign-in here, a link is on its way to it."
+    "forgotSent": "If that address has a sign-in here, a link is on its way to it.",
+    "codeTexted": "We’ve texted a code to {{to}}. Type it here.",
+    "codeTextOffer": "A code can be texted to your mobile, {{to}}.",
+    "textMe": "Text me a code",
+    "textAgain": "Text me a new code",
+    "useText": "Text me a code instead",
+    "useApp": "Use my authenticator app instead"
   },
   "home": {
     "attentionTitle": "Needs attention",
@@ -416,7 +422,11 @@
     "useCode": "Use a code instead",
     "usePassword": "Use your password instead",
     "cancel": "Cancel",
-    "failed": "That didn't match. Try again."
+    "failed": "That didn't match. Try again.",
+    "texted": "We’ve texted a code to {{to}}.",
+    "textCode": "The code we texted you",
+    "textMe": "Text a code to {{to}}",
+    "textAgain": "Text me a new code"
   },
   "tabs": {
     "home": "Home",
@@ -1083,7 +1093,12 @@
     "theLink": "The link",
     "reveal": "Show the link",
     "hide": "Hide the link",
-    "againLater": "You can see this link, and its PIN or password, again in More → Sharing."
+    "againLater": "You can see this link, and its PIN or password, again in More → Sharing.",
+    "protect_text": "Code by text",
+    "phone": "Their mobile number",
+    "phoneHint": "When they open the link, a code is texted to this number. It is never shown back in full.",
+    "phoneProblem": "That doesn’t look like a mobile number.",
+    "codeByText": "When they open it, a code is texted to {{to}}."
   },
   "sharing": {
     "title": "Sharing",
@@ -1158,5 +1173,54 @@
     "scanShort": "Scan text",
     "scanNothing": "No words were found on that page. Try again with the page flat and in good light.",
     "scanFailed": "The page could not be read on this phone."
+  },
+  "mobile": {
+    "title": "Mobile number",
+    "why": "For texts from your vault, and codes by text. Only you and the owners see it.",
+    "number": "Your mobile number",
+    "newNumber": "Your new mobile number",
+    "numberHint": "Without +, it’s read as a number in your household’s country.",
+    "send": "Text me a code",
+    "codeSent": "We’ve texted a code to {{to}}. Type it here to confirm the number.",
+    "code": "The code we texted you",
+    "confirm": "Confirm the number",
+    "resend": "Text me a new code",
+    "other": "Use another number",
+    "confirmed": "Your mobile number is confirmed.",
+    "resent": "A new code is on its way.",
+    "isConfirmed": "Confirmed. Texts and codes come here.",
+    "change": "Change the number",
+    "remove": "Remove the number",
+    "removeTitle": "Remove your mobile number?",
+    "removeWords": "No more texts or codes by text will come to it. You can add a number again any time.",
+    "removeYes": "Remove it",
+    "removed": "Your mobile number is removed."
+  },
+  "textCodes": {
+    "title": "Codes by text",
+    "to": "Texted to {{to}}.",
+    "signIn": "When I sign in",
+    "signInHint": "A code by text after your password.",
+    "reset": "When I set a new password",
+    "resetHint": "A code by text as well as the emailed link."
+  },
+  "texts": {
+    "title": "Texts",
+    "hint": "Sent to your mobile number. Texts never say what a document is.",
+    "noNumber": "Add and confirm your mobile number in Account to get texts.",
+    "addNumber": "Add my mobile number",
+    "daily": "The day’s reminders",
+    "dailyHint": "One text with how many documents need attention.",
+    "alerts": "Alerts about my account",
+    "alertsHint": "A new device signing in, and the like.",
+    "share-opened": "When a link I shared is opened",
+    "share-openedHint": "At most once an hour for each link.",
+    "quiet": "Quiet hours",
+    "quietHint": "No texts between these times, on the family’s clock — except an alert about your own sign-in. The same time twice means none.",
+    "quietFrom": "From",
+    "quietTo": "Until",
+    "timeProblem": "As 21:00",
+    "quietSave": "Save quiet hours",
+    "quietSaved": "Quiet hours saved."
   }
 }

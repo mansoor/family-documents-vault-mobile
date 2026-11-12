@@ -24,6 +24,11 @@ import { Sheet } from '../ui/sheet';
  * no password, which the vault would not take. Somebody whose only second
  * factor is a passkey (GET /me: no authenticator app) has no code to give:
  * the sheet says so, and where it can be done, rather than asking for one.
+ *
+ * A code by text (0.9.0-dev.33, SMS3): where the vault offers one
+ * (`StepUpState.text_to`, for somebody who turned on the sign-in code), the
+ * sheet offers Text me a code beside the password — never for what takes a
+ * code alone, which a text does not serve.
  */
 
 interface StepUpValue {
@@ -124,8 +129,12 @@ export function useStepUp(): StepUpValue {
 /** The sheet: the password, or a code from the authenticator app. */
 function StepUpSheet(props: { asking: Asking | null }) {
   const { t } = useTranslation();
-  const { withToken } = useVault();
-  const [chosen, setHow] = useState<'password' | 'code'>('password');
+  const { withToken, caps } = useVault();
+  const [chosen, setHow] = useState<'password' | 'code' | 'text'>('password');
+  // Where a code can be texted (masked), and where one went.
+  const [textTo, setTextTo] = useState<string | null>(null);
+  const [textedTo, setTextedTo] = useState<string | null>(null);
+  const [texting, setTexting] = useState(false);
   const [value, setValue] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -133,12 +142,49 @@ function StepUpSheet(props: { asking: Asking | null }) {
   // A code alone, for what the vault takes no password for.
   const codeOnly = asking !== null && FACTOR_STEP_UPS.includes(asking.action);
   const how = codeOnly ? 'code' : chosen;
+  const texts = caps?.features.sms_codes === true;
 
-  const done = (ok: boolean) => {
+  // Asked as the sheet opens: whether a code can be texted instead.
+  useEffect(() => {
+    if (!asking || codeOnly || !texts) return;
+    let gone = false;
+    withToken((a, tk) => a.stepUpState(tk)).then(
+      (st) => {
+        if (!gone) setTextTo(st.text_to ?? null);
+      },
+      () => undefined,
+    );
+    return () => {
+      gone = true;
+    };
+  }, [asking, codeOnly, texts, withToken]);
+
+  const reset = () => {
     setValue('');
     setError(null);
     setHow('password');
+    setTextTo(null);
+    setTextedTo(null);
+  };
+  const done = (ok: boolean) => {
+    reset();
     asking?.settle(ok);
+  };
+  const sendText = async () => {
+    setTexting(true);
+    setError(null);
+    try {
+      const sent = await withToken((a, tk) => a.stepUpTextCode(tk));
+      setTextedTo(sent.sent_to);
+      setValue('');
+      setHow('text');
+    } catch (err) {
+      const words = wordsFor(err, t, 'stepUp.failed');
+      setError(words);
+      AccessibilityInfo.announceForAccessibility(words);
+    } finally {
+      setTexting(false);
+    }
   };
   const confirm = async () => {
     // The prompt this answer is for: a later one is never answered by it.
@@ -146,10 +192,10 @@ function StepUpSheet(props: { asking: Asking | null }) {
     setBusy(true);
     setError(null);
     try {
-      const body = how === 'password' ? { password: value } : { code: value.replace(/\s/g, '') };
+      const typed = value.replace(/\s/g, '');
+      const body = how === 'password' ? { password: value } : how === 'text' ? { text_code: typed } : { code: typed };
       await withToken((a, token) => a.stepUp(token, body));
-      setValue('');
-      setHow('password');
+      reset();
       answering?.settle(true);
     } catch (err) {
       // The vault's own words when it has them, said aloud too.
@@ -172,6 +218,9 @@ function StepUpSheet(props: { asking: Asking | null }) {
           {t('stepUp.codeOnly')}
         </Text>
       ) : null}
+      {how === 'text' && textedTo ? (
+        <Text testID="step-up-texted">{t('stepUp.texted', { to: textedTo })}</Text>
+      ) : null}
       {codeOnly && asking?.codeless ? null : how === 'password' ? (
         <Field
           testID="step-up-password"
@@ -188,12 +237,12 @@ function StepUpSheet(props: { asking: Asking | null }) {
       ) : (
         <Field
           testID="step-up-code"
-          label={t('stepUp.code')}
+          label={how === 'text' ? t('stepUp.textCode') : t('stepUp.code')}
           value={value}
           onChangeText={setValue}
           keyboardType="number-pad"
           textContentType="oneTimeCode"
-          autoComplete="one-time-code"
+          autoComplete={how === 'text' ? 'sms-otp' : 'one-time-code'}
           maxLength={9}
           returnKeyType="go"
           onSubmitEditing={() => void confirm()}
@@ -209,7 +258,7 @@ function StepUpSheet(props: { asking: Asking | null }) {
           onPress={() => void confirm()}
         />
       )}
-      {codeOnly ? null : (
+      {codeOnly || how === 'text' ? null : (
         <Button
           testID="step-up-switch"
           kind="quiet"
@@ -221,6 +270,37 @@ function StepUpSheet(props: { asking: Asking | null }) {
           }}
         />
       )}
+      {!codeOnly && textTo ? (
+        how === 'text' ? (
+          <>
+            <Button
+              testID="step-up-text-again"
+              kind="quiet"
+              label={t('stepUp.textAgain')}
+              busy={texting}
+              onPress={() => void sendText()}
+            />
+            <Button
+              testID="step-up-switch"
+              kind="quiet"
+              label={t('stepUp.usePassword')}
+              onPress={() => {
+                setValue('');
+                setError(null);
+                setHow('password');
+              }}
+            />
+          </>
+        ) : (
+          <Button
+            testID="step-up-text"
+            kind="quiet"
+            label={t('stepUp.textMe', { to: textTo })}
+            busy={texting}
+            onPress={() => void sendText()}
+          />
+        )
+      ) : null}
       <Button testID="step-up-cancel" kind="quiet" label={t('stepUp.cancel')} onPress={() => done(false)} />
     </Sheet>
   );
