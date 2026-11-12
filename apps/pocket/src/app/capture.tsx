@@ -474,7 +474,7 @@ function Card(props: { initial: CaptureSource }) {
   };
 
   return (
-    <SafeAreaView style={styles.safe} edges={['bottom']}>
+    <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
       <ScrollView
         ref={scroll}
         contentContainerStyle={styles.page}

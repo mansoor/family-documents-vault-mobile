@@ -175,3 +175,12 @@ export async function unlocked(
   await fireEvent.press(await screen.findByTestId('lock-unlock'));
   return { app, parts };
 }
+
+/**
+ * Documents' search box and filters, opened from the title row's
+ * magnifier (the owner's ask of 11 Nov 2026), unless they are open.
+ */
+export async function openSearch(): Promise<void> {
+  const button = await screen.findByTestId('documents-search');
+  if (!screen.queryByTestId('search-field')) await fireEvent.press(button);
+}

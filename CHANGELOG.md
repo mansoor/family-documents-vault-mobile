@@ -6,6 +6,31 @@ app's own, tagged `vX.Y.Z` in this repository.
 
 ## [Unreleased]
 
+## [0.5.6] — the vault's name on every page, and notes three ways
+
+The owner's notes of 11 Nov 2026.
+
+### Changed
+- **A bar at the top of every page**: the vault's name, the bell and
+  Settings, higher than Home had them. A page's own title, and its
+  buttons (Edit, ⋯), are below it; the bell is no longer beside each
+  tab's title. No back arrows: Android's back goes back. Show mode, the
+  pages, the camera and the edit pages keep the whole screen.
+- **Documents**: the search box and the filters open from a magnifier
+  beside the title, and close with ✕ (what was typed goes); chips for
+  the filters in use stay in sight.
+- **A link just made**: Send and Copy come first; the link and its PIN or
+  password are behind an eye.
+
+### Added
+- **Notes three ways**, one button beside the + going round them, and
+  remembered on this phone: **Sticky** (squares, two to a row, the ⋯ on
+  each corner), **List** (each name on one line, cut with …), and
+  **Detailed** (as before).
+- **What you looked for in your notes**, kept on this phone (each person's
+  apart), behind the clock beside the box: tap one to look again;
+  **Forget these searches**, asked first.
+
 ## [0.5.5] — Essentials on Home, and the counts in threes
 
 The owner's notes on 0.5.4 (11 Nov 2026).

@@ -249,8 +249,13 @@ env:
           id: step-up-go
 - extendedWaitUntil:
     visible:
-      id: share-link
+      id: share-reveal
     timeout: 20000
+# The link and its PIN behind the eye (0.5.6).
+- tapOn:
+    id: share-reveal
+- assertVisible:
+    id: share-link
 - assertVisible:
     id: share-secret
 - takeScreenshot: shot-light-share
@@ -331,6 +336,9 @@ env:
     visible:
       id: doc-row-.*
     timeout: 15000
+# The search box and its filters open from the title row's magnifier (0.5.6).
+- tapOn:
+    id: documents-search
 - tapOn:
     id: documents-filters
 - extendedWaitUntil:

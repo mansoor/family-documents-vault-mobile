@@ -10,7 +10,7 @@ import {
   type StatusValue,
 } from '@fdv/shared';
 import { useLocalSearchParams } from 'expo-router';
-import { ArrowUpDown, SlidersHorizontal, X } from 'lucide-react-native';
+import { ArrowUpDown, Search, SlidersHorizontal, X } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
@@ -22,7 +22,7 @@ import { on } from '../../state/events';
 import { useFamilyZone } from '../../state/family-time';
 import { useVault } from '../../state/vault';
 import { Field, Notice, Text } from '../../ui';
-import { BellButton } from '../../ui/bell';
+import { IconButton } from '../../ui/icon-button';
 import { PickerSheet } from '../../ui/picker';
 import { sp } from '../../ui/space';
 import { LoadFailed, loadFailure, Placeholder } from '../../ui/states';
@@ -71,6 +71,8 @@ export default function DocumentsScreen() {
   const { status: asked, essential: essentialAsked } = useLocalSearchParams<{ status?: string; essential?: string }>();
   const [q, setQ] = useState('');
   const searching = q.trim() !== '';
+  // The search box and the filters, shown from the title row's magnifier (the owner's ask of 11 Nov 2026).
+  const [searchOpen, setSearchOpen] = useState(false);
   const [sort, setSort] = useState<Sort>('recent');
   const [filters, setFilters] = useState<Filters>(NO_FILTERS);
   const [panel, setPanel] = useState(false);
@@ -324,7 +326,7 @@ export default function DocumentsScreen() {
       }));
 
   return (
-    <SafeAreaView style={styles.screen} edges={['top']}>
+    <SafeAreaView style={styles.screen} edges={[]}>
       <FlatList
         testID="documents"
         contentContainerStyle={styles.page}
@@ -349,8 +351,18 @@ export default function DocumentsScreen() {
               <Text variant="hero" style={styles.flex}>
                 {t('documents.title')}
               </Text>
-              <BellButton />
+              <IconButton
+                testID="documents-search"
+                label={searchOpen ? t('documents.searchClose') : t('documents.searchOpen')}
+                icon={searchOpen ? X : Search}
+                onPress={() => {
+                  // Closed, what was typed goes: the list is the list again.
+                  if (searchOpen) setQ('');
+                  setSearchOpen((o) => !o);
+                }}
+              />
             </View>
+            {searchOpen ? (
             <View style={styles.searchRow}>
               <View style={styles.flex}>
                 <Field
@@ -385,6 +397,7 @@ export default function DocumentsScreen() {
                 ) : null}
               </Pressable>
             </View>
+            ) : null}
             {chips.length > 0 ? (
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
                 {chips.map((c) => (

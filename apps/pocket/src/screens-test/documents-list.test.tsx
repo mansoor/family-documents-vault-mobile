@@ -1,7 +1,7 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react-native';
 import DocumentsScreen from '../app/(tabs)/documents';
 import Home from '../test-support/home';
-import { unlocked } from '../test-support/lookup';
+import { unlocked, openSearch } from '../test-support/lookup';
 import { installed } from '../test-support/render';
 import { resetRoutes, routes } from '../test-support/router';
 import { capabilities, testVault, type TestVault } from '../test-support/vault';
@@ -94,6 +94,7 @@ describe('all your documents (P7)', () => {
     await unlocked(t, <DocumentsScreen />);
     await waitFor(() => expect(screen.getAllByTestId(/^doc-row-/)).toHaveLength(2));
     // From the filter panel (R5), applied with Show.
+    await openSearch();
     await fireEvent.press(screen.getByTestId('documents-filters'));
     await fireEvent.press(await screen.findByTestId('filter-status-expired'));
     await fireEvent.press(screen.getByTestId('filter-visibility-private'));

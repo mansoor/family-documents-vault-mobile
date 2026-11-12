@@ -6,7 +6,6 @@ import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-n
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useVault } from '../../state/vault';
 import { Notice, Text } from '../../ui';
-import { BellButton } from '../../ui/bell';
 import { sp } from '../../ui/space';
 import { useStyles, type Palette } from '../../ui/theme';
 import { LoadFailed, loadFailure, Placeholder } from '../../ui/states';
@@ -40,7 +39,7 @@ export default function PeopleScreen() {
   }, [load, offline]);
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
+    <SafeAreaView style={styles.safe} edges={[]}>
       <ScrollView
         testID="people"
         contentContainerStyle={styles.page}
@@ -58,7 +57,6 @@ export default function PeopleScreen() {
           <Text variant="hero" style={styles.flex}>
             {t('people.title')}
           </Text>
-          <BellButton />
         </View>
         {offline && !members ? (
           <Notice tone="warn" testID="people-offline">

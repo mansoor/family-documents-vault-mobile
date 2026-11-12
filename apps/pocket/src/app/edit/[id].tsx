@@ -163,7 +163,7 @@ export default function EditScreen() {
   return (
     <ScrollView
       testID="edit"
-      contentContainerStyle={[styles.page, { paddingBottom: sp(20) + insets.bottom }]}
+      contentContainerStyle={[styles.page, { paddingTop: sp(20) + insets.top, paddingBottom: sp(20) + insets.bottom }]}
       keyboardShouldPersistTaps="handled"
     >
       <Text variant="hero">{t('edit.title')}</Text>

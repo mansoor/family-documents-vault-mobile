@@ -1,17 +1,20 @@
 import { Tabs } from 'expo-router';
 import { useTranslation } from 'react-i18next';
+import { headerFor, type HeaderOptions } from '../../ui/app-header';
 import { TabBar } from '../../ui/tab-bar';
 
 /**
  * Home, Documents, the +, Notes and More (R3; the owner, 10 Nov 2026).
  * People takes Notes' place on a vault without notes (before 0.9.0).
- * Needs attention is the bell in each tab's header, not a tab.
+ * Needs attention is the bell in the bar at the top, not a tab: the vault's
+ * name, the bell and Settings, on every tab (the owner's ask of 11 Nov
+ * 2026); each tab's title is its page's, below the bar.
  */
 export default function TabsLayout() {
   const { t } = useTranslation();
   return (
     <Tabs
-      screenOptions={{ headerShown: false }}
+      screenOptions={{ header: ({ options }) => headerFor({ ...(options as HeaderOptions), headerTitle: '' }) }}
       tabBar={(props) => <TabBar state={props.state} navigation={props.navigation} />}
     >
       <Tabs.Screen name="index" options={{ title: t('tabs.home') }} />

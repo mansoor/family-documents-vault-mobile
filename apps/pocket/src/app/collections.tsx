@@ -54,7 +54,7 @@ export default function CollectionsScreen() {
   useEffect(() => on('collectionChanged', () => void load()), [load]);
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
+    <SafeAreaView style={styles.safe} edges={[]}>
     <FlatList
       testID="collections"
       style={styles.screen}

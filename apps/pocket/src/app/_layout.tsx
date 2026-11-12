@@ -24,6 +24,7 @@ import { EssentialsProvider, useEssentials } from '../state/essentials';
 import { LockProvider, useLock } from '../state/lock';
 import { StepUpProvider } from '../state/step-up';
 import { useVault, VaultProvider } from '../state/vault';
+import { headerFor, type HeaderOptions } from '../ui/app-header';
 import { font } from '../ui/fonts';
 import { TextScaleProvider, useTextScale } from '../ui/text-scale';
 import { WEB_FONTS } from '../ui/web-fonts';
@@ -87,29 +88,32 @@ function Gates() {
         headerTintColor: colours.ink,
         headerShadowVisible: false,
         contentStyle: { backgroundColor: colours.bg },
+        // The vault's bar at the top of every page, the page's title and buttons below it
+        // (the owner's ask of 11 Nov 2026): no back arrow, Android's back goes back.
+        header: ({ options }) => headerFor(options as HeaderOptions),
         ...(still ? { animation: 'none' as const } : {}),
       }}
     >
       <Stack.Protected guard={phase === 'ready'}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false, title: t('tabs.home') }} />
         <Stack.Screen name="document/[id]" options={{ title: '' }} />
-        <Stack.Screen name="edit/[id]" options={{ title: '' }} />
+        <Stack.Screen name="edit/[id]" options={{ title: '', headerShown: false }} />
         {/* Its title is its page's, with the + beside it, as Notes': no bar above it (the owner's ask of 11 Nov 2026). */}
-        <Stack.Screen name="collections" options={{ headerShown: false, title: t('collections.title') }} />
+        <Stack.Screen name="collections" options={{ title: t('collections.title'), headerTitle: '' }} />
         <Stack.Screen name="trash" options={{ title: t('trashList.title') }} />
         <Stack.Screen name="sharing" options={{ title: t('sharing.title') }} />
         <Stack.Screen name="collection/[id]" options={{ title: '' }} />
-        <Stack.Screen name="new-note" options={{ title: '' }} />
+        <Stack.Screen name="new-note" options={{ title: '', headerShown: false }} />
         <Stack.Screen name="person/[id]" options={{ title: '' }} />
         <Stack.Screen name="attention" options={{ title: t('attention.title') }} />
         <Stack.Screen name="account" options={{ title: t('more.account') }} />
-        <Stack.Screen name="capture" options={{ title: '', gestureEnabled: false }} />
+        <Stack.Screen name="capture" options={{ title: '', gestureEnabled: false, headerShown: false }} />
         <Stack.Screen name="settings" options={{ title: t('settings.title') }} />
         <Stack.Screen name="licences" options={{ title: t('settings.licences') }} />
         <Stack.Screen name="timings" options={{ title: t('timings.title') }} />
       </Stack.Protected>
       <Stack.Protected guard={reading}>
-        <Stack.Screen name="essential/[id]" options={{ title: '' }} />
+        <Stack.Screen name="essential/[id]" options={{ title: '', headerShown: false }} />
         <Stack.Screen name="show/[id]" options={{ headerShown: false, animation: still ? 'none' : 'fade', gestureEnabled: false }} />
       </Stack.Protected>
       <Stack.Protected guard={phase === 'sign_in'}>

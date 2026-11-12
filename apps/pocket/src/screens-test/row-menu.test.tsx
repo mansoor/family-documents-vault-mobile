@@ -5,7 +5,7 @@ import SearchScreen from '../app/(tabs)/documents';
 import { copySettings, saveCopyIo } from '../documents/save-copy';
 import { audit } from '../test-support/a11y';
 import { addGuest, GUEST, signedInAs } from '../test-support/guest';
-import { libraryDoc, unlocked } from '../test-support/lookup';
+import { libraryDoc, unlocked, openSearch } from '../test-support/lookup';
 import { installed, respond } from '../test-support/render';
 import { resetRoutes, routes } from '../test-support/router';
 import { capabilities, caps0519, testVault, type TestVault } from '../test-support/vault';
@@ -87,6 +87,7 @@ function hit(doc: DocumentView): SearchHit {
 /** Searched for, and its ⋯ pressed. */
 async function fromSearch(t: TestVault, docs: DocumentView[], id: string) {
   t.library.search = () => ({ items: docs.map(hit), sealed: 0 });
+  await openSearch();
   await fireEvent.changeText(await screen.findByTestId('search-field'), 'any');
   await fireEvent.press(await screen.findByTestId(`doc-menu-${id}`));
   return screen.findByTestId('row-sheet');
@@ -161,6 +162,7 @@ describe('a menu on every row (5.36)', () => {
     t.library.versions.set('note', []);
     await unlocked(t, <SearchScreen />);
     t.library.search = () => ({ items: [{ ...hit(note), note_name: 'Where the spare keys are' }], sealed: 0 });
+    await openSearch();
     await fireEvent.changeText(await screen.findByTestId('search-field'), 'keys');
     expect(await screen.findByTestId('doc-row-note')).toHaveTextContent(/Where the spare keys are/);
     expect(screen.queryByText('Untitled document')).toBeNull();

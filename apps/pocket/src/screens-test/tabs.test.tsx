@@ -2,6 +2,8 @@ import { fireEvent, screen, waitFor, within } from '@testing-library/react-nativ
 import type { ReactElement } from 'react';
 import { AccessibilityInfo, StyleSheet } from 'react-native';
 import Home from '../app/(tabs)/index';
+import { AppHeader } from '../ui/app-header';
+
 import MoreScreen from '../app/(tabs)/more';
 import PeopleScreen from '../app/(tabs)/people';
 import * as Linking from 'expo-linking';
@@ -15,6 +17,14 @@ import { installed, renderApp, signedIn, testCapture } from '../test-support/ren
 import { resetRoutes, routes } from '../test-support/router';
 import { capabilities, testVault } from '../test-support/vault';
 import { TabBar } from '../ui/tab-bar';
+
+/** Home under the bar every page has (11 Nov 2026): the bell is the bar's. */
+const WithBar = () => (
+  <>
+    <AppHeader />
+    <Home />
+  </>
+);
 
 jest.mock(
   'expo-router',
@@ -90,11 +100,11 @@ describe('the tab bar', () => {
     expect(audit()).toEqual([]);
   });
 
-  it('Needs attention is the bell on Home (R3): no number when nothing is due, and it opens the list', async () => {
+  it('Needs attention is the bell in the top bar, on every page (R3; 11 Nov 2026): no number when nothing is due, and it opens the list', async () => {
     installed();
     resetRoutes();
     const t = testVault([ORIGIN]);
-    await unlocked(t, <Home />);
+    await unlocked(t, <WithBar />);
     const bell = await screen.findByTestId('bell');
     expect(bell.props.accessibilityLabel).toBe('Needs attention: nothing now');
     expect(screen.queryByTestId('bell-count')).toBeNull();
@@ -107,7 +117,7 @@ describe('the tab bar', () => {
     resetRoutes();
     const t = testVault([ORIGIN]);
     t.reminders = [{ id: 'r1', document_id: 'd1', document_title: 'Passport', kind: 'derived', fire_at: '2026-09-20T00:00:00Z', lead_days: 90, note: null, recurrence: null, status: 'due', snoozed_until: null, label: 'Expires soon' }, { id: 'r2', document_id: 'd2', document_title: 'Licence', kind: 'derived', fire_at: '2026-09-20T00:00:00Z', lead_days: 90, note: null, recurrence: null, status: 'due', snoozed_until: null, label: 'Expires soon' }] as never;
-    await unlocked(t, <Home />);
+    await unlocked(t, <WithBar />);
     // The number is drawn for the eye; a screen reader hears it in the bell's name.
     expect(await screen.findByTestId('bell-count', { includeHiddenElements: true })).toHaveTextContent('2');
     expect(screen.getByTestId('bell').props.accessibilityLabel).toBe('Needs attention: 2 things');

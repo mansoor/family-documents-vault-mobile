@@ -457,7 +457,9 @@
     "none": "No documents yet. Add one with the + button.",
     "noneMatch": "Nothing matches these choices. Try fewer of them.",
     "needsConnection": "Showing your documents needs a connection to your vault.",
-    "sortNow": "Sort: {{sort}}"
+    "sortNow": "Sort: {{sort}}",
+    "searchOpen": "Search",
+    "searchClose": "Close the search"
   },
   "document": {
     "show": "Show",
@@ -837,7 +839,18 @@
     "truncated": "Only the newest notes are shown. Find in notes to narrow them down.",
     "untitled": "Untitled note",
     "changed": "Changed {{when}}",
-    "needsConnection": "Notes need a connection to the vault."
+    "needsConnection": "Notes need a connection to the vault.",
+    "layout_sticky": "Sticky notes",
+    "layout_list": "List",
+    "layout_detailed": "Detailed",
+    "layoutNow": "Shown as {{now}}. Show as {{next}}",
+    "history": "Searches on this phone",
+    "historyNone": "Nothing looked for yet.",
+    "historyAgain": "Look for “{{words}}” again",
+    "forget": "Forget these searches",
+    "forgetTitle": "Forget these searches?",
+    "forgetWords": "What you looked for in your notes is forgotten on this phone. Your notes are not touched.",
+    "forgetYes": "Forget them"
   },
   "newNote": {
     "title": "New note",
@@ -1056,7 +1069,12 @@
     "copyPassword": "Copy the password",
     "copied": "Copied, for a minute",
     "done": "Done",
-    "collectionOnlyMe": "A collection for Only me is never shared outside the family."
+    "collectionOnlyMe": "A collection for Only me is never shared outside the family.",
+    "linkAndPin": "The link and its PIN",
+    "linkAndPassword": "The link and its password",
+    "theLink": "The link",
+    "reveal": "Show the link",
+    "hide": "Hide the link"
   },
   "sharing": {
     "title": "Sharing",
