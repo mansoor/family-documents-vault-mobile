@@ -1074,7 +1074,8 @@
     "linkAndPassword": "The link and its password",
     "theLink": "The link",
     "reveal": "Show the link",
-    "hide": "Hide the link"
+    "hide": "Hide the link",
+    "againLater": "You can see this link, and its PIN or password, again in More → Sharing."
   },
   "sharing": {
     "title": "Sharing",
@@ -1091,6 +1092,9 @@
     "endTitle": "End this link?",
     "endWords": "The link to “{{what}}” stops working at once, for whoever has it. It cannot be started again; you can share it anew.",
     "endYes": "End the link",
-    "ended": "The link to “{{what}}” is ended."
+    "ended": "The link to “{{what}}” is ended.",
+    "show": "Show the link",
+    "showFor": "Show the link to {{what}}",
+    "shownTitle": "The link to “{{what}}”"
   }
 }

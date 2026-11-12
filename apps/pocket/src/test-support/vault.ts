@@ -173,6 +173,8 @@ export interface Library {
    */
   shares: Share[];
   shareBodies: { to: string; body: Record<string, unknown> }[];
+  /** What each link made here was handed over with, to show its maker again (0.9.0-dev.30). */
+  shareSecrets: Map<string, { link_token: string; link_url: string; pin?: string; password?: string }>;
   /** Whether Only me documents may be shared (GET /household/sharing); null: an older vault, which says nothing. */
   onlyMeShareable: boolean | null;
   /** What a collection's share sheet offers (GET /collections/{id}/share-preview), by collection. */
@@ -252,6 +254,7 @@ export function testVault(origins: string[] = ['https://vault.test']): TestVault
       trashed: [],
       shares: [],
       shareBodies: [],
+      shareSecrets: new Map(),
       onlyMeShareable: null,
       sharePreviews: new Map(),
     },
@@ -467,8 +470,15 @@ async function library(t: TestVault, path: string, init: Parameters<FetchLike>[1
       permission: (body.permission as 'view' | 'download' | undefined) ?? 'download',
       max_opens: (body.max_opens as number | undefined) ?? null,
       summary: 'A link',
+      revealable: true,
     } as Share;
     lib.shares.push(share);
+    lib.shareSecrets.set(share.id, {
+      link_token: `tok-${n}`,
+      link_url: `https://share.vault.test/s#tok-${n}`,
+      ...(body.with_pin === true ? { pin: '4821' } : {}),
+      ...(body.with_password === true ? { password: 'amber-otter-41' } : {}),
+    });
     return json({
       share,
       link_token: `tok-${n}`,
@@ -478,6 +488,15 @@ async function library(t: TestVault, path: string, init: Parameters<FetchLike>[1
     });
   }
   if (q === '/api/v1/shares' && init.method === 'GET') return json({ items: lib.shares });
+  // A link shown again to its maker (0.9.0-dev.30), after confirming it is them.
+  m = /^\/api\/v1\/shares\/([^/]+)\/reveal$/.exec(q);
+  if (m?.[1] && init.method === 'POST') {
+    const kept = lib.shareSecrets.get(m[1]);
+    if (!lib.shares.some((x) => x.id === m?.[1])) return failure(404, 'not_found', 'There is no such link.');
+    if (!kept) return failure(409, 'share_not_revealable', 'This link was shown once, as it was made.');
+    if (!lib.verified) return failure(403, 'step_up_required', 'Please confirm it is you to see this link again.', 'reveal_share');
+    return json(kept);
+  }
   m = /^\/api\/v1\/shares\/([^/]+)$/.exec(q);
   if (m?.[1] && init.method === 'DELETE') {
     const id = m[1];
