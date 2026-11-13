@@ -1,5 +1,5 @@
 import type { ReminderView } from '@fdv/shared';
-import { fireEvent, screen, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react-native';
 import Home from '../app/(tabs)/index';
 import DocumentsScreen from '../app/(tabs)/documents';
 import { countAlert, hide, prefsName, prune, reminderAlert, shows, unhide, type Hidden } from '../home/alerts';
@@ -97,12 +97,40 @@ describe("Home's alerts (R4)", () => {
     expect(await screen.findByText('Hide this alert')).toBeTruthy();
     await fireEvent.press(screen.getByTestId('alert-hide-7'));
     await waitFor(() => expect(screen.queryByTestId('home-alert-r1')).toBeNull());
-    expect(screen.getByTestId('home-alert-hidden')).toHaveTextContent(/^Hidden\. It comes back in a week\./);
+    expect(screen.getByTestId('home-alert-hidden')).toHaveTextContent(
+      /^Hidden\. It comes back in a week, and the bell still has it\.Undo \(60s\)$/,
+    );
     await fireEvent.press(screen.getByTestId('home-alert-undo'));
     expect(await screen.findByTestId('home-alert-r1')).toBeTruthy();
 
     await fireEvent.press(screen.getByTestId('home-alert-open-r1'));
     expect(routes().at(-1)).toEqual({ pathname: '/document/[id]', params: { id: 'doc-r1' } });
+  });
+
+  it('Undo counts down from 60 seconds and then goes; the alert stays hidden (the owner, 13 Nov 2026)', async () => {
+    jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate', 'queueMicrotask'] });
+    try {
+      const t = testVault([ORIGIN]);
+      t.reminders = [reminder('r1')];
+      await unlocked(t, <Home />);
+      await screen.findByTestId('home-alert-r1');
+      await fireEvent.press(screen.getByTestId('home-alert-r1-hide'));
+      await fireEvent.press(await screen.findByTestId('alert-hide-7'));
+      expect(await screen.findByTestId('home-alert-undo-label')).toHaveTextContent('Undo (60s)');
+      await act(async () => {
+        jest.advanceTimersByTime(15_000);
+      });
+      expect(screen.getByTestId('home-alert-undo-label')).toHaveTextContent('Undo (45s)');
+      expect(screen.getByTestId('home-alert-undo')).toHaveProp('accessibilityLabel', 'Undo, 45 seconds left');
+      await act(async () => {
+        jest.advanceTimersByTime(45_000);
+      });
+      expect(screen.queryByTestId('home-alert-hidden')).toBeNull();
+      expect(screen.queryByTestId('home-alert-undo')).toBeNull();
+      expect(screen.queryByTestId('home-alert-r1')).toBeNull();
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it('hidden on this phone stays hidden the next time Home is opened', async () => {

@@ -44,6 +44,12 @@ owner, an adult or a teen, so an older vault looks as before.
 - Re-pinned to the vault's **v0.9.0-dev.38** (neutral wording in
   notifications and email, H2, which changes nothing on the phone).
 
+### Changed
+- **Undo after hiding a Home alert lasts a minute.** It counts down
+  ("Undo (45s)") and then the line goes; it no longer stays until the app
+  is closed. A hidden alert is still under the bell. Screen readers hear
+  the line once, not every second.
+
 ## [0.7.1] — pages turn with a swipe and zoom with your fingers
 
 The owner's report of 13 Nov 2026, on a real Android phone: in a
