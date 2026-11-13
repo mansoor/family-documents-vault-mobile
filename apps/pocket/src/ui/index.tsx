@@ -1,5 +1,5 @@
 import { radii, statusTone, TAP_MIN, type Status } from '@fdv/shared';
-import { AlertTriangle, CheckCircle2, Clock, Info, XCircle, type LucideIcon } from 'lucide-react-native';
+import { AlertTriangle, CheckCircle2, Clock, Info, X, XCircle, type LucideIcon } from 'lucide-react-native';
 import { useCallback, useEffect, useRef, type ReactNode } from 'react';
 import {
   AccessibilityInfo,
@@ -218,11 +218,18 @@ export function Field(
      * time it is given a new value: Save waiting for it.
      */
     goTo?: object | null;
+    /**
+     * A clear (×) button inside the box, shown while it holds words (the
+     * owner, 12 Nov 2026: a search took many Backspaces to empty). It
+     * empties it and keeps the keyboard where it is.
+     */
+    clear?: { label: string; onClear: () => void };
   } & Omit<TextInputProps, 'style'>,
 ) {
   const colours = useColours();
   const styles = useStyles(makeStyles);
-  const { label, error, testID, required, goTo, onLayout, ...input } = props;
+  const { label, error, testID, required, goTo, onLayout, clear, ...input } = props;
+  const clearing = !!clear && typeof input.value === 'string' && input.value !== '';
   const { scale } = useTextScale();
   const box = useRef<TextInput>(null);
   // Focused before it is laid out — Save opening More details mounts the
@@ -245,6 +252,7 @@ export function Field(
       <Text variant="secondary" weight="600" tone="soft">
         {requiredLabel(label, required)}
       </Text>
+      <View>
       <TextInput
         ref={box}
         testID={testID}
@@ -252,7 +260,13 @@ export function Field(
         autoCapitalize="none"
         autoCorrect={false}
         placeholderTextColor={colours.inkMuted}
-        style={[styles.input, font(), { fontSize: TYPE.body * scale }, error ? styles.inputError : null]}
+        style={[
+          styles.input,
+          font(),
+          { fontSize: TYPE.body * scale },
+          clear ? styles.inputClearable : null,
+          error ? styles.inputError : null,
+        ]}
         {...input}
         onLayout={(e) => {
           laidOut.current = true;
@@ -263,6 +277,21 @@ export function Field(
           onLayout?.(e);
         }}
       />
+      {clearing ? (
+        <Pressable
+          testID={testID ? `${testID}-clear` : undefined}
+          accessibilityRole="button"
+          accessibilityLabel={clear.label}
+          onPress={() => {
+            clear.onClear();
+            box.current?.focus();
+          }}
+          style={({ pressed }) => [styles.clear, pressed ? styles.pressed : null]}
+        >
+          <X color={colours.inkSoft} size={18} accessibilityElementsHidden importantForAccessibility="no" />
+        </Pressable>
+      ) : null}
+      </View>
       {error ? (
         <Text variant="secondary" tone="danger" role="alert">
           {error}
@@ -310,4 +339,15 @@ const makeStyles = (colours: Palette) =>
       backgroundColor: colours.surface,
     },
     inputError: { borderColor: colours.danger },
+    inputClearable: { paddingRight: TAP_MIN },
+    clear: {
+      position: 'absolute',
+      right: 0,
+      top: 0,
+      bottom: 0,
+      width: TAP_MIN,
+      minHeight: TAP_MIN,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
   });

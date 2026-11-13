@@ -17,6 +17,8 @@ export interface Confirmation {
   warning?: string | null;
   /** The red button, named for what it does — never "OK". */
   confirmLabel: string;
+  /** The quiet button, when Cancel would be unclear ("Keep editing"). */
+  cancelLabel?: string;
   icon?: LucideIcon;
   busy?: boolean;
   /** What went wrong, if it did: said here, the question still open. */
@@ -69,7 +71,7 @@ export function ConfirmBody(props: Confirmation) {
       <Button
         testID={props.cancelID}
         kind="quiet"
-        label={t('common.cancel')}
+        label={props.cancelLabel ?? t('common.cancel')}
         disabled={props.busy === true}
         onPress={props.onCancel}
       />

@@ -375,7 +375,7 @@ export default function DocumentsScreen() {
                   value={q}
                   onChangeText={setQ}
                   returnKeyType="search"
-                  clearButtonMode="while-editing"
+                  clear={{ label: t('common.clearSearch'), onClear: () => setQ('') }}
                 />
               </View>
               <Pressable

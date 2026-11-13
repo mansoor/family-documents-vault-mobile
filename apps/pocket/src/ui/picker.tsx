@@ -107,6 +107,7 @@ export function PickerSheet(props: {
           onChangeText={setQ}
           autoCapitalize="none"
           returnKeyType="search"
+          clear={{ label: t('common.clearSearch'), onClear: () => setQ('') }}
           testID={props.findID}
         />
       ) : null}
