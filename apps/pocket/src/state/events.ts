@@ -16,6 +16,8 @@ interface Events {
   documentChanged: [id: string];
   /** Documents put in a collection or taken out of it on the phone (P9): its list and its page look again. */
   collectionChanged: [id: string];
+  /** A collection's checklist kept, cleared or filled from on the phone (0.8.0): its page looks again. */
+  checklistChanged: [id: string];
   /** A link made or ended on the phone: Sharing looks again. */
   sharesChanged: [];
   /** The person's mobile number added, confirmed or removed (SMS4): what hangs on it looks again. */
@@ -33,6 +35,7 @@ const listeners: { [K in keyof Events]: Set<Listener<K>> } = {
   phoneChanged: new Set(),
   documentChanged: new Set(),
   collectionChanged: new Set(),
+  checklistChanged: new Set(),
   sharesChanged: new Set(),
 };
 
