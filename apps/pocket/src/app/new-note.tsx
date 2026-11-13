@@ -2,16 +2,16 @@ import { NOTE_KIND, NOTES_MAX, type Visibility } from '@fdv/shared';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ScrollView, StyleSheet, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { StyleSheet, View } from 'react-native';
 import { noteVisibilities, secretNoteKey } from '../documents/note-write';
 import { wordsFor } from '../errors/words';
 import { emit } from '../state/events';
 import { feel } from '../ui/feel';
 import { useVault } from '../state/vault';
 import { NoteEditor } from '../documents/note-editor';
-import { Button, Field, Notice, Text } from '../ui';
+import { Field, Notice, Text } from '../ui';
 import { Chip, ChipRow } from '../ui/chip';
+import { EditorFrame } from '../ui/editor-frame';
 import { sp } from '../ui/space';
 import { useStyles, type Palette } from '../ui/theme';
 
@@ -26,7 +26,6 @@ export default function NewNoteScreen() {
   const styles = useStyles(makeStyles);
   const { t } = useTranslation();
   const router = useRouter();
-  const insets = useSafeAreaInsets();
   const { withToken, who } = useVault();
   const [title, setTitle] = useState('');
   const [words, setWords] = useState('');
@@ -37,8 +36,8 @@ export default function NewNoteScreen() {
   const secret = secretNoteKey(words, visibility);
   const empty = title.trim() === '' && words.trim() === '';
 
-  const save = async () => {
-    if (busy || tooLong || empty) return;
+  const save = async (): Promise<(() => void) | null> => {
+    if (busy || tooLong || empty) return null;
     setBusy(true);
     setProblem(null);
     try {
@@ -54,19 +53,22 @@ export default function NewNoteScreen() {
       feel('done');
       emit('documentChanged', made.id);
       // New note replaced by the note: Back never finds an empty New note.
-      router.replace({ pathname: '/document/[id]', params: { id: made.id } });
+      return () => router.replace({ pathname: '/document/[id]', params: { id: made.id } });
     } catch (err) {
       setProblem(wordsFor(err, t));
+      return null;
     } finally {
       setBusy(false);
     }
   };
 
   return (
-    <ScrollView
+    <EditorFrame
       testID="new-note"
-      contentContainerStyle={[styles.page, { paddingTop: sp(20) + insets.top, paddingBottom: sp(20) + insets.bottom }]}
-      keyboardShouldPersistTaps="handled"
+      changed={!empty}
+      busy={busy}
+      save={{ testID: 'new-note-save', label: t('edit.save'), disabled: tooLong || empty, onPress: save }}
+      cancelID="new-note-cancel"
     >
       <Text variant="hero">{t('newNote.title')}</Text>
       <View style={styles.section}>
@@ -114,20 +116,11 @@ export default function NewNoteScreen() {
           {problem}
         </Notice>
       ) : null}
-      <Button
-        testID="new-note-save"
-        label={t('edit.save')}
-        busy={busy}
-        disabled={tooLong || empty}
-        onPress={() => void save()}
-      />
-      <Button testID="new-note-cancel" kind="quiet" label={t('common.cancel')} disabled={busy} onPress={() => router.back()} />
-    </ScrollView>
+    </EditorFrame>
   );
 }
 
-const makeStyles = (colours: Palette) =>
+const makeStyles = (_colours: Palette) =>
   StyleSheet.create({
-    page: { padding: sp(20), gap: sp(16), backgroundColor: colours.bg },
     section: { gap: sp(8) },
   });

@@ -3,18 +3,15 @@ import { NOTES_MAX, type DocumentView } from '@fdv/shared';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ScrollView, StyleSheet } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NoteEditor } from './note-editor';
 import { TagsEditor } from './tags-edit';
 import { wordsFor } from '../errors/words';
 import { emit } from '../state/events';
 import { useStepUp } from '../state/step-up';
 import { useVault } from '../state/vault';
-import { Button, Field, Notice, Text } from '../ui';
+import { Field, Notice, Text } from '../ui';
+import { EditorFrame } from '../ui/editor-frame';
 import { feel } from '../ui/feel';
-import { sp } from '../ui/space';
-import { useStyles, type Palette } from '../ui/theme';
 import { secretNoteKey } from './note-write';
 
 /**
@@ -27,10 +24,8 @@ import { secretNoteKey } from './note-write';
  * typed stays here, and Save again replaces theirs.
  */
 export function NoteEdit(props: { doc: DocumentView; onStale: () => Promise<void> }) {
-  const styles = useStyles(makeStyles);
   const { t } = useTranslation();
   const router = useRouter();
-  const insets = useSafeAreaInsets();
   const { who } = useVault();
   const { guarded } = useStepUp();
   const { doc } = props;
@@ -46,9 +41,10 @@ export function NoteEdit(props: { doc: DocumentView; onStale: () => Promise<void
   const secret = secretNoteKey(words, doc.visibility);
   const titleChanged = title.trim() !== (doc.title ?? '').trim();
   const empty = title.trim() === '' && words.trim() === '';
+  const changed = titleChanged || words.trim() !== (doc.notes ?? '').trim() || tagsChanged;
 
-  const save = async () => {
-    if (busy || tooLong || empty) return;
+  const save = async (): Promise<(() => void) | null> => {
+    if (busy || tooLong || empty) return null;
     setBusy(true);
     setProblem(null);
     try {
@@ -58,10 +54,10 @@ export function NoteEdit(props: { doc: DocumentView; onStale: () => Promise<void
         ...(tagsChanged ? { tags } : {}),
       };
       const saved = await guarded((a, tk) => a.updateDocument(tk, doc.id, body, doc.etag));
-      if (saved === null) return;
+      if (saved === null) return null;
       feel('done');
       emit('documentChanged', saved.id);
-      router.back();
+      return () => router.back();
     } catch (err) {
       if (err instanceof ApiRequestError && err.status === 409) {
         setProblem(t('edit.changedNote'));
@@ -70,16 +66,19 @@ export function NoteEdit(props: { doc: DocumentView; onStale: () => Promise<void
       } else {
         setProblem(wordsFor(err, t));
       }
+      return null;
     } finally {
       setBusy(false);
     }
   };
 
   return (
-    <ScrollView
+    <EditorFrame
       testID="edit"
-      contentContainerStyle={[styles.page, { paddingTop: sp(20) + insets.top, paddingBottom: sp(20) + insets.bottom }]}
-      keyboardShouldPersistTaps="handled"
+      changed={changed}
+      busy={busy}
+      save={{ testID: 'edit-save', label: t('edit.save'), disabled: tooLong || empty, onPress: save }}
+      cancelID="edit-cancel"
     >
       <Text variant="hero">{t('edit.noteTitle')}</Text>
       {own ? (
@@ -111,19 +110,6 @@ export function NoteEdit(props: { doc: DocumentView; onStale: () => Promise<void
           {problem}
         </Notice>
       ) : null}
-      <Button
-        testID="edit-save"
-        label={t('edit.save')}
-        busy={busy}
-        disabled={tooLong || empty}
-        onPress={() => void save()}
-      />
-      <Button testID="edit-cancel" kind="quiet" label={t('common.cancel')} disabled={busy} onPress={() => router.back()} />
-    </ScrollView>
+    </EditorFrame>
   );
 }
-
-const makeStyles = (colours: Palette) =>
-  StyleSheet.create({
-    page: { padding: sp(20), gap: sp(16), backgroundColor: colours.bg },
-  });

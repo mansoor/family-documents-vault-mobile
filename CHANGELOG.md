@@ -6,6 +6,26 @@ app's own, tagged `vX.Y.Z` in this repository.
 
 ## [Unreleased]
 
+## [0.6.1] — Cancel beside Save, and a clear button in search
+
+The owner's two fixes of 12 Nov 2026. Same vault as 0.6.0 (0.9.0-dev.33).
+
+### Changed
+- **New note, Edit note and Edit details**: Cancel and Save sit side by
+  side in one row at the foot of the screen. The row stays put while the
+  rest scrolls, above Android's Back and Home buttons (or its gesture
+  bar) and above the keyboard. Before, Cancel came last on the page and
+  could end up behind Android's own buttons.
+- **Cancel, or Back, with something changed asks first**: "Leave without
+  saving?", with Keep editing and Leave without saving. With nothing
+  changed it leaves straight away, as before.
+
+### Added
+- **A clear (×) button in every search box** (Documents, Notes, choosing
+  a kind or a person, adding documents to a collection): shown while the
+  box holds words, named "Clear search", 44 points wide. It empties the box
+  and keeps the keyboard open, and the list goes back to everything.
+
 ## [0.6.0] — texts: your mobile number, codes by text, and texts you choose
 
 SMS4, the phone's side of the vault's text messages (SMS1–SMS3), with a

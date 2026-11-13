@@ -173,6 +173,7 @@ export default function NotesScreen() {
                 returnKeyType="search"
                 onSubmitEditing={() => remember(q)}
                 onBlur={() => remember(q)}
+                clear={{ label: t('common.clearSearch'), onClear: () => setQ('') }}
                 testID="notes-find"
               />
             </View>

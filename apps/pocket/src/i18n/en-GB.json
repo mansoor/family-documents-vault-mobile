@@ -11,7 +11,8 @@
     "tryAgain": "Try again",
     "openInBrowser": "Open in browser",
     "working": "Working…",
-    "back": "Back"
+    "back": "Back",
+    "clearSearch": "Clear search"
   },
   "connect": {
     "title": "Your vault",
@@ -1222,5 +1223,11 @@
     "timeProblem": "As 21:00",
     "quietSave": "Save quiet hours",
     "quietSaved": "Quiet hours saved."
+  },
+  "editor": {
+    "leaveTitle": "Leave without saving?",
+    "leaveWords": "What you changed here isn’t kept.",
+    "leave": "Leave without saving",
+    "keep": "Keep editing"
   }
 }

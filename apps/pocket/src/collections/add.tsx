@@ -112,6 +112,7 @@ export function AddDocuments(props: {
         onChangeText={setQ}
         autoCapitalize="none"
         returnKeyType="search"
+        clear={{ label: t('common.clearSearch'), onClear: () => setQ('') }}
         testID="add-documents-find"
       />
       <ScrollView style={styles.scroll} contentContainerStyle={styles.list} keyboardShouldPersistTaps="handled">

@@ -3,8 +3,7 @@ import { issuedByLabel, NOTE_KIND, NOTES_MAX, type DocumentView } from '@fdv/sha
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ScrollView, StyleSheet, Switch, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { StyleSheet, Switch, View } from 'react-native';
 import { andList, chooseOwner, chooseType, coreAsk, detailError, ownFields, typeOf, type CardCore, type Draft, type FieldErrors, type Household } from '../../capture/draft';
 import { KindChooser, OwnerChooser } from '../../capture/choose';
 import { Chip, ChipRow, detailInput } from '../../capture/ui';
@@ -16,7 +15,8 @@ import { emit } from '../../state/events';
 import { feel } from '../../ui/feel';
 import { useStepUp } from '../../state/step-up';
 import { useVault } from '../../state/vault';
-import { Button, Field, Notice, requiredLabel, Text } from '../../ui';
+import { Field, Notice, requiredLabel, Text } from '../../ui';
+import { EditorFrame } from '../../ui/editor-frame';
 import { sp } from '../../ui/space';
 import { LoadFailed, loadFailure, Placeholder } from '../../ui/states';
 import { useColours, useStyles, type Palette } from '../../ui/theme';
@@ -41,7 +41,6 @@ export default function EditScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { t } = useTranslation();
   const router = useRouter();
-  const insets = useSafeAreaInsets();
   const { withToken, caps, who } = useVault();
   const { guarded } = useStepUp();
   const [doc, setDoc] = useState<DocumentView | null>(null);
@@ -121,9 +120,14 @@ export default function EditScreen() {
   const writesNotes = doc.notes_updated_at !== undefined;
   const notesLabel = type?.core?.notes?.label?.trim() || t('document.notes');
   const notesTooLong = notes.length > NOTES_MAX;
+  // Anything differing from the document as it was opened: Cancel or Back asks first.
+  const changed =
+    JSON.stringify(draft) !== JSON.stringify(draftOf(doc)) ||
+    notes.trim() !== (doc.notes ?? '').trim() ||
+    JSON.stringify(tags) !== JSON.stringify(doc.tags ?? []);
 
-  const save = async () => {
-    if (busy) return;
+  const save = async (): Promise<(() => void) | null> => {
+    if (busy) return null;
     const out = editBody(draft, household, { confirm: caps?.features.version_details === true });
     setFields(out.fields);
     if (!out.body) {
@@ -131,11 +135,11 @@ export default function EditScreen() {
         out.problem ??
           (out.missing.length > 0 ? t('edit.stillNeeded', { fields: andList(out.missing.map(labelOf)) }) : null),
       );
-      return;
+      return null;
     }
     if (notesTooLong) {
       setProblem(t('newNote.tooLong', { count: notes.length }));
-      return;
+      return null;
     }
     // The note and the tags only when changed: an edit of the card never puts back what somebody wrote meanwhile.
     if (writesNotes && notes.trim() !== (doc.notes ?? '').trim()) out.body.notes = notes.trim() || null;
@@ -145,10 +149,10 @@ export default function EditScreen() {
     try {
       // Through the step-up, as the page's own Essential switch is.
       const saved = await guarded((a, tk) => a.updateDocument(tk, doc.id, out.body ?? {}, doc.etag));
-      if (saved === null) return;
+      if (saved === null) return null;
       feel('done');
       emit('documentChanged', saved.id);
-      router.back();
+      return () => router.back();
     } catch (err) {
       if (err instanceof ApiRequestError && err.status === 409 && err.code === 'conflict') {
         setProblem(t('edit.changed'));
@@ -156,16 +160,19 @@ export default function EditScreen() {
       } else {
         setProblem(wordsFor(err, t));
       }
+      return null;
     } finally {
       setBusy(false);
     }
   };
 
   return (
-    <ScrollView
+    <EditorFrame
       testID="edit"
-      contentContainerStyle={[styles.page, { paddingTop: sp(20) + insets.top, paddingBottom: sp(20) + insets.bottom }]}
-      keyboardShouldPersistTaps="handled"
+      changed={changed}
+      busy={busy}
+      save={{ testID: 'edit-save', label: t('edit.save'), onPress: save }}
+      cancelID="edit-cancel"
     >
       <Text variant="hero">{t('edit.title')}</Text>
 
@@ -333,9 +340,7 @@ export default function EditScreen() {
           {problem}
         </Notice>
       ) : null}
-      <Button label={t('edit.save')} busy={busy} onPress={() => void save()} testID="edit-save" />
-      <Button label={t('common.cancel')} kind="quiet" disabled={busy} onPress={() => router.back()} testID="edit-cancel" />
-    </ScrollView>
+    </EditorFrame>
   );
 }
 
