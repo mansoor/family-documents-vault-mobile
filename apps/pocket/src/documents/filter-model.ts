@@ -1,4 +1,4 @@
-import { addDays, type DocumentListParams, type StatusValue, type Visibility } from '@fdv/shared';
+import { addDays, type DocumentListParams, type SensitiveFilter, type StatusValue, type Visibility } from '@fdv/shared';
 
 /**
  * What Documents is narrowed by (R5; the owner's redesign of 10 Nov 2026:
@@ -13,6 +13,9 @@ import { addDays, type DocumentListParams, type StatusValue, type Visibility } f
  * The owner's tidy-up of 11 Nov 2026: tags too, several, where the vault
  * takes them (`tag_filters`); and Documents without the notes, which have
  * their own tab, where the vault leaves them out (`notes_apart`).
+ *
+ * Sensitive or not (AIR4), where the vault keeps it (`sensitive_documents`,
+ * 0.9.0-dev.34): `sensitive=yes`, `no`, or both, as V1's other filters.
  */
 
 export type DateWhich = 'added' | 'issued' | 'expires';
@@ -44,24 +47,38 @@ export interface Filters {
   visibilities: Visibility[];
   /** Tags, any of them, whatever their case (`tag_filters`). */
   tags: string[];
+  /** Sensitive, Not sensitive, or either (`sensitive_documents`); absent, none chosen. */
+  sensitive?: SensitiveFilter[];
   /** Essentials only: Home's Essentials, See all (the owner's ask of 11 Nov 2026). */
   essential?: boolean;
   date: DateRange | null;
 }
 
-export const NO_FILTERS: Filters = { people: [], kinds: [], statuses: [], visibilities: [], tags: [], date: null };
+export const NO_FILTERS: Filters = {
+  people: [],
+  kinds: [],
+  statuses: [],
+  visibilities: [],
+  tags: [],
+  sensitive: [],
+  date: null,
+};
 
-/** What else the vault takes: several tags, and the notes left out. */
+/** What else the vault takes: several tags, the notes left out, and Sensitive. */
 export interface Apart {
   tags: boolean;
   notes: boolean;
+  /** `sensitive=yes,no` (`sensitive_documents`). */
+  sensitive?: boolean;
 }
 
-/** The tags and the notes, as the vault takes them; nothing for an older one. */
-function apartOf(f: Filters, apart: Apart | undefined): { tag?: string[]; notes?: 'exclude' } {
+/** The tags, the notes and Sensitive, as the vault takes them; nothing for an older one. */
+function apartOf(f: Filters, apart: Apart | undefined): { tag?: string[]; notes?: 'exclude'; sensitive?: string } {
+  const sensitive = f.sensitive ?? [];
   return {
     ...(apart?.tags && f.tags.length > 0 ? { tag: f.tags } : {}),
     ...(apart?.notes ? { notes: 'exclude' as const } : {}),
+    ...(apart?.sensitive && sensitive.length > 0 ? { sensitive: sensitive.join(',') } : {}),
   };
 }
 
@@ -107,6 +124,7 @@ export function countOn(f: Filters): number {
     (f.statuses.length > 0 ? 1 : 0) +
     (f.visibilities.length > 0 ? 1 : 0) +
     (f.tags.length > 0 ? 1 : 0) +
+    ((f.sensitive ?? []).length > 0 ? 1 : 0) +
     (f.essential ? 1 : 0) +
     (f.date ? 1 : 0)
   );

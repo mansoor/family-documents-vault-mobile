@@ -43,6 +43,7 @@ import {
   type Household,
 } from '../capture/draft';
 import { KindChooser, OwnerChooser } from '../capture/choose';
+import { SensitiveChooser } from '../capture/sensitive';
 import { Chip, ChipRow, detailInput, FileRow, LeaveQuestion, PageStrip } from '../capture/ui';
 import type { CaptureSource } from '../queue/commit';
 import { useCapture, type CardData, type SaveProblem } from '../state/capture';
@@ -210,6 +211,8 @@ function Card(props: { initial: CaptureSource }) {
 
   // The household as whose a document is (0.9.0-dev.32).
   const householdOn = caps?.features.household_owner === true;
+  // Sensitive, as its kind says, yes or no (0.9.0-dev.34, AIR2).
+  const sensitiveOn = caps?.features.sensitive_documents === true;
   const household = useMemo<Household | null>(
     () =>
       data && me
@@ -220,9 +223,10 @@ function Card(props: { initial: CaptureSource }) {
             issuedBy: issuedByOn,
             details: detailsOn,
             householdOwner: householdOn,
+            sensitive: sensitiveOn,
           }
         : null,
-    [data, me, issuedByOn, detailsOn, householdOn],
+    [data, me, issuedByOn, detailsOn, householdOn, sensitiveOn],
   );
 
   // The card can be used once its choices are in: that is when it counts as shown.
@@ -578,6 +582,16 @@ function Card(props: { initial: CaptureSource }) {
                 </Text>
               ) : null}
             </View>
+
+            {household?.sensitive ? (
+              <SensitiveChooser
+                kind={type}
+                chosen={draft.sensitive}
+                teen={teen}
+                onChoose={(v) => set({ sensitive: v })}
+                id="sensitive"
+              />
+            ) : null}
 
             <View style={styles.switchRow}>
               <View style={styles.flex}>

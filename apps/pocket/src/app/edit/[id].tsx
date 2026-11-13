@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { StyleSheet, Switch, View } from 'react-native';
 import { andList, chooseOwner, chooseType, coreAsk, detailError, ownFields, typeOf, type CardCore, type Draft, type FieldErrors, type Household } from '../../capture/draft';
 import { KindChooser, OwnerChooser } from '../../capture/choose';
+import { SensitiveChooser } from '../../capture/sensitive';
 import { Chip, ChipRow, detailInput } from '../../capture/ui';
 import { draftOf, editBody } from '../../documents/edit';
 import { NoteEdit } from '../../documents/note-edit';
@@ -71,6 +72,7 @@ export default function EditScreen() {
         issuedBy: caps?.features.issued_by === true,
         details: caps?.features.custom_types === true,
         householdOwner: caps?.features.household_owner === true,
+        sensitive: caps?.features.sensitive_documents === true,
       });
       setFailed(null);
     } catch (err) {
@@ -128,7 +130,10 @@ export default function EditScreen() {
 
   const save = async (): Promise<(() => void) | null> => {
     if (busy) return null;
-    const out = editBody(draft, household, { confirm: caps?.features.version_details === true });
+    const out = editBody(draft, household, {
+      confirm: caps?.features.version_details === true,
+      sensitiveWas: doc.sensitive ?? null,
+    });
     setFields(out.fields);
     if (!out.body) {
       setProblem(
@@ -201,6 +206,17 @@ export default function EditScreen() {
           ids={{ more: 'edit-owners-more', picker: 'edit-owners-picker', chip: 'edit-owner' }}
         />
       </View>
+
+      {household.sensitive ? (
+        <SensitiveChooser
+          kind={type}
+          chosen={draft.sensitive}
+          teen={teen}
+          was={doc.sensitive ?? null}
+          onChoose={(v) => set({ sensitive: v })}
+          id="edit-sensitive"
+        />
+      ) : null}
 
       <View style={styles.section}>
         <Field

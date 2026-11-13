@@ -3,6 +3,7 @@ import {
   formatDate,
   localToday,
   NOTE_KIND,
+  SENSITIVE_LABEL,
   type DocumentTypeView,
   type DocumentView,
   type Member,
@@ -64,7 +65,12 @@ export default function DocumentsScreen() {
   // Several tags, and the notes left out: they have their own tab (the owner's tidy-up of 11 Nov 2026).
   const tagsOn = caps?.features.tag_filters === true;
   const notesApart = caps?.features.notes_apart === true;
-  const apart = useMemo(() => ({ tags: tagsOn, notes: notesApart }), [tagsOn, notesApart]);
+  // Sensitive or not (0.9.0-dev.34, AIR2), as the web's Documents filters.
+  const sensitiveOn = caps?.features.sensitive_documents === true;
+  const apart = useMemo(
+    () => ({ tags: tagsOn, notes: notesApart, sensitive: sensitiveOn }),
+    [tagsOn, notesApart, sensitiveOn],
+  );
   const [tags, setTags] = useState<string[]>([]);
 
   // Opened from Home's numbers or an alert (R4): narrowed to that status.
@@ -285,6 +291,15 @@ export default function DocumentsScreen() {
       : []),
     ...(filters.tags.length > 0 ? [{ id: 'tags', label: named(filters.tags, (x) => x), clear: { tags: [] } }] : []),
     ...(filters.essential ? [{ id: 'essential', label: t('filters.essentials'), clear: { essential: false } }] : []),
+    ...((filters.sensitive ?? []).length > 0
+      ? [
+          {
+            id: 'sensitive',
+            label: named(filters.sensitive ?? [], (v) => (v === 'yes' ? SENSITIVE_LABEL : t('filters.notSensitive'))),
+            clear: { sensitive: [] },
+          },
+        ]
+      : []),
     ...(filters.visibilities.length > 0
       ? [
           {
@@ -561,6 +576,7 @@ export default function DocumentsScreen() {
         // Nobody's goes with a column sort only, and the list's first sort is not one.
         nobody={false}
         household={caps?.features.household_owner === true}
+        sensitive={sensitiveOn}
         today={localToday(zone)}
         count={countFor}
       />

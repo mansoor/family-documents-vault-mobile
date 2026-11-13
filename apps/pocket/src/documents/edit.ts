@@ -43,6 +43,7 @@ export function draftOf(doc: DocumentView): Draft {
     typeKey: doc.type_key ?? null,
     ownerId: doc.owner_member_id ?? null,
     household: doc.household_owned === true,
+    sensitive: doc.sensitive ?? null,
     visibility: doc.visibility,
     essential: doc.is_essential,
     title: doc.title ?? '',
@@ -59,13 +60,18 @@ export function draftOf(doc: DocumentView): Draft {
  * Save: what PATCH /documents/{id} is sent, or what is wrong first, in the
  * card's words. `confirm` (a vault with `version_details`, and only for
  * this whole card) says the newest version's details are now confirmed.
+ * `sensitiveWas` is the document's own Sensitive as it was opened: the
+ * choice is sent only when it changed (a vault with `sensitive_documents`),
+ * as the web's edit does, so an edit never puts back what was there.
  */
 export function editBody(
   d: Draft,
   h: Household,
-  opts: { confirm: boolean },
+  opts: { confirm: boolean; sensitiveWas?: boolean | null },
 ): { body: DocumentInput | null; fields: FieldErrors; problem: string | null; missing: string[] } {
-  const { metadata: m, fields, problem, missing } = toMetadata(d, h);
+  // Sensitive is checked only when changed: a teen's paper already marked No is theirs to keep so.
+  const sensitiveChanged = h.sensitive === true && opts.sensitiveWas !== undefined && d.sensitive !== opts.sensitiveWas;
+  const { metadata: m, fields, problem, missing } = toMetadata(sensitiveChanged ? d : { ...d, sensitive: null }, h);
   if (Object.keys(fields).length > 0 || problem || missing.length > 0) {
     return { body: null, fields, problem: problem?.message ?? null, missing };
   }
@@ -85,6 +91,7 @@ export function editBody(
   if (own.length > 0) {
     body.extra = Object.fromEntries(own.map((f) => [f.key, m.extra?.[f.key] ?? null]));
   }
+  if (sensitiveChanged) body.sensitive = d.sensitive;
   if (opts.confirm) body.confirm_details = true;
   return { body, fields, problem: null, missing };
 }

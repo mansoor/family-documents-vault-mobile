@@ -2,6 +2,8 @@ import {
   categoryLabel,
   formatDate,
   parseDateInput,
+  SENSITIVE_FILTER_VALUES,
+  SENSITIVE_LABEL,
   shortTypeLabel,
   type DateValue,
   type DocumentTypeView,
@@ -68,6 +70,8 @@ export function FilterPanel(props: {
   nobody: boolean;
   /** The household's may be asked for (`household_owner`, 0.9.0-dev.32). */
   household?: boolean;
+  /** Sensitive or not may be asked for (`sensitive_documents`, 0.9.0-dev.34). */
+  sensitive?: boolean;
   today: string;
   /** How many the filters would give; null when the vault cannot say. */
   count: (f: Filters) => Promise<number | null>;
@@ -335,6 +339,21 @@ export function FilterPanel(props: {
             ))}
           </View>
         </Section>
+        {props.sensitive ? (
+          <Section title={SENSITIVE_LABEL} chosen={(draft.sensitive ?? []).length}>
+            <View style={styles.chips}>
+              {SENSITIVE_FILTER_VALUES.map((v) => (
+                <Chip
+                  key={v}
+                  label={v === 'yes' ? SENSITIVE_LABEL : t('filters.notSensitive')}
+                  selected={(draft.sensitive ?? []).includes(v)}
+                  onPress={() => set({ sensitive: toggle(draft.sensitive ?? [], v, several) })}
+                  testID={`filter-sensitive-${v}`}
+                />
+              ))}
+            </View>
+          </Section>
+        ) : null}
         {several ? null : (
           <Text variant="secondary" tone="soft" testID="filters-older">
             {t('filters.older')}

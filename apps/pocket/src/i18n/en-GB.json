@@ -987,7 +987,8 @@
     "chipDays_issued": "Issued {{from}} – {{to}}",
     "chipDays_expires": "Expires {{from}} – {{to}}",
     "tags": "Tags",
-    "essentials": "Essentials"
+    "essentials": "Essentials",
+    "notSensitive": "Not sensitive"
   },
   "tags": {
     "none": "No tags yet.",
@@ -1204,6 +1205,30 @@
     "signInHint": "A code by text after your password.",
     "reset": "When I set a new password",
     "resetHint": "A code by text as well as the emailed link."
+  },
+  "aiReader": {
+    "title": "Reading",
+    "heading": "The AI reader",
+    "reader": "Reader",
+    "kindModel": "{{kind}} · {{model}}",
+    "address": "Address",
+    "where": "Where it runs",
+    "ownNetwork": "On your own network",
+    "cloud": "A cloud service",
+    "whereUnknown": "Not known yet",
+    "status": "Working",
+    "status_ok": "Yes: its last test passed",
+    "status_untested": "Not tested yet: nothing is sent to it",
+    "status_failed": "No: nothing is sent to it",
+    "sensitive": "Sensitive papers",
+    "sensitiveSent": "Sent to it too",
+    "sensitiveNotSent": "Never sent to it",
+    "sensitiveHome": "Read on your own network",
+    "month": "This month",
+    "env": "Set by whoever runs this server.",
+    "none": "No AI reader is set up.",
+    "off": "Whoever runs this vault keeps the AI reader out of Settings.",
+    "onWeb": "Change these on the web."
   },
   "texts": {
     "title": "Texts",
