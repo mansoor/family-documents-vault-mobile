@@ -11,6 +11,8 @@ import {
   NOTE_KIND,
   parseDateInput,
   radii,
+  SENSITIVE_LABEL,
+  sensitiveOf,
   type DocumentTypeView,
   type DocumentView,
   type Member,
@@ -29,6 +31,7 @@ import {
   Eye,
   FilePlus,
   FileText,
+  Lock,
   NotebookText,
   Pencil,
   Trash2,
@@ -302,6 +305,9 @@ export function DocumentDetail(props: { id: string }) {
   const subline = [whose, note ? null : type?.label, t(`document.visibility_${shown.visibility}`)]
     .filter(Boolean)
     .join(' · ');
+  // Sensitive, all said (0.9.0-dev.34, AIR2): the vault's answer, else the one rule; a lock beside its status.
+  const sensitive =
+    caps?.features.sensitive_documents === true && (shown.sensitive_effective ?? sensitiveOf(shown, type));
   const ordered = [...versions].sort((x, y) => y.version_no - x.version_no);
   const first = ordered[ordered.length - 1];
   const thumb = api && token && latest && !note ? api.thumbnailUrl(latest.id) : null;
@@ -544,6 +550,19 @@ export function DocumentDetail(props: { id: string }) {
           ) : null}
           <View style={styles.pills}>
             <StatusLine status={shown.status} />
+            {sensitive ? (
+              <View
+                style={[styles.pill, styles.lockPill]}
+                testID="document-sensitive"
+                accessible
+                accessibilityLabel={SENSITIVE_LABEL}
+              >
+                <Lock color={colours.ink} size={12} accessibilityElementsHidden importantForAccessibility="no" />
+                <Text variant="small" weight="700">
+                  {SENSITIVE_LABEL}
+                </Text>
+              </View>
+            ) : null}
             {shown.is_essential && !note ? (
               <View style={styles.pill} testID="document-essential-pill">
                 <Text variant="small" tone="accent" weight="700">
@@ -1004,6 +1023,8 @@ const makeStyles = (colours: Palette) =>
       borderRadius: radii.pill,
       backgroundColor: colours.accentSoft,
     },
+    // A closed lock and the word, on the line's own colour: not the accent, which says Essential.
+    lockPill: { flexDirection: 'row', alignItems: 'center', gap: sp(4), backgroundColor: colours.border },
     card: {
       backgroundColor: colours.surface,
       borderRadius: radii.m,

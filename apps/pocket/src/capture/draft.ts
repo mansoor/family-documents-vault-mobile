@@ -32,6 +32,12 @@ export interface Draft {
    * Neither: Not sure yet.
    */
   household: boolean;
+  /**
+   * Sensitive, as the document itself says (a vault with
+   * `sensitive_documents`, 0.9.0-dev.34, AIR2): null as its kind says, true
+   * Yes, false No. Kept when the kind changes: "As its kind says" follows it.
+   */
+  sensitive: boolean | null;
   /** Null: the type's default, as the vault would choose it. */
   visibility: Visibility | null;
   /** Null: the type's usual. */
@@ -70,6 +76,8 @@ export interface Household {
   details: boolean;
   /** The vault keeps The household as whose a document is, and each kind's belongs_to. */
   householdOwner?: boolean;
+  /** The vault keeps Sensitive on each document, and each kind's default (`sensitive_documents`). */
+  sensitive?: boolean;
 }
 
 /** The household, as a value a chip can carry: never a person's id. */
@@ -85,6 +93,7 @@ export function newDraft(source: CaptureSource, me: Me): Draft {
     // A teen's scans are theirs; anyone else says whose it is.
     ownerId: me.role === 'teen' ? me.member_id : null,
     household: false,
+    sensitive: null,
     visibility: null,
     essential: null,
     title: '',
@@ -352,6 +361,8 @@ export function toMetadata(
   if (d.typeKey) m.type_key = d.typeKey;
   if (d.ownerId) m.owner_member_id = d.ownerId;
   else if (d.household && h.householdOwner) m.household_owned = true;
+  // Sensitive, only where the vault has it and only when said: left out, it is as its kind says.
+  if (h.sensitive && d.sensitive !== null) m.sensitive = d.sensitive;
   m.visibility = visibilityOf(d, h);
   m.is_essential = essentialOf(d, h);
   const title = text(d.title) ?? suggestedTitle(d, h);

@@ -6,6 +6,33 @@ app's own, tagged `vX.Y.Z` in this repository.
 
 ## [Unreleased]
 
+## [0.7.0] — Sensitive, and the AI reader in Settings
+
+AIR4, the phone's side of the vault's Sensitive flag (AIR2) and its AI
+readers (AIR1, AIR3), with a vault of 0.9.0-dev.37. Each part is offered
+only where the vault has it, so an older vault looks as before.
+
+### Added
+- **Sensitive** on the capture card and in Edit details: *As its kind
+  says* — with what that is now, yes or no, in the web's own words — **Yes**
+  or **No**, and what it means under it: handled with extra care, never
+  sent to a cloud AI reader. Left as its kind says, a document follows its
+  kind's default; Edit details sends the choice only when it was changed. A
+  teen may mark a paper sensitive, never not (No is offered to a teen only
+  where the document is so already), as on the web.
+- **A lock** on a sensitive document's page, beside its status: "Sensitive".
+- **Sensitive** among Documents' filters: Sensitive, Not sensitive, or
+  both, with its chip above the list.
+- **More → Settings → Reading**, for owners: the household's AI reader,
+  read only — its kind and model (never its key), its address as the host
+  alone, whether it runs on your own network or as a cloud service, whether
+  it is working, whether papers marked Sensitive are sent to it, and for a
+  cloud reader this month's count ("120 of 500 this month"). Changed on the
+  web, as the card says. Anybody else sees nothing of it.
+
+### Changed
+- Pinned to the vault of 0.9.0-dev.37.
+
 ## [0.6.1] — Cancel beside Save, and a clear button in search
 
 The owner's two fixes of 12 Nov 2026. Same vault as 0.6.0 (0.9.0-dev.33).
