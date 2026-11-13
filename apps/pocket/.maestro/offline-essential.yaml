@@ -3,7 +3,8 @@
 # capture flow. The workflow has made that flow's passport an Essential,
 # with its pages drawn (.github/scripts/essentials-seed.sh).
 #  - Keeping Essentials asks for the password once; then "1 on this phone".
-#  - Airplane mode, a cold start, unlock: the passport opens at page 1.
+#  - Airplane mode, a cold start, unlock: the passport opens at page 1, and
+#    a swipe left turns to page 2.
 appId: io.github.mansoor.familyvault.e2e
 env:
   VAULT: 10.0.2.2:8099
@@ -71,4 +72,14 @@ env:
     timeout: 15000
 - assertVisible:
     text: "Page 1 of .*"
+# A swipe left turns to the next page, as › does (0.7.1: on Gesture Handler;
+# the e2e scanner's passport has two pages). A pinch is not something Maestro does.
+- swipe:
+    from:
+      id: essential-image
+    direction: LEFT
+- extendedWaitUntil:
+    visible:
+      text: "Page 2 of .*"
+    timeout: 10000
 - setAirplaneMode: disabled

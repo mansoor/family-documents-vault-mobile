@@ -384,6 +384,7 @@
     "next": "Next page",
     "larger": "Larger",
     "smaller": "Smaller",
+    "fit": "Fit page",
     "pageAlt": "Page {{n}} of {{title}}",
     "untitled": "Untitled document",
     "count_one": "1 on this phone",
