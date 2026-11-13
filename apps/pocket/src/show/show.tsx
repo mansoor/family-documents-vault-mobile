@@ -3,26 +3,18 @@ import { Image } from 'expo-image';
 import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  AppState,
-  BackHandler,
-  PanResponder,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  useWindowDimensions,
-  View,
-} from 'react-native';
+import { AppState, BackHandler, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useEssentials, type OpenCopy } from '../state/essentials';
 import { useLock, useScreenGuard } from '../state/lock';
 import { Text } from '../ui';
+import { PageZoom } from '../ui/page-zoom';
+import { atOwnSize, MAX_ZOOM, MIN_ZOOM, stepZoom } from '../ui/zoom';
 import { brighten, restoreBrightness } from './brightness';
 import { takeForShow } from './handoff';
 import { defaultShowPlatform, type ShowPlatform } from './platform';
 import { sp } from '../ui/space';
 
-const ZOOMS = [1, 1.5, 2, 3];
 /** Showing ends by itself after this long: the phone may have been left with someone. */
 export const SHOW_FOR_MS = 10 * 60_000;
 /** The controls fade after this long (never while a screen reader is on); a tap brings them back. */
@@ -62,11 +54,11 @@ export function ShowMode(props: {
   const [copy, setCopy] = useState<OpenCopy | 'missing' | null>(null);
   const [n, setN] = useState(1);
   const [uri, setUri] = useState<string | null>(null);
-  const [zoom, setZoom] = useState(0);
+  const [zoom, setZoom] = useState<number>(MIN_ZOOM);
+  const [aspect, setAspect] = useState<number | undefined>(undefined);
   const [controls, setControls] = useState(true);
   const [touched, setTouched] = useState(0);
   const [reader, setReader] = useState(false);
-  const [stage, setStage] = useState<{ w: number; h: number } | null>(null);
   const opened = useRef(false);
   const left = useRef(false);
 
@@ -161,7 +153,10 @@ export function ShowMode(props: {
   const go = useCallback(
     (to: number) => {
       if (to < 1 || to > pages) return;
+      // Another page starts at its own size.
       setUri(null);
+      setAspect(undefined);
+      setZoom(MIN_ZOOM);
       setN(to);
     },
     [pages],
@@ -172,53 +167,11 @@ export function ShowMode(props: {
   };
 
   // A swipe across turns the page and down ends it — at its own size; made
-  // larger, one finger moves around the page instead. A pinch zooms.
-  const gesture = useRef({ n, go, leave, zoom, spread: 0 });
-  useEffect(() => {
-    gesture.current = { ...gesture.current, n, go, leave, zoom };
-  }, [n, go, leave, zoom]);
-  const responder = useMemo(
-    () =>
-      // The handlers read the ref on a touch, not while rendering; the
-      // compiler cannot see that from here.
-      // eslint-disable-next-line react-hooks/refs
-      PanResponder.create({
-        onMoveShouldSetPanResponder: (_evt, g) =>
-          g.numberActiveTouches > 1 || (gesture.current.zoom === 0 && (Math.abs(g.dx) > 20 || Math.abs(g.dy) > 20)),
-        onPanResponderGrant: () => {
-          gesture.current.spread = 0;
-        },
-        onPanResponderTerminate: () => {
-          gesture.current.spread = 0;
-        },
-        onPanResponderMove: (evt) => {
-          const touches = evt.nativeEvent.touches;
-          if (touches.length !== 2) return;
-          const [a, b] = touches;
-          const spread = Math.hypot((a?.pageX ?? 0) - (b?.pageX ?? 0), (a?.pageY ?? 0) - (b?.pageY ?? 0));
-          if (!gesture.current.spread) gesture.current.spread = spread;
-          else if (spread / gesture.current.spread > 1.3) {
-            gesture.current.spread = spread;
-            setZoom((z) => Math.min(ZOOMS.length - 1, z + 1));
-          } else if (spread / gesture.current.spread < 0.75) {
-            gesture.current.spread = spread;
-            setZoom((z) => Math.max(0, z - 1));
-          }
-        },
-        onPanResponderRelease: (_evt, g) => {
-          const pinched = gesture.current.spread > 0;
-          gesture.current.spread = 0;
-          if (pinched || gesture.current.zoom > 0) return;
-          if (g.dy > 120 && Math.abs(g.dx) < 60) gesture.current.leave();
-          else if (g.dx < -60) gesture.current.go(gesture.current.n + 1);
-          else if (g.dx > 60) gesture.current.go(gesture.current.n - 1);
-        },
-      }),
-    [],
-  );
+  // larger, one finger moves around the page instead. A pinch zooms, and a
+  // double tap (0.7.1: on Gesture Handler, as the Pages viewer).
+  const ownSize = atOwnSize(zoom);
 
   const title = copy && copy !== 'missing' ? (copy.document.title ?? '') : '';
-  const scale = ZOOMS[zoom] ?? 1;
   const problem =
     copy === 'missing'
       ? t('show.notKept')
@@ -235,7 +188,8 @@ export function ShowMode(props: {
       accessibilityIgnoresInvertColors
       accessibilityLabel={t('show.pageAlt', { n, title })}
       testID="show-image"
-      style={{ width: (stage?.w ?? width) * scale, height: (stage?.h ?? height) * scale }}
+      onLoad={(e) => setAspect(e.source.height > 0 ? e.source.width / e.source.height : undefined)}
+      style={styles.image}
     />
   ) : null;
   const top = shown ? (
@@ -268,15 +222,15 @@ export function ShowMode(props: {
       <ShowButton
         label="−"
         accessibilityLabel={t('show.smaller')}
-        disabled={zoom === 0}
-        onPress={() => setZoom((z) => Math.max(0, z - 1))}
+        disabled={ownSize}
+        onPress={() => setZoom((z) => stepZoom(z, -1))}
         testID="show-smaller"
       />
       <ShowButton
         label="+"
         accessibilityLabel={t('show.larger')}
-        disabled={zoom === ZOOMS.length - 1}
-        onPress={() => setZoom((z) => Math.min(ZOOMS.length - 1, z + 1))}
+        disabled={zoom >= MAX_ZOOM - 0.01}
+        onPress={() => setZoom((z) => stepZoom(z, 1))}
         testID="show-larger"
       />
       <ShowButton
@@ -296,26 +250,30 @@ export function ShowMode(props: {
         setControls(true);
         setTouched((x) => x + 1);
       }}
-      {...responder.panHandlers}
     >
       <StatusBar hidden style="light" />
       {reader ? top : null}
-      <View
-        style={styles.stage}
-        onLayout={(e) => setStage({ w: e.nativeEvent.layout.width - 32, h: e.nativeEvent.layout.height - 32 })}
-      >
+      <View style={styles.stage}>
         {problem ? (
           <Text style={styles.ink} testID="show-problem">
             {problem}
           </Text>
         ) : null}
-        {zoom > 0 && image ? (
-          // Larger than the screen: moved around with a finger.
-          <ScrollView horizontal contentContainerStyle={styles.center}>
-            <ScrollView contentContainerStyle={styles.center}>{image}</ScrollView>
-          </ScrollView>
-        ) : (
-          image
+        {problem ? null : (
+          <PageZoom
+            level={zoom}
+            onLevel={setZoom}
+            page={n}
+            canPrevious={n > 1}
+            canNext={n < pages}
+            onTurn={(d) => go(n + d)}
+            onSwipeDown={leave}
+            {...(aspect ? { aspect } : {})}
+            testID="show-zoom"
+            style={styles.zoom}
+          >
+            {image}
+          </PageZoom>
         )}
       </View>
       {reader ? bottom : null}
@@ -394,7 +352,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: sp(12),
   },
-  center: { alignItems: 'center', justifyContent: 'center' },
+  zoom: { alignSelf: 'stretch' },
+  image: { width: '100%', height: '100%' },
   button: {
     minHeight: 48,
     minWidth: 48,

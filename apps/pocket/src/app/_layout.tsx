@@ -9,6 +9,7 @@ import * as SystemUI from 'expo-system-ui';
 import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { extra, SPIKE } from '../config';
 import { LockGate } from '../lock/gate';
@@ -155,13 +156,19 @@ function ShowRecovery() {
   return null;
 }
 
+// Gesture Handler sees touches only under its root view (0.7.1: the pages'
+// swipe and pinch), so it holds everything.
 export default function RootLayout() {
   return (
-    <ThemeProvider>
-      <Root />
-    </ThemeProvider>
+    <GestureHandlerRootView style={fill.root}>
+      <ThemeProvider>
+        <Root />
+      </ThemeProvider>
+    </GestureHandlerRootView>
   );
 }
+
+const fill = StyleSheet.create({ root: { flex: 1 } });
 
 /**
  * The window behind every screen, and the bars the system draws over it,

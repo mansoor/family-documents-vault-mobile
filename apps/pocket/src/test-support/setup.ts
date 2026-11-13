@@ -144,3 +144,10 @@ jest.mock('expo-constants', () => {
   const { version } = jest.requireActual<{ version: string }>('../../package.json');
   return { ...actual, __esModule: true, default: { ...actual.default, expoConfig: { version, extra: {} } } };
 });
+
+// The pages' gestures (0.7.1): Gesture Handler's own stand-ins for its
+// native module, and Reanimated's and Worklets' mocks, which run worklets
+// and animations at once on the JS thread.
+jest.requireActual('react-native-gesture-handler/jestSetup');
+jest.mock('react-native-worklets', () => jest.requireActual('react-native-worklets/src/mock'));
+jest.mock('react-native-reanimated', () => jest.requireActual('react-native-reanimated/mock'));

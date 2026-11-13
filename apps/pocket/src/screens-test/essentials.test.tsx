@@ -1,7 +1,8 @@
 import type { FetchLike } from '@fdv/client';
 import type { DocumentView, OfflineItem } from '@fdv/shared';
 import { act, fireEvent, screen, waitFor } from '@testing-library/react-native';
-import { StyleSheet } from 'react-native';
+import { fireGestureHandler, getByGestureTestId } from 'react-native-gesture-handler/jest-utils';
+import { State } from 'react-native-gesture-handler';
 import { useEffect, useState } from 'react';
 import Home from '../app/(tabs)/index';
 import SignIn from '../app/sign-in';
@@ -138,6 +139,19 @@ async function keep(password = PASSWORD) {
   await fireEvent.press(await screen.findByTestId('essentials-keep'));
   await fireEvent.changeText(await screen.findByTestId('essentials-password-field'), password);
   await fireEvent.press(screen.getByTestId('essentials-password-go'));
+}
+
+/** The two-page passport kept, and opened in the viewer at page 1. */
+async function viewing() {
+  const t = testVault([ORIGIN]);
+  t.vault.state.offlineEssentials.items = [passport()];
+  await start(t);
+  await keep();
+  await screen.findByTestId('essential-passport');
+  await fireEvent.press(screen.getByLabelText('Open: Passport'));
+  await screen.findByTestId('essential-image');
+  expect(screen.getByTestId('essential-page')).toHaveTextContent('Page 1 of 2');
+  return t;
 }
 
 /** What pull-to-refresh does for the kept Essentials: a sync, now. */
@@ -373,17 +387,110 @@ describe('Essentials in airplane mode', () => {
     await fireEvent.press(screen.getByLabelText('Open: Passport'));
     await screen.findByTestId('essential-image');
     expect(audit()).toEqual([]);
-    // Pages by Previous and Next; size by Larger and Smaller — no swipe, no pinch.
-    const width = () => Number(StyleSheet.flatten(screen.getByTestId('essential-image').props.style).width);
-    const at = width();
+    // Pages by Previous and Next; size by Larger, Smaller and Fit page — no swipe, no pinch.
+    expect(screen.getByTestId('essential-smaller')).toBeDisabled();
+    expect(screen.getByTestId('essential-fit')).toBeDisabled();
+    expect(screen.getByLabelText('Fit page')).toBeTruthy();
     await fireEvent.press(screen.getByTestId('essential-larger'));
-    await waitFor(() => expect(width()).toBeGreaterThan(at));
+    await waitFor(() => expect(screen.getByTestId('essential-smaller')).toBeEnabled());
+    expect(audit()).toEqual([]);
     await fireEvent.press(screen.getByTestId('essential-smaller'));
-    await waitFor(() => expect(width()).toBe(at));
+    await waitFor(() => expect(screen.getByTestId('essential-smaller')).toBeDisabled());
+    // The page's own words for a screen reader, whatever its size.
+    expect(screen.getByLabelText('Page 1 of Passport')).toBeTruthy();
     await fireEvent.press(screen.getByTestId('essential-next'));
     await waitFor(() => expect(screen.getByTestId('essential-page')).toHaveTextContent('Page 2 of 2'));
     await fireEvent.press(screen.getByTestId('essential-previous'));
     await waitFor(() => expect(screen.getByTestId('essential-page')).toHaveTextContent('Page 1 of 2'));
+  });
+
+  it('the zoom steps 1×, 1.5×, 2×, 3×, 4×; Fit page and a new page go back to 1× (0.7.1)', async () => {
+    await viewing();
+    const larger = screen.getByTestId('essential-larger');
+    for (let i = 0; i < 4; i++) await fireEvent.press(larger);
+    await waitFor(() => expect(screen.getByTestId('essential-larger')).toBeDisabled());
+    expect(screen.getByTestId('essential-fit')).toBeEnabled();
+    await fireEvent.press(screen.getByTestId('essential-fit'));
+    await waitFor(() => expect(screen.getByTestId('essential-fit')).toBeDisabled());
+    expect(screen.getByTestId('essential-smaller')).toBeDisabled();
+    expect(screen.getByTestId('essential-larger')).toBeEnabled();
+
+    await fireEvent.press(screen.getByTestId('essential-larger'));
+    await waitFor(() => expect(screen.getByTestId('essential-fit')).toBeEnabled());
+    await fireEvent.press(screen.getByTestId('essential-next'));
+    await waitFor(() => expect(screen.getByTestId('essential-page')).toHaveTextContent('Page 2 of 2'));
+    expect(screen.getByTestId('essential-fit')).toBeDisabled();
+    expect(screen.getByTestId('essential-smaller')).toBeDisabled();
+  });
+
+  it('a swipe left turns to the next page and right to the previous; a short or upward one does not (0.7.1)', async () => {
+    await viewing();
+    const swipe = async (dx: number, dy = 0, vx = 0) =>
+      act(async () => {
+        fireGestureHandler(getByGestureTestId('essential-zoom-pan'), [
+          { state: State.BEGAN, translationX: 0, translationY: 0 },
+          { state: State.ACTIVE, translationX: dx / 2, translationY: dy / 2 },
+          { state: State.END, translationX: dx, translationY: dy, velocityX: vx },
+        ]);
+        await new Promise((r) => setTimeout(r, 0));
+      });
+    const page = () => screen.getByTestId('essential-page');
+    await swipe(-30);
+    expect(page()).toHaveTextContent('Page 1 of 2');
+    await swipe(-90, 120);
+    expect(page()).toHaveTextContent('Page 1 of 2');
+    // At the first page, a swipe right bounces.
+    await swipe(120);
+    expect(page()).toHaveTextContent('Page 1 of 2');
+    await swipe(-120);
+    await waitFor(() => expect(page()).toHaveTextContent('Page 2 of 2'));
+    // At the last, a swipe left bounces.
+    await swipe(-120);
+    expect(page()).toHaveTextContent('Page 2 of 2');
+    await swipe(120);
+    await waitFor(() => expect(page()).toHaveTextContent('Page 1 of 2'));
+  });
+
+  it('a pinch or a double tap makes it larger, and a pinch let go below 1× comes back to it (0.7.1)', async () => {
+    await viewing();
+    const fit = () => screen.getByTestId('essential-fit');
+    const pinch = async (scale: number) =>
+      act(async () => {
+        fireGestureHandler(getByGestureTestId('essential-zoom-pinch'), [
+          { state: State.BEGAN, scale: 1, focalX: 0, focalY: 0 },
+          { state: State.ACTIVE, scale: 1, focalX: 0, focalY: 0 },
+          { state: State.ACTIVE, scale, focalX: 0, focalY: 0 },
+          { state: State.END, scale, focalX: 0, focalY: 0 },
+        ]);
+        await new Promise((r) => setTimeout(r, 0));
+      });
+    await pinch(2);
+    await waitFor(() => expect(fit()).toBeEnabled());
+    await fireEvent.press(fit());
+    await waitFor(() => expect(fit()).toBeDisabled());
+    await pinch(0.5);
+    expect(fit()).toBeDisabled();
+    expect(screen.getByTestId('essential-smaller')).toBeDisabled();
+    // Past 4×, it settles at 4×: + has nowhere further to go.
+    await pinch(6);
+    await waitFor(() => expect(screen.getByTestId('essential-larger')).toBeDisabled());
+    await fireEvent.press(fit());
+    await waitFor(() => expect(fit()).toBeDisabled());
+
+    // A double tap: 2.5× there, and again back to 1×.
+    const doubleTap = async () =>
+      act(async () => {
+        fireGestureHandler(getByGestureTestId('essential-zoom-double-tap'), [
+          { state: State.BEGAN, x: 50, y: 50 },
+          { state: State.ACTIVE, x: 50, y: 50 },
+          { state: State.END, x: 50, y: 50 },
+        ]);
+        await new Promise((r) => setTimeout(r, 0));
+      });
+    await doubleTap();
+    await waitFor(() => expect(fit()).toBeEnabled());
+    await doubleTap();
+    await waitFor(() => expect(fit()).toBeDisabled());
   });
 
   it('somebody else signing in is offered afresh: the last person’s choice is not theirs, and no grant is taken', async () => {

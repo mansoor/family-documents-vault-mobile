@@ -1,7 +1,9 @@
 import type { DocumentView } from '@fdv/shared';
 import { act, fireEvent, screen, waitFor } from '@testing-library/react-native';
 import { useEffect, useState } from 'react';
-import { AppState, BackHandler, StyleSheet, type AppStateStatus } from 'react-native';
+import { AppState, BackHandler, type AppStateStatus } from 'react-native';
+import { State } from 'react-native-gesture-handler';
+import { fireGestureHandler, getByGestureTestId } from 'react-native-gesture-handler/jest-utils';
 import Home from '../app/(tabs)/index';
 import type { Tier } from '../essentials/open';
 import { MemoryEssentialsStore } from '../essentials/store';
@@ -282,15 +284,41 @@ describe('Show mode', () => {
     await waitFor(() => expect(screen.getByTestId('show-page')).toHaveTextContent('Page 2 of 2'));
     await fireEvent.press(screen.getByTestId('show-previous'));
     await waitFor(() => expect(screen.getByTestId('show-page')).toHaveTextContent('Page 1 of 2'));
-    const width = () => Number(StyleSheet.flatten(screen.getByTestId('show-image').props.style).width);
-    const at = width();
+    expect(screen.getByTestId('show-smaller')).toBeDisabled();
     await fireEvent.press(screen.getByTestId('show-larger'));
-    await waitFor(() => expect(width()).toBeGreaterThan(at));
+    await waitFor(() => expect(screen.getByTestId('show-smaller')).toBeEnabled());
     await fireEvent.press(screen.getByTestId('show-smaller'));
-    await waitFor(() => expect(width()).toBe(at));
+    await waitFor(() => expect(screen.getByTestId('show-smaller')).toBeDisabled());
+    // Larger, then another page: that one starts at its own size.
+    await fireEvent.press(screen.getByTestId('show-larger'));
+    await waitFor(() => expect(screen.getByTestId('show-smaller')).toBeEnabled());
+    await fireEvent.press(screen.getByTestId('show-next'));
+    await waitFor(() => expect(screen.getByTestId('show-page')).toHaveTextContent('Page 2 of 2'));
+    expect(screen.getByTestId('show-smaller')).toBeDisabled();
+    await fireEvent.press(screen.getByTestId('show-previous'));
     // Turned from however it is now: upright here, so sideways.
     await fireEvent.press(screen.getByTestId('show-rotate'));
     expect(fake.calls).toContain('turn landscape');
+  });
+
+  it('a swipe left turns the page, and a swipe down ends it at the lock screen (0.7.1)', async () => {
+    showing = { platform: fakePlatform().platform };
+    await phone();
+    await enterShow();
+    const swipe = async (dx: number, dy: number) =>
+      act(async () => {
+        fireGestureHandler(getByGestureTestId('show-zoom-pan'), [
+          { state: State.BEGAN, translationX: 0, translationY: 0 },
+          { state: State.ACTIVE, translationX: dx / 2, translationY: dy / 2 },
+          { state: State.END, translationX: dx, translationY: dy },
+        ]);
+        await new Promise((r) => setTimeout(r, 0));
+      });
+    await swipe(-120, 0);
+    await waitFor(() => expect(screen.getByTestId('show-page')).toHaveTextContent('Page 2 of 2'));
+    await swipe(0, 200);
+    expect(await screen.findByTestId('lock-screen')).toBeTruthy();
+    expect(screen.queryByTestId('show-screen')).toBeNull();
   });
 
   it('showing from the cache records an open', async () => {

@@ -6,6 +6,41 @@ app's own, tagged `vX.Y.Z` in this repository.
 
 ## [Unreleased]
 
+## [0.7.1] — pages turn with a swipe and zoom with your fingers
+
+The owner's report of 13 Nov 2026, on a real Android phone: in a
+document's Pages, and in Show mode, neither the swipe nor the pinch of
+0.5.11 did anything. Same vault as 0.7.0 (0.9.0-dev.37).
+
+### Fixed
+- **A sideways swipe turns the page** (left for the next, right for the
+  previous, as ‹ and › do), with the page following the finger a little.
+  At the first or last page it bounces back. A short drag, or one more up
+  and down than across, does not turn it. The swipe was handled by React
+  Native's PanResponder, around two scroll views and the picture, and on a
+  phone those kept the touches; the page now has Gesture Handler and
+  Reanimated, which the touches reach first, under a Gesture Handler root
+  around the whole app.
+- **Pinch to zoom, smoothly, under your fingers**: from the page's own
+  size up to 4×, about the point between your fingers. Let go below its
+  own size, it comes back to it; past 4×, back to 4×. Made larger, one
+  finger moves it about, no further than its edges. **A double tap** goes
+  to 2.5× where you tapped, and again back to the page's own size.
+- **Another page starts at its own size**, by a swipe or by ‹ ›.
+- **Show mode** has the same: a swipe across turns the page, a swipe down
+  still ends it, and a pinch, a finger and a double tap work as in Pages.
+
+### Added
+- **Fit page**, between ‹ › and − +: back to the whole page, in the middle,
+  in one tap. Named "Fit page" for a screen reader, 48 points square, and
+  greyed out at the page's own size.
+
+### Changed
+- **− and +** step 1×, 1.5×, 2×, 3× and 4× (3× was the most before), from
+  wherever your fingers left it. They and ‹ › are still there for anyone who
+  would rather not swipe or pinch, and a screen reader reads each page as
+  before.
+
 ## [0.7.0] — Sensitive, and the AI reader in Settings
 
 AIR4, the phone's side of the vault's Sensitive flag (AIR2) and its AI
