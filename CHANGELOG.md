@@ -6,6 +6,50 @@ app's own, tagged `vX.Y.Z` in this repository.
 
 ## [Unreleased]
 
+## [0.8.0] — Fill a collection from a checklist
+
+What the family asked for after the app's demo: the web's **Fill from a
+checklist** (the vault's C1), on the phone, where it is handiest on the
+go. Offered only where the vault has it (`collection_checklist`), to an
+owner, an adult or a teen, so an older vault looks as before.
+
+### Added
+- **Fill from a checklist** on a collection's page, beside Add documents,
+  for the person who made the collection. Paste or type the list you were
+  given — one thing a line, "Documents for Mansoor" as a heading — and
+  **Read the list**: the vault reads it with plain rules and says back
+  what it understood of each line, how it stands (Found 1 of 2, Missing,
+  Choose which, Not understood) and the documents it found, ticked, with
+  their title, date and whose. Tick or untick any of them.
+- **A line it could not read is opened** to choose its kind, whose it is
+  and how many (each from a list), or to skip it; it is looked for again
+  at once. Any other line has **Change**.
+- **Add 2 found** at the foot, beside Cancel, asks first — "Add 2
+  documents to “Mortgage”?", saying so too for a collection shared outside
+  the family — then adds them in one go and keeps the list on the
+  collection; or **Keep the list without adding**. With nothing ticked it
+  is **Keep the list**. Leaving with something changed asks first.
+- **Add it** beside a missing paper: a file or a picture (or the camera,
+  on a phone with the scanner), through the usual card. Once it has gone
+  to the vault, the checklist looks again and finds it.
+- **The checklist kept on a collection** is one line on its page —
+  "Checklist · 2 of 4 found · 1 new match" — which opens its lines; the
+  family who see the collection can read it. Its maker goes on to
+  **Review and add** or **Change the checklist**, or **Clear the
+  checklist**, asked first (the collection's documents stay in it).
+- What the vault says when it can't — only the collection's maker may fill
+  it; the list could not be read just now — is said in its own words.
+
+### Changed
+- Re-pinned to the vault's **v0.9.0-dev.38** (neutral wording in
+  notifications and email, H2, which changes nothing on the phone).
+
+### Changed
+- **Undo after hiding a Home alert lasts a minute.** It counts down
+  ("Undo (45s)") and then the line goes; it no longer stays until the app
+  is closed. A hidden alert is still under the bell. Screen readers hear
+  the line once, not every second.
+
 ## [0.7.1] — pages turn with a swipe and zoom with your fingers
 
 The owner's report of 13 Nov 2026, on a real Android phone: in a

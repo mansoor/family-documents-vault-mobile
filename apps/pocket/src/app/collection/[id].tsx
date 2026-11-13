@@ -1,11 +1,19 @@
 import { ApiRequestError } from '@fdv/client';
-import { can, documentName, sharedOutsideWords, type CollectionDetail, type CollectionItemView } from '@fdv/shared';
+import {
+  can,
+  documentName,
+  sharedOutsideWords,
+  type CollectionChecklist,
+  type CollectionDetail,
+  type CollectionItemView,
+} from '@fdv/shared';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { Ellipsis, Info, Pencil, Share2, Trash2 } from 'lucide-react-native';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, View } from 'react-native';
 import { AddDocuments } from '../../collections/add';
+import { checklistOffered, ChecklistPanel, keptChecklist, takeChecklistDone } from '../../collections/checklist';
 import { CollectionForm } from '../../collections/collection-form';
 import { ConfirmSheet } from '../../ui/confirm';
 import { MenuRow } from '../../ui/menu-row';
@@ -31,6 +39,11 @@ import { useColours, useStyles, type Palette } from '../../ui/theme';
  * Its maker changes its name, words and audience with the pencil in the
  * header, and deletes it with the bin there, asked first (the gaps review,
  * 11 Nov 2026): its documents stay where they are.
+ *
+ * Where the vault has it (app 0.8.0, the vault's C1), its maker fills it
+ * from a checklist — Fill from a checklist, beside Add documents — and a
+ * checklist kept on it is one line under them, saying how it stands, for
+ * the family who see it.
  */
 export default function CollectionScreen() {
   const styles = useStyles(makeStyles);
@@ -56,6 +69,9 @@ export default function CollectionScreen() {
   const [said, setSaid] = useState<{ tone: 'ok' | 'warn'; text: string } | null>(null);
   // Which asking is current: an answer to an older one is let go.
   const asking = useRef(0);
+  // The checklist kept on it (app 0.8.0), where the vault has them.
+  const checklistOn = checklistOffered(caps, who?.role);
+  const [checklist, setChecklist] = useState<CollectionChecklist | null>(null);
 
   const first = (d: CollectionDetail) => {
     setDetail(d);
@@ -89,6 +105,36 @@ export default function CollectionScreen() {
   }, [load, offline]);
   // A document changed or moved to the Trash on its page: the first page again.
   useEffect(() => on('documentChanged', () => void load()), [load]);
+
+  /** The checklist kept on it, matched again now; none said if it can't be read (Fill from a checklist says why). */
+  const loadChecklist = useCallback(async () => {
+    if (!checklistOn) return;
+    try {
+      setChecklist(await withToken((a, tk) => a.collectionChecklist(tk, id)));
+    } catch {
+      setChecklist(null);
+    }
+  }, [checklistOn, withToken, id]);
+  useEffect(() => {
+    // Set once the vault answers.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void loadChecklist();
+  }, [loadChecklist, offline]);
+  // Filled from its checklist, kept or cleared: the page again, and what was done said.
+  useEffect(() => {
+    const said = () => {
+      const words = takeChecklistDone(id);
+      if (words) setSaid({ tone: 'ok', text: words });
+    };
+    // Back from the checklist's screen after this page was let go.
+    said();
+    return on('checklistChanged', (changed) => {
+      if (changed !== id) return;
+      said();
+      void load();
+      void loadChecklist();
+    });
+  }, [id, load, loadChecklist]);
 
   /** The next 50; a page whose place has gone (422) starts again from the top. */
   const loadMore = async () => {
@@ -166,6 +212,13 @@ export default function CollectionScreen() {
   }
 
   const audience = t(audienceKey(detail.audience));
+  const kept = checklistOn ? keptChecklist(checklist) : null;
+  // Filled from a checklist by its maker, online.
+  const mayFill = mayChange && checklistOn && !offline;
+  const fill = () => {
+    setSaid(null);
+    router.push({ pathname: '/checklist/[id]', params: { id: detail.id } });
+  };
   return (
     <FlatList
       testID="collection"
@@ -180,7 +233,7 @@ export default function CollectionScreen() {
           refreshing={refreshing}
           onRefresh={() => {
             setRefreshing(true);
-            void load().finally(() => setRefreshing(false));
+            void Promise.all([load(), loadChecklist()]).finally(() => setRefreshing(false));
           }}
         />
       }
@@ -309,14 +362,32 @@ export default function CollectionScreen() {
           ) : null}
           {failed ? <LoadFailed words={failed} onRetry={() => void load()} /> : null}
           {mayChange && !offline ? (
-            <Button
-              testID="collection-add"
-              kind="quiet"
-              label={t('collection.add')}
-              onPress={() => {
-                setSaid(null);
-                setAdding(true);
-              }}
+            <View style={styles.actions}>
+              <View style={styles.flex}>
+                <Button
+                  testID="collection-add"
+                  kind="quiet"
+                  label={t('collection.add')}
+                  onPress={() => {
+                    setSaid(null);
+                    setAdding(true);
+                  }}
+                />
+              </View>
+              {mayFill && !kept ? (
+                <View style={styles.flex}>
+                  <Button testID="collection-checklist-fill" kind="quiet" label={t('checklist.fill')} onPress={fill} />
+                </View>
+              ) : null}
+            </View>
+          ) : null}
+          {kept ? (
+            <ChecklistPanel
+              collection={detail}
+              kept={kept}
+              mayFill={mayFill && kept.mine}
+              onFill={fill}
+              onCleared={() => setSaid({ tone: 'ok', text: t('checklist.cleared', { name: detail.name }) })}
             />
           ) : null}
           {items.length === 0 && !more ? (
@@ -384,5 +455,6 @@ const makeStyles = (colours: Palette) =>
     header: { gap: sp(12), marginBottom: sp(10) },
     menu: { gap: sp(10) },
     lineRow: { flexDirection: 'row', alignItems: 'center', gap: sp(4) },
+    actions: { flexDirection: 'row', gap: sp(10) },
     flex: { flex: 1 },
   });

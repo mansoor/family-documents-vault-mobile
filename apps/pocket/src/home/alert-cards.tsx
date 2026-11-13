@@ -14,12 +14,14 @@ import { HIDE_CHOICES, hide, prune, readHidden, shows, unhide, writeHidden, type
 
 /** How many alerts Home shows before "and N more", which the bell holds. */
 const SHOWN = 3;
+/** How long Undo stays after an alert is hidden (the owner's ask of 13 Nov 2026); the bell still has it. */
+export const UNDO_SECONDS = 60;
 
 /**
  * Home's alerts (R4): each a card that says what needs doing and does it —
  * Open, Scan the new one, Name them, Open your Inbox — and a ✕ that hides
  * it on this phone for a day, a week, 30 days or until it changes, with
- * Undo for a moment after. Three at most; the rest are behind the bell.
+ * Undo for a minute after, counting down, then gone (the bell still holds it). Three at most; the rest are behind the bell.
  * With none, nothing is said: Home has no "nothing to do".
  */
 export function AlertCards(props: {
@@ -35,7 +37,20 @@ export function AlertCards(props: {
   const router = useRouter();
   const [hidden, setHidden] = useState(() => readHidden(props.who));
   const [hiding, setHiding] = useState<HomeAlert | null>(null);
-  const [undo, setUndo] = useState<{ alert: HomeAlert; by: HideFor } | null>(null);
+  const [undo, setUndo] = useState<{ alert: HomeAlert; by: HideFor; until: number } | null>(null);
+  // Seconds left to undo, counted down once a second; at none, the line goes.
+  const [left, setLeft] = useState(UNDO_SECONDS);
+  useEffect(() => {
+    if (!undo) return;
+    const tick = () => {
+      const s = Math.max(0, Math.ceil((undo.until - Date.now()) / 1000));
+      setLeft(s);
+      if (s === 0) setUndo(null);
+    };
+    tick();
+    const timer = setInterval(tick, 1000);
+    return () => clearInterval(timer);
+  }, [undo]);
   // The time, taken again each time the alerts are: a day's hiding ends with it.
   const [now, setNow] = useState(() => Date.now());
 
@@ -56,7 +71,7 @@ export function AlertCards(props: {
     const next = hide(hidden, alert, by, Date.now());
     setHidden(next);
     writeHidden(who, next);
-    setUndo({ alert, by });
+    setUndo({ alert, by, until: Date.now() + UNDO_SECONDS * 1000 });
   };
   const putBack = () => {
     if (!undo) return;
@@ -94,20 +109,23 @@ export function AlertCards(props: {
         </Pressable>
       ) : null}
       {undo ? (
-        <View style={styles.undo} testID="home-alert-hidden" accessibilityLiveRegion="polite">
-          <Text variant="secondary" tone="soft" style={styles.flex}>
-            {t('alerts.hidden', { when: t(`alerts.back_${undo.by}`) })}
-          </Text>
+        <View style={styles.undo} testID="home-alert-hidden">
+          {/* Only the words are announced, once: not the countdown each second. */}
+          <View style={styles.flex} accessibilityLiveRegion="polite">
+            <Text variant="secondary" tone="soft">
+              {t('alerts.hidden', { when: t(`alerts.back_${undo.by}`) })}
+            </Text>
+          </View>
           <Pressable
             testID="home-alert-undo"
             accessibilityRole="button"
-            accessibilityLabel={t('alerts.undo')}
+            accessibilityLabel={t('alerts.undoLeft', { count: left })}
             hitSlop={8}
             onPress={putBack}
             style={({ pressed }) => [styles.undoButton, pressed ? styles.pressed : null]}
           >
-            <Text variant="secondary" weight="700" tone="accent">
-              {t('alerts.undo')}
+            <Text variant="secondary" weight="700" tone="accent" testID="home-alert-undo-label">
+              {t('alerts.undoFor', { count: left })}
             </Text>
           </Pressable>
         </View>

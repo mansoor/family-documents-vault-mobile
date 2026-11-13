@@ -105,6 +105,7 @@ function Gates() {
         <Stack.Screen name="trash" options={{ title: t('trashList.title') }} />
         <Stack.Screen name="sharing" options={{ title: t('sharing.title') }} />
         <Stack.Screen name="collection/[id]" options={{ title: '', headerBackVisible: true }} />
+        <Stack.Screen name="checklist/[id]" options={{ title: '', headerShown: false }} />
         <Stack.Screen name="new-note" options={{ title: '', headerShown: false }} />
         <Stack.Screen name="person/[id]" options={{ title: '' }} />
         <Stack.Screen name="attention" options={{ title: t('attention.title') }} />
