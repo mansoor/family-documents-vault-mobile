@@ -208,10 +208,19 @@ export function AddMenu(props: {
   const [shown, setShown] = useState(false);
   if (props.visible && !shown) setShown(true);
   if (!props.visible && shown && still) setShown(false);
+  // How it moves is settled as it opens, and again as it closes: told to
+  // stand still while open, it finishes as it began. Stopping a spring
+  // mid-way and setting its end at once left the choices drawn but unseen
+  // on a busy emulator (the Maestro run of 14 Nov 2026).
+  const stillNow = useRef(still);
+  useEffect(() => {
+    stillNow.current = still;
+  }, [still]);
 
   useEffect(() => {
+    const calm = stillNow.current;
     if (props.visible) {
-      if (still) {
+      if (calm) {
         progress.setValue(1);
         return;
       }
@@ -220,7 +229,7 @@ export function AddMenu(props: {
       a.start();
       return () => a.stop();
     }
-    if (still) {
+    if (calm) {
       progress.setValue(0);
       return;
     }
@@ -234,7 +243,7 @@ export function AddMenu(props: {
       if (finished) setShown(false);
     });
     return () => a.stop();
-  }, [props.visible, still, progress]);
+  }, [props.visible, progress]);
 
   const camera: Choice = {
     how: 'scan',

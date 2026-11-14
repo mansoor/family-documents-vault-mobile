@@ -6,6 +6,21 @@ app's own, tagged `vX.Y.Z` in this repository.
 
 ## [Unreleased]
 
+## [0.10.1] — the + and a cold start, steady on a busy phone
+
+Two faults that made the Maestro run fail now and then, on changes that had
+nothing to do with them. Both could happen on a phone too.
+
+### Fixed
+- **The +'s choices could open unseen.** With Remove animations on, a +
+  opened before it had heard the phone's setting started to fan out, was
+  then told to stand still, and was left with File, Camera and Picture
+  there but invisible. Each part now starts from what the phone last said,
+  and the + keeps the way it opened until it closes.
+- **A rare crash on opening, on Android 14 and later.** The system's
+  memory sampling (GWP-ASan) could walk off the end of Hermes's own stack
+  as it noted where memory was freed. The app now opts out of it.
+
 ## [0.10.0] — Collection managers
 
 The vault's **collection managers** (0.9.0-dev.40) on the phone: the person
