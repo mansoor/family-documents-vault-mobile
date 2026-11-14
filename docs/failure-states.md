@@ -60,6 +60,8 @@ Written by `node apps/pocket/scripts/failure-states.mjs`; CI fails if it is out 
 |  |  | `errors.alreadyDecided` | It's already been dealt with in your Inbox. |
 |  |  | `errors.changedElsewhere` | This was changed somewhere else, so nothing was saved. Look at it again, then try again. |
 |  |  | `errors.linksChoice` | You have share links to this document. Say whether they end or keep working, then try again. |
+|  |  | `errors.sensitiveConfirm` | This is sensitive, so nothing was shared. Say you mean to share it, then try again. |
+|  |  | `errors.sensitiveStillShared` | This paper is sensitive and still shared outside the family. See More → Sharing to keep or end its links. |
 |  |  | `errors.general` | That didn't work. Try again in a moment. |
 | The lock | Lock screen, Settings | `lock.tooMany` | Too many tries. Unlock with your phone's PIN or pattern instead. |
 |  |  | `lock.noScreenLock` | To lock the app and keep documents on this phone, set a screen lock in your phone's settings first. Everything else works as it is. |
