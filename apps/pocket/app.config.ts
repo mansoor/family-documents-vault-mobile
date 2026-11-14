@@ -41,7 +41,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     name,
     slug: 'family-vault',
     scheme: variant === 'release' ? 'familyvault' : `familyvault-${variant}`,
-    version: '0.10.0',
+    version: '0.10.1',
     orientation: 'portrait',
     icon: './assets/icon.png',
     // Light or dark, as the phone is set (P4); Settings can fix it to one.
@@ -122,6 +122,8 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       'expo-status-bar',
       './plugins/with-network-security.js',
       './plugins/with-data-extraction.js',
+      // No GWP-ASan sampling: its stack walk crashed Hermes at a cold start (13 Nov 2026).
+      './plugins/with-gwp-asan.js',
     ],
     experiments: { typedRoutes: true },
     extra: {
