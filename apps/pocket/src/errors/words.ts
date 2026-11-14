@@ -63,6 +63,12 @@ export const CATALOGUE: Readonly<Record<string, string>> = {
   renewal_not_undoable: 'renewal.notUndoable',
   // Into Only me with share links of the person's own (P8): Who can see it asks what becomes of them.
   links_choice_needed: 'errors.linksChoice',
+  // Email the link (0.9.0-dev.39) and Show the link: the vault's own words when it gives them.
+  email_link_limit: 'share.emailLimit',
+  email_link_unavailable: 'share.emailUnavailable',
+  share_paused: 'share.linkPaused',
+  share_ended: 'share.linkEnded',
+  share_not_revealable: 'share.notRevealable',
 };
 
 /** The vault's "not now" answers: a scan waiting on one of these is sent again later by itself. */
@@ -93,19 +99,26 @@ const VAULT_SAYS: ReadonlySet<string> = new Set([
   'not_found',
   'two_step_required',
   'totp_required_for_owner',
+  // How many a link, or a person, may email in a day — and when — only the vault knows.
+  'email_link_limit',
+  'email_link_unavailable',
+  'share_paused',
+  'share_ended',
+  'share_not_revealable',
 ]);
 
 /** The words for a failure, as the person should read them. */
 export function wordsFor(err: unknown, t: TFunction, general = 'errors.general'): string {
   if (err instanceof NetworkError) return t(CATALOGUE[err.kind] ?? CATALOGUE.offline ?? general);
   if (err instanceof ApiRequestError) {
+    // The vault's own words first, where only it knows them — its limits among them.
+    if (VAULT_SAYS.has(err.code) && err.message) return err.message;
     // Too many tries, however the vault's limiter phrased it: when to try again.
     if (err.status === 429 || err.code === 'rate_limited') {
       const minutes = Math.max(1, Math.ceil((err.retryAfterSeconds ?? 60) / 60));
       return t('errors.rateLimited', { count: minutes });
     }
     const key = CATALOGUE[err.code];
-    if (key && VAULT_SAYS.has(err.code) && err.message) return err.message;
     if (key) return t(key);
     return err.message || t(general);
   }

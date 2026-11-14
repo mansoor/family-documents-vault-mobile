@@ -192,6 +192,15 @@ export interface Library {
   onlyMeShareable: boolean | null;
   /** What a collection's share sheet offers (GET /collections/{id}/share-preview), by collection. */
   sharePreviews: Map<string, CollectionSharePreview>;
+  /**
+   * Email the link (0.9.0-dev.39): whether the vault can email links (a link
+   * made here is then `emailable`), each one emailed, whether it asks to
+   * confirm it is them first (past 15 minutes), and a refusal to give instead.
+   */
+  emailLinks: boolean;
+  emailed: { id: string; to: string; message?: string }[];
+  emailStepUp: boolean;
+  emailRefusal: { status: number; code: string; message: string; retryAfter?: number } | null;
 }
 
 const JPEG = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x02, 0xff, 0xd9]);
@@ -271,6 +280,10 @@ export function testVault(origins: string[] = ['https://vault.test']): TestVault
       shareSecrets: new Map(),
       onlyMeShareable: null,
       sharePreviews: new Map(),
+      emailLinks: false,
+      emailed: [],
+      emailStepUp: false,
+      emailRefusal: null,
     },
     fetch: async (url, init) => {
       t.calls.push(`${init.method} ${url}`);
@@ -329,12 +342,18 @@ async function captured(
 
 type Reply = Awaited<ReturnType<FetchLike>>;
 
-function failure(status: number, code: string, message: string, action?: string): Reply {
+function failure(status: number, code: string, message: string, action?: string, retryAfter?: number): Reply {
   const body = { error: { code, message, ...(action ? { action } : {}) } };
+  const header = (h: string) =>
+    h.toLowerCase() === 'content-type'
+      ? 'application/json'
+      : h.toLowerCase() === 'retry-after' && retryAfter !== undefined
+        ? String(retryAfter)
+        : null;
   return {
     ok: false,
     status,
-    headers: { get: (h: string) => (h.toLowerCase() === 'content-type' ? 'application/json' : null) },
+    headers: { get: header },
     json: async () => body,
     text: async () => JSON.stringify(body),
     arrayBuffer: async () => new TextEncoder().encode(JSON.stringify(body)).buffer,
@@ -536,6 +555,8 @@ async function library(t: TestVault, path: string, init: Parameters<FetchLike>[1
       max_opens: (body.max_opens as number | undefined) ?? null,
       summary: 'A link',
       revealable: true,
+      emailable: lib.emailLinks,
+      emailed_to: null,
     } as Share;
     lib.shares.push(share);
     lib.shareSecrets.set(share.id, {
@@ -561,6 +582,27 @@ async function library(t: TestVault, path: string, init: Parameters<FetchLike>[1
     if (!kept) return failure(409, 'share_not_revealable', 'This link was shown once, as it was made.');
     if (!lib.verified) return failure(403, 'step_up_required', 'Please confirm it is you to see this link again.', 'reveal_share');
     return json(kept);
+  }
+  // A link emailed by the vault to whom its maker typed (0.9.0-dev.39).
+  m = /^\/api\/v1\/shares\/([^/]+)\/email$/.exec(q);
+  if (m?.[1] && init.method === 'POST') {
+    const id = m[1];
+    const share = lib.shares.find((x) => x.id === id);
+    if (!share?.emailable) return failure(404, 'not_found', 'There is no such link.');
+    const r = lib.emailRefusal;
+    if (r) return failure(r.status, r.code, r.message, undefined, r.retryAfter);
+    if (lib.emailStepUp && !lib.verified) {
+      return failure(403, 'step_up_required', 'Please confirm it is you to email this link.', 'email_share');
+    }
+    const to = String(body.to);
+    lib.emailed.push({ id, to, ...(typeof body.message === 'string' ? { message: body.message } : {}) });
+    const masked = `${to.slice(0, 1)}•••${to.slice(to.lastIndexOf('@'))}`;
+    share.emailed_to = masked;
+    return json({
+      sent_to: masked,
+      sent_at: new Date().toISOString(),
+      sends_left: 3 - lib.emailed.filter((e) => e.id === id).length,
+    });
   }
   m = /^\/api\/v1\/shares\/([^/]+)$/.exec(q);
   if (m?.[1] && init.method === 'DELETE') {

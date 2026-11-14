@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FlatList, RefreshControl, ScrollView, Share as SystemShare, StyleSheet, View } from 'react-native';
 import { copyForAMinute, nativeClipboard } from '../identity/clipboard';
+import { EmailTheLink } from '../sharing/email-link';
 import { Sheet } from '../ui/sheet';
 import { wordsFor } from '../errors/words';
 import { emit, on } from '../state/events';
@@ -31,6 +32,7 @@ const LISTED: readonly Share['state'][] = ['active', 'used_up', 'paused'];
  * 0.9.0-dev.30): a link the person made since then, and its PIN or the
  * password the vault made up, shown again after confirming it is them —
  * to send it again, or copy it. Links made before are shown once only.
+ * Email the link (0.9.0) beside them, where the vault can send it.
  */
 export default function SharingScreen() {
   const styles = useStyles(makeStyles);
@@ -248,7 +250,7 @@ export default function SharingScreen() {
   );
 }
 
-/** A link shown again, with its PIN or password: Send, Copy, and gone when closed. */
+/** A link shown again, with its PIN or password: Send, Copy, Email where it can, and gone when closed. */
 function ShownLink(props: {
   share: Share;
   revealed: RevealedShare;
@@ -268,8 +270,8 @@ function ShownLink(props: {
     if (clipboard && copyForAMinute(clipboard, text)) props.onCopied(what);
   };
   return (
-    <Sheet visible onClose={props.onClose} testID="sharing-shown" tall>
-      <ScrollView contentContainerStyle={styles.shown}>
+    <Sheet visible onClose={props.onClose} testID="sharing-shown" keyboard tall>
+      <ScrollView contentContainerStyle={styles.shown} keyboardShouldPersistTaps="handled">
         <Text variant="screen">{t('sharing.shownTitle', { what: props.what })}</Text>
         {props.share.recipient_label ? (
           <Text variant="secondary" tone="soft">
@@ -310,6 +312,7 @@ function ShownLink(props: {
             testID="sharing-shown-copy-secret"
           />
         ) : null}
+        <EmailTheLink share={props.share} testID="sharing-shown-email" />
         <Button kind="quiet" label={t('share.done')} onPress={props.onClose} testID="sharing-shown-done" />
       </ScrollView>
     </Sheet>
