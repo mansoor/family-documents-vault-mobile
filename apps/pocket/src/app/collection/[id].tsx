@@ -15,12 +15,13 @@ import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, View } from 'r
 import { AddDocuments } from '../../collections/add';
 import { checklistOffered, ChecklistPanel, keptChecklist, takeChecklistDone } from '../../collections/checklist';
 import { CollectionForm } from '../../collections/collection-form';
+import { ManagersRow } from '../../collections/managers';
 import { ConfirmSheet } from '../../ui/confirm';
 import { MenuRow } from '../../ui/menu-row';
 import { Sheet } from '../../ui/sheet';
 import { IconButton } from '../../ui/icon-button';
 import { ShareSheet } from '../../sharing/share-sheet';
-import { audienceKey, mayChangeCollection } from '../../collections/rules';
+import { audienceKey, managersShown, powersFor } from '../../collections/rules';
 import { DocumentRow, rowPlace } from '../../documents/row';
 import { wordsFor } from '../../errors/words';
 import { emit, on } from '../../state/events';
@@ -44,6 +45,13 @@ import { useColours, useStyles, type Palette } from '../../ui/theme';
  * from a checklist — Fill from a checklist, beside Add documents — and a
  * checklist kept on it is one line under them, saying how it stands, for
  * the family who see it.
+ *
+ * Where the vault has collection managers (app 0.10.0), each of these is
+ * offered by what the vault says the person may do (`my_powers`): its maker,
+ * or someone they chose to manage it. Who it is for is changed only by whoever
+ * may; Delete only by whoever may delete it. Managers, one row under the
+ * actions, opens who manages it and what each may do. An older vault keeps
+ * the maker-only rules.
  */
 export default function CollectionScreen() {
   const styles = useStyles(makeStyles);
@@ -120,6 +128,8 @@ export default function CollectionScreen() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadChecklist();
   }, [loadChecklist, offline]);
+  // Its managers changed on their screen (0.10.0): what the person may do may have too.
+  useEffect(() => on('managersChanged', (changed) => changed === id && void load()), [id, load]);
   // Filled from its checklist, kept or cleared: the page again, and what was done said.
   useEffect(() => {
     const said = () => {
@@ -156,9 +166,11 @@ export default function CollectionScreen() {
     }
   };
 
-  const mayChange = !!detail && mayChangeCollection(who?.role, detail);
-  // Deleted by its maker, whatever their role now.
-  const mayDelete = !!detail && detail.mine;
+  // What the person may do with it (0.10.0): the vault's word, or its maker's alone from an older one.
+  const powers = detail ? powersFor(caps, who?.role, detail) : null;
+  const mayChange = powers?.edit === true;
+  // Deleted by whoever may: its maker, whatever their role now, or a manager let to.
+  const mayDelete = powers?.delete === true;
   // Shared outside the family (5.19), by an owner or an adult, never an Only me collection.
   const mayShare =
     !!detail && !!who && can(who.role, 'document.share') && caps?.features.collection_shares === true && detail.audience !== 'only_me';
@@ -311,6 +323,8 @@ export default function CollectionScreen() {
           {editing ? (
             <CollectionForm
               editing={detail}
+              audienceFixed={!powers?.change_audience}
+              noOnlyMe={!powers?.maker}
               onClose={() => setEditing(false)}
               onSaved={(d) => {
                 setEditing(false);
@@ -355,6 +369,11 @@ export default function CollectionScreen() {
               {sharedOutsideWords(detail.shared_outside, who?.role ?? null)}
             </Notice>
           ) : null}
+          {powers?.manager ? (
+            <Text variant="secondary" tone="soft" testID="collection-manager-note">
+              {t('managers.youManage')}
+            </Text>
+          ) : null}
           {said ? (
             <Notice tone={said.tone} testID="collection-said">
               {said.text}
@@ -388,6 +407,15 @@ export default function CollectionScreen() {
               mayFill={mayFill && kept.mine}
               onFill={fill}
               onCleared={() => setSaid({ tone: 'ok', text: t('checklist.cleared', { name: detail.name }) })}
+            />
+          ) : null}
+          {managersShown(caps, who?.role, detail) && !offline ? (
+            <ManagersRow
+              managers={detail.managers ?? []}
+              onPress={() => {
+                setSaid(null);
+                router.push({ pathname: '/managers/[id]', params: { id: detail.id, name: detail.name } });
+              }}
             />
           ) : null}
           {items.length === 0 && !more ? (

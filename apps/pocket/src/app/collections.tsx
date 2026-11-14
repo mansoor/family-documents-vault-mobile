@@ -129,7 +129,7 @@ function CollectionRow(props: { collection: CollectionView; onPress: () => void 
   const line = [
     t('collections.documents', { count: c.item_count }),
     t(audienceKey(c.audience)),
-    ...(c.mine ? [t('collections.yours')] : []),
+    ...(c.mine ? [t('collections.yours')] : c.my_powers?.manager ? [t('collections.youManage')] : []),
   ].join(' · ');
   const shared = c.shared_outside ? t('collections.sharedOutside') : null;
   return (
