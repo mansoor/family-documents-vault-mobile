@@ -6,6 +6,12 @@ app's own, tagged `vX.Y.Z` in this repository.
 
 ## [Unreleased]
 
+## [0.8.1] — shorter words after hiding an alert
+
+### Changed
+- After hiding a Home alert, the line says only "Hidden. It comes back in a
+  week." (the owner, 13 Nov 2026), with Undo counting down for a minute.
+
 ## [0.8.0] — Fill a collection from a checklist
 
 What the family asked for after the app's demo: the web's **Fill from a

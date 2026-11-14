@@ -98,7 +98,7 @@ describe("Home's alerts (R4)", () => {
     await fireEvent.press(screen.getByTestId('alert-hide-7'));
     await waitFor(() => expect(screen.queryByTestId('home-alert-r1')).toBeNull());
     expect(screen.getByTestId('home-alert-hidden')).toHaveTextContent(
-      /^Hidden\. It comes back in a week, and the bell still has it\.Undo \(60s\)$/,
+      /^Hidden\. It comes back in a week\.Undo \(60s\)$/,
     );
     await fireEvent.press(screen.getByTestId('home-alert-undo'));
     expect(await screen.findByTestId('home-alert-r1')).toBeTruthy();
