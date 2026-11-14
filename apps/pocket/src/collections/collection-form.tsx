@@ -28,10 +28,18 @@ import { audienceKey } from './rules';
  * what it is for if the person says, and who it is for — only the
  * audiences the person is in (A17), as the vault allows no other. Changed
  * somewhere else since it was opened: nothing is saved, and it says so.
+ *
+ * Changed by a manager (app 0.10.0): who it is for is plain words, never
+ * sent, unless they may change it; and never Only me, which is its maker's
+ * alone. The vault's words say why when it refuses.
  */
 export function CollectionForm(props: {
   /** The collection being changed; none for a new one. */
   editing?: CollectionView | null;
+  /** Who it is for is not the person's to change: said, not offered. */
+  audienceFixed?: boolean;
+  /** Only its maker makes it Only me. */
+  noOnlyMe?: boolean;
   onSaved: (saved: CollectionDetail) => void;
   onClose: () => void;
 }) {
@@ -44,7 +52,10 @@ export function CollectionForm(props: {
   const [audience, setAudience] = useState<CollectionAudience>(e?.audience ?? 'everyone');
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
-  const audiences = who ? COLLECTION_AUDIENCES.filter((a) => inCollectionAudience(who.role, a)) : [];
+  const audiences = who
+    ? COLLECTION_AUDIENCES.filter((a) => inCollectionAudience(who.role, a) && !(props.noOnlyMe && a === 'only_me'))
+    : [];
+  const fixed = !!e && props.audienceFixed === true;
   const nameMissing = name.trim() === '';
 
   const save = async () => {
@@ -52,9 +63,11 @@ export function CollectionForm(props: {
     setBusy(true);
     setProblem(null);
     const body = { name: name.trim(), description: words.trim() || null, audience };
+    // Who it is for, not the person's to change: not sent.
+    const { audience: _same, ...unchanged } = body;
     try {
       const saved = await withToken((a, tk) =>
-        e ? a.updateCollection(tk, e.id, body, e.etag) : a.createCollection(tk, body),
+        e ? a.updateCollection(tk, e.id, fixed ? unchanged : body, e.etag) : a.createCollection(tk, body),
       );
       feel('done');
       props.onSaved(saved);
@@ -94,17 +107,21 @@ export function CollectionForm(props: {
           <Text variant="secondary" weight="600" tone="soft">
             {t('collectionForm.forWhom')}
           </Text>
-          <ChipRow label={t('collectionForm.forWhom')}>
-            {audiences.map((a) => (
-              <Chip
-                key={a}
-                label={t(audienceKey(a))}
-                selected={audience === a}
-                onPress={() => setAudience(a)}
-                testID={`collection-form-${a}`}
-              />
-            ))}
-          </ChipRow>
+          {fixed ? (
+            <Text testID="collection-form-audience-fixed">{t(audienceKey(audience))}</Text>
+          ) : (
+            <ChipRow label={t('collectionForm.forWhom')}>
+              {audiences.map((a) => (
+                <Chip
+                  key={a}
+                  label={t(audienceKey(a))}
+                  selected={audience === a}
+                  onPress={() => setAudience(a)}
+                  testID={`collection-form-${a}`}
+                />
+              ))}
+            </ChipRow>
+          )}
         </View>
         {problem ? (
           <Notice tone="warn" testID="collection-form-problem">

@@ -386,7 +386,7 @@ export function ChecklistScreen(props: { id: string }) {
         </>
       ) : (
         <Notice tone="warn" testID="checklist-not-mine">
-          {t('checklist.notMine')}
+          {t(caps?.features.collection_managers === true ? 'checklist.notMineManagers' : 'checklist.notMine')}
         </Notice>
       )}
       <View accessibilityLiveRegion="polite">

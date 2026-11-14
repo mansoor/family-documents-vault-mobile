@@ -1,7 +1,6 @@
 import { ApiRequestError, NetworkError } from '@fdv/client';
 import {
   can,
-  inCollectionAudience,
   NOTE_KIND,
   radii,
   sharedOutsideWords,
@@ -28,6 +27,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode, type Ref } fr
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { focusOn } from '../capture/add-button';
+import { mayChangeCollection } from '../collections/rules';
 import { renewWords } from '../capture/renew-words';
 import { wordsFor } from '../errors/words';
 import { useCapture } from '../state/capture';
@@ -594,8 +594,8 @@ function Choice({
 
 /**
  * Add to a collection (5.15's, on the phone): the collections this person
- * made and may still change (A18) — only a collection's maker puts things
- * in it — each with how many of its documents they can see, and where one
+ * made and may still change (A18), or manages (app 0.10.0) — only they put
+ * things in it — each with how many of its documents they can see, and where one
  * is shared outside the family, that (5.19), heard with its Add button
  * too (the web's W519-3). Those they made for people they are no longer
  * one of are said to be so, not that there are none. The vault's answer
@@ -612,7 +612,7 @@ function CollectionPicker(props: {
 }) {
   const styles = useStyles(makeStyles);
   const { t } = useTranslation();
-  const { withToken } = useVault();
+  const { withToken, caps } = useVault();
   const [data, setData] = useState<{ collections: CollectionView[]; on: Set<string> } | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [adding, setAdding] = useState<string | null>(null);
@@ -634,9 +634,10 @@ function CollectionPicker(props: {
   }, [load]);
 
   const role = props.role;
-  const mine = role ? (data?.collections ?? []).filter((c) => c.mine && inCollectionAudience(role, c.audience)) : [];
+  // Theirs to put documents in (A18): made by them, in its audience, or chosen to manage it (0.10.0).
+  const mine = (data?.collections ?? []).filter((c) => mayChangeCollection(caps, role, c));
   // Made by them, for people they are no longer one of (A18): theirs to delete, not to add to.
-  const outgrown = (data?.collections ?? []).filter((c) => c.mine).length - mine.length;
+  const outgrown = (data?.collections ?? []).filter((c) => c.mine && !mayChangeCollection(caps, role, c)).length;
 
   const add = async (collection: CollectionView) => {
     if (adding) return;
@@ -687,7 +688,9 @@ function CollectionPicker(props: {
       {data === null && !problem ? <Text tone="soft">{t('row.collectLoading')}</Text> : null}
       {data !== null && mine.length === 0 ? (
         <Text tone="soft" testID="row-collections-none">
-          {outgrown > 0 ? t('row.collectOutgrown', { count: outgrown }) : t('row.collectNone')}
+          {outgrown > 0
+            ? t('row.collectOutgrown', { count: outgrown })
+            : t(caps?.features.collection_managers === true ? 'row.collectNoneManagers' : 'row.collectNone')}
         </Text>
       ) : null}
       {mine.map((c) => (

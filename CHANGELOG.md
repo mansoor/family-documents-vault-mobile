@@ -6,6 +6,43 @@ app's own, tagged `vX.Y.Z` in this repository.
 
 ## [Unreleased]
 
+## [0.10.0] — Collection managers
+
+The vault's **collection managers** (0.9.0-dev.40) on the phone: the person
+who made a collection can choose others in the family to manage it with
+them, and what each of them may do.
+
+### Added
+- **Managers**, a row on a collection's page under its actions, for the
+  family who see it: who manages it besides the person who made it. It opens
+  a screen that lists each manager and what they may do. Every manager can
+  always add and remove documents, fill it from a checklist, and rename it;
+  three switches, off until turned on, let one do more: **Can also change
+  who it's for**, **Can also delete it** and **Can also choose managers**.
+- Whoever may choose managers — the person who made it, or a manager they
+  let — makes someone a manager (picked from the family the vault offers:
+  people with a sign-in who can already see it), turns each switch on or
+  off, and removes a manager, asked first. A switch you can't do yourself is
+  never offered to give.
+- An owner, while the person who made a collection can no longer change it,
+  sees Remove beside each manager, and nothing more.
+- The list of collections says "You manage it", and a collection's page
+  says when someone else made it and chose you.
+
+### Changed
+- A collection's page offers each action by what the vault says you may do
+  with it now, not by whether you made it: Add documents, removing a
+  document, Fill from a checklist, the pencil (name and words), who it's for
+  — plain words when it isn't yours to change, and never Only me unless you
+  made it — and Delete, only to whoever may delete it. Add to a collection,
+  in a document's ⋯, offers the collections you manage too.
+- What the vault refuses is said in its own words: not allowed, already a
+  manager, someone who can't be one, or a change that would leave the
+  person who made it unable to see their own collection.
+- An older vault, without managers, keeps the rules as they were: only the
+  person who made a collection changes it.
+- Re-pinned to the vault's **v0.9.0-dev.40** (collection managers).
+
 ## [0.9.0] — Email the link
 
 The vault's **Email the link** (0.9.0-dev.39) on the phone: the vault
