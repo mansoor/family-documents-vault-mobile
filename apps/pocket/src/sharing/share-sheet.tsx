@@ -26,6 +26,7 @@ import { Sheet } from '../ui/sheet';
 import { sp } from '../ui/space';
 import { LoadFailed, loadFailure, Placeholder } from '../ui/states';
 import { useColours, useStyles, type Palette } from '../ui/theme';
+import { EmailTheLink } from './email-link';
 import { NO_SHARE_OPTIONS, readShareOptions, type EndChoice, type Protection, type ShareOptions } from './share-model';
 
 /** What is being shared: a document (or a note kept on its own), or a collection. */
@@ -41,7 +42,8 @@ export type ShareTarget =
  * documents go (ticked as the web ticks them) and whether the link keeps
  * up with it. Made, the link — and its PIN or password — is shown here once
  * and nowhere else: Send gives the phone's own share menu, Copy puts it on
- * the clipboard for a minute. An Only me document goes only where the
+ * the clipboard for a minute, and Email the link (0.9.0) has the vault
+ * email it, where it can. An Only me document goes only where the
  * household lets them; a collection always asks to confirm it is you.
  */
 export function ShareSheet(props: { target: ShareTarget; onClose: () => void }) {
@@ -161,8 +163,8 @@ export function ShareSheet(props: { target: ShareTarget; onClose: () => void }) 
       if (clipboard && copyForAMinute(clipboard, text)) setCopied(what);
     };
     return (
-      <Sheet visible onClose={props.onClose} testID="share-sheet" tall>
-        <ScrollView style={styles.scroll} contentContainerStyle={styles.body}>
+      <Sheet visible onClose={props.onClose} testID="share-sheet" keyboard tall>
+        <ScrollView style={styles.scroll} contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
           <Text variant="screen">{t('share.madeTitle')}</Text>
           <Text variant="secondary" tone="soft">
             {t('share.madeWords', { name, end: shareEndWords(new Date(made.share.expires_at), zone) })}
@@ -193,6 +195,7 @@ export function ShareSheet(props: { target: ShareTarget; onClose: () => void }) 
               {t('share.secretApart')}
             </Text>
           ) : null}
+          <EmailTheLink share={made.share} testID="share-email" />
           {made.share.second_factor === 'sms' && made.share.code_to ? (
             <Notice tone="info" testID="share-code-by-text">
               {t('share.codeByText', { to: made.share.code_to })}

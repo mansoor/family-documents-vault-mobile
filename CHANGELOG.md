@@ -6,6 +6,37 @@ app's own, tagged `vX.Y.Z` in this repository.
 
 ## [Unreleased]
 
+## [0.9.0] — Email the link
+
+The vault's **Email the link** (0.9.0-dev.39) on the phone: the vault
+emails a share link to the person it is for, through the mail server of
+whoever runs it. Another way to send a link, never in place of copying it.
+
+### Added
+- **Email the link** after "The link is made", and in More → Sharing →
+  Show the link, beside Send the link…, Copy the link and Copy the PIN or
+  password, which all stay as they were. Type their address and, if you
+  like, a short message — up to 300 characters and five lines, with no web
+  addresses or website names — then **Send** (Cancel beside it). It says
+  "Sent to j•••@example.com" and how many more times it can be emailed
+  today; a link emailed before says where, masked.
+- What is wrong with the address or the message is said on the phone, by
+  the vault's own rules, before anything is sent: the message as you type
+  it, the address at Send.
+- Past the first 15 minutes after making the link, the vault asks to
+  confirm it's you first, with the same sheet as Show the link.
+- What the vault refuses — a link paused or ended, one made before it kept
+  copies, too many emails today (3 a link, 20 a person), no mail server —
+  is said in its own words. Copy and Send stay whatever it says.
+- Offered only where it can work: the vault has its operator's mail server
+  (`share_link_email`), and the link is one you made that it can email
+  (`emailable`). Otherwise it is simply not there.
+
+### Changed
+- Re-pinned to the vault's **v0.9.0-dev.39** (email a share link). Its
+  other change — a kept checklist with no lines is no checklist — the phone
+  already treated as none.
+
 ## [0.8.1] — shorter words after hiding an alert
 
 ### Changed
