@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { wordsFor } from '../errors/words';
+import { useSensitiveConfirm } from '../sharing/sensitive-confirm';
 import { useVault } from '../state/vault';
 import { Button, Field, Notice, StatusLine, Text } from '../ui';
 import { Sheet } from '../ui/sheet';
@@ -26,7 +27,9 @@ const RECENT = 20;
  * already are said to be. One Add puts every ticked one in, at the end, by
  * the vault's own rules, and the vault's answer — who else will now see
  * them — is said on the collection's page. A collection shared outside the
- * family says so before anything goes in, as the web does (5.19).
+ * family says so before anything goes in, as the web does (5.19); a
+ * sensitive document its link that keeps up with it would send is asked
+ * about first, in the vault's words (0.9.0-dev.41, H1a).
  */
 export function AddDocuments(props: {
   collection: CollectionDetail;
@@ -45,6 +48,11 @@ export function AddDocuments(props: {
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const untitled = t('document.untitled');
+  const confirm = useSensitiveConfirm({
+    title: t('sensitive.putInTitle'),
+    confirmLabel: t('sensitive.putInYes'),
+    id: 'add-documents-sensitive',
+  });
 
   useEffect(() => {
     let stopped = false;
@@ -89,8 +97,12 @@ export function AddDocuments(props: {
     setBusy(true);
     setProblem(null);
     try {
-      const d = await withToken((a, tk) => a.addToCollection(tk, props.collection.id, ticked));
-      props.onAdded(d, ticked.length);
+      const d = await confirm.ask((confirmed) =>
+        withToken((a, tk) =>
+          a.addToCollection(tk, props.collection.id, ticked, confirmed ? { confirm_sensitive: true } : {}),
+        ),
+      );
+      if (d) props.onAdded(d, ticked.length);
     } catch (err) {
       setProblem(wordsFor(err, t));
     } finally {
@@ -99,82 +111,93 @@ export function AddDocuments(props: {
   };
 
   return (
-    <Sheet visible onClose={() => (busy ? undefined : props.onClose())} testID="add-documents" tall keyboard>
-      <Text variant="screen">{t('collection.addTitle', { name: props.collection.name })}</Text>
-      {props.collection.shared_outside ? (
-        <Notice tone="warn" testID="add-documents-shared">
-          {sharedOutsideWords(props.collection.shared_outside, who?.role ?? null)}
-        </Notice>
-      ) : null}
-      <Field
-        label={t('collection.find')}
-        value={q}
-        onChangeText={setQ}
-        autoCapitalize="none"
-        returnKeyType="search"
-        clear={{ label: t('common.clearSearch'), onClear: () => setQ('') }}
-        testID="add-documents-find"
-      />
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.list} keyboardShouldPersistTaps="handled">
-        {found === null && !problem ? (
-          <Text tone="soft">{t('common.loading')}</Text>
-        ) : found && found.length === 0 ? (
-          <Text tone="soft" testID="add-documents-none">
-            {q.trim() ? t('collection.findNone') : t('collection.nothingYet')}
-          </Text>
-        ) : null}
-        {(found ?? []).map((d) => {
-          const already = props.inIt.has(d.id);
-          const on = ticked.includes(d.id);
-          return (
-            <Pressable
-              key={d.id}
-              testID={`add-documents-${d.id}`}
-              accessibilityRole="checkbox"
-              accessibilityLabel={already ? `${d.title}. ${t('row.collectIn')}` : d.title}
-              accessibilityState={{ checked: already || on, disabled: already || busy }}
-              disabled={already || busy}
-              onPress={() => toggle(d.id)}
-              style={({ pressed }) => [styles.choice, on ? styles.chosen : null, pressed ? styles.pressed : null]}
-            >
-              <View style={styles.words}>
-                <Text weight="600">{d.title}</Text>
-                {already ? (
-                  <Text variant="secondary" tone="soft">
-                    {t('row.collectIn')}
-                  </Text>
-                ) : (
-                  <StatusLine status={d.status} />
-                )}
-              </View>
-              <View style={[styles.box, on || already ? styles.boxOn : null]}>
-                {on || already ? (
-                  <Check color={colours.accent} size={18} accessibilityElementsHidden importantForAccessibility="no" />
-                ) : null}
-              </View>
-            </Pressable>
-          );
-        })}
-      </ScrollView>
-      {problem ? (
-        <Notice tone="warn" testID="add-documents-problem">
-          {problem}
-        </Notice>
-      ) : null}
-      <Button
-        testID="add-documents-add"
-        label={ticked.length > 0 ? t('collection.addCount', { count: ticked.length }) : t('collection.addNone')}
-        disabled={ticked.length === 0}
-        busy={busy}
-        onPress={() => void add()}
-      />
-      <Button
-        testID="add-documents-cancel"
-        kind="quiet"
-        label={t('common.cancel')}
-        disabled={busy}
-        onPress={props.onClose}
-      />
+    <Sheet
+      visible
+      onClose={() => (confirm.asking ? confirm.cancel() : busy ? undefined : props.onClose())}
+      testID="add-documents"
+      tall
+      keyboard
+    >
+      {/* Asked in the sheet's place, until answered. */}
+      {confirm.body ?? (
+        <>
+          <Text variant="screen">{t('collection.addTitle', { name: props.collection.name })}</Text>
+          {props.collection.shared_outside ? (
+            <Notice tone="warn" testID="add-documents-shared">
+              {sharedOutsideWords(props.collection.shared_outside, who?.role ?? null)}
+            </Notice>
+          ) : null}
+          <Field
+            label={t('collection.find')}
+            value={q}
+            onChangeText={setQ}
+            autoCapitalize="none"
+            returnKeyType="search"
+            clear={{ label: t('common.clearSearch'), onClear: () => setQ('') }}
+            testID="add-documents-find"
+          />
+          <ScrollView style={styles.scroll} contentContainerStyle={styles.list} keyboardShouldPersistTaps="handled">
+            {found === null && !problem ? (
+              <Text tone="soft">{t('common.loading')}</Text>
+            ) : found && found.length === 0 ? (
+              <Text tone="soft" testID="add-documents-none">
+                {q.trim() ? t('collection.findNone') : t('collection.nothingYet')}
+              </Text>
+            ) : null}
+            {(found ?? []).map((d) => {
+              const already = props.inIt.has(d.id);
+              const on = ticked.includes(d.id);
+              return (
+                <Pressable
+                  key={d.id}
+                  testID={`add-documents-${d.id}`}
+                  accessibilityRole="checkbox"
+                  accessibilityLabel={already ? `${d.title}. ${t('row.collectIn')}` : d.title}
+                  accessibilityState={{ checked: already || on, disabled: already || busy }}
+                  disabled={already || busy}
+                  onPress={() => toggle(d.id)}
+                  style={({ pressed }) => [styles.choice, on ? styles.chosen : null, pressed ? styles.pressed : null]}
+                >
+                  <View style={styles.words}>
+                    <Text weight="600">{d.title}</Text>
+                    {already ? (
+                      <Text variant="secondary" tone="soft">
+                        {t('row.collectIn')}
+                      </Text>
+                    ) : (
+                      <StatusLine status={d.status} />
+                    )}
+                  </View>
+                  <View style={[styles.box, on || already ? styles.boxOn : null]}>
+                    {on || already ? (
+                      <Check color={colours.accent} size={18} accessibilityElementsHidden importantForAccessibility="no" />
+                    ) : null}
+                  </View>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+          {problem ? (
+            <Notice tone="warn" testID="add-documents-problem">
+              {problem}
+            </Notice>
+          ) : null}
+          <Button
+            testID="add-documents-add"
+            label={ticked.length > 0 ? t('collection.addCount', { count: ticked.length }) : t('collection.addNone')}
+            disabled={ticked.length === 0}
+            busy={busy}
+            onPress={() => void add()}
+          />
+          <Button
+            testID="add-documents-cancel"
+            kind="quiet"
+            label={t('common.cancel')}
+            disabled={busy}
+            onPress={props.onClose}
+          />
+        </>
+      )}
     </Sheet>
   );
 }

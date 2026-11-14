@@ -1,5 +1,5 @@
 import { ApiRequestError } from '@fdv/client';
-import { issuedByLabel, NOTE_KIND, NOTES_MAX, type DocumentView } from '@fdv/shared';
+import { issuedByLabel, NOTE_KIND, NOTES_MAX, stopSharingWords, type DocumentView } from '@fdv/shared';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -12,6 +12,7 @@ import { draftOf, editBody } from '../../documents/edit';
 import { NoteEdit } from '../../documents/note-edit';
 import { TagsEditor } from '../../documents/tags-edit';
 import { wordsFor } from '../../errors/words';
+import { StillSharedSheet } from '../../sharing/sensitive-confirm';
 import { emit } from '../../state/events';
 import { feel } from '../../ui/feel';
 import { useStepUp } from '../../state/step-up';
@@ -35,6 +36,12 @@ import { useColours, useStyles, type Palette } from '../../ui/theme';
  * note, where the vault keeps one that can be written (5.35), and its
  * tags; each is sent only when it was changed. A note kept on its own is
  * edited as a note: its title and its words (`NoteEdit`).
+ *
+ * Made sensitive while links outside the family still give it (a vault
+ * with `sensitive_protects`, 0.9.0-dev.41, H1a): it is saved, and then the
+ * person is asked whether to keep them or end them now, as the web asks.
+ * Ended, what was done is said before the screen goes back. Never in the
+ * save's way: an older vault never says so, and nothing is asked.
  */
 export default function EditScreen() {
   const styles = useStyles(makeStyles);
@@ -54,6 +61,8 @@ export default function EditScreen() {
   // Its note and its tags, beside the card's questions.
   const [notes, setNotes] = useState('');
   const [tags, setTags] = useState<string[]>([]);
+  // Saved, and still shared outside the family though now sensitive (H1a): asked, then gone back.
+  const [stillShared, setStillShared] = useState<{ links: number; id: string; done: () => void } | null>(null);
 
   const load = useCallback(async () => {
     if (!who) return;
@@ -157,6 +166,12 @@ export default function EditScreen() {
       if (saved === null) return null;
       feel('done');
       emit('documentChanged', saved.id);
+      const shared = saved.warnings?.find((w) => w.code === 'sensitive_still_shared');
+      if (shared?.links) {
+        const links = shared.links;
+        await new Promise<void>((done) => setStillShared({ links, id: saved.id, done }));
+        setStillShared(null);
+      }
       return () => router.back();
     } catch (err) {
       if (err instanceof ApiRequestError && err.status === 409 && err.code === 'conflict') {
@@ -355,6 +370,19 @@ export default function EditScreen() {
         <Notice tone="warn" testID="edit-problem">
           {problem}
         </Notice>
+      ) : null}
+      {stillShared ? (
+        <StillSharedSheet
+          links={stillShared.links}
+          testID="edit-still-shared"
+          onEnd={async () => {
+            const r = await guarded((a, tk) => a.stopSharing(tk, stillShared.id));
+            if (!r) return t('sensitive.nothingChanged');
+            emit('sharesChanged');
+            return stopSharingWords(r);
+          }}
+          onDone={stillShared.done}
+        />
       ) : null}
     </EditorFrame>
   );

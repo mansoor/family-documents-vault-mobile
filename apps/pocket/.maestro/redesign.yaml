@@ -235,6 +235,15 @@ env:
       id: share-make
 - tapOn:
     id: share-make
+# The passport is sensitive by its kind (a vault of 0.9.0-dev.41, H1a): asked first, in the web's words.
+- extendedWaitUntil:
+    visible:
+      id: share-sensitive-yes
+    timeout: 15000
+- assertVisible: This document is sensitive.*
+- takeScreenshot: shot-light-share-sensitive
+- tapOn:
+    id: share-sensitive-yes
 # An Essential's link may ask to confirm it is you.
 - runFlow:
     when:

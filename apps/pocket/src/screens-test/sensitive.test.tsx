@@ -1,4 +1,4 @@
-import type { AiReaderView, DocumentTypeView } from '@fdv/shared';
+import { SENSITIVE_MEANS, type AiReaderView, type DocumentTypeView } from '@fdv/shared';
 import { fireEvent, screen, waitFor } from '@testing-library/react-native';
 import { useEffect, useRef, useState } from 'react';
 import DocumentsScreen from '../app/(tabs)/documents';
@@ -146,7 +146,9 @@ describe('the capture card', () => {
     // No kind yet: as its kind says is yes, the safer answer.
     expect(await screen.findByTestId('sensitive-kind')).toHaveTextContent('As its kind says (yes)');
     expect(screen.getByTestId('sensitive-kind').props.accessibilityState).toEqual(expect.objectContaining({ selected: true }));
-    expect(screen.getByText('Handled with extra care. Never sent to a cloud AI reader.')).toBeTruthy();
+    // What it means, in the vault's words (since 0.9.0-dev.41, what it protects too).
+    expect(screen.getByText(SENSITIVE_MEANS)).toBeTruthy();
+    expect(SENSITIVE_MEANS).toMatch(/asked about before it’s shared/);
     // A bill is not sensitive by default: the words follow the kind.
     await fireEvent.press(screen.getByTestId('types-more'));
     await fireEvent.changeText(screen.getByTestId('types-search'), 'Utility');

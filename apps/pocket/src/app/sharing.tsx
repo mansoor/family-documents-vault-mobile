@@ -1,10 +1,11 @@
-import { radii, shareEndWords, shareUses, type RevealedShare, type Share } from '@fdv/shared';
+import { can, radii, shareEndWords, shareUses, type RevealedShare, type Share } from '@fdv/shared';
 import { FileText, FolderOpen, Link2Off } from 'lucide-react-native';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FlatList, RefreshControl, ScrollView, Share as SystemShare, StyleSheet, View } from 'react-native';
 import { copyForAMinute, nativeClipboard } from '../identity/clipboard';
 import { EmailTheLink } from '../sharing/email-link';
+import { useSensitiveConfirm } from '../sharing/sensitive-confirm';
 import { Sheet } from '../ui/sheet';
 import { wordsFor } from '../errors/words';
 import { emit, on } from '../state/events';
@@ -33,13 +34,27 @@ const LISTED: readonly Share['state'][] = ['active', 'used_up', 'paused'];
  * password the vault made up, shown again after confirming it is them —
  * to send it again, or copy it. Links made before are shown once only.
  * Email the link (0.9.0) beside them, where the vault can send it.
+ *
+ * Turn back on (a vault of 0.9.0-dev.41): a link a restore paused, for an
+ * owner to say it still stands, as the web's After a restore does it. One
+ * that gives a sensitive document asks first (H1a), in the vault's words.
  */
 export default function SharingScreen() {
   const styles = useStyles(makeStyles);
   const colours = useColours();
   const { t } = useTranslation();
   const zone = useFamilyZone();
-  const { withToken, offline, caps, vault } = useVault();
+  const { withToken, offline, caps, vault, who } = useVault();
+  // Only an owner turns back on what a restore paused (`restore.review`), on a
+  // vault that asks first about a sensitive document's link (H1a): an older
+  // one, which never asks, is left to the web's After a restore, as before.
+  const resumable = caps?.features.sensitive_protects === true && (who ? can(who.role, 'restore.review') : false);
+  const [resuming, setResuming] = useState<string | null>(null);
+  const confirm = useSensitiveConfirm({
+    title: t('sensitive.resumeTitle'),
+    confirmLabel: t('sensitive.resumeYes'),
+    id: 'sharing-resume-sensitive',
+  });
   const revealOn = caps?.features.share_reveal === true;
   // A link shown again: what the vault gave back, until the sheet is closed.
   const [shown, setShown] = useState<{ share: Share; revealed: RevealedShare } | null>(null);
@@ -93,6 +108,27 @@ export default function SharingScreen() {
       setProblem(wordsFor(err, t));
     } finally {
       setRevealing(null);
+    }
+  };
+
+  const resume = async (s: Share) => {
+    setResuming(s.id);
+    setProblem(null);
+    setSaid(null);
+    try {
+      // Confirming it is them, as the vault asks; and, for a sensitive document, whether they mean it (H1a).
+      const done = await confirm.ask((confirmed) =>
+        guarded((a, tk) => a.resumeShare(tk, s.id, confirmed ? { confirm_sensitive: true } : {})),
+      );
+      if (!done) return;
+      feel('done');
+      setItems((xs) => xs?.map((x) => (x.id === done.id ? done : x)) ?? xs);
+      setSaid(t(done.state === 'paused' ? 'sharing.stillPaused' : 'sharing.worksAgain', { what: what(s) }));
+      emit('sharesChanged');
+    } catch (err) {
+      setProblem(wordsFor(err, t));
+    } finally {
+      setResuming(null);
     }
   };
 
@@ -190,6 +226,18 @@ export default function SharingScreen() {
                 </View>
               </View>
               <View style={styles.actions}>
+                {resumable && s.state === 'paused' && s.paused_reason === 'restored' ? (
+                  <Button
+                    size="small"
+                    kind="quiet"
+                    label={t('sharing.resume')}
+                    accessibilityLabel={t('sharing.resumeFor', { what: what(s) })}
+                    busy={resuming === s.id}
+                    disabled={offline || resuming !== null}
+                    onPress={() => void resume(s)}
+                    testID={`sharing-resume-${s.id}`}
+                  />
+                ) : null}
                 {revealOn && s.revealable ? (
                   <Button
                     size="small"
@@ -246,6 +294,7 @@ export default function SharingScreen() {
         cancelID="sharing-end-cancel"
         problemID="sharing-end-problem"
       />
+      {confirm.sheet}
     </>
   );
 }

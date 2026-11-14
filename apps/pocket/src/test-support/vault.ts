@@ -9,6 +9,7 @@ import type {
   SearchHit,
   SessionRow,
   Share,
+  StopSharing,
   VersionView,
 } from '@fdv/shared';
 
@@ -201,6 +202,20 @@ export interface Library {
   emailed: { id: string; to: string; message?: string }[];
   emailStepUp: boolean;
   emailRefusal: { status: number; code: string; message: string; retryAfter?: number } | null;
+  /**
+   * What Sensitive protects (0.9.0-dev.41, H1a): what is refused `409
+   * sensitive_confirm` without `confirm_sensitive: true`, with the vault's
+   * question — a document's or a collection's link (`share:<id>`), putting
+   * documents in a collection (`items:<id>`), a paused link turned back on
+   * (`resume:<id>`) — and each of those sent with the flag, in order.
+   */
+  asksSensitive: Map<string, string>;
+  confirmedSensitive: string[];
+  /** How many live links still give a document an edit makes sensitive (`sensitive_still_shared`). */
+  stillShared: Map<string, number>;
+  /** Each POST /documents/{id}/stop-sharing, and what it answers. */
+  stopped: string[];
+  stopSharing: StopSharing;
 }
 
 const JPEG = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x02, 0xff, 0xd9]);
@@ -284,6 +299,11 @@ export function testVault(origins: string[] = ['https://vault.test']): TestVault
       emailed: [],
       emailStepUp: false,
       emailRefusal: null,
+      asksSensitive: new Map(),
+      confirmedSensitive: [],
+      stillShared: new Map(),
+      stopped: [],
+      stopSharing: { ended: 2, left_out: 0, kept: 0 },
     },
     fetch: async (url, init) => {
       t.calls.push(`${init.method} ${url}`);
@@ -509,13 +529,46 @@ async function library(t: TestVault, path: string, init: Parameters<FetchLike>[1
       }
       const next = { ...doc, ...body, etag: nextEtag() } as DocumentView;
       lib.documents.set(doc.id, next);
-      return json(next);
+      // Made sensitive while links outside the family still give it (H1a): saved, and said.
+      const links = body.sensitive === true ? lib.stillShared.get(doc.id) : undefined;
+      return json(links ? { ...next, warnings: [{ code: 'sensitive_still_shared', links }] } : next);
     }
   }
   if (m?.[1] && lib.documents.has(m[1]) && init.method === 'DELETE') {
     lib.trashed.push(m[1]);
     lib.documents.delete(m[1]);
     return { ...json(null), status: 204, text: async () => '' } as Reply;
+  }
+  // Its sharing ended (H1a): its own links taken back, collections' links made to leave it out.
+  const stop = /^\/api\/v1\/documents\/([^/]+)\/stop-sharing$/.exec(q);
+  if (stop?.[1] && init.method === 'POST') {
+    lib.stopped.push(stop[1]);
+    return json(lib.stopSharing);
+  }
+  // Asked first (H1a): without the flag, the vault's question and nothing done; with it, noted.
+  const asksFirst = (what: string): Reply | null => {
+    const question = lib.asksSensitive.get(what);
+    if (!question) return null;
+    if (body.confirm_sensitive !== true) return failure(409, 'sensitive_confirm', question);
+    lib.confirmedSensitive.push(what);
+    return null;
+  };
+  m = /^\/api\/v1\/collections\/([^/]+)\/items$/.exec(q);
+  if (m?.[1] && init.method === 'POST') {
+    const refused = asksFirst(`items:${m[1]}`);
+    if (refused) return refused;
+    const { confirm_sensitive: _asked, ...rest } = body;
+    return t.vault.fetch(`https://vault.test${path}`, { ...init, body: JSON.stringify(rest) });
+  }
+  m = /^\/api\/v1\/shares\/([^/]+)\/resume$/.exec(q);
+  if (m?.[1] && init.method === 'POST') {
+    const share = lib.shares.find((x) => x.id === m?.[1]);
+    if (!share) return failure(404, 'not_found', 'There is no such link.');
+    const refused = asksFirst(`resume:${share.id}`);
+    if (refused) return refused;
+    share.state = 'active';
+    share.paused_reason = null;
+    return json(share);
   }
   // Sharing outside the family, as the vault of 0.9.0 answers it: a link
   // made (its token, and a PIN or a password made up, here once), listed,
@@ -535,6 +588,8 @@ async function library(t: TestVault, path: string, init: Parameters<FetchLike>[1
     if (collection && !lib.verified) {
       return failure(403, 'step_up_required', 'Please confirm it is you to share a collection.', 'share_collection');
     }
+    const refused = asksFirst(`share:${shareAt[1]}`);
+    if (refused) return refused;
     lib.shareBodies.push({ to: shareAt[1], body });
     const n = lib.shares.length + 1;
     const share = {

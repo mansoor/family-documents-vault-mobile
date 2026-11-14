@@ -63,6 +63,11 @@ export const CATALOGUE: Readonly<Record<string, string>> = {
   renewal_not_undoable: 'renewal.notUndoable',
   // Into Only me with share links of the person's own (P8): Who can see it asks what becomes of them.
   links_choice_needed: 'errors.linksChoice',
+  // A sensitive document going outside the family (0.9.0-dev.41, H1a): asked
+  // first, in the vault's own question; and one made sensitive while it is
+  // still shared, asked about once the edit is saved.
+  sensitive_confirm: 'errors.sensitiveConfirm',
+  sensitive_still_shared: 'errors.sensitiveStillShared',
   // Email the link (0.9.0-dev.39) and Show the link: the vault's own words when it gives them.
   email_link_limit: 'share.emailLimit',
   email_link_unavailable: 'share.emailUnavailable',

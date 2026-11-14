@@ -3,11 +3,13 @@ import {
   dateReminderSentence,
   issuedByLabel,
   issuerFromFilename,
+  keepsOwnSensitive,
   localToday,
   rankKnownIssuers,
   REMIND_ONCE,
   reminderOf,
   reminderSentence,
+  SENSITIVE_ONLY_ME_NOTE,
   type DocumentTypeView,
   type TypeField,
 } from '@fdv/shared';
@@ -32,6 +34,7 @@ import {
   pagesLeft,
   removePage,
   replacePage,
+  startsOnlyMe,
   suggestedTitle,
   toMetadata,
   typeOf,
@@ -125,6 +128,8 @@ function Card(props: { initial: CaptureSource }) {
   const live = data?.members.find((m) => m.is_me);
   const liveId = live?.id;
   const liveRole = live?.role;
+  const liveBirth = live?.date_of_birth ?? null;
+  const liveRelationship = live?.relationship ?? null;
   const me = useMemo(
     () =>
       signedInAs
@@ -213,6 +218,20 @@ function Card(props: { initial: CaptureSource }) {
   const householdOn = caps?.features.household_owner === true;
   // Sensitive, as its kind says, yes or no (0.9.0-dev.34, AIR2).
   const sensitiveOn = caps?.features.sensitive_documents === true;
+  // What Sensitive protects (0.9.0-dev.41, H1a): a teen's or a grown-up
+  // child's own sensitive paper starts as Only me, as the vault starts it —
+  // as it says now, or as it said when the card was kept.
+  const protects = caps ? caps.features.sensitive_protects === true : data?.sensitiveProtects === true;
+  const keeps = useMemo(
+    () =>
+      protects && me !== null
+        ? keepsOwnSensitive(
+            { role: me.role, date_of_birth: liveBirth, relationship: liveRelationship },
+            localToday(familyZoneNow()),
+          )
+        : false,
+    [protects, me, liveBirth, liveRelationship],
+  );
   const household = useMemo<Household | null>(
     () =>
       data && me
@@ -224,9 +243,10 @@ function Card(props: { initial: CaptureSource }) {
             details: detailsOn,
             householdOwner: householdOn,
             sensitive: sensitiveOn,
+            keepsOwnSensitive: keeps,
           }
         : null,
-    [data, me, issuedByOn, detailsOn, householdOn, sensitiveOn],
+    [data, me, issuedByOn, detailsOn, householdOn, sensitiveOn, keeps],
   );
 
   // The card can be used once its choices are in: that is when it counts as shown.
@@ -579,6 +599,12 @@ function Card(props: { initial: CaptureSource }) {
               ) : !choices.private ? (
                 <Text variant="secondary" tone="muted">
                   {t('capture.onlyMeYours')}
+                </Text>
+              ) : null}
+              {household && startsOnlyMe(draft, household) ? (
+                // Only me by H1a's rule, nobody having chosen: why, and that it can be changed.
+                <Text variant="secondary" tone="muted" testID="capture-sensitive-only-me">
+                  {SENSITIVE_ONLY_ME_NOTE}
                 </Text>
               ) : null}
             </View>
