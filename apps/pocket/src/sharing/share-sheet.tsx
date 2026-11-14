@@ -1,12 +1,20 @@
 import { ApiRequestError } from '@fdv/client';
 import {
   canShareToView,
+  DOWNLOAD_KEEPS_DETAILS,
   FOLLOW_MAX_DAYS,
   radii,
+  SENSITIVE_LABEL,
+  SENSITIVE_SHARE_CONFIRM,
+  sensitiveCollectionShareConfirm,
   SHARE_MAX_DAYS,
   shareEndWords,
+  SHOW_TITLE_COLLECTION_HINT,
+  SHOW_TITLE_LABEL,
+  SHOW_TITLE_SENSITIVE_HINT,
   type CollectionShareItem,
   type CreatedShare,
+  type ShareInput,
 } from '@fdv/shared';
 import { Check, Eye, EyeOff } from 'lucide-react-native';
 import { useCallback, useEffect, useState } from 'react';
@@ -27,11 +35,16 @@ import { sp } from '../ui/space';
 import { LoadFailed, loadFailure, Placeholder } from '../ui/states';
 import { useColours, useStyles, type Palette } from '../ui/theme';
 import { EmailTheLink } from './email-link';
+import { useSensitiveConfirm } from './sensitive-confirm';
 import { NO_SHARE_OPTIONS, readShareOptions, type EndChoice, type Protection, type ShareOptions } from './share-model';
 
-/** What is being shared: a document (or a note kept on its own), or a collection. */
+/**
+ * What is being shared: a document (or a note kept on its own), or a
+ * collection. `sensitive`: the document is sensitive, all said
+ * (`sensitive_effective`), so the sheet asks before its link is made.
+ */
 export type ShareTarget =
-  | { kind: 'document'; id: string; title: string; note: boolean; onlyMe: boolean }
+  | { kind: 'document'; id: string; title: string; note: boolean; onlyMe: boolean; sensitive?: boolean }
   | { kind: 'collection'; id: string; name: string };
 
 /**
@@ -45,6 +58,14 @@ export type ShareTarget =
  * the clipboard for a minute, and Email the link (0.9.0) has the vault
  * email it, where it can. An Only me document goes only where the
  * household lets them; a collection always asks to confirm it is you.
+ *
+ * What Sensitive protects (a vault with `sensitive_protects`, 0.9.0-dev.41,
+ * H1a), as the web's share sheets do it: a sensitive document asks before
+ * its link is made — a collection's, with one ticked, says how many — and
+ * "Show its title on the link page" is off for it, so the page the
+ * recipient opens says "A document". A `409 sensitive_confirm` the phone
+ * did not see coming asks the vault's own question, and the link is made
+ * once it is answered.
  */
 export function ShareSheet(props: { target: ShareTarget; onClose: () => void }) {
   const styles = useStyles(makeStyles);
@@ -71,6 +92,16 @@ export function ShareSheet(props: { target: ShareTarget; onClose: () => void }) 
   // A code by text can be offered (SMS4): the vault texts links' codes and its texts are set up.
   const [texts, setTexts] = useState(false);
   const set = (change: Partial<ShareOptions>) => setOpts((o) => ({ ...o, ...change }));
+  // What Sensitive protects (H1a), where the vault has it.
+  const protects = caps?.features.sensitive_protects === true;
+  const sensitive = target.kind === 'document' && target.sensitive === true;
+  // Its title on the link's page: off for a sensitive document; for a collection's sensitive ones, off until chosen.
+  const [showTitle, setShowTitle] = useState(target.kind === 'document' && !sensitive);
+  const confirm = useSensitiveConfirm(
+    target.kind === 'document'
+      ? { title: t('sensitive.shareTitle'), confirmLabel: t('sensitive.shareYes'), id: 'share-sensitive' }
+      : { title: t('sensitive.shareManyTitle'), confirmLabel: t('sensitive.shareManyYes'), id: 'share-sensitive' },
+  );
 
   const load = useCallback(async () => {
     if (caps?.features.sms_codes === true) {
@@ -123,22 +154,50 @@ export function ShareSheet(props: { target: ShareTarget; onClose: () => void }) 
     texts,
   });
   const nothingTicked = target.kind === 'collection' && ticked.size === 0 && !follow;
+  const sensitiveTicked = (items ?? []).filter((i) => i.sensitive === true && ticked.has(i.document_id)).length;
+  // A collection's choice is offered with a sensitive one ticked, or a link that keeps up with it, as the web's.
+  const titleChoice = protects && (target.kind === 'document' || sensitiveTicked > 0 || follow);
 
   const share = async () => {
     if (!read.body || busy || nothingTicked) return;
     setBusy(true);
     setProblem(null);
     try {
-      const body = read.body;
-      const created = await guarded((a, tk) =>
-        target.kind === 'document'
-          ? a.share(tk, target.id, body)
-          : a.shareCollection(tk, target.id, {
-              ...body,
-              document_ids: [...ticked],
-              ...(follow ? { follow_collection: true } : {}),
-              left_out_ids: (items ?? []).filter((i) => !ticked.has(i.document_id)).map((i) => i.document_id),
-            }),
+      // Its title on the link's page (H1a): a document's said only when it is
+      // not what the vault would do anyway, so one made sensitive later is
+      // covered too; a collection's only when chosen.
+      const titled: Pick<ShareInput, 'show_title'> =
+        protects && target.kind === 'document' && showTitle !== !sensitive
+          ? { show_title: showTitle }
+          : protects && target.kind === 'collection' && titleChoice && showTitle
+            ? { show_title: true }
+            : {};
+      const body = { ...read.body, ...titled };
+      const asked = (confirmed: boolean) => (confirmed ? { confirm_sensitive: true } : {});
+      // Known to be sensitive: asked first, in the web's words; else only if the vault asks.
+      const first = !protects
+        ? null
+        : target.kind === 'document'
+          ? sensitive
+            ? SENSITIVE_SHARE_CONFIRM
+            : null
+          : sensitiveTicked > 0
+            ? sensitiveCollectionShareConfirm(sensitiveTicked)
+            : null;
+      const created = await confirm.ask(
+        (confirmed) =>
+          guarded((a, tk) =>
+            target.kind === 'document'
+              ? a.share(tk, target.id, { ...body, ...asked(confirmed) })
+              : a.shareCollection(tk, target.id, {
+                  ...body,
+                  document_ids: [...ticked],
+                  ...(follow ? { follow_collection: true } : {}),
+                  left_out_ids: (items ?? []).filter((i) => !ticked.has(i.document_id)).map((i) => i.document_id),
+                  ...asked(confirmed),
+                }),
+          ),
+        first,
       );
       if (created === null) return;
       feel('done');
@@ -247,238 +306,273 @@ export function ShareSheet(props: { target: ShareTarget; onClose: () => void }) 
   }
 
   return (
-    <Sheet visible onClose={props.onClose} testID="share-sheet" keyboard tall>
+    <Sheet visible onClose={confirm.asking ? confirm.cancel : props.onClose} testID="share-sheet" keyboard tall>
       <ScrollView style={styles.scroll} contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
         <Text variant="screen">{t('share.title')}</Text>
         <Text variant="secondary" tone="soft" testID="share-what">
           {name}
         </Text>
-        {!ready ? <Placeholder rows={2} /> : null}
-        {failed ? <LoadFailed words={failed} onRetry={() => void load()} /> : null}
-        {refused ? (
-          <Notice tone="warn" testID="share-refused">
-            {refused}
-          </Notice>
-        ) : null}
-        {ready && !failed && !refused ? (
+        {/* Asked before a sensitive document goes (H1a): in the form's place, until answered. */}
+        {confirm.body}
+        {!confirm.asking ? (
           <>
-            {target.kind === 'document' && target.onlyMe ? (
-              <Notice tone="warn" testID="share-only-me">
-                {t('share.onlyMeWarning')}
+            {!ready ? <Placeholder rows={2} /> : null}
+            {failed ? <LoadFailed words={failed} onRetry={() => void load()} /> : null}
+            {refused ? (
+              <Notice tone="warn" testID="share-refused">
+                {refused}
               </Notice>
             ) : null}
-            <Field
-              label={t('share.forWhom')}
-              value={opts.label}
-              onChangeText={(v) => set({ label: v })}
-              maxLength={100}
-              autoCapitalize="words"
-              placeholder={t('share.forWhomExample')}
-              testID="share-label"
-            />
+            {ready && !failed && !refused ? (
+              <>
+                {target.kind === 'document' && target.onlyMe ? (
+                  <Notice tone="warn" testID="share-only-me">
+                    {t('share.onlyMeWarning')}
+                  </Notice>
+                ) : null}
+                <Field
+                  label={t('share.forWhom')}
+                  value={opts.label}
+                  onChangeText={(v) => set({ label: v })}
+                  maxLength={100}
+                  autoCapitalize="words"
+                  placeholder={t('share.forWhomExample')}
+                  testID="share-label"
+                />
 
-            <View style={styles.section}>
-              <Text variant="secondary" weight="600" tone="soft">
-                {t('share.ends')}
-              </Text>
-              <ChipRow label={t('share.ends')}>
-                {[...read.picks.map((p) => p.key), 'other' as const].map((key: EndChoice) => (
-                  <Chip
-                    key={key}
-                    label={t(`share.end_${key}`)}
-                    selected={read.end === key}
-                    onPress={() => set({ end: key })}
-                    testID={`share-end-${key}`}
-                  />
-                ))}
-              </ChipRow>
-              {read.end === 'other' ? (
-                <View style={styles.row}>
-                  <View style={styles.flex}>
-                    <Field
-                      label={t('share.day')}
-                      value={opts.day}
-                      onChangeText={(v) => set({ day: v })}
-                      placeholder={read.fallback.date}
-                      testID="share-day"
-                    />
-                  </View>
-                  <View style={styles.time}>
-                    <Field
-                      label={t('share.time')}
-                      value={opts.time}
-                      onChangeText={(v) => set({ time: v })}
-                      placeholder="17:00"
-                      testID="share-time"
-                    />
-                  </View>
-                </View>
-              ) : null}
-              {read.endAt && !read.endProblem ? (
-                <Text variant="small" tone="soft" testID="share-end-words">
-                  {t('share.endsAt', { end: shareEndWords(read.endAt, zone) })}
-                </Text>
-              ) : null}
-              {read.endProblem ? (
-                <Text variant="secondary" tone="danger" role="alert" testID="share-end-problem">
-                  {endWords(read.endProblem)}
-                </Text>
-              ) : null}
-            </View>
-
-            {caps?.features.share_options === true && !(target.kind === 'document' && target.note) && viewable ? (
-              <View style={styles.section}>
-                <Text variant="secondary" weight="600" tone="soft">
-                  {t('share.theyCan')}
-                </Text>
-                <ChipRow label={t('share.theyCan')}>
-                  {(['download', 'view'] as const).map((p) => (
-                    <Chip
-                      key={p}
-                      label={t(`share.permission_${p}`)}
-                      selected={opts.permission === p}
-                      onPress={() => set({ permission: p })}
-                      testID={`share-permission-${p}`}
-                    />
-                  ))}
-                </ChipRow>
-              </View>
-            ) : null}
-
-            {caps?.features.share_options === true ? (
-              <Field
-                label={t('share.opens')}
-                value={opts.opens}
-                onChangeText={(v) => set({ opens: v })}
-                keyboardType="number-pad"
-                placeholder={t('share.opensNone')}
-                error={read.opensProblem ? t('share.opensProblem') : null}
-                testID="share-opens"
-              />
-            ) : null}
-
-            <View style={styles.section}>
-              <Text variant="secondary" weight="600" tone="soft">
-                {t('share.protect')}
-              </Text>
-              <ChipRow label={t('share.protect')}>
-                {(
-                  [
-                    'none',
-                    'pin',
-                    ...(caps?.features.share_second_factor === true ? (['password'] as const) : []),
-                    ...(texts ? (['text'] as const) : []),
-                  ] as Protection[]
-                ).map(
-                  (p) => (
-                    <Chip
-                      key={p}
-                      label={t(`share.protect_${p}`)}
-                      selected={opts.protection === p}
-                      onPress={() => set({ protection: p })}
-                      testID={`share-protect-${p}`}
-                    />
-                  ),
-                )}
-              </ChipRow>
-              {texts && opts.protection === 'text' ? (
-                <>
-                  <Field
-                    label={t('share.phone')}
-                    value={opts.phone}
-                    onChangeText={(phone) => set({ phone })}
-                    keyboardType="phone-pad"
-                    textContentType="telephoneNumber"
-                    autoComplete="tel"
-                    error={opts.phone.trim() && read.phoneProblem ? t('share.phoneProblem') : null}
-                    testID="share-phone"
-                  />
-                  <Text variant="small" tone="soft">
-                    {t('share.phoneHint')}
+                <View style={styles.section}>
+                  <Text variant="secondary" weight="600" tone="soft">
+                    {t('share.ends')}
                   </Text>
-                </>
-              ) : null}
-            </View>
+                  <ChipRow label={t('share.ends')}>
+                    {[...read.picks.map((p) => p.key), 'other' as const].map((key: EndChoice) => (
+                      <Chip
+                        key={key}
+                        label={t(`share.end_${key}`)}
+                        selected={read.end === key}
+                        onPress={() => set({ end: key })}
+                        testID={`share-end-${key}`}
+                      />
+                    ))}
+                  </ChipRow>
+                  {read.end === 'other' ? (
+                    <View style={styles.row}>
+                      <View style={styles.flex}>
+                        <Field
+                          label={t('share.day')}
+                          value={opts.day}
+                          onChangeText={(v) => set({ day: v })}
+                          placeholder={read.fallback.date}
+                          testID="share-day"
+                        />
+                      </View>
+                      <View style={styles.time}>
+                        <Field
+                          label={t('share.time')}
+                          value={opts.time}
+                          onChangeText={(v) => set({ time: v })}
+                          placeholder="17:00"
+                          testID="share-time"
+                        />
+                      </View>
+                    </View>
+                  ) : null}
+                  {read.endAt && !read.endProblem ? (
+                    <Text variant="small" tone="soft" testID="share-end-words">
+                      {t('share.endsAt', { end: shareEndWords(read.endAt, zone) })}
+                    </Text>
+                  ) : null}
+                  {read.endProblem ? (
+                    <Text variant="secondary" tone="danger" role="alert" testID="share-end-problem">
+                      {endWords(read.endProblem)}
+                    </Text>
+                  ) : null}
+                </View>
 
-            {target.kind === 'collection' && items ? (
-              <View style={styles.section} testID="share-items">
-                <Text variant="secondary" weight="600" tone="soft">
-                  {t('share.whichGo')}
-                </Text>
-                {items.length === 0 ? (
-                  <Text tone="soft">{t('share.noneInIt')}</Text>
-                ) : (
-                  items.map((i) => {
-                    const on = ticked.has(i.document_id);
-                    const locked = i.lock === 'no_file';
-                    return (
-                      <Pressable
-                        key={i.document_id}
-                        testID={`share-item-${i.document_id}`}
-                        accessibilityRole="checkbox"
-                        accessibilityLabel={i.title ?? t('document.untitled')}
-                        accessibilityState={{ checked: on, disabled: locked }}
-                        disabled={locked}
-                        onPress={() =>
-                          setTicked((had) => {
-                            const next = new Set(had);
-                            if (next.has(i.document_id)) next.delete(i.document_id);
-                            else next.add(i.document_id);
-                            return next;
-                          })
-                        }
-                        style={({ pressed }) => [styles.item, pressed ? styles.pressed : null]}
-                      >
-                        <View style={[styles.box, on ? styles.boxOn : null]}>
-                          {on ? (
-                            <Check color={colours.accent} size={16} accessibilityElementsHidden importantForAccessibility="no" />
-                          ) : null}
-                        </View>
-                        <View style={styles.flex}>
-                          <Text>{i.title ?? t('document.untitled')}</Text>
-                          {i.reason ? (
-                            <Text variant="small" tone="soft">
-                              {i.reason}
-                            </Text>
-                          ) : null}
-                        </View>
-                      </Pressable>
-                    );
-                  })
-                )}
-                <View style={styles.switchRow}>
-                  <View style={styles.flex}>
-                    <Text>{t('share.follow')}</Text>
-                    <Text variant="small" tone="soft">
-                      {t('share.followWords', { days: FOLLOW_MAX_DAYS })}
+                {caps?.features.share_options === true && !(target.kind === 'document' && target.note) && viewable ? (
+                  <View style={styles.section}>
+                    <Text variant="secondary" weight="600" tone="soft">
+                      {t('share.theyCan')}
+                    </Text>
+                    <ChipRow label={t('share.theyCan')}>
+                      {(['download', 'view'] as const).map((p) => (
+                        <Chip
+                          key={p}
+                          label={t(`share.permission_${p}`)}
+                          selected={opts.permission === p}
+                          onPress={() => set({ permission: p })}
+                          testID={`share-permission-${p}`}
+                        />
+                      ))}
+                    </ChipRow>
+                  </View>
+                ) : null}
+
+                {caps?.features.share_options === true ? (
+                  <Field
+                    label={t('share.opens')}
+                    value={opts.opens}
+                    onChangeText={(v) => set({ opens: v })}
+                    keyboardType="number-pad"
+                    placeholder={t('share.opensNone')}
+                    error={read.opensProblem ? t('share.opensProblem') : null}
+                    testID="share-opens"
+                  />
+                ) : null}
+
+                <View style={styles.section}>
+                  <Text variant="secondary" weight="600" tone="soft">
+                    {t('share.protect')}
+                  </Text>
+                  <ChipRow label={t('share.protect')}>
+                    {(
+                      [
+                        'none',
+                        'pin',
+                        ...(caps?.features.share_second_factor === true ? (['password'] as const) : []),
+                        ...(texts ? (['text'] as const) : []),
+                      ] as Protection[]
+                    ).map(
+                      (p) => (
+                        <Chip
+                          key={p}
+                          label={t(`share.protect_${p}`)}
+                          selected={opts.protection === p}
+                          onPress={() => set({ protection: p })}
+                          testID={`share-protect-${p}`}
+                        />
+                      ),
+                    )}
+                  </ChipRow>
+                  {texts && opts.protection === 'text' ? (
+                    <>
+                      <Field
+                        label={t('share.phone')}
+                        value={opts.phone}
+                        onChangeText={(phone) => set({ phone })}
+                        keyboardType="phone-pad"
+                        textContentType="telephoneNumber"
+                        autoComplete="tel"
+                        error={opts.phone.trim() && read.phoneProblem ? t('share.phoneProblem') : null}
+                        testID="share-phone"
+                      />
+                      <Text variant="small" tone="soft">
+                        {t('share.phoneHint')}
+                      </Text>
+                    </>
+                  ) : null}
+                </View>
+
+                {target.kind === 'collection' && items ? (
+                  <View style={styles.section} testID="share-items">
+                    <Text variant="secondary" weight="600" tone="soft">
+                      {t('share.whichGo')}
+                    </Text>
+                    {items.length === 0 ? (
+                      <Text tone="soft">{t('share.noneInIt')}</Text>
+                    ) : (
+                      items.map((i) => {
+                        const on = ticked.has(i.document_id);
+                        const locked = i.lock === 'no_file';
+                        return (
+                          <Pressable
+                            key={i.document_id}
+                            testID={`share-item-${i.document_id}`}
+                            accessibilityRole="checkbox"
+                            accessibilityLabel={i.title ?? t('document.untitled')}
+                            accessibilityState={{ checked: on, disabled: locked }}
+                            disabled={locked}
+                            onPress={() =>
+                              setTicked((had) => {
+                                const next = new Set(had);
+                                if (next.has(i.document_id)) next.delete(i.document_id);
+                                else next.add(i.document_id);
+                                return next;
+                              })
+                            }
+                            style={({ pressed }) => [styles.item, pressed ? styles.pressed : null]}
+                          >
+                            <View style={[styles.box, on ? styles.boxOn : null]}>
+                              {on ? (
+                                <Check color={colours.accent} size={16} accessibilityElementsHidden importantForAccessibility="no" />
+                              ) : null}
+                            </View>
+                            <View style={styles.flex}>
+                              <Text>{i.title ?? t('document.untitled')}</Text>
+                              {protects && i.sensitive === true ? (
+                                <Text variant="small" tone="soft" testID={`share-item-sensitive-${i.document_id}`}>
+                                  {SENSITIVE_LABEL}
+                                </Text>
+                              ) : null}
+                              {i.reason ? (
+                                <Text variant="small" tone="soft">
+                                  {i.reason}
+                                </Text>
+                              ) : null}
+                            </View>
+                          </Pressable>
+                        );
+                      })
+                    )}
+                    <View style={styles.switchRow}>
+                      <View style={styles.flex}>
+                        <Text>{t('share.follow')}</Text>
+                        <Text variant="small" tone="soft">
+                          {t('share.followWords', { days: FOLLOW_MAX_DAYS })}
+                        </Text>
+                      </View>
+                      <Switch
+                        testID="share-follow"
+                        accessibilityLabel={t('share.follow')}
+                        value={follow}
+                        onValueChange={setFollow}
+                        trackColor={{ true: colours.accent, false: colours.border }}
+                      />
+                    </View>
+                  </View>
+                ) : null}
+
+                {titleChoice ? (
+                  <View style={styles.section}>
+                    <View style={styles.switchRow}>
+                      <Text style={styles.flex}>{SHOW_TITLE_LABEL}</Text>
+                      <Switch
+                        testID="share-show-title"
+                        accessibilityLabel={SHOW_TITLE_LABEL}
+                        value={showTitle}
+                        onValueChange={setShowTitle}
+                        trackColor={{ true: colours.accent, false: colours.border }}
+                      />
+                    </View>
+                    {target.kind === 'collection' || sensitive ? (
+                      <Text variant="small" tone="soft" testID="share-show-title-hint">
+                        {target.kind === 'collection' ? SHOW_TITLE_COLLECTION_HINT : SHOW_TITLE_SENSITIVE_HINT}
+                      </Text>
+                    ) : null}
+                    {/* The page, not the file (the vault's H1a review, M5). */}
+                    <Text variant="small" tone="soft" testID="share-download-keeps">
+                      {DOWNLOAD_KEEPS_DETAILS}
                     </Text>
                   </View>
-                  <Switch
-                    testID="share-follow"
-                    accessibilityLabel={t('share.follow')}
-                    value={follow}
-                    onValueChange={setFollow}
-                    trackColor={{ true: colours.accent, false: colours.border }}
-                  />
-                </View>
-              </View>
-            ) : null}
+                ) : null}
 
-            {problem ? (
-              <Notice tone="warn" testID="share-problem">
-                {problem}
-              </Notice>
+                {problem ? (
+                  <Notice tone="warn" testID="share-problem">
+                    {problem}
+                  </Notice>
+                ) : null}
+                <Button
+                  label={t('share.make')}
+                  busy={busy}
+                  disabled={!read.body || nothingTicked}
+                  onPress={() => void share()}
+                  testID="share-make"
+                />
+              </>
             ) : null}
-            <Button
-              label={t('share.make')}
-              busy={busy}
-              disabled={!read.body || nothingTicked}
-              onPress={() => void share()}
-              testID="share-make"
-            />
+            <Button kind="quiet" label={t('common.cancel')} disabled={busy} onPress={props.onClose} testID="share-cancel" />
           </>
         ) : null}
-        <Button kind="quiet" label={t('common.cancel')} disabled={busy} onPress={props.onClose} testID="share-cancel" />
       </ScrollView>
     </Sheet>
   );

@@ -740,7 +740,9 @@
     "batchFull": "The batch it was going into is full. Remove it here and scan it again.",
     "changedElsewhere": "This was changed somewhere else, so nothing was saved. Look at it again, then try again.",
     "alreadyDecided": "It's already been dealt with in your Inbox.",
-    "linksChoice": "You have share links to this document. Say whether they end or keep working, then try again."
+    "linksChoice": "You have share links to this document. Say whether they end or keep working, then try again.",
+    "sensitiveConfirm": "This is sensitive, so nothing was shared. Say you mean to share it, then try again.",
+    "sensitiveStillShared": "This paper is sensitive and still shared outside the family. See More → Sharing to keep or end its links."
   },
   "inbox": {
     "batchName": "From my phone, {{date}}"
@@ -1252,7 +1254,11 @@
     "ended": "The link to “{{what}}” is ended.",
     "show": "Show the link",
     "showFor": "Show the link to {{what}}",
-    "shownTitle": "The link to “{{what}}”"
+    "shownTitle": "The link to “{{what}}”",
+    "resume": "Turn back on",
+    "resumeFor": "Turn the link to {{what}} back on",
+    "worksAgain": "The link to “{{what}}” works again.",
+    "stillPaused": "The link to “{{what}}” is turned back on, but it is still paused for now."
   },
   "password": {
     "title": "Your password",
@@ -1386,5 +1392,22 @@
     "leaveWords": "What you changed here isn’t kept.",
     "leave": "Leave without saving",
     "keep": "Keep editing"
+  },
+  "sensitive": {
+    "shareTitle": "Share a sensitive document?",
+    "shareYes": "Share it anyway",
+    "shareManyTitle": "Share sensitive documents?",
+    "shareManyYes": "Share anyway",
+    "putInTitle": "Put a sensitive document in?",
+    "putInYes": "Put it in anyway",
+    "resumeTitle": "Turn on a link to sensitive documents?",
+    "resumeYes": "Turn it back on",
+    "stillTitle": "Still shared outside the family",
+    "endOne": "End it now",
+    "endMany": "End them now",
+    "keepOne": "Keep it",
+    "keepMany": "Keep them",
+    "endedTitle": "Sharing ended",
+    "nothingChanged": "Nothing was changed."
   }
 }

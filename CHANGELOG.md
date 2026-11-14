@@ -6,6 +6,50 @@ app's own, tagged `vX.Y.Z` in this repository.
 
 ## [Unreleased]
 
+## [0.11.0] — What Sensitive protects, when it's shared
+
+The vault's **what Sensitive protects** (0.9.0-dev.41, H1a) on the phone: a
+sensitive paper is asked about before it goes outside the family, its title
+is kept off the page a link opens, and a paper made sensitive while it's
+shared asks what becomes of its links.
+
+### Added
+- **Asked before it's shared.** Making a link to a sensitive document asks
+  first, in the web's words: "This document is sensitive. A link lets
+  somebody outside the family open it. Share it anyway?" A collection's link
+  with sensitive documents ticked says how many, and each one is marked
+  Sensitive in the list. Cancel shares nothing.
+- **"Show its title on the link page"**, a new switch when making a link.
+  It's off for a sensitive document, so the page the recipient opens says
+  "A document"; any other document's title shows, unless you turn it off.
+  For a collection's link it covers its sensitive papers, those put in later
+  too. Under it: a file someone downloads keeps its own details, such as a
+  PDF's title or a photo's data, while a link to view only shows the pages.
+- **Putting a sensitive document into a collection whose link keeps up with
+  it** asks first, from a document's ⋯ and from a collection's Add
+  documents. A checklist's add is never asked: the vault puts the paper in
+  but leaves it out of the link, and the phone says so, as before.
+- **Turn back on**, in More → Sharing, for a link a restore paused, for an
+  owner, on a vault that asks about sensitive documents. One that gives a
+  sensitive document asks first.
+- **Made sensitive while it's shared?** Saving Edit details that makes a
+  paper sensitive, while links outside the family still give it, saves it
+  and then asks: "This paper is shared outside the family by 2 links. Keep
+  them, or end them now?" Ending them takes back its own links and takes it
+  out of any collection's link, and the phone says which. The save is never
+  held up.
+
+### Changed
+- **A teen's or a grown-up child's own sensitive papers start as Only me**
+  on the capture card, as the vault starts them, and the card says why. They
+  can still choose who can see it before they save. A card opened with no
+  connection follows what the vault said last.
+- If the vault asks about a sensitive document the phone didn't know was
+  sensitive, its question is shown and the link is made once you answer.
+- A vault without what Sensitive protects is unchanged: nothing more is
+  asked or sent.
+- Re-pinned to the vault's **v0.9.0-dev.41** (what Sensitive protects).
+
 ## [0.10.1] — the + and a cold start, steady on a busy phone
 
 Two faults that made the Maestro run fail now and then, on changes that had

@@ -5,6 +5,8 @@ import {
   effectiveVisibility,
   missingFields,
   parseDateInput,
+  sensitiveOf,
+  sensitiveStartingVisibility,
   type CaptureMetadata,
   type CaptureProblem,
   type DocumentTypeView,
@@ -78,6 +80,12 @@ export interface Household {
   householdOwner?: boolean;
   /** The vault keeps Sensitive on each document, and each kind's default (`sensitive_documents`). */
   sensitive?: boolean;
+  /**
+   * Whoever adds it keeps their own sensitive papers to themselves from the
+   * start (`keepsOwnSensitive`: a teen, or a grown-up child), where the
+   * vault does so too (`sensitive_protects`, 0.9.0-dev.41, H1a).
+   */
+  keepsOwnSensitive?: boolean;
 }
 
 /** The household, as a value a chip can carry: never a person's id. */
@@ -162,7 +170,27 @@ export function typeOf(d: Draft, h: Pick<Household, 'types'>): DocumentTypeView 
 
 /** Who can see it, as the vault will decide when nobody chooses. */
 export function visibilityOf(d: Draft, h: Household): Visibility {
-  return effectiveVisibility(d.visibility ? { visibility: d.visibility } : {}, typeOf(d, h), h.me.role);
+  const base = effectiveVisibility(d.visibility ? { visibility: d.visibility } : {}, typeOf(d, h), h.me.role);
+  // Nobody chose: the vault's rule on top (H1a) — the adder's own sensitive paper, Only me.
+  return d.visibility ? base : sensitiveStartingVisibility(base, sensitiveStart(d, h));
+}
+
+/** What H1a's rule asks of a new paper: is it sensitive, all said; is it the adder's own; do they keep theirs. */
+function sensitiveStart(d: Draft, h: Household): { sensitive: boolean; own: boolean; keeps: boolean } {
+  return {
+    sensitive: sensitiveOf({ sensitive: d.sensitive }, typeOf(d, h) ?? null),
+    own: d.ownerId !== null && d.ownerId === h.me.member_id,
+    keeps: h.keepsOwnSensitive === true,
+  };
+}
+
+/**
+ * It starts as Only me by H1a's rule, nobody having chosen who can see it
+ * (0.9.0-dev.41): the card says why (`SENSITIVE_ONLY_ME_NOTE`).
+ */
+export function startsOnlyMe(d: Draft, h: Household): boolean {
+  const s = sensitiveStart(d, h);
+  return d.visibility === null && s.sensitive && s.own && s.keeps;
 }
 
 /** Which of Everyone, Adults only and Only me may be chosen now. */

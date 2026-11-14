@@ -94,6 +94,11 @@ export interface CardData {
   customTypes?: boolean;
   /** Likewise, whether it had an Inbox for scans (`features.batches`, I5). */
   batches?: boolean;
+  /**
+   * Likewise, whether its own sensitive papers start as Only me for a teen or
+   * a grown-up child (`features.sensitive_protects`, 0.9.0-dev.41, H1a).
+   */
+  sensitiveProtects?: boolean;
 }
 
 interface CaptureValue {
@@ -482,8 +487,19 @@ export function CaptureProvider(props: { children: ReactNode; deps?: Partial<Cap
         if (held && held.key === key) return held.data;
         const kept = (await storeRef.current?.cached<CardData>(key)) ?? null;
         // Started with no connection: whether the vault asked for details, as it last said.
-        const said = kept && (await storeRef.current?.cached<{ customTypes: boolean; batches?: boolean }>(kindsKey(key)));
-        return kept && said ? { ...kept, customTypes: said.customTypes, batches: said.batches === true } : kept;
+        const said =
+          kept &&
+          (await storeRef.current?.cached<{ customTypes: boolean; batches?: boolean; sensitiveProtects?: boolean }>(
+            kindsKey(key),
+          ));
+        return kept && said
+          ? {
+              ...kept,
+              customTypes: said.customTypes,
+              batches: said.batches === true,
+              sensitiveProtects: said.sensitiveProtects === true,
+            }
+          : kept;
       } finally {
         if (cardFetch.current === entry) cardFetch.current = null;
       }
@@ -508,10 +524,14 @@ export function CaptureProvider(props: { children: ReactNode; deps?: Partial<Cap
   // as the vault last said.
   const customTypes = caps ? caps.features.custom_types === true : null;
   const batches = caps ? caps.features.batches === true : null;
+  const sensitiveProtects = caps ? caps.features.sensitive_protects === true : null;
   useEffect(() => {
     if (store && cardKey && customTypes !== null)
-      void store.cache(kindsKey(cardKey), { customTypes, batches: batches === true }).catch(() => undefined);
-  }, [store, cardKey, customTypes, batches]);
+      void store
+        // Said only where it is on: what an older vault's card kept is as before.
+        .cache(kindsKey(cardKey), { customTypes, batches: batches === true, ...(sensitiveProtects ? { sensitiveProtects } : {}) })
+        .catch(() => undefined);
+  }, [store, cardKey, customTypes, batches, sensitiveProtects]);
 
   // A session the vault ended because the person is gone from it — their
   // access ended (a guest's), they were taken out, or it was revoked — takes

@@ -690,7 +690,7 @@ export function DocumentDetail(props: { id: string }) {
       />
       {sharing && doc ? (
         <ShareSheet
-          target={{ kind: 'document', id, title: name, note, onlyMe: doc.visibility === 'private' }}
+          target={{ kind: 'document', id, title: name, note, onlyMe: doc.visibility === 'private', sensitive }}
           onClose={() => setSharing(false)}
         />
       ) : null}

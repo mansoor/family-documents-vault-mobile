@@ -44,6 +44,7 @@ import { ConfirmBody } from '../ui/confirm';
 import { Sheet } from '../ui/sheet';
 import { sp } from '../ui/space';
 import { useColours, useStyles, type Palette } from '../ui/theme';
+import { useSensitiveConfirm } from '../sharing/sensitive-confirm';
 import { ShareSheet } from '../sharing/share-sheet';
 
 /**
@@ -200,6 +201,8 @@ export function useDocumentMenu(props: {
         title: props.title,
         note: sharing.type_key === NOTE_KIND,
         onlyMe: sharing.visibility === 'private',
+        // Sensitive, all said (H1a): the vault's own answer, as the web's row sheet asks it.
+        sensitive: sharing.sensitive_effective === true,
       }}
       onClose={() => {
         setSharing(null);
@@ -600,7 +603,9 @@ function Choice({
  * too (the web's W519-3). Those they made for people they are no longer
  * one of are said to be so, not that there are none. The vault's answer
  * says who else will now see it (5.33): a viewer the collection is given
- * to; the sheet waits for it.
+ * to; the sheet waits for it. A sensitive document that a link keeping up
+ * with the collection would send outside the family is asked about first
+ * (0.9.0-dev.41, H1a), in the vault's words.
  */
 function CollectionPicker(props: {
   id: string;
@@ -616,6 +621,12 @@ function CollectionPicker(props: {
   const [data, setData] = useState<{ collections: CollectionView[]; on: Set<string> } | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [adding, setAdding] = useState<string | null>(null);
+  // A sensitive document its collection's link would send outside the family asks first (H1a).
+  const confirm = useSensitiveConfirm({
+    title: t('sensitive.putInTitle'),
+    confirmLabel: t('sensitive.putInYes'),
+    id: 'row-collect-sensitive',
+  });
 
   const load = useCallback(async () => {
     try {
@@ -645,7 +656,12 @@ function CollectionPicker(props: {
     props.onBusy(true);
     setProblem(null);
     try {
-      const after = await withToken((a, token) => a.addToCollection(token, collection.id, [props.id]));
+      const after = await confirm.ask((confirmed) =>
+        withToken((a, token) =>
+          a.addToCollection(token, collection.id, [props.id], confirmed ? { confirm_sensitive: true } : {}),
+        ),
+      );
+      if (!after) return;
       // Its page and the list of collections, if open behind, look again (P9).
       emit('collectionChanged', collection.id);
       setData((d) =>
@@ -677,6 +693,14 @@ function CollectionPicker(props: {
     }
   };
 
+  // Asked in the list's place, until answered.
+  if (confirm.body) {
+    return (
+      <View style={styles.choices} testID="row-collections">
+        {confirm.body}
+      </View>
+    );
+  }
   return (
     <View style={styles.choices} testID="row-collections">
       <Text weight="600">{t('row.collectTitle', { title: props.title })}</Text>
