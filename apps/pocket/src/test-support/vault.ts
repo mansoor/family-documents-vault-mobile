@@ -878,3 +878,88 @@ function json(body: unknown): Awaited<ReturnType<FetchLike>> {
     arrayBuffer: async () => new TextEncoder().encode(JSON.stringify(body)).buffer,
   } as unknown as Awaited<ReturnType<FetchLike>>;
 }
+
+/** A JSON answer with its own status and headers. */
+function answer(status: number, body: unknown, headers: Record<string, string> = {}): Awaited<ReturnType<FetchLike>> {
+  const lower = Object.fromEntries(Object.entries(headers).map(([k, v]) => [k.toLowerCase(), v]));
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    headers: { get: (h: string) => (h.toLowerCase() === 'content-type' ? 'application/json' : (lower[h.toLowerCase()] ?? null)) },
+    json: async () => body,
+    text: async () => JSON.stringify(body),
+    arrayBuffer: async () => new TextEncoder().encode(JSON.stringify(body)).buffer,
+  } as unknown as Awaited<ReturnType<FetchLike>>;
+}
+
+/** A body as the vault fingerprints it: its keys in any order. */
+function canonical(value: unknown): string {
+  if (value === null || typeof value !== 'object') return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
+  const o = value as Record<string, unknown>;
+  return `{${Object.keys(o)
+    .filter((k) => o[k] !== undefined)
+    .sort()
+    .map((k) => `${JSON.stringify(k)}:${canonical(o[k])}`)
+    .join(',')}}`;
+}
+
+/**
+ * POST /documents's Idempotency-Key as the real vault keeps it
+ * (0.9.0-dev.45, documents/create-once.ts) — the order the client's fake
+ * does not keep: the request is checked first (its words, who may make it:
+ * a refusal keeps no key), then the key, scoped to the household, the
+ * account and the person signed in, for 24 hours on the test's own clock.
+ * The same key and body again: 201, Idempotent-Replayed. Another body: 422
+ * idempotency_key_reused. What it made and the caller can no longer see
+ * (`hide`): 404 created_not_visible. Removed for good: the key goes with it.
+ */
+export function keysAsDev45(t: TestVault, now: () => number = () => Date.now()) {
+  const keys = new Map<string, { fingerprint: string; id: string; made: unknown; at: number }>();
+  const hidden = new Set<string>();
+  const inner = t.fetch;
+  t.fetch = async (url, init) => {
+    const key = init.headers['idempotency-key'];
+    if (init.method !== 'POST' || !url.endsWith('/api/v1/documents') || key === undefined) return inner(url, init);
+    const headers = Object.fromEntries(Object.entries(init.headers).filter(([k]) => k !== 'idempotency-key'));
+    const auth = (init.headers.authorization ?? '').replace(/^Bearer /, '');
+    const session = t.vault.state.sessions.find((s) => s.id === t.vault.state.access.get(auth));
+    const member = (session as { memberId?: string } | undefined)?.memberId ?? 'fake-member';
+    const scope = `fake-household|account:${member}|${member}|${key}`;
+    const fingerprint = canonical(JSON.parse(String(init.body ?? 'null')));
+    // Checked as any create is, before the key: refused, it keeps none.
+    const res = await inner(url, { ...init, headers });
+    if (!res.ok) return res;
+    const made = (await res.json()) as { id: string };
+    const prior = keys.get(scope);
+    const live = prior && now() - prior.at < 24 * 60 * 60 * 1000 && t.vault.state.documents.some((d) => d.id === prior.id);
+    if (!prior || !live) {
+      keys.set(scope, { fingerprint, id: made.id, made, at: now() });
+      return answer(201, made);
+    }
+    // The key was there: this request makes nothing.
+    t.vault.state.documents = t.vault.state.documents.filter((d) => d.id !== made.id);
+    if (prior.fingerprint !== fingerprint) {
+      return answer(422, {
+        error: {
+          code: 'idempotency_key_reused',
+          message: 'That Idempotency-Key was already used for a different request. Send a new key with a new request.',
+          retriable: false,
+        },
+      });
+    }
+    if (hidden.has(prior.id)) {
+      return answer(
+        404,
+        { error: { code: 'created_not_visible', message: 'What this Idempotency-Key made is no longer there for you.' } },
+        { 'idempotent-replayed': 'true' },
+      );
+    }
+    return answer(201, prior.made, { 'idempotent-replayed': 'true' });
+  };
+  return {
+    /** What a key made, no longer the caller's to see (made Only me by its person). */
+    hide: (id: string) => hidden.add(id),
+    keys,
+  };
+}

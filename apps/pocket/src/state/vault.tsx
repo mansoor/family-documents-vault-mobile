@@ -174,6 +174,12 @@ interface VaultValue {
    */
   recheck: () => Promise<boolean>;
   /**
+   * The same look, and what the vault said in it (0.13.1): its capability
+   * document, or null when it did not answer. A note decides from this, the
+   * answer of its own look, whether it goes under its Idempotency-Key.
+   */
+  recheckCaps: () => Promise<Capabilities | null>;
+  /**
    * The vault's http for sending a note written on this phone (0.13.0), its
    * fetch watched, so a failure can say whether the request ever left
    * (queue/note-send.ts). Null until there is a vault.
@@ -290,6 +296,16 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
   const [phase, setPhase] = useState<Phase>('loading');
   const [vault, setVault] = useState<VaultRecord | null>(null);
   const [caps, setCaps] = useState<Capabilities | null>(null);
+  /**
+   * What the vault said last, as soon as it said it (0.13.1): a note about
+   * to go reads the answer to its own look here, never React state that may
+   * not have caught up — or not be there yet at all, just after a launch.
+   */
+  const capsRef = useRef<Capabilities | null>(null);
+  const knowCaps = useCallback((c: Capabilities | null) => {
+    capsRef.current = c;
+    setCaps(c);
+  }, []);
   const [offline, setOffline] = useState(false);
   const [reach, setReach] = useState<Reach>('online');
   const [waiting, setWaiting] = useState<number | null>(null);
@@ -433,11 +449,11 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
       }
       verified.current = { at: deps.now(), network, epoch: started };
       setNotice((n) => (n === 'stranger' || n === 'wifi_only' ? null : n));
-      setCaps(answered);
+      knowCaps(answered);
       return;
     }
     throw new NetworkError('offline');
-  }, [vault, api, deps]);
+  }, [vault, api, deps, knowCaps]);
 
   // The session core outlives changes to the vault record, so it reaches
   // the gate through a ref. Until the first effect has run it refuses.
@@ -541,7 +557,7 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
         const next = updateVault(vault.origin, { instanceId: answered.instance_id ?? null });
         setVault(next.known.find((k) => k.origin === vault.origin) ?? vault);
       }
-      setCaps(answered);
+      knowCaps(answered);
       checkedAt.current = deps.now();
       if (identity.kind === 'reinstalled') {
         await session.clear();
@@ -555,7 +571,7 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
       if (err instanceof NetworkError || unreachableAnswer(err)) setOffline(true);
       return false;
     }
-  }, [api, vault, session, gate, deps]);
+  }, [api, vault, session, gate, deps, knowCaps]);
   // One look at a time: Try again, the looks by themselves, a timeout and a
   // note about to be sent all share the one under way.
   const looking = useRef<Promise<boolean> | null>(null);
@@ -567,6 +583,11 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
     looking.current = run;
     return run;
   }, [look]);
+  // The same look, with what the vault said in it: null when it did not answer.
+  const recheckCaps = useCallback(
+    async (): Promise<Capabilities | null> => ((await recheck()) ? capsRef.current : null),
+    [recheck],
+  );
 
   const watchedHttp = useCallback(
     (watch: (d: Departure) => void): Http | null =>
@@ -817,11 +838,11 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
       saveVault(record);
       verified.current = null;
       setNotice(outcome.kind === 'reinstalled' ? 'reinstalled' : null);
-      setCaps(outcome.caps);
+      knowCaps(outcome.caps);
       setVault(record);
       setPhase('loading');
     },
-    [session],
+    [session, knowCaps],
   );
 
   const accepted = useCallback(
@@ -970,10 +991,10 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
     leaveVault();
     verified.current = null;
     setVault(null);
-    setCaps(null);
+    knowCaps(null);
     setNotice(null);
     setPhase('connect');
-  }, [session, runBeforeSignOut]);
+  }, [session, runBeforeSignOut, knowCaps]);
 
   const sessionOwner = useCallback(() => {
     const info = session.info;
@@ -1011,6 +1032,7 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
       withTokenNow,
       withTokenQuick,
       recheck,
+      recheckCaps,
       watchedHttp,
       onBeforeSignOut,
     }),
@@ -1036,6 +1058,7 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
       withTokenNow,
       withTokenQuick,
       recheck,
+      recheckCaps,
       watchedHttp,
       onBeforeSignOut,
     ],

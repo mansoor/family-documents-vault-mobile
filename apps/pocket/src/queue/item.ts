@@ -13,14 +13,19 @@ import type { CaptureMetadata } from '@fdv/shared';
  *   connection (`send_failed`), and it waits for a person to try again.
  *
  * - unsure (a note written offline only, 0.13.0): a try went out and no
- *   answer came back, so it may already be in the vault. The vault takes no
- *   idempotency key for a new note yet, so the phone never sends it again by
- *   itself, and never guesses: the person looks in Notes, then Sends again
- *   or Deletes.
+ *   answer came back, so it may already be in the vault — to a vault that
+ *   takes no Idempotency-Key for a new note; or to one that does, more than
+ *   23 hours after its first try (the vault keeps a key 24), or after the
+ *   vault failed it too many times (0.13.1). The phone never sends it again
+ *   by itself, and never guesses: the person looks in Notes, then Sends
+ *   again or Deletes.
+ * - arrived (a note only, 0.13.1): the vault has it as it first went, under
+ *   its key, and the person changed it since: their change waits for them,
+ *   to be sent as a new note or discarded.
  *
  * Once the vault has it (201), the item, its bytes and its key are gone.
  */
-export type QueueState = 'waiting' | 'sending' | 'needs_you' | 'unsure';
+export type QueueState = 'waiting' | 'sending' | 'needs_you' | 'unsure' | 'arrived';
 
 /** Waiting for its time: the only items the uploader starts. */
 export const startable = (i: Pick<QueueItem, 'state'>) => i.state === 'waiting' || i.state === 'sending';

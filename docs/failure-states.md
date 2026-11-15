@@ -64,6 +64,9 @@ Written by `node apps/pocket/scripts/failure-states.mjs`; CI fails if it is out 
 |  |  | `errors.batchEnded` | The batch it was going into has ended. Remove it here and scan it again. |
 |  |  | `errors.batchFull` | The batch it was going into is full. Remove it here and scan it again. |
 |  |  | `errors.alreadyDecided` | It's already been dealt with in your Inbox. |
+|  |  | `errors.createInProgress` | Your vault is still saving this from an earlier try. It's sent again in a moment. |
+|  |  | `errors.createdNotVisible` | This reached your vault, and is now kept private by the person it's about. |
+|  |  | `errors.earlierVersion` | An earlier version of this is already in your vault. |
 |  |  | `errors.changedElsewhere` | This was changed somewhere else, so nothing was saved. Look at it again, then try again. |
 |  |  | `errors.linksChoice` | You have share links to this document. Say whether they end or keep working, then try again. |
 |  |  | `errors.sensitiveConfirm` | This is sensitive, so nothing was shared. Say you mean to share it, then try again. |
@@ -166,6 +169,7 @@ Written by `node apps/pocket/scripts/failure-states.mjs`; CI fails if it is out 
 |  |  | `newNote.gone` | This note has reached your vault. Open it from Notes to change it there. |
 |  |  | `newNote.notWithItSending` | This note started on its way to your vault as it was, so your change didn't go with it. Save it as a new note to keep it, or Cancel. |
 |  |  | `newNote.notWithItGone` | This note reached your vault as it was, so your change didn't go with it. Save it as a new note to keep it, or Cancel. |
+|  |  | `newNote.sentOnce` | This note was sent once and we haven't heard back yet. If you change it, we first make sure that one reached your vault, then ask about your changes. |
 | Notes written offline | Notes, New note | `notesList.waiting` | Waiting to send |
 |  |  | `notesList.unsure` | Might already be in your vault |
 |  |  | `notesList.unsureWhy` | We sent this but didn't hear back. Check Notes first. If it isn't there, send it again. |
@@ -174,6 +178,13 @@ Written by `node apps/pocket/scripts/failure-states.mjs`; CI fails if it is out 
 |  |  | `notesList.deleteSending` | It's on its way to your vault now, so it can't be deleted here. Once it's there, delete it from its page. |
 |  |  | `notesList.deleteWordsUnsure` | “{{name}}” might already be in your vault. Deleting it here only removes it from this phone: if it's in Notes, it stays there. This can't be undone. |
 |  |  | `notesList.narrowed` | “{{name}}” was sent as Only me: you can no longer make notes Adults only. |
+|  |  | `notesList.arrived` | In your vault, with its earlier words |
+|  |  | `notesList.arrivedWhy` | Your note reached the vault with its earlier words. Send your changes as a new note? |
+|  |  | `notesList.arrivedWhyReused` | An earlier version of this note is already in your vault. Send your changes as a new note? |
+|  |  | `notesList.arrivedWhyHidden` | Your note reached the vault with its earlier words, and is now kept private by the person it's about. Send your changes as a new note? |
+|  |  | `notesList.discardWords` | “{{name}}” is in your vault with its earlier words, and stays there. Your changes are only on this phone: discarding them can't be undone. |
+|  |  | `notesList.hidden` | “{{name}}” reached your vault. It's now kept private by the person it's about, so it isn't in your list. |
+|  |  | `notesList.putIntoChanged` | That note was changed somewhere else since, so your changes weren't put in. Send them as a new note, or discard them. |
 |  |  | `edit.noteOffline` | Changing a note needs a connection to your vault. New notes can be written now, and are sent later. |
 | A row’s ⋯ | Home, Search, a person | `row.collectionGone` | “{{name}}” is not there any more, so nothing went into it. |
 | A note’s link | Document | `notes.openFailed` | This phone couldn't open that link. |

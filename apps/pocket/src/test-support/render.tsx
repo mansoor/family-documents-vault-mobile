@@ -83,11 +83,13 @@ export async function signedIn(t: TestVault, origin = 'https://vault.test'): Pro
   await new SessionCore({ refresh: (r) => api.refresh(r) }, new SecureTokenStore()).accept(tokens);
 }
 
-export function respond(status: number, body: unknown) {
+export function respond(status: number, body: unknown, headers: Record<string, string> = {}) {
   return {
     ok: status >= 200 && status < 300,
     status,
-    headers: { get: (h: string) => (h.toLowerCase() === 'content-type' ? 'application/json' : null) },
+    headers: {
+      get: (h: string) => (h.toLowerCase() === 'content-type' ? 'application/json' : (headers[h.toLowerCase()] ?? null)),
+    },
     json: async () => body,
     text: async () => JSON.stringify(body),
     arrayBuffer: async () => new TextEncoder().encode(JSON.stringify(body)).buffer,

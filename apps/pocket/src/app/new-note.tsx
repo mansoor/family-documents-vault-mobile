@@ -11,6 +11,7 @@ import { emit } from '../state/events';
 import { feel } from '../ui/feel';
 import { useVault } from '../state/vault';
 import { NoteEditor } from '../documents/note-editor';
+import { arrivedWhyKey } from '../documents/note-outbox';
 import { Field, Notice, Text } from '../ui';
 import { Chip, ChipRow } from '../ui/chip';
 import { EditorFrame } from '../ui/editor-frame';
@@ -34,6 +35,8 @@ import { useStyles, type Palette } from '../ui/theme';
  * Opened from Notes with `queued`: that note, not sent yet, changed here —
  * and not sent while it is open. Already on its way, or arrived, its change
  * can't go with it: said so, and Save as a new note keeps what was typed.
+ * One sent once under its Idempotency-Key (0.13.1) says that its change
+ * waits until the vault has said whether that try landed.
  */
 export default function NewNoteScreen() {
   const styles = useStyles(makeStyles);
@@ -108,6 +111,11 @@ export default function NewNoteScreen() {
     try {
       if (queued) return await saveQueued(queued);
       const out = await capture.saveNewNote(payload());
+      if (out.kind === 'hidden') {
+        // In the vault, and private to the person it's about: Notes says so.
+        feel('done');
+        return () => router.back();
+      }
       if (out.kind !== 'made') return onKept(out);
       feel('done');
       emit('documentChanged', out.id);
@@ -134,6 +142,9 @@ export default function NewNoteScreen() {
 
   const sending = kept?.state === 'sending';
   const unsure = kept?.state === 'unsure';
+  const arrived = kept?.state === 'arrived';
+  // Sent once under its key, not settled yet: a change waits until the vault says whether that landed (0.13.1).
+  const sentOnce = !!kept?.payload?.sent && !unsure && !arrived;
   const unreadable = !!kept && !kept.payload;
   const gone = !!queued && !kept;
   // Arrived while open, or its change refused: what was typed can still be kept, as a new note.
@@ -146,7 +157,11 @@ export default function NewNoteScreen() {
         ? 'newNote.sendingNow'
         : unsure
           ? 'notesList.unsureWhy'
-          : 'newNote.queuedHint';
+          : arrived
+            ? arrivedWhyKey(kept?.problem?.code)
+            : sentOnce
+              ? 'newNote.sentOnce'
+              : 'newNote.queuedHint';
 
   return (
     <EditorFrame
@@ -163,7 +178,7 @@ export default function NewNoteScreen() {
     >
       <Text variant="hero">{t(queued ? 'newNote.queuedTitle' : 'newNote.title')}</Text>
       {queued ? (
-        <Notice tone={gone || sending || unsure || unreadable ? 'warn' : 'info'} testID="new-note-queued">
+        <Notice tone={gone || sending || unsure || arrived || unreadable ? 'warn' : 'info'} testID="new-note-queued">
           {t(notice)}
         </Notice>
       ) : offline ? (

@@ -26,7 +26,7 @@ const AREAS = [
     'Any request that fails (wordsFor)',
     'Every screen',
     'errors',
-    'offline noNetwork timeout rateLimited unavailable internal storageUnreachable sessionEnded paused accessEnded stepUp twoStep setupRequired unexpected stranger wifiOnly invalidCredentials notFound previewPending noPreview uploadInProgress invalidExtra batchEnded batchFull alreadyDecided changedElsewhere linksChoice sensitiveConfirm sensitiveStillShared general',
+    'offline noNetwork timeout rateLimited unavailable internal storageUnreachable sessionEnded paused accessEnded stepUp twoStep setupRequired unexpected stranger wifiOnly invalidCredentials notFound previewPending noPreview uploadInProgress invalidExtra batchEnded batchFull alreadyDecided createInProgress createdNotVisible earlierVersion changedElsewhere linksChoice sensitiveConfirm sensitiveStillShared general',
   ],
   ['The lock', 'Lock screen, Settings', 'lock', 'tooMany noScreenLock weakBiometrics enrolmentChanged'],
   [
@@ -64,12 +64,12 @@ const AREAS = [
   ['Collections', 'Collections, a collection', 'collections', 'needsConnection'],
   ['', '', 'collection', 'gone'],
   ['Notes', 'Notes, New note', 'notesList', 'needsConnection'],
-  ['', '', 'newNote', 'tooLong offline notKept sendingNow gone notWithItSending notWithItGone'],
+  ['', '', 'newNote', 'tooLong offline notKept sendingNow gone notWithItSending notWithItGone sentOnce'],
   [
     'Notes written offline',
     'Notes, New note',
     'notesList',
-    'waiting unsure unsureWhy couldNotSend unreadable deleteSending deleteWordsUnsure narrowed',
+    'waiting unsure unsureWhy couldNotSend unreadable deleteSending deleteWordsUnsure narrowed arrived arrivedWhy arrivedWhyReused arrivedWhyHidden discardWords hidden putIntoChanged',
   ],
   ['', '', 'edit', 'noteOffline'],
   ['A row’s ⋯', 'Home, Search, a person', 'row', 'collectionGone'],

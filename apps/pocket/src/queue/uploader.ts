@@ -3,7 +3,7 @@ import type { CaptureResult, UploadStatus } from '@fdv/shared';
 import { log } from '../log';
 import { noConnection } from '../net/no-connection';
 import { startable, type QueueItem } from './item';
-import { MaybeSentError } from './note-send';
+import { ArrivedEarlierError, MaybeSentError, NoAnswerError } from './note-send';
 import type { QueueStore } from './store';
 
 /**
@@ -56,6 +56,13 @@ export interface UploaderDeps {
    * it was, and is to go again at once.
    */
   amend?(item: QueueItem, err: ApiRequestError): Promise<boolean>;
+  /**
+   * Whether a note cut off while sending (the app closed) may simply go
+   * again: only when the try it was cut off in went under its
+   * Idempotency-Key, which its bytes say (0.13.1). Otherwise it might
+   * already be there, for its person to decide.
+   */
+  resumable?(item: QueueItem): Promise<boolean>;
 }
 
 /**
@@ -128,6 +135,18 @@ export class Uploader {
 
   private freshen = false;
 
+  /**
+   * A note New note is sending itself, now (0.13.1): in the queue first, so
+   * an app killed mid-Save keeps it, and never taken for one cut off.
+   */
+  claim(id: string): void {
+    this.inFlight.add(id);
+  }
+
+  unclaim(id: string): void {
+    this.inFlight.delete(id);
+  }
+
   /** Not sent while a person changes it; one already on its way is left to arrive. */
   hold(id: string): void {
     this.held.add(id);
@@ -167,7 +186,7 @@ export class Uploader {
     const due = (await this.mine()).filter((i) => startable(i) && i.nextAt <= this.deps.now());
     for (const item of due) {
       if (this.stopped || !sameOwner(this.deps.who(), item)) return;
-      if (this.held.has(item.id)) continue;
+      if (this.held.has(item.id) || this.inFlight.has(item.id)) continue;
       await this.attempt(item);
     }
   }
@@ -181,7 +200,10 @@ export class Uploader {
     let changed = false;
     for (const i of await this.mine()) {
       if (i.kind === 'note' && i.state === 'sending' && !this.inFlight.has(i.id)) {
-        await this.deps.store.update(i.id, { state: 'unsure' });
+        await this.deps.store.update(
+          i.id,
+          (await this.deps.resumable?.(i)) ? { state: 'waiting', nextAt: 0 } : { state: 'unsure' },
+        );
         changed = true;
       }
     }
@@ -304,6 +326,22 @@ export class Uploader {
   private async failed(item: QueueItem, attempts: number, err: unknown): Promise<void> {
     const random = this.deps.random ?? Math.random;
     const later = (e: unknown) => this.deps.now() + retryDelay(e, attempts, random);
+    if (err instanceof ArrivedEarlierError) {
+      // In the vault as it first went; the person's change waits for them (0.13.1).
+      this.phoneSide.delete(item.id);
+      await this.deps.store.update(item.id, {
+        state: 'arrived',
+        attempts,
+        problem: err.code ? { status: err.code === 'created_not_visible' ? 404 : 422, code: err.code, message: null } : null,
+      });
+      this.deps.onEvent?.({ kind: 'changed' });
+      return;
+    }
+    if (err instanceof NoAnswerError && err.retryInMs !== undefined) {
+      // The vault answered "not yet" to a try under its key: again, under it, when it said.
+      this.phoneSide.delete(item.id);
+      return this.wait(item, { attempts, nextAt: this.deps.now() + err.retryInMs, lastCode: err.answer?.code ?? null });
+    }
     if (err instanceof MaybeSentError) {
       // It went, or may have, and no answer came: never sent again by itself.
       this.phoneSide.delete(item.id);
