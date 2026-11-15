@@ -1,4 +1,4 @@
-import { NetworkError } from '@fdv/client';
+import { ApiRequestError, NetworkError } from '@fdv/client';
 
 /**
  * Whether a failure is the phone's connection, and nothing else: no answer
@@ -26,7 +26,23 @@ export function noConnection(err: unknown): boolean {
   return err.name === 'TypeError' && FETCH_FAILED.test(err.message);
 }
 
-const PHONE_REFUSED: ReadonlySet<string> = new Set(['StrangerError', 'WifiOnlyError']);
+// A note the phone did not send (queue/note-send.ts): nothing reached the vault
+// either. And one sent under its Idempotency-Key with no answer: sent again
+// by itself, as a scan with no answer is.
+const PHONE_REFUSED: ReadonlySet<string> = new Set(['StrangerError', 'WifiOnlyError', 'NotSentError', 'NoAnswerError']);
+
+/**
+ * An answer that is not the vault's (0.13.0): a gateway's 502, 503 or 504 —
+ * a proxy, a tunnel, a load balancer with nothing behind it — or any 5xx with
+ * no error envelope of the vault's. For the app's state it is "can't reach
+ * your vault", as no answer is; the scan queue still takes it as busy, and
+ * tries again later, as before.
+ */
+export function unreachableAnswer(err: unknown): boolean {
+  if (!(err instanceof ApiRequestError)) return false;
+  if (err.status === 502 || err.status === 503 || err.status === 504) return true;
+  return err.status >= 500 && err.code === 'http_error';
+}
 
 const FETCH_FAILED =
   /network request failed|failed to fetch|fetch failed|networkerror|load failed|network connection was lost|internet connection|unable to resolve host|failed to connect|connection (?:refused|reset|abort)|timed? ?out|ECONNREFUSED|ECONNRESET|ENOTFOUND|EAI_AGAIN|ETIMEDOUT/i;

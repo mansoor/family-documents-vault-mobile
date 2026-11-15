@@ -12,9 +12,18 @@ import type { CaptureMetadata } from '@fdv/shared';
  *   or the phone could not send it, for a reason that is not the
  *   connection (`send_failed`), and it waits for a person to try again.
  *
+ * - unsure (a note written offline only, 0.13.0): a try went out and no
+ *   answer came back, so it may already be in the vault. The vault takes no
+ *   idempotency key for a new note yet, so the phone never sends it again by
+ *   itself, and never guesses: the person looks in Notes, then Sends again
+ *   or Deletes.
+ *
  * Once the vault has it (201), the item, its bytes and its key are gone.
  */
-export type QueueState = 'waiting' | 'sending' | 'needs_you';
+export type QueueState = 'waiting' | 'sending' | 'needs_you' | 'unsure';
+
+/** Waiting for its time: the only items the uploader starts. */
+export const startable = (i: Pick<QueueItem, 'state'>) => i.state === 'waiting' || i.state === 'sending';
 
 export interface QueueProblem {
   /** The HTTP status, or 0 for a refusal the phone made itself. */
@@ -39,8 +48,12 @@ export const sendFailed = (problem: QueueProblem | null): boolean =>
  * item in the person's Inbox (I5, `features.batches`): a scan sent with
  * "Send to my Inbox", one file of the day's batch (POST
  * /batches/{target}/items), read by the vault and finished on the web.
+ *
+ * Or a new note written while the vault could not be reached (0.13.0): its
+ * title, words and who can see it are the item's bytes (queue/note.ts), kept
+ * in the same encrypted queue as a scan, and sent as POST /documents.
  */
-export type QueueKind = 'capture' | 'version' | 'inbox';
+export type QueueKind = 'capture' | 'version' | 'inbox' | 'note';
 
 export interface QueueItem {
   id: string;

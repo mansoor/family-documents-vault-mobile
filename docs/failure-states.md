@@ -28,13 +28,19 @@ Written by `node apps/pocket/scripts/failure-states.mjs`; CI fails if it is out 
 |  |  | `connect.linkJoin` | Invitations are accepted in the browser. Open it there, then come back and sign in. |
 |  |  | `connect.linkReset` | Password resets are finished in the browser. Open it there, then come back and sign in. |
 |  |  | `connect.linkShared` | That's a link for someone outside the family. It opens in the browser. |
+| The vault not answering | The tabs, Notes, Documents, People | `reach.noNetwork` | This phone is offline. Showing what's saved on it. |
+|  |  | `reach.unreachable` | Can't reach your vault right now. Check you're on a network that can reach it. |
+|  |  | `reach.wifiOnly` | This vault is used only on Wi-Fi. Join your Wi-Fi to reach it. |
+|  |  | `reach.stranger` | Something other than your vault is answering at its address on this network. |
+|  |  | `reach.showingSaved` | Offline: showing what's saved on this phone. |
 | Signing in | Sign in | `signIn.signedOutHere` | You've been signed out on this phone. Sign in again to carry on. |
 |  |  | `signIn.passkeyOnly` | You sign in with a passkey. The app can't use passkeys yet, so set a password in the browser (Settings → Password), then sign in here with it. |
 |  |  | `signIn.startAgain` | Start again from your password. |
 |  |  | `signIn.paused` | An owner has paused your access. Ask them if you think this is a mistake. |
 |  |  | `signIn.pausedRestored` | Your access is paused after the vault was restored. Ask an owner to turn it back on. |
 |  |  | `signIn.accessEnded` | Your access to this family's vault has ended. Ask them to renew it if you still need it. |
-| Any request that fails (wordsFor) | Every screen | `errors.offline` | Can't reach your vault right now. Check this phone's connection, then try again. |
+| Any request that fails (wordsFor) | Every screen | `errors.offline` | Can't reach your vault right now. Check you're on a network that can reach it. |
+|  |  | `errors.noNetwork` | This phone is offline. Connect to Wi-Fi or mobile data, then try again. |
 |  |  | `errors.timeout` | Your vault took too long to answer. Try again in a moment. |
 |  |  | `errors.rateLimited` | Too many tries. Wait a minute, then try again. / Too many tries. Wait {{count}} minutes, then try again. |
 |  |  | `errors.unavailable` | Your vault is busy or starting up. Try again in a moment. |
@@ -111,7 +117,7 @@ Written by `node apps/pocket/scripts/failure-states.mjs`; CI fails if it is out 
 |  |  | `home.savedInboxOffline` | Saved on this phone. It'll go to your Inbox as soon as there's a connection. |
 |  |  | `home.savedInboxFiled` | Saved as a document only you can see. Add its details on the web. |
 |  |  | `home.vaultWait` | The vault asked us to wait {{count}} second. Trying again then. / The vault asked us to wait {{count}} seconds. Trying again then. |
-|  |  | `home.offline` | No connection. What you see may be out of date. |
+|  |  | `home.offline` | Offline: showing what's saved on this phone. It may be out of date. |
 | Essentials kept for no signal | Home, a kept Essential, Sign in | `essentials.wrongPassword` | That password isn't right. |
 |  |  | `essentials.noConnection` | No connection. Try again when the phone is online. |
 |  |  | `essentials.failed` | That didn't work. Try again. |
@@ -152,8 +158,23 @@ Written by `node apps/pocket/scripts/failure-states.mjs`; CI fails if it is out 
 |  |  | `edit.changed` | Someone changed this document while you were editing. Here it is as it is now: check it and save again. |
 | Collections | Collections, a collection | `collections.needsConnection` | Collections need a connection to the vault. |
 |  |  | `collection.gone` | This collection isn't there any more, or isn't one you can see. |
-| Notes | Notes, New note | `notesList.needsConnection` | Notes need a connection to the vault. |
+| Notes | Notes, New note | `notesList.needsConnection` | Your notes need a connection to your vault. You can still write a new one: it's sent once the vault can be reached. |
 |  |  | `newNote.tooLong` | Too long to save: {{count}} characters. |
+|  |  | `newNote.offline` | Your vault can't be reached right now. This note is kept on this phone, and sent once it can be. |
+|  |  | `newNote.notKept` | This phone couldn't keep the note to send later. Copy your words somewhere safe, then try again. |
+|  |  | `newNote.sendingNow` | This note is on its way to your vault now. Open it from Notes once it's there to change it. |
+|  |  | `newNote.gone` | This note has reached your vault. Open it from Notes to change it there. |
+|  |  | `newNote.notWithItSending` | This note started on its way to your vault as it was, so your change didn't go with it. Save it as a new note to keep it, or Cancel. |
+|  |  | `newNote.notWithItGone` | This note reached your vault as it was, so your change didn't go with it. Save it as a new note to keep it, or Cancel. |
+| Notes written offline | Notes, New note | `notesList.waiting` | Waiting to send |
+|  |  | `notesList.unsure` | Might already be in your vault |
+|  |  | `notesList.unsureWhy` | We sent this but didn't hear back. Check Notes first. If it isn't there, send it again. |
+|  |  | `notesList.couldNotSend` | Couldn't send — {{reason}} |
+|  |  | `notesList.unreadable` | Couldn't read this note |
+|  |  | `notesList.deleteSending` | It's on its way to your vault now, so it can't be deleted here. Once it's there, delete it from its page. |
+|  |  | `notesList.deleteWordsUnsure` | “{{name}}” might already be in your vault. Deleting it here only removes it from this phone: if it's in Notes, it stays there. This can't be undone. |
+|  |  | `notesList.narrowed` | “{{name}}” was sent as Only me: you can no longer make notes Adults only. |
+|  |  | `edit.noteOffline` | Changing a note needs a connection to your vault. New notes can be written now, and are sent later. |
 | A row’s ⋯ | Home, Search, a person | `row.collectionGone` | “{{name}}” is not there any more, so nothing went into it. |
 | A note’s link | Document | `notes.openFailed` | This phone couldn't open that link. |
 | Search, Needs attention, People | Tabs | `search.needsConnection` | Search needs a connection. Your Essentials are under On this phone. |
@@ -173,6 +194,8 @@ Written by `node apps/pocket/scripts/failure-states.mjs`; CI fails if it is out 
 | Settings | Settings | `settings.notSecure` | Not secure: reached without encryption, on your home network only. |
 |  |  | `settings.changeVaultWords` | Changing the vault signs you out and removes everything kept on this phone. |
 |  |  | `settings.changeVaultWaiting` | A scan hasn't reached this vault yet. It will be removed too. / {{count}} scans haven't reached this vault yet. They will be removed too. |
+|  |  | `settings.changeVaultNotes` | A note written on this phone hasn't reached this vault, or may be on its way. It will be removed from this phone, and can't be got back. / {{count}} notes written on this phone haven't reached this vault, or may be on their way. They will be removed from this phone, and can't be got back. |
+|  |  | `settings.notesWaiting` | A note you wrote hasn't reached the vault yet. / {{count}} notes you wrote haven't reached the vault yet. |
 |  |  | `settings.onItsWay` | One is already on its way and will reach the vault. / {{count}} are already on their way and will reach the vault. |
 |  |  | `settings.devicesUnreachable` | Couldn't reach your vault to list them. Try again when you're online. |
 |  |  | `settings.offlineNone` | Nothing is kept on this phone. You can keep the Essentials here from Home. |

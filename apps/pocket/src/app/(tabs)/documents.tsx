@@ -513,6 +513,11 @@ export default function DocumentsScreen() {
                     {t('documents.needsConnection')}
                   </Notice>
                 ) : null}
+                {offline && docs ? (
+                  <Text variant="secondary" tone="soft" testID="documents-showing-saved">
+                    {t('reach.showingSaved')}
+                  </Text>
+                ) : null}
                 {failed ? <LoadFailed words={failed} onRetry={() => void load()} /> : null}
                 {!docs && !failed && !offline ? <Placeholder rows={4} /> : null}
                 {docs && docs.length === 0 && !more ? (

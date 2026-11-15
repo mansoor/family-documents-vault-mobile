@@ -20,12 +20,13 @@ const AREAS = [
     'connect',
     'invalid notAVault unreachable setupRequired serverTooOld clientTooOld apiVersion askHttp refusePublicHttp refuseMobileData stranger reinstalled certificateUntrusted certificateWrongName certificateExpired captivePortal linkJoin linkReset linkShared',
   ],
+  ['The vault not answering', 'The tabs, Notes, Documents, People', 'reach', 'noNetwork unreachable wifiOnly stranger showingSaved'],
   ['Signing in', 'Sign in', 'signIn', 'signedOutHere passkeyOnly startAgain paused pausedRestored accessEnded'],
   [
     'Any request that fails (wordsFor)',
     'Every screen',
     'errors',
-    'offline timeout rateLimited unavailable internal storageUnreachable sessionEnded paused accessEnded stepUp twoStep setupRequired unexpected stranger wifiOnly invalidCredentials notFound previewPending noPreview uploadInProgress invalidExtra batchEnded batchFull alreadyDecided changedElsewhere linksChoice sensitiveConfirm sensitiveStillShared general',
+    'offline noNetwork timeout rateLimited unavailable internal storageUnreachable sessionEnded paused accessEnded stepUp twoStep setupRequired unexpected stranger wifiOnly invalidCredentials notFound previewPending noPreview uploadInProgress invalidExtra batchEnded batchFull alreadyDecided changedElsewhere linksChoice sensitiveConfirm sensitiveStillShared general',
   ],
   ['The lock', 'Lock screen, Settings', 'lock', 'tooMany noScreenLock weakBiometrics enrolmentChanged'],
   [
@@ -63,7 +64,14 @@ const AREAS = [
   ['Collections', 'Collections, a collection', 'collections', 'needsConnection'],
   ['', '', 'collection', 'gone'],
   ['Notes', 'Notes, New note', 'notesList', 'needsConnection'],
-  ['', '', 'newNote', 'tooLong'],
+  ['', '', 'newNote', 'tooLong offline notKept sendingNow gone notWithItSending notWithItGone'],
+  [
+    'Notes written offline',
+    'Notes, New note',
+    'notesList',
+    'waiting unsure unsureWhy couldNotSend unreadable deleteSending deleteWordsUnsure narrowed',
+  ],
+  ['', '', 'edit', 'noteOffline'],
   ['A row’s ⋯', 'Home, Search, a person', 'row', 'collectionGone'],
   ['A note’s link', 'Document', 'notes', 'openFailed'],
   ['Search, Needs attention, People', 'Tabs', 'search', 'needsConnection sealedNone'],
@@ -79,7 +87,7 @@ const AREAS = [
     'Settings',
     'Settings',
     'settings',
-    'notSecure changeVaultWords changeVaultWaiting onItsWay devicesUnreachable offlineNone offlineRemoveWords',
+    'notSecure changeVaultWords changeVaultWaiting changeVaultNotes notesWaiting onItsWay devicesUnreachable offlineNone offlineRemoveWords',
   ],
 ];
 

@@ -116,6 +116,30 @@ describe.each(stores)('the queue store: %s', (_name, make) => {
     expect(await store.list()).toEqual([]);
     expect(await store.bytes('a')).toBeNull();
   });
+
+  it('new bytes and the item with them, together; nothing for an item that is gone (a note changed, 0.13.0)', async () => {
+    const store = await make();
+    await store.add(item('n', { kind: 'note', state: 'needs_you', problem: { status: 422, code: 'x', message: 'No.' } }), new Uint8Array([1]));
+    expect(await store.replaceBytes('n', new Uint8Array([7, 8]), { state: 'waiting', problem: null, size: 2 })).toBe('ok');
+    expect(await store.bytes('n')).toEqual(new Uint8Array([7, 8]));
+    expect((await store.list())[0]).toEqual(expect.objectContaining({ state: 'waiting', problem: null, size: 2 }));
+    await store.remove('n');
+    expect(await store.replaceBytes('n', new Uint8Array([9]), { state: 'waiting' })).toBe('gone');
+    expect(await store.bytes('n')).toBeNull();
+  });
+
+  it('while a try sends it, an item is neither changed nor removed, unless the uploader itself asks', async () => {
+    const store = await make();
+    await store.add(item('s', { kind: 'note', state: 'sending' }), new Uint8Array([1]));
+    expect(await store.replaceBytes('s', new Uint8Array([2]), { state: 'waiting' })).toBe('sending');
+    expect(await store.removeIdle('s')).toBe('sending');
+    expect(await store.bytes('s')).toEqual(new Uint8Array([1]));
+    expect(await store.replaceBytes('s', new Uint8Array([3]), {}, { evenIfSending: true })).toBe('ok');
+    await store.update('s', { state: 'waiting' });
+    expect(await store.removeIdle('s')).toBe('ok');
+    expect(await store.removeIdle('s')).toBe('gone');
+    expect(await store.list()).toEqual([]);
+  });
 });
 
 describe('queue.db on opening', () => {

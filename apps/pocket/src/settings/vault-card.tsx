@@ -97,6 +97,12 @@ export function VaultCard() {
         {here.length - hereOnItsWay > 0 ? (
           <Text tone="warn">{t('settings.changeVaultWaiting', { count: here.length - hereOnItsWay })}</Text>
         ) : null}
+        {/* Every note written here for this vault, anybody's, on its way or not: a count, never what they say. */}
+        {capture.notesHere > 0 ? (
+          <Text tone="warn" testID="change-vault-notes">
+            {t('settings.changeVaultNotes', { count: capture.notesHere })}
+          </Text>
+        ) : null}
         {hereOnItsWay > 0 ? <Text tone="soft">{t('settings.onItsWay', { count: hereOnItsWay })}</Text> : null}
       </ConfirmSheet>
     </Card>

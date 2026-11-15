@@ -1,5 +1,7 @@
 import { ApiRequestError, NetworkError } from '@fdv/client';
 import type { TFunction } from 'i18next';
+import { unreachableAnswer } from '../net/no-connection';
+import { isPhoneOffline } from '../net/reach';
 
 /**
  * A failure in words (4.17). What the app can say better than the vault —
@@ -114,7 +116,17 @@ const VAULT_SAYS: ReadonlySet<string> = new Set([
 
 /** The words for a failure, as the person should read them. */
 export function wordsFor(err: unknown, t: TFunction, general = 'errors.general'): string {
-  if (err instanceof NetworkError) return t(CATALOGUE[err.kind] ?? CATALOGUE.offline ?? general);
+  // No answer: the phone with no network at all is told so (0.13.0); with
+  // one, that the vault can't be reached on it, or took too long.
+  if (err instanceof NetworkError) {
+    if (isPhoneOffline()) return t('errors.noNetwork');
+    return t(CATALOGUE[err.kind] ?? CATALOGUE.offline ?? general);
+  }
+  // Something in front of the vault answered in its place, with no words of
+  // the vault's (0.13.0): it can't be reached. The vault's own 503 says its own.
+  if (unreachableAnswer(err) && (err as ApiRequestError).code === 'http_error') {
+    return t(isPhoneOffline() ? 'errors.noNetwork' : 'errors.offline');
+  }
   if (err instanceof ApiRequestError) {
     // The vault's own words first, where only it knows them — its limits among them.
     if (VAULT_SAYS.has(err.code) && err.message) return err.message;
