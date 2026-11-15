@@ -8,14 +8,13 @@ import {
   type CollectionItemView,
 } from '@fdv/shared';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { Ellipsis, Info, Pencil, Share2, Trash2 } from 'lucide-react-native';
+import { Ellipsis, Info, Pencil, Share2, Trash2, UsersRound } from 'lucide-react-native';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, View } from 'react-native';
 import { AddDocuments } from '../../collections/add';
 import { checklistOffered, ChecklistPanel, keptChecklist, takeChecklistDone } from '../../collections/checklist';
 import { CollectionForm } from '../../collections/collection-form';
-import { ManagersRow } from '../../collections/managers';
 import { ConfirmSheet } from '../../ui/confirm';
 import { MenuRow } from '../../ui/menu-row';
 import { Sheet } from '../../ui/sheet';
@@ -49,9 +48,14 @@ import { useColours, useStyles, type Palette } from '../../ui/theme';
  * Where the vault has collection managers (app 0.10.0), each of these is
  * offered by what the vault says the person may do (`my_powers`): its maker,
  * or someone they chose to manage it. Who it is for is changed only by whoever
- * may; Delete only by whoever may delete it. Managers, one row under the
- * actions, opens who manages it and what each may do. An older vault keeps
- * the maker-only rules.
+ * may; Delete only by whoever may delete it. Managers, in the ⋯ with who
+ * they are (the owner, 14 Nov 2026: the page itself is for its documents),
+ * opens who manages it and what each may do. An older vault keeps the
+ * maker-only rules.
+ *
+ * Add documents and Fill from a checklist share one row, each label on one
+ * line on a 360 dp phone (0.13.0); at a large text size the second goes
+ * under the first rather than cutting a word.
  */
 export default function CollectionScreen() {
   const styles = useStyles(makeStyles);
@@ -178,7 +182,9 @@ export default function CollectionScreen() {
   // The ⋯ (Share, Delete) and the ⓘ beside who it is for (the owner's tidy-up of 11 Nov 2026).
   const [menuOpen, setMenuOpen] = useState(false);
   const [about, setAbout] = useState(false);
-  const hasMenu = (mayShare || mayDelete) && !offline;
+  // Who manages it (0.10.0), in the ⋯ since 0.13.0: for whoever is told of them today.
+  const mayManagers = !!detail && managersShown(caps, who?.role, detail);
+  const hasMenu = (mayShare || mayDelete || mayManagers) && !offline;
 
   const deleteIt = async () => {
     setDeleteBusy(true);
@@ -278,6 +284,30 @@ export default function CollectionScreen() {
           <Sheet visible={menuOpen} onClose={() => setMenuOpen(false)} outside testID="collection-more-sheet">
             <View style={styles.menu}>
               <Text variant="screen">{detail.name}</Text>
+              {mayManagers ? (
+                <MenuRow
+                  testID="collection-managers"
+                  icon={UsersRound}
+                  label={t('managers.title')}
+                  detail={
+                    (detail.managers ?? []).length > 0
+                      ? (detail.managers ?? []).map((m) => m.display_name).join(', ')
+                      : t('managers.nobody')
+                  }
+                  detailID="collection-managers-line"
+                  hint={t('managers.rowHint')}
+                  onPress={() => {
+                    setMenuOpen(false);
+                    setSaid(null);
+                    router.push({ pathname: '/managers/[id]', params: { id: detail.id, name: detail.name } });
+                  }}
+                />
+              ) : null}
+              {mayManagers && powers?.manager ? (
+                <Text variant="secondary" tone="soft" testID="collection-manager-note">
+                  {t('managers.youManage')}
+                </Text>
+              ) : null}
               {mayShare ? (
                 <MenuRow
                   testID="collection-share"
@@ -369,11 +399,6 @@ export default function CollectionScreen() {
               {sharedOutsideWords(detail.shared_outside, who?.role ?? null)}
             </Notice>
           ) : null}
-          {powers?.manager ? (
-            <Text variant="secondary" tone="soft" testID="collection-manager-note">
-              {t('managers.youManage')}
-            </Text>
-          ) : null}
           {said ? (
             <Notice tone={said.tone} testID="collection-said">
               {said.text}
@@ -381,11 +406,12 @@ export default function CollectionScreen() {
           ) : null}
           {failed ? <LoadFailed words={failed} onRetry={() => void load()} /> : null}
           {mayChange && !offline ? (
-            <View style={styles.actions}>
-              <View style={styles.flex}>
+            <View style={styles.actions} testID="collection-actions">
+              <View style={styles.action}>
                 <Button
                   testID="collection-add"
                   kind="quiet"
+                  tight
                   label={t('collection.add')}
                   onPress={() => {
                     setSaid(null);
@@ -394,8 +420,8 @@ export default function CollectionScreen() {
                 />
               </View>
               {mayFill && !kept ? (
-                <View style={styles.flex}>
-                  <Button testID="collection-checklist-fill" kind="quiet" label={t('checklist.fill')} onPress={fill} />
+                <View style={styles.action}>
+                  <Button testID="collection-checklist-fill" kind="quiet" tight label={t('checklist.fill')} onPress={fill} />
                 </View>
               ) : null}
             </View>
@@ -407,15 +433,6 @@ export default function CollectionScreen() {
               mayFill={mayFill && kept.mine}
               onFill={fill}
               onCleared={() => setSaid({ tone: 'ok', text: t('checklist.cleared', { name: detail.name }) })}
-            />
-          ) : null}
-          {managersShown(caps, who?.role, detail) && !offline ? (
-            <ManagersRow
-              managers={detail.managers ?? []}
-              onPress={() => {
-                setSaid(null);
-                router.push({ pathname: '/managers/[id]', params: { id: detail.id, name: detail.name } });
-              }}
             />
           ) : null}
           {items.length === 0 && !more ? (
@@ -483,6 +500,9 @@ const makeStyles = (colours: Palette) =>
     header: { gap: sp(12), marginBottom: sp(10) },
     menu: { gap: sp(10) },
     lineRow: { flexDirection: 'row', alignItems: 'center', gap: sp(4) },
-    actions: { flexDirection: 'row', gap: sp(10) },
+    // Side by side, each as wide as its words and sharing what is left; a
+    // second that does not fit goes under the first, never cut (0.13.0).
+    actions: { flexDirection: 'row', flexWrap: 'wrap', gap: sp(8) },
+    action: { flexGrow: 1, flexShrink: 1 },
     flex: { flex: 1 },
   });

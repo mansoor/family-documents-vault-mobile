@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useDocumentMenu } from '../../documents/menu';
+import { NoteOutbox } from '../../documents/note-outbox';
 import { noteListName } from '../../documents/note-write';
 import { on } from '../../state/events';
 import { dayWords, useFamilyZone } from '../../state/family-time';
@@ -36,6 +37,10 @@ import { useColours, useStyles, type Palette } from '../../ui/theme';
  * name on one line, cut with …), Detailed (as before) — remembered on this
  * phone; and what was looked for, remembered on this phone for each
  * person, behind the clock beside the box, with a way to forget it all.
+ *
+ * Written with no answer from the vault (0.13.0): a new note waits on the
+ * phone, at the top here as "Waiting to send", and goes by itself once the
+ * vault answers (documents/note-outbox.tsx). The + is there offline too.
  */
 
 /** The layouts, in the order the button goes round them. */
@@ -153,7 +158,8 @@ export default function NotesScreen() {
               icon={LAYOUT_ICON[layout]}
               onPress={cycle}
             />
-            {mayAdd && !offline ? (
+            {/* Offline too (0.13.0): a new note waits on the phone, and goes later. */}
+            {mayAdd ? (
               <IconButton
                 testID="notes-new"
                 label={t('notesList.new')}
@@ -188,10 +194,22 @@ export default function NotesScreen() {
               }}
             />
           </View>
+          <NoteOutbox
+            onLookInNotes={() => {
+              // Every note, asked for again: one that may already be there is found among them.
+              setQ('');
+              setAgain((n) => n + 1);
+            }}
+          />
           {offline && !items ? (
             <Notice tone="warn" testID="notes-offline">
               {t('notesList.needsConnection')}
             </Notice>
+          ) : null}
+          {offline && items ? (
+            <Text variant="secondary" tone="soft" testID="notes-showing-saved">
+              {t('reach.showingSaved')}
+            </Text>
           ) : null}
           {failed ? <LoadFailed words={failed} onRetry={() => setAgain((n) => n + 1)} /> : null}
           {!items && !failed && !offline ? <Placeholder rows={3} /> : null}

@@ -1,4 +1,4 @@
-import { ApiRequestError, isSessionOver } from '@fdv/client';
+import { ApiRequestError, isSessionOver, NetworkError } from '@fdv/client';
 import { radii } from '@fdv/shared';
 import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
@@ -24,6 +24,9 @@ import { useStyles, type Palette } from './theme';
  *   was, never its words, which could quote a document.
  */
 export function loadFailure(screen: string, err: unknown, t: TFunction): string | null {
+  // Too slow to answer (0.13.0): said, with Try again — the app looks at the
+  // vault again too, and only says "can't reach" when that look fails too.
+  if (err instanceof NetworkError && err.kind === 'timeout') return wordsFor(err, t);
   if (noConnection(err)) return null;
   if (isSessionOver(err) || (err instanceof ApiRequestError && err.status === 401)) return null;
   const kind = err instanceof ApiRequestError ? err.code : err instanceof Error ? err.name : typeof err;

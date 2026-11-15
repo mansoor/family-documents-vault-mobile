@@ -86,9 +86,11 @@ async function openTrip(t: TestVault) {
   await screen.findByTestId('collection-line');
 }
 
-/** Its Managers, from the row on its page. */
+/** Its Managers, in the page's ⋯ since 0.13.0 (the owner: the page is for its documents). */
 async function openManagers() {
-  await fireEvent.press(screen.getByTestId('collection-managers'));
+  expect(screen.queryByTestId('collection-managers')).toBeNull();
+  await fireEvent.press(screen.getByTestId('collection-more'));
+  await fireEvent.press(await screen.findByTestId('collection-managers'));
   await waitFor(() =>
     expect(routes().at(-1)).toEqual({ pathname: '/managers/[id]', params: { id: 'trip', name: 'Trip' } }),
   );
@@ -105,6 +107,19 @@ async function deleteOffered(): Promise<boolean> {
   return offered;
 }
 
+/** What the ⋯ says under Managers — who manages it — and whether it says the person does; closed again. */
+async function managersLine(): Promise<{ line: string; youManage: boolean }> {
+  // Never on the page itself: only its documents, and the checklist, are there.
+  expect(screen.queryByTestId('collection-managers-line')).toBeNull();
+  await fireEvent.press(screen.getByTestId('collection-more'));
+  const line = await screen.findByTestId('collection-managers-line');
+  const words = String(line.props.children);
+  const youManage = screen.queryByTestId('collection-manager-note') !== null;
+  await fireEvent.press(screen.getByTestId('collection-more-cancel'));
+  await waitFor(() => expect(screen.queryByTestId('collection-managers-line')).toBeNull());
+  return { line: words, youManage };
+}
+
 const disabled = (id: string) => screen.getByTestId(id).props.disabled === true;
 
 describe('a collection page, by what the vault says the person may do (app 0.10.0)', () => {
@@ -115,8 +130,7 @@ describe('a collection page, by what the vault says the person may do (app 0.10.
     expect(screen.getByTestId('collection-edit')).toBeTruthy();
     expect(screen.getByTestId('collection-add')).toBeTruthy();
     expect(screen.getByTestId('collection-checklist-fill')).toBeTruthy();
-    expect(screen.queryByTestId('collection-manager-note')).toBeNull();
-    expect(screen.getByTestId('collection-managers-line')).toHaveTextContent('Nobody else manages it yet.');
+    expect(await managersLine()).toEqual({ line: 'Nobody else manages it yet.', youManage: false });
     expect(await deleteOffered()).toBe(true);
     expect(audit()).toEqual([]);
   });
@@ -125,10 +139,13 @@ describe('a collection page, by what the vault says the person may do (app 0.10.
     const t = vault({ role: 'adult' });
     const kept = trip(t, 'sam', [manager('fake-member')]);
     await openTrip(t);
-    expect(screen.getByTestId('collection-manager-note')).toHaveTextContent(/chose you to manage it/);
+    expect(screen.queryByTestId('collection-manager-note')).toBeNull();
     expect(screen.getByTestId('collection-add')).toBeTruthy();
     expect(screen.getByTestId('collection-checklist-fill')).toBeTruthy();
-    expect(screen.getByTestId('collection-managers-line')).toHaveTextContent('Fake Owner');
+    expect(await managersLine()).toEqual({ line: expect.stringContaining('Fake Owner'), youManage: true });
+    await fireEvent.press(screen.getByTestId('collection-more'));
+    expect(await screen.findByTestId('collection-manager-note')).toHaveTextContent(/chose you to manage it/);
+    await fireEvent.press(screen.getByTestId('collection-more-cancel'));
     expect(await deleteOffered()).toBe(false);
 
     await fireEvent.press(screen.getByTestId('collection-edit'));
@@ -162,7 +179,7 @@ describe('a collection page, by what the vault says the person may do (app 0.10.
     expect(screen.queryByTestId('collection-add')).toBeNull();
     expect(screen.queryByTestId('collection-checklist-fill')).toBeNull();
     expect(await deleteOffered()).toBe(false);
-    expect(screen.getByTestId('collection-managers-line')).toHaveTextContent('Kim');
+    expect((await managersLine()).line).toContain('Kim');
   });
 
   it('the list of collections says which the person manages', async () => {
@@ -267,7 +284,8 @@ describe('Managers (app 0.10.0)', () => {
 
     // Back on its page, it is looked at again.
     await back();
-    await screen.findByTestId('collection-managers-line');
+    await screen.findByTestId('collection-line');
+    expect((await managersLine()).line).toBe('Nobody else manages it yet.');
   });
 
   it('a manager who may not choose managers reads who does what: no switches, no Add, no Remove', async () => {

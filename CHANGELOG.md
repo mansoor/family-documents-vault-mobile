@@ -6,6 +6,81 @@ app's own, tagged `vX.Y.Z` in this repository.
 
 ## [Unreleased]
 
+## [0.13.0] — Notes written offline, and a clear word when the vault can't be reached
+
+The owner's requests after installing 0.12.0. The vault pin is unchanged
+(v0.9.0-dev.43).
+
+### Added
+- **New notes while offline.** With no connection, or somewhere the vault
+  can't be reached, New note still saves: the note is kept on this phone, in
+  the same encrypted queue scans wait in (SQLCipher, key in the phone's
+  keystore), behind the app's lock, and only ever shown to — and changed or
+  deleted by — the person who wrote it. It's sent by itself once the vault
+  answers: when the app comes back to the front, when the network changes,
+  when the vault answers again, and by retries that wait longer each time.
+  Once the vault has it, it's removed from the phone and is an ordinary note.
+  Who can see it is what was chosen; unreadable or missing, it's Only me.
+- **Waiting to send**, at the top of Notes: each note not sent yet, opened to
+  change it before it goes (nothing is sent while it's open), or deleted
+  from the phone, asked first. "Sending…" while a try is under way: nothing
+  can be changed or deleted then, so what goes is what was last saved.
+- **Never guessed: "Might already be in your vault".** The vault doesn't yet
+  take an idempotency key for a new note, so when a try went out and no
+  answer came back — given up on in time, the connection lost, a failure the
+  phone can't name, or a 5xx — the note says "We sent this but didn't hear
+  back. Check Notes first. If it isn't there, send it again." with Open
+  Notes, Send again (as a new note) and Delete. It's never sent again by
+  itself. A try that never left the phone — the vault didn't answer just
+  before, the address not found, the connection refused, a certificate
+  refused, no network — stays Waiting to send and goes by itself. A note left
+  "Sending…" by an app that closed becomes "Might already be in your vault".
+- **Ready for a vault that takes the key**: each note carries a client id;
+  a vault that says `features.idempotent_create` gets it as the POST's
+  Idempotency-Key, and then a lost answer is simply sent again by itself.
+- **Couldn't send — {reason}**, with Try again and Delete, when the vault
+  refuses a note for a reason trying again can't fix. A note for Adults only
+  from somebody who can no longer choose that (their role) is sent as Only
+  me — narrower, never wider — and Notes says so; any other refusal leaves
+  their choice as it was. A note whose words on the phone can't be read says
+  "Couldn't read this note", with Delete.
+- **A clear word when the vault can't be reached.** A slim line above the tab
+  bar, after two seconds out of reach, says which it is — "This phone is
+  offline", "This vault is used only on Wi-Fi", something else answering at
+  its address, or "Can't reach your vault right now. Check you're on a
+  network that can reach it." — with Try again, said aloud on iOS and
+  Android, and goes by itself when the vault answers: the app looks again on
+  a network change, back in front, and after 10 s, 20 s, 40 s, then every
+  minute — not while the phone has no network at all. Documents, Notes and
+  People keep what they already show, with "Offline: showing what's saved
+  on this phone."
+
+### Changed
+- **Requests give up after 15 s** with no answer (they waited 20 s). One slow
+  answer is said as slow, with Try again, and the vault is looked at again:
+  only when that look fails too is it "can't reach your vault", so the line
+  doesn't come and go. Looks that overlap are one look. Downloads (a file, a
+  page) wait 15 s to start, then only give up when nothing has come for
+  30 s. Uploads, sent in one piece, keep their deadline sized to the file;
+  the scan queue's retries are as before. Thumbnails stay with the phone's
+  own image loader.
+- A gateway's 502, 503 or 504, or a 5xx without the vault's own words,
+  counts as "can't reach your vault".
+- A failure with no network at all says "This phone is offline", and one with
+  a network says the vault can't be reached on it (`errors.noNetwork`, and new
+  words for `errors.offline`).
+- **A collection's Managers is in its ⋯**, with who manages it, for whoever
+  saw it before; the page itself holds its documents, and its checklist.
+- **Add documents and Fill from a checklist** sit side by side on one line
+  each on a 360 dp phone: less room at their sides, the same height and type.
+  At a large text size the second goes under the first, never cut.
+- Changing a note already in the vault says plainly that it needs a
+  connection; only new notes are kept to send later.
+- Signing out with notes not sent says so, and Remove them takes them off the
+  phone. Change vault counts every note written here for that vault —
+  anybody's, on its way or not, never what they say — and removes them,
+  asked first.
+
 ## [0.12.0] — Caregivers, and the question at 18
 
 The vault's **caregivers and turning 18** (0.9.0-dev.43, H1b) on the phone:

@@ -7,7 +7,7 @@ import {
   type CollectionPowers,
 } from '@fdv/shared';
 import type { TFunction } from 'i18next';
-import { ChevronRight, UserPlus, UsersRound } from 'lucide-react-native';
+import { UserPlus, UsersRound } from 'lucide-react-native';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, RefreshControl, ScrollView, StyleSheet, Switch, View } from 'react-native';
@@ -72,34 +72,6 @@ const lower = (words: string) => words.charAt(0).toLowerCase() + words.slice(1);
 export function managersRefusal(err: unknown, t: TFunction): string {
   if (err instanceof ApiRequestError && [403, 409, 422].includes(err.status) && err.message) return err.message;
   return wordsFor(err, t);
-}
-
-/** Managers, one line on a collection's page: who manages it, and the way to more. */
-export function ManagersRow(props: { managers: readonly CollectionManager[]; onPress: () => void }) {
-  const styles = useStyles(makeStyles);
-  const colours = useColours();
-  const { t } = useTranslation();
-  const line =
-    props.managers.length > 0 ? props.managers.map((m) => m.display_name).join(', ') : t('managers.nobody');
-  return (
-    <Pressable
-      testID="collection-managers"
-      accessibilityRole="button"
-      accessibilityLabel={`${t('managers.title')}. ${line}`}
-      accessibilityHint={t('managers.rowHint')}
-      onPress={props.onPress}
-      style={({ pressed }) => [styles.panel, pressed ? styles.pressed : null]}
-    >
-      <UsersRound color={colours.accent} size={20} accessibilityElementsHidden importantForAccessibility="no" />
-      <View style={styles.flex}>
-        <Text weight="600">{t('managers.title')}</Text>
-        <Text variant="secondary" tone="soft" testID="collection-managers-line">
-          {line}
-        </Text>
-      </View>
-      <ChevronRight color={colours.inkSoft} size={20} accessibilityElementsHidden importantForAccessibility="no" />
-    </Pressable>
-  );
 }
 
 /** The Managers screen, for a collection by its id; its name, as its page had it, for the words. */

@@ -22,11 +22,15 @@ import { secretNoteKey } from './note-write';
  * changed meanwhile; anybody else who may change it changes its words.
  * Changed somewhere else since it was opened: nothing is saved, what was
  * typed stays here, and Save again replaces theirs.
+ *
+ * A note already in the vault is changed only with an answer from it: with
+ * none, this says so plainly (0.13.0) — a new note can be written offline,
+ * and is sent later, but a change is never kept to send.
  */
 export function NoteEdit(props: { doc: DocumentView; onStale: () => Promise<void> }) {
   const { t } = useTranslation();
   const router = useRouter();
-  const { who } = useVault();
+  const { who, offline } = useVault();
   const { guarded } = useStepUp();
   const { doc } = props;
   const own = !!who && doc.owner_member_id === who.member_id;
@@ -81,6 +85,11 @@ export function NoteEdit(props: { doc: DocumentView; onStale: () => Promise<void
       cancelID="edit-cancel"
     >
       <Text variant="hero">{t('edit.noteTitle')}</Text>
+      {offline ? (
+        <Notice tone="warn" testID="edit-note-offline">
+          {t('edit.noteOffline')}
+        </Notice>
+      ) : null}
       {own ? (
         <Field
           label={t('newNote.name')}

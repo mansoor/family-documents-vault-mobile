@@ -2,7 +2,8 @@ import { ApiRequestError, isSessionOver, retryDelay } from '@fdv/client';
 import type { CaptureResult, UploadStatus } from '@fdv/shared';
 import { log } from '../log';
 import { noConnection } from '../net/no-connection';
-import type { QueueItem } from './item';
+import { startable, type QueueItem } from './item';
+import { MaybeSentError } from './note-send';
 import type { QueueStore } from './store';
 
 /**
@@ -48,6 +49,13 @@ export interface UploaderDeps {
   /** Runs `fn` after `ms`; returns a cancel. */
   schedule?(ms: number, fn: () => void): () => void;
   onEvent?(event: UploadEvent): void;
+  /**
+   * A refusal no retry could change, before it waits for a person: the item
+   * put right where it can be — a note asked for Adults only by somebody who
+   * may no longer choose it goes as Only me, never wider (0.13.0). True when
+   * it was, and is to go again at once.
+   */
+  amend?(item: QueueItem, err: ApiRequestError): Promise<boolean>;
 }
 
 /**
@@ -80,6 +88,10 @@ export class Uploader {
    * trying the moment that changes rather than after their backoff.
    */
   private readonly phoneSide = new Set<string>();
+  /** Items being changed by a person (a note opened to edit, 0.13.0): not started until let go. */
+  private readonly held = new Set<string>();
+  /** Items a try is sending now, in this app: a note said to be 'sending' and not among them was cut off (S8). */
+  private readonly inFlight = new Set<string>();
 
   constructor(private readonly deps: UploaderDeps) {}
 
@@ -116,6 +128,17 @@ export class Uploader {
 
   private freshen = false;
 
+  /** Not sent while a person changes it; one already on its way is left to arrive. */
+  hold(id: string): void {
+    this.held.add(id);
+  }
+
+  /** Let go: sent as soon as its time comes. */
+  release(id: string): Promise<void> {
+    this.held.delete(id);
+    return this.kick();
+  }
+
   /** Back in the foreground: sending may start again. */
   resume(): Promise<void> {
     this.stopped = false;
@@ -140,11 +163,29 @@ export class Uploader {
 
   /** Every item due now, once each, in order — each checked against who is signed in when its turn comes. */
   private async drainOnce(): Promise<void> {
-    const due = (await this.mine()).filter((i) => i.state !== 'needs_you' && i.nextAt <= this.deps.now());
+    await this.recoverNotes();
+    const due = (await this.mine()).filter((i) => startable(i) && i.nextAt <= this.deps.now());
     for (const item of due) {
       if (this.stopped || !sameOwner(this.deps.who(), item)) return;
+      if (this.held.has(item.id)) continue;
       await this.attempt(item);
     }
+  }
+
+  /**
+   * A note left 'sending' with no try under way — the app closed, or was
+   * killed, while it went — may be in the vault, or not: said so, for its
+   * person to decide (0.13.0, S8), never stuck and never sent again unseen.
+   */
+  private async recoverNotes(): Promise<void> {
+    let changed = false;
+    for (const i of await this.mine()) {
+      if (i.kind === 'note' && i.state === 'sending' && !this.inFlight.has(i.id)) {
+        await this.deps.store.update(i.id, { state: 'unsure' });
+        changed = true;
+      }
+    }
+    if (changed) this.deps.onEvent?.({ kind: 'changed' });
   }
 
   private async mine(): Promise<QueueItem[]> {
@@ -160,7 +201,9 @@ export class Uploader {
     if (this.stopped) return;
     void this.mine().then((items) => {
       if (this.stopped || this.draining) return;
-      const next = Math.min(...items.filter((i) => i.state !== 'needs_you').map((i) => i.nextAt));
+      const next = Math.min(
+        ...items.filter((i) => startable(i) && !this.held.has(i.id)).map((i) => i.nextAt),
+      );
       if (!Number.isFinite(next)) return;
       const schedule = this.deps.schedule ?? defaultSchedule;
       this.cancelTimer = schedule(Math.max(0, next - this.deps.now()), () => void this.kick());
@@ -168,6 +211,7 @@ export class Uploader {
   }
 
   private async attempt(item: QueueItem): Promise<void> {
+    if (item.kind === 'note') return this.attemptNote(item);
     const { store } = this.deps;
     const attempts = item.attempts + 1;
     try {
@@ -208,6 +252,34 @@ export class Uploader {
     }
   }
 
+  /**
+   * A note (0.13.0): 'sending' first, before anything goes over the network,
+   * so from then on it can't be changed or deleted (the store refuses both
+   * while it is) — and its words are read only after that, so what goes is
+   * exactly what its person last saved. Deleted before that: nothing is sent.
+   */
+  private async attemptNote(item: QueueItem): Promise<void> {
+    const { store } = this.deps;
+    const attempts = item.attempts + 1;
+    if (!sameOwner(this.deps.who(), item)) return;
+    this.inFlight.add(item.id);
+    try {
+      await store.update(item.id, { state: 'sending', attempts });
+      this.deps.onEvent?.({ kind: 'changed' });
+      const bytes = await store.bytes(item.id);
+      if (!bytes) {
+        this.deps.onEvent?.({ kind: 'changed' });
+        return;
+      }
+      const made = await this.deps.send(item, bytes);
+      await this.sent(item, made.document_id);
+    } catch (err) {
+      await this.failed(item, attempts, err);
+    } finally {
+      this.inFlight.delete(item.id);
+    }
+  }
+
   /** GET /uploads/{key}; null when the vault has nothing finished under it. */
   private async statusOf(item: QueueItem): Promise<UploadStatus | null> {
     try {
@@ -232,6 +304,13 @@ export class Uploader {
   private async failed(item: QueueItem, attempts: number, err: unknown): Promise<void> {
     const random = this.deps.random ?? Math.random;
     const later = (e: unknown) => this.deps.now() + retryDelay(e, attempts, random);
+    if (err instanceof MaybeSentError) {
+      // It went, or may have, and no answer came: never sent again by itself.
+      this.phoneSide.delete(item.id);
+      await this.deps.store.update(item.id, { state: 'unsure', attempts, problem: null });
+      this.deps.onEvent?.({ kind: 'changed' });
+      return;
+    }
     if (err instanceof NotThisAccountError) {
       // Nothing was sent: the item stays exactly as it was, for its own person.
       await this.deps.store.update(item.id, { state: 'waiting' });
@@ -258,6 +337,11 @@ export class Uploader {
         return this.withoutDetails(item, attempts, err.detail);
       }
       if (FINAL.has(err.status) || (err.status === 409 && !err.retriable)) {
+        if (this.deps.amend && (await this.deps.amend(item, err))) {
+          this.again = true;
+          this.deps.onEvent?.({ kind: 'changed' });
+          return;
+        }
         await this.deps.store.update(item.id, {
           state: 'needs_you',
           attempts,

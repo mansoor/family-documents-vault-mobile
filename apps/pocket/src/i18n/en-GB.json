@@ -89,7 +89,7 @@
     "noneViewer": "No documents yet.",
     "needsAName": "Needs a name",
     "untitled": "Untitled document",
-    "offline": "No connection. What you see may be out of date.",
+    "offline": "Offline: showing what's saved on this phone. It may be out of date.",
     "settings": "Settings",
     "needName_one": "{{count}} document needs a name",
     "needName_other": "{{count}} documents need a name",
@@ -220,7 +220,11 @@
     "signOutTitle": "Sign out of this vault?",
     "signOutWords": "This phone shows nothing of the vault until you sign in again, with your password.",
     "deviceSignOutTitle": "Sign out “{{name}}”?",
-    "deviceSignOutWords": "It needs a password to sign in again, and any Essentials it keeps are removed from it."
+    "deviceSignOutWords": "It needs a password to sign in again, and any Essentials it keeps are removed from it.",
+    "notesWaiting_one": "A note you wrote hasn't reached the vault yet.",
+    "notesWaiting_other": "{{count}} notes you wrote haven't reached the vault yet.",
+    "changeVaultNotes_one": "A note written on this phone hasn't reached this vault, or may be on its way. It will be removed from this phone, and can't be got back.",
+    "changeVaultNotes_other": "{{count}} notes written on this phone haven't reached this vault, or may be on their way. They will be removed from this phone, and can't be got back."
   },
   "queue": {
     "sending": "Sending to the vault…",
@@ -715,7 +719,8 @@
   },
   "errors": {
     "general": "That didn't work. Try again in a moment.",
-    "offline": "Can't reach your vault right now. Check this phone's connection, then try again.",
+    "offline": "Can't reach your vault right now. Check you're on a network that can reach it.",
+    "noNetwork": "This phone is offline. Connect to Wi-Fi or mobile data, then try again.",
     "timeout": "Your vault took too long to answer. Try again in a moment.",
     "sessionEnded": "You were signed out. Sign in again to carry on.",
     "paused": "An owner has paused your access. Ask them if you think this is a mistake.",
@@ -793,7 +798,8 @@
     "stillNeeded": "Still needed: {{fields}}.",
     "changed": "Someone changed this document while you were editing. Here it is as it is now: check it and save again.",
     "noteTitle": "Edit note",
-    "changedNote": "Someone changed this note since you opened it. What you typed is still here: Save again to replace their change."
+    "changedNote": "Someone changed this note since you opened it. What you typed is still here: Save again to replace their change.",
+    "noteOffline": "Changing a note needs a connection to your vault. New notes can be written now, and are sent later."
   },
   "visibility": {
     "title": "Who can see it",
@@ -974,7 +980,7 @@
     "truncated": "Only the newest notes are shown. Find in notes to narrow them down.",
     "untitled": "Untitled note",
     "changed": "Changed {{when}}",
-    "needsConnection": "Notes need a connection to the vault.",
+    "needsConnection": "Your notes need a connection to your vault. You can still write a new one: it's sent once the vault can be reached.",
     "layout_sticky": "Sticky notes",
     "layout_list": "List",
     "layout_detailed": "Detailed",
@@ -985,7 +991,29 @@
     "forget": "Forget these searches",
     "forgetTitle": "Forget these searches?",
     "forgetWords": "What you looked for in your notes is forgotten on this phone. Your notes are not touched.",
-    "forgetYes": "Forget them"
+    "forgetYes": "Forget them",
+    "waitingTitle": "Waiting to send",
+    "waitingWhy": "Written on this phone while your vault couldn't be reached. Each goes by itself once it can be, and is then removed from this phone.",
+    "waiting": "Waiting to send",
+    "sending": "Sending…",
+    "couldNotSend": "Couldn't send — {{reason}}",
+    "tryAgain": "Try again",
+    "deleteLabel": "Delete “{{name}}” from this phone",
+    "deleteTitle": "Delete this note?",
+    "deleteWords": "“{{name}}” hasn't reached your vault, so it's only on this phone. Deleting it can't be undone.",
+    "deleteYes": "Delete it",
+    "deleteSending": "It's on its way to your vault now, so it can't be deleted here. Once it's there, delete it from its page.",
+    "narrowed": "“{{name}}” was sent as Only me: you can no longer make notes Adults only.",
+    "unsure": "Might already be in your vault",
+    "unsureWhy": "We sent this but didn't hear back. Check Notes first. If it isn't there, send it again.",
+    "sendAgain": "Send again",
+    "sendAgainNamed": "Send “{{name}}” again, as a new note",
+    "tryAgainNamed": "Try sending “{{name}}” again",
+    "lookInNotes": "Open Notes",
+    "lookInNotesHint": "Shows all your notes again, so you can see whether it's there",
+    "unreadable": "Couldn't read this note",
+    "openQueuedHint": "Opens it to change it",
+    "deleteWordsUnsure": "“{{name}}” might already be in your vault. Deleting it here only removes it from this phone: if it's in Notes, it stays there. This can't be undone."
   },
   "newNote": {
     "title": "New note",
@@ -995,7 +1023,16 @@
     "notFor": "A note is not a password manager: keep passwords and PINs in one, or at the very least in an Only me note.",
     "tooLong": "Too long to save: {{count}} characters.",
     "secret": "This looks like a password or a PIN. Everyone who can see this note can read and search it: keep passwords and PINs in a password manager, or make the note Only me.",
-    "secretOnlyMe": "This looks like a password or a PIN. A note is not a password manager: keep them in one if you can."
+    "secretOnlyMe": "This looks like a password or a PIN. A note is not a password manager: keep them in one if you can.",
+    "offline": "Your vault can't be reached right now. This note is kept on this phone, and sent once it can be.",
+    "queuedTitle": "Note waiting to send",
+    "queuedHint": "It's only on this phone until your vault can be reached. Changes are sent with it.",
+    "sendingNow": "This note is on its way to your vault now. Open it from Notes once it's there to change it.",
+    "gone": "This note has reached your vault. Open it from Notes to change it there.",
+    "notKept": "This phone couldn't keep the note to send later. Copy your words somewhere safe, then try again.",
+    "notWithItSending": "This note started on its way to your vault as it was, so your change didn't go with it. Save it as a new note to keep it, or Cancel.",
+    "notWithItGone": "This note reached your vault as it was, so your change didn't go with it. Save it as a new note to keep it, or Cancel.",
+    "saveAsNew": "Save as a new note"
   },
   "picker": {
     "find": "Find",
@@ -1487,5 +1524,14 @@
     "onlyMeWords_other": "Your {{count}} medical papers become Only me. Nobody else in the family can open them after this, owners included — only a caregiver you keep. Links you made to them end. You can’t answer this question again, but you can change each paper yourself later.",
     "onlyMeYes": "Make them Only me",
     "keepTheirsFinal": "This answer can’t be changed later, but {{name}} can still change each paper once they have their own sign-in."
+  },
+  "reach": {
+    "noNetwork": "This phone is offline. Showing what's saved on it.",
+    "unreachable": "Can't reach your vault right now. Check you're on a network that can reach it.",
+    "tryAgain": "Try again",
+    "tryAgainHint": "Looks for your vault again now",
+    "showingSaved": "Offline: showing what's saved on this phone.",
+    "wifiOnly": "This vault is used only on Wi-Fi. Join your Wi-Fi to reach it.",
+    "stranger": "Something other than your vault is answering at its address on this network."
   }
 }

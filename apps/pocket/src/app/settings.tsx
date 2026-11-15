@@ -45,16 +45,22 @@ export default function Settings() {
   const insets = useSafeAreaInsets();
   const [asking, setAsking] = useState(false);
   const [confirmOut, setConfirmOut] = useState(false);
-  // Signing out with scans still on their way: keep them for next time, or not.
+  // Signing out with scans, or notes written offline (0.13.0), still on their way: keep them for next time, or not.
   const leave = () => {
-    if (capture.queue.length > 0) setAsking(true);
+    if (capture.queue.length > 0 || capture.notes.length > 0) setAsking(true);
     else setConfirmOut(true);
   };
   // One already on its way cannot be called back: it is left to arrive.
-  const sending = capture.queue.filter((i) => i.state === 'sending').length;
+  const sending =
+    capture.queue.filter((i) => i.state === 'sending').length + capture.notes.filter((n) => n.state === 'sending').length;
   const leaveAnyway = async (remove: boolean) => {
     setAsking(false);
-    if (remove) await capture.removeMany(capture.queue.filter((i) => i.state !== 'sending').map((i) => i.id));
+    if (remove) {
+      await capture.removeMany([
+        ...capture.queue.filter((i) => i.state !== 'sending').map((i) => i.id),
+        ...capture.notes.filter((n) => n.state !== 'sending').map((n) => n.id),
+      ]);
+    }
     await signOut();
   };
   const version = t('settings.version', { server: caps?.server_version ?? '…', app: APP_VERSION });
@@ -178,7 +184,14 @@ export default function Settings() {
         cancelID="sign-out-no"
       />
       <Sheet visible={asking} onClose={() => setAsking(false)} testID="sign-out-question">
-        <Text variant="screen">{t('settings.waiting', { count: capture.queue.length })}</Text>
+        {capture.queue.length > 0 ? (
+          <Text variant="screen">{t('settings.waiting', { count: capture.queue.length })}</Text>
+        ) : null}
+        {capture.notes.length > 0 ? (
+          <Text variant={capture.queue.length > 0 ? 'body' : 'screen'} testID="sign-out-notes">
+            {t('settings.notesWaiting', { count: capture.notes.length })}
+          </Text>
+        ) : null}
         {sending > 0 ? <Text tone="soft">{t('settings.onItsWay', { count: sending })}</Text> : null}
         <Button label={t('settings.keepThem')} onPress={() => void leaveAnyway(false)} testID="sign-out-keep" />
         <Button

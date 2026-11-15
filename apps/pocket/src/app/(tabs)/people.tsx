@@ -63,6 +63,11 @@ export default function PeopleScreen() {
             {t('people.needsConnection')}
           </Notice>
         ) : null}
+        {offline && members ? (
+          <Text variant="secondary" tone="soft" testID="people-showing-saved">
+            {t('reach.showingSaved')}
+          </Text>
+        ) : null}
         {failed ? <LoadFailed words={failed} onRetry={() => void load()} /> : null}
         {!members && !failed && !offline ? <Placeholder rows={4} /> : null}
         {members?.map((m) => {

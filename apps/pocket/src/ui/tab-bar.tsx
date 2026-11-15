@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AddButton } from '../capture/add-button';
+import { ReachBanner } from './reach-banner';
 import { useVault } from '../state/vault';
 import { Text } from './index';
 import { useTextScale } from './text-scale';
@@ -71,10 +72,14 @@ export function TabBar(props: TabBarProps) {
     );
   };
   return (
-    <View style={[styles.bar, { paddingBottom: 6 + insets.bottom }]} accessibilityRole="tablist" testID="tab-bar">
-      {routes.slice(0, 2).map(tab)}
-      {canAdd ? <AddButton /> : null}
-      {routes.slice(2).map(tab)}
+    <View>
+      {/* The vault not answering, said just above the tabs (0.13.0). */}
+      <ReachBanner />
+      <View style={[styles.bar, { paddingBottom: 6 + insets.bottom }]} accessibilityRole="tablist" testID="tab-bar">
+        {routes.slice(0, 2).map(tab)}
+        {canAdd ? <AddButton /> : null}
+        {routes.slice(2).map(tab)}
+      </View>
     </View>
   );
 }

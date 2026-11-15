@@ -1,5 +1,5 @@
 import type { QueueItem } from './item';
-import type { QueueStore } from './store';
+import type { ChangeOutcome, QueueStore } from './store';
 
 /**
  * queue.db: captures waiting for the vault, encrypted with SQLCipher under
@@ -210,6 +210,54 @@ export class SqliteQueueStore implements QueueStore {
         `update queue_item set ${fields.map((f) => `${COLUMNS[f]} = ?`).join(', ')} where id = ?`,
         [...fields.map((f) => toParam(f, patch[f])), id],
       );
+    });
+  }
+
+  replaceBytes(
+    id: string,
+    bytes: Uint8Array,
+    patch: Partial<Omit<QueueItem, 'id'>>,
+    opts: { evenIfSending?: boolean } = {},
+  ): Promise<ChangeOutcome> {
+    const fields = (Object.keys(patch) as Exclude<keyof QueueItem, 'id'>[]).filter((f) => f in COLUMNS);
+    return this.serial(async () => {
+      let out: ChangeOutcome = 'gone';
+      // The bytes and the item together, or neither; looked at and changed in one go.
+      await this.db.withTransactionAsync(async () => {
+        const row = await this.db.getFirstAsync<{ state: string }>('select state from queue_item where id = ?', [id]);
+        if (!row) return;
+        if (row.state === 'sending' && !opts.evenIfSending) {
+          out = 'sending';
+          return;
+        }
+        await this.db.runAsync('update queue_bytes set bytes = ? where id = ?', [bytes, id]);
+        if (fields.length > 0) {
+          await this.db.runAsync(
+            `update queue_item set ${fields.map((f) => `${COLUMNS[f]} = ?`).join(', ')} where id = ?`,
+            [...fields.map((f) => toParam(f, patch[f])), id],
+          );
+        }
+        out = 'ok';
+      });
+      return out;
+    });
+  }
+
+  removeIdle(id: string): Promise<ChangeOutcome> {
+    return this.serial(async () => {
+      let out: ChangeOutcome = 'gone';
+      await this.db.withTransactionAsync(async () => {
+        const row = await this.db.getFirstAsync<{ state: string }>('select state from queue_item where id = ?', [id]);
+        if (!row) return;
+        if (row.state === 'sending') {
+          out = 'sending';
+          return;
+        }
+        await this.db.runAsync('delete from queue_bytes where id = ?', [id]);
+        await this.db.runAsync('delete from queue_item where id = ?', [id]);
+        out = 'ok';
+      });
+      return out;
     });
   }
 

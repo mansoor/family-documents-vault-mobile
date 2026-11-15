@@ -8,6 +8,7 @@ import {
   SessionCore,
   type Api,
   type FetchLike,
+  type Http,
   type ResponseLike,
   type StoredSession,
   type TokenStore,
@@ -18,8 +19,12 @@ import { AppState, Platform } from 'react-native';
 import { log } from '../log';
 import { appHeaders } from '../net/app-headers';
 import type { ConnectOutcome } from '../net/connect';
+import { REQUEST_TIMEOUT_MS, routeDownloads, withStallGuard } from '../net/deadline';
 import { currentNetwork, onNetworkChange } from '../net/network';
 import { httpDecision, identityCheck, type NetworkKind } from '../net/policy';
+import { unreachableAnswer } from '../net/no-connection';
+import { noNetwork, setPhoneOffline, type Reach } from '../net/reach';
+import { watched, type Departure } from '../queue/note-send';
 import { firstLaunch } from '../platform/prefs';
 import { pushNative, type PushNative } from '../push/native';
 import { forgetPreviousInstallation, installationId, SecureTokenStore } from '../session/store';
@@ -89,6 +94,16 @@ export interface VaultDeps {
   fetch: FetchLike;
   /** For uploads: expo/fetch on the phone, which sends a body of bytes as it is. */
   uploadFetch: FetchLike;
+  /**
+   * For downloads (a file, a page, a picture): expo/fetch on the phone too,
+   * whose body comes as it arrives, so one that stops coming is noticed
+   * (net/deadline.ts) rather than waited for.
+   */
+  downloadFetch: FetchLike;
+  /** How long an ordinary request waits for its answer (net/deadline.ts); a test makes it short. */
+  requestTimeoutMs: number;
+  /** Runs `fn` after `ms`; returns a cancel. The looks again while the vault gives no answer use it. */
+  schedule: (ms: number, fn: () => void) => () => void;
   network: () => Promise<NetworkKind>;
   /** Calls back on any change of network; returns the unsubscribe. */
   onNetworkChange: (callback: () => void) => () => void;
@@ -107,6 +122,13 @@ interface VaultValue {
   vault: VaultRecord | null;
   caps: Capabilities | null;
   offline: boolean;
+  /**
+   * Why there is no answer, while there is none (0.13.0): the phone has no
+   * network at all, or it has one and the vault can't be reached on it.
+   * 'online' otherwise. The tabs' banner says which, and the app looks again
+   * by itself, on a network change, back in front, and every so often.
+   */
+  reach: Reach;
   /**
    * The vault turned a renewal away for too many tries and asked for a wait
    * the client is waiting out: the seconds, while it does (I5-4); else null.
@@ -145,7 +167,18 @@ interface VaultValue {
    * client's token({ wait: 'join' }).
    */
   withTokenQuick: <T>(fn: (api: Api, token: string) => Promise<T>) => Promise<T>;
-  recheck: () => Promise<void>;
+  /**
+   * Looks at the vault again (its capability document, nothing secret):
+   * true when it answered. One look at a time: a second asked meanwhile
+   * shares the first (0.13.0).
+   */
+  recheck: () => Promise<boolean>;
+  /**
+   * The vault's http for sending a note written on this phone (0.13.0), its
+   * fetch watched, so a failure can say whether the request ever left
+   * (queue/note-send.ts). Null until there is a vault.
+   */
+  watchedHttp: (watch: (d: Departure) => void) => Http | null;
   /**
    * Work that must be done while the session still works, before signing
    * out or leaving the vault (4.14: the phone's push device is removed, so
@@ -167,6 +200,13 @@ const IDENTITY_TTL = 5 * 60_000;
 const SIGN_OUT_WAIT_MS = 3_000;
 /** How long an https vault's capability document is believed before the front looks again. */
 const RECHECK_TTL = 5 * 60_000;
+/**
+ * While the vault gives no answer, how long before the app looks again by
+ * itself (0.13.0), each wait longer than the last, up to the last: the
+ * banner goes once it answers, and what waited for it (notes written
+ * offline, scans) is sent.
+ */
+export const RETRY_WAITS_MS = [10_000, 20_000, 40_000, 60_000] as const;
 
 /** The vault answering on this network is not the one approved. */
 export class StrangerError extends Error {
@@ -223,6 +263,12 @@ function withSizedTimeout(send: FetchLike): FetchLike {
 const defaultDeps = (): VaultDeps => ({
   fetch: platformFetch,
   uploadFetch: expoUploadFetch,
+  downloadFetch: expoUploadFetch,
+  requestTimeoutMs: REQUEST_TIMEOUT_MS,
+  schedule: (ms, fn) => {
+    const timer = setTimeout(fn, ms);
+    return () => clearTimeout(timer);
+  },
   network: currentNetwork,
   onNetworkChange,
   store: new SecureTokenStore(),
@@ -237,6 +283,7 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
       ...defaultDeps(),
       ...props.deps,
       uploadFetch: props.deps?.uploadFetch ?? props.deps?.fetch ?? expoUploadFetch,
+      downloadFetch: props.deps?.downloadFetch ?? props.deps?.fetch ?? expoUploadFetch,
     }),
     [props.deps],
   );
@@ -244,6 +291,7 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
   const [vault, setVault] = useState<VaultRecord | null>(null);
   const [caps, setCaps] = useState<Capabilities | null>(null);
   const [offline, setOffline] = useState(false);
+  const [reach, setReach] = useState<Reach>('online');
   const [waiting, setWaiting] = useState<number | null>(null);
   const waitingRef = useRef<number | null>(null);
   const heardWait = useCallback((seconds: number | null) => {
@@ -277,13 +325,15 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
       // eslint-disable-next-line react-hooks/refs
       createHttp({
         baseUrl: origin,
-        fetch: deps.fetch,
+        // JSON by the phone's fetch; files by one whose bytes are watched as they come.
+        fetch: routeDownloads(deps.fetch, withStallGuard(deps.downloadFetch)),
         headers: () => appHeaders(installation),
-        timeoutMs: 20_000,
+        // No answer in this long, and none is waited for (0.13.0, net/deadline.ts).
+        timeoutMs: deps.requestTimeoutMs,
         onServerVersion: (version) => versionHeard.current(version),
       }),
     );
-  }, [origin, installation, deps.fetch]);
+  }, [origin, installation, deps.fetch, deps.downloadFetch, deps.requestTimeoutMs]);
 
   const uploadApi = useMemo(() => {
     if (!origin || !installation) return null;
@@ -303,16 +353,45 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
   // And if the app had found no connection, it looks now — what waited
   // for the connection (kept Essentials, 4.10) carries on when it answers.
   const offlineRef = useRef(false);
-  const recheckRef = useRef<() => Promise<void>>(async () => undefined);
+  const recheckRef = useRef<() => Promise<boolean>>(async () => false);
+  // Bumped on a network change: whether the phone has one at all is asked again.
+  const [networkSeen, setNetworkSeen] = useState(0);
   useEffect(
     () =>
       deps.onNetworkChange(() => {
         epoch.current += 1;
         verified.current = null;
+        setNetworkSeen((n) => n + 1);
         if (offlineRef.current && AppState.currentState === 'active') void recheckRef.current();
       }),
     [deps],
   );
+
+  // No answer: is it the phone, with no network at all, or the vault, not
+  // answering on the network it has? Asked when the answers stop, and again
+  // on each network change while they have.
+  useEffect(() => {
+    if (!offline) {
+      setPhoneOffline(false);
+      // Answering again: said at once, nothing to ask.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setReach('online');
+      return;
+    }
+    let stopped = false;
+    void deps
+      .network()
+      .catch((): NetworkKind => 'unknown')
+      .then((kind) => {
+        if (stopped) return;
+        const none = noNetwork(kind);
+        setPhoneOffline(none);
+        setReach(none ? 'no_network' : 'unreachable');
+      });
+    return () => {
+      stopped = true;
+    };
+  }, [offline, networkSeen, deps]);
 
   /**
    * For an http vault: may anything secret go to it, here and now? Only on
@@ -437,8 +516,8 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
     };
   }, []);
 
-  const recheck = useCallback(async () => {
-    if (!api || !vault) return;
+  const look = useCallback(async (): Promise<boolean> => {
+    if (!api || !vault) return false;
     epoch.current += 1;
     verified.current = null;
     if (vault.origin.startsWith('http://')) {
@@ -447,10 +526,11 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
       try {
         await gate();
         setOffline(false);
+        return true;
       } catch (err) {
-        if (unusable(err)) setOffline(true);
+        if (unusable(err) || unreachableAnswer(err)) setOffline(true);
+        return false;
       }
-      return;
     }
     try {
       const answered = await api.capabilities();
@@ -467,11 +547,39 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
         await session.clear();
         setNotice('reinstalled');
         setPhase('sign_in');
+        return false;
       }
+      return true;
     } catch (err) {
-      if (err instanceof NetworkError) setOffline(true);
+      // No answer, or a gateway's in its place (502–504): not reachable.
+      if (err instanceof NetworkError || unreachableAnswer(err)) setOffline(true);
+      return false;
     }
   }, [api, vault, session, gate, deps]);
+  // One look at a time: Try again, the looks by themselves, a timeout and a
+  // note about to be sent all share the one under way.
+  const looking = useRef<Promise<boolean> | null>(null);
+  const recheck = useCallback((): Promise<boolean> => {
+    if (looking.current) return looking.current;
+    const run = look().finally(() => {
+      if (looking.current === run) looking.current = null;
+    });
+    looking.current = run;
+    return run;
+  }, [look]);
+
+  const watchedHttp = useCallback(
+    (watch: (d: Departure) => void): Http | null =>
+      origin && installation
+        ? createHttp({
+            baseUrl: origin,
+            fetch: watched(deps.fetch, watch),
+            headers: () => appHeaders(installation),
+            timeoutMs: deps.requestTimeoutMs,
+          })
+        : null,
+    [origin, installation, deps.fetch, deps.requestTimeoutMs],
+  );
 
   /**
    * The vault signed this phone out and said so by push (4.14): signed out
@@ -558,6 +666,39 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
     recheckRef.current = recheck;
   }, [offline, recheck]);
 
+  // While there is no answer, and the app is in front: looked at again by
+  // itself, each wait longer than the last (RETRY_WAITS_MS), so the banner
+  // goes, and what waited is sent, without anybody pressing Try again.
+  const [inFront, setInFront] = useState(AppState.currentState !== 'background');
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => setInFront(state === 'active'));
+    return () => sub.remove();
+  }, []);
+  // Not while the phone has no network at all: nothing could answer, and the
+  // network coming back says so by itself (onNetworkChange, above).
+  const noNet = reach === 'no_network';
+  useEffect(() => {
+    if (!offline || noNet || phase !== 'ready' || !inFront) return;
+    let tries = 0;
+    let stopped = false;
+    let cancel: () => void = () => undefined;
+    const next = () => {
+      if (stopped) return;
+      const wait = RETRY_WAITS_MS[Math.min(tries, RETRY_WAITS_MS.length - 1)] as number;
+      tries += 1;
+      cancel = deps.schedule(wait, () => {
+        void recheckRef.current().finally(() => {
+          if (offlineRef.current) next();
+        });
+      });
+    };
+    next();
+    return () => {
+      stopped = true;
+      cancel();
+    };
+  }, [offline, noNet, phase, inFront, deps]);
+
   // An answer from another version than the one last read: the vault was
   // upgraded (or rolled back), so what it can do is read again. Once per
   // version, so a vault that says two things cannot make every answer a
@@ -605,6 +746,7 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
         await gate();
       } catch (err) {
         if (unusable(err)) setOffline(true);
+        else if (unreachableAnswer(err) || (err instanceof NetworkError && err.kind === 'timeout')) void recheck();
         throw err;
       }
       const t = await session.token({ wait });
@@ -629,7 +771,11 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
         setOffline(false);
         return out;
       } catch (err) {
-        if (err instanceof NetworkError) setOffline(true);
+        // No network on the way: offline at once. One answer too slow, or a
+        // gateway's 502–504 in the vault's place: looked at again, and that
+        // look decides (0.13.0) — one slow answer is not "can't reach".
+        if (err instanceof NetworkError && err.kind === 'offline') setOffline(true);
+        else if (err instanceof NetworkError || unreachableAnswer(err)) void recheck();
         if (isSessionOver(err)) {
           await session.clear();
           emit('sessionEnded', (err as ApiRequestError).reason ?? 'revoked');
@@ -639,7 +785,7 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
         throw err;
       }
     },
-    [api, gate, session, hydrated],
+    [api, gate, session, hydrated, recheck],
   );
   const withToken = useCallback(
     <T,>(fn: (a: Api, token: string) => Promise<T>): Promise<T> => tokenFor(fn, true),
@@ -848,6 +994,7 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
       vault,
       caps,
       offline,
+      reach,
       waiting,
       notice,
       api,
@@ -864,6 +1011,7 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
       withTokenNow,
       withTokenQuick,
       recheck,
+      watchedHttp,
       onBeforeSignOut,
     }),
     [
@@ -871,6 +1019,7 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
       vault,
       caps,
       offline,
+      reach,
       waiting,
       notice,
       api,
@@ -887,6 +1036,7 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
       withTokenNow,
       withTokenQuick,
       recheck,
+      watchedHttp,
       onBeforeSignOut,
     ],
   );

@@ -90,6 +90,11 @@ export function Button(props: {
   kind?: 'primary' | 'quiet' | 'danger';
   /** Small (R6): an action on a row, 32 dp high and 44 with its hit slop. */
   size?: 'small';
+  /**
+   * Less room at its sides (0.13.0): two side by side on a 360 dp phone, each
+   * label on one line. Its height, and the type, are as any button's.
+   */
+  tight?: boolean;
   disabled?: boolean;
   busy?: boolean;
   hint?: string;
@@ -114,6 +119,7 @@ export function Button(props: {
       style={({ pressed }) => [
         styles.button,
         small ? styles.small : null,
+        props.tight ? styles.tight : null,
         kind === 'quiet' ? styles.quiet : kind === 'danger' ? styles.danger : styles.primary,
         disabled ? styles.disabled : null,
         pressed ? styles.pressed : null,
@@ -312,6 +318,7 @@ const makeStyles = (colours: Palette) =>
       alignItems: 'center',
     },
     small: { minHeight: 32, borderRadius: radii.s, paddingHorizontal: sp(10), paddingVertical: sp(4) },
+    tight: { paddingHorizontal: sp(10) },
     primary: { backgroundColor: colours.accent },
     danger: { backgroundColor: colours.danger },
     quiet: { backgroundColor: colours.surface, borderWidth: 1, borderColor: colours.borderInput },
