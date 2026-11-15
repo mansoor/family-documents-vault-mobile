@@ -6,6 +6,77 @@ app's own, tagged `vX.Y.Z` in this repository.
 
 ## [Unreleased]
 
+## [0.13.1] — A note whose answer was lost is sent again safely
+
+Re-pinned to the vault's **v0.9.0-dev.45**, which keeps a new note's
+Idempotency-Key (`features.idempotent_create`): the same key and the same
+body again make nothing new. Notes written offline (0.13.0) now use it fully.
+A vault without it is answered exactly as by 0.13.0.
+
+### Changed
+- **The key is decided by what the vault says now.** Every try asks the vault
+  first, and that answer — never one from before it, nor a guess while the
+  app is still starting — decides whether the note goes under its key. With
+  no answer, nothing is sent. A note that went once under its key never goes
+  without one: should the vault say it keeps none now, it's "Might already be
+  in your vault". What the vault last said is kept on the phone as a hint for
+  what Notes offers, never to decide a send.
+- **The words a note first went with are kept with its key.** Once a note has
+  been sent under its key, what went — title, words, whose and who can see
+  it — is kept with the key, in the note's encrypted bytes on the phone,
+  before anything goes, and every later try sends exactly that. A note
+  changed meanwhile goes again with the words it first went with, which
+  settles safely whether the first try landed. New note says so when such a
+  note is opened.
+- **"Still being made", "busy" and a 5xx are not refusals.** The vault's `409
+  idempotency_in_progress`, `503 busy_try_again` and any 5xx (a gateway's
+  502 or 504 among them) are sent again under the same key after the vault's
+  Retry-After, waiting twice as long each time, at most 5 minutes apart —
+  for as long as the vault keeps the key. A change made meanwhile keeps the
+  wait the vault asked for.
+- **The vault keeps a key 24 hours**: a note is never sent again by itself
+  more than 23 hours after its first try, nor with the phone's clock put back
+  before that try. It's "Might already be in your vault" then.
+- **Send again settles it, while it can.** "Might already be in your vault",
+  still within its key's day on a vault that keeps keys: Send again goes
+  under the same key with the words it first went with, so the vault's
+  answer settles it — one note, never two. After that day, or to a vault
+  that keeps no key, Send again is a new note, as before.
+- **Refused outright on its first try** (any 4xx but signed out, a timeout,
+  "still being made" and too many tries): nothing was made, so the note can
+  be put right — shortened, say — and goes as it is then. Refused on a later
+  try, that says nothing of the first: "Might already be in your vault", its
+  key and its day kept.
+- A note cut off while sending (the app closed) goes again under its key
+  only if that try went with one; otherwise it's "Might already be in your
+  vault".
+- New note puts the note in the phone's queue before anything goes, so an
+  app closed mid-Save never loses it.
+- A failed SSL read in the middle of an answer is "might have arrived": only
+  a refused handshake or certificate means a try never left.
+
+### Added
+- **"In your vault, with its earlier words"**: a note the vault has as it first
+  went, changed on the phone since, says "Your note reached the vault with
+  its earlier words. Send your changes as a new note?". When the vault said
+  where it is, and who can see it is unchanged, **Put my changes in that
+  note** comes first; then Send as a new note (the change, under a new key)
+  and Discard changes, asked first. Nothing happens by itself. A vault that
+  kept other words under the key (`422 idempotency_key_reused`) says an
+  earlier version is already there, with the same choice; for a note
+  unchanged since, those are its words, and it's sent.
+- **Reached the vault, kept private since**: a note the vault made and its
+  writer can no longer see (`404 created_not_visible` — the person it's
+  about made it Only me) is sent: Notes says it reached the vault and is now
+  kept private by the person it's about — kept on the phone until Notes has
+  said it. It's never sent again.
+- A row that asks something — "Might already be in your vault", or "In your
+  vault, with its earlier words" — reads its question to a screen reader
+  with it; the bin on the latter is "Discard your changes to …".
+- Words for the vault's new answers, should one ever be shown:
+  `idempotency_in_progress`, `busy_try_again`, `created_not_visible` and
+  `idempotency_key_reused`.
+
 ## [0.13.0] — Notes written offline, and a clear word when the vault can't be reached
 
 The owner's requests after installing 0.12.0. The vault pin is unchanged

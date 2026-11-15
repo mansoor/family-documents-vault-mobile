@@ -746,6 +746,9 @@
     "batchFull": "The batch it was going into is full. Remove it here and scan it again.",
     "changedElsewhere": "This was changed somewhere else, so nothing was saved. Look at it again, then try again.",
     "alreadyDecided": "It's already been dealt with in your Inbox.",
+    "createInProgress": "Your vault is still saving this from an earlier try. It's sent again in a moment.",
+    "createdNotVisible": "This reached your vault, and is now kept private by the person it's about.",
+    "earlierVersion": "An earlier version of this is already in your vault.",
     "linksChoice": "You have share links to this document. Say whether they end or keep working, then try again.",
     "sensitiveConfirm": "This is sensitive, so nothing was shared. Say you mean to share it, then try again.",
     "sensitiveStillShared": "This paper is sensitive and still shared outside the family. See More → Sharing to keep or end its links."
@@ -1013,7 +1016,23 @@
     "lookInNotesHint": "Shows all your notes again, so you can see whether it's there",
     "unreadable": "Couldn't read this note",
     "openQueuedHint": "Opens it to change it",
-    "deleteWordsUnsure": "“{{name}}” might already be in your vault. Deleting it here only removes it from this phone: if it's in Notes, it stays there. This can't be undone."
+    "deleteWordsUnsure": "“{{name}}” might already be in your vault. Deleting it here only removes it from this phone: if it's in Notes, it stays there. This can't be undone.",
+    "arrived": "In your vault, with its earlier words",
+    "arrivedWhy": "Your note reached the vault with its earlier words. Send your changes as a new note?",
+    "arrivedWhyReused": "An earlier version of this note is already in your vault. Send your changes as a new note?",
+    "arrivedWhyHidden": "Your note reached the vault with its earlier words, and is now kept private by the person it's about. Send your changes as a new note?",
+    "putInto": "Put my changes in that note",
+    "putIntoNamed": "Put your changes to “{{name}}” in the note in your vault",
+    "putIntoChanged": "That note was changed somewhere else since, so your changes weren't put in. Send them as a new note, or discard them.",
+    "sendAgainSameNamed": "Send “{{name}}” again, to find out whether it reached your vault",
+    "sendChanges": "Send as a new note",
+    "sendChangesNamed": "Send your changes to “{{name}}” as a new note",
+    "discardChanges": "Discard changes",
+    "discardChangesNamed": "Discard your changes to “{{name}}”",
+    "discardTitle": "Discard your changes?",
+    "discardWords": "“{{name}}” is in your vault with its earlier words, and stays there. Your changes are only on this phone: discarding them can't be undone.",
+    "discardYes": "Discard them",
+    "hidden": "“{{name}}” reached your vault. It's now kept private by the person it's about, so it isn't in your list."
   },
   "newNote": {
     "title": "New note",
@@ -1032,7 +1051,8 @@
     "notKept": "This phone couldn't keep the note to send later. Copy your words somewhere safe, then try again.",
     "notWithItSending": "This note started on its way to your vault as it was, so your change didn't go with it. Save it as a new note to keep it, or Cancel.",
     "notWithItGone": "This note reached your vault as it was, so your change didn't go with it. Save it as a new note to keep it, or Cancel.",
-    "saveAsNew": "Save as a new note"
+    "saveAsNew": "Save as a new note",
+    "sentOnce": "This note was sent once and we haven't heard back yet. If you change it, we first make sure that one reached your vault, then ask about your changes."
   },
   "picker": {
     "find": "Find",

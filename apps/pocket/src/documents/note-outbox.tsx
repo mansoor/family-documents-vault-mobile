@@ -1,13 +1,16 @@
+import { ApiRequestError } from '@fdv/client';
 import { noteFirstWords, radii } from '@fdv/shared';
 import { useRouter } from 'expo-router';
 import type { TFunction } from 'i18next';
 import { CircleHelp, CloudUpload, FileWarning, Trash2 } from 'lucide-react-native';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, View } from 'react-native';
-import { wordsForCode } from '../errors/words';
+import { wordsFor, wordsForCode } from '../errors/words';
 import type { QueueItem } from '../queue/item';
 import { useCapture, type QueuedNote } from '../state/capture';
+import { emit } from '../state/events';
+import { useStepUp } from '../state/step-up';
 import { Button, Notice, Text } from '../ui';
 import { ConfirmSheet } from '../ui/confirm';
 import { IconButton } from '../ui/icon-button';
@@ -24,11 +27,23 @@ export function couldNotSendWhy(problem: QueueItem['problem'], t: TFunction): st
   return problem?.message || wordsForCode(problem?.code, t);
 }
 
+/**
+ * What a note in the vault with its earlier words says (0.13.1): made as it
+ * first went; an earlier version kept under its key (422); or made, and kept
+ * private since by the person it's about (404 created_not_visible).
+ */
+export function arrivedWhyKey(code: string | null | undefined): string {
+  if (code === 'idempotency_key_reused') return 'notesList.arrivedWhyReused';
+  if (code === 'created_not_visible') return 'notesList.arrivedWhyHidden';
+  return 'notesList.arrivedWhy';
+}
+
 /** How a queued note stands, in words. */
 function stateWords(n: QueuedNote, t: TFunction): string {
   if (!n.payload) return t('notesList.unreadable');
   if (n.state === 'sending') return t('notesList.sending');
   if (n.state === 'unsure') return t('notesList.unsure');
+  if (n.state === 'arrived') return t('notesList.arrived');
   if (n.state === 'needs_you') return t('notesList.couldNotSend', { reason: couldNotSendWhy(n.problem, t) });
   return t('notesList.waiting');
 }
@@ -44,6 +59,13 @@ function stateWords(n: QueuedNote, t: TFunction): string {
  *   in Notes (Look in Notes), then Sends again — as a new note — or Deletes.
  * - "Couldn't send — {reason}": refused by the vault for a reason trying
  *   again by itself can't fix: Try again, or Delete.
+ * - "In your vault, with its earlier words" (0.13.1): sent under its key,
+ *   then changed here; the vault has it as it first went. Put my changes in
+ *   that note (when the vault said where it is, and who can see it is
+ *   unchanged), Send as a new note (the change, under a new key), or
+ *   Discard changes, asked first.
+ * - Might already be in your vault, still within its key's day (0.13.1):
+ *   Send again goes under the same key, which settles it.
  * - "Couldn't read this note": its words on the phone can't be read: Delete.
  *
  * Every Delete asks first. Once sent, each is an ordinary note below.
@@ -56,7 +78,8 @@ export function NoteOutbox(props: { onLookInNotes: () => void }) {
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const untitled = t('notesList.untitled');
-  if (capture.notes.length === 0 && capture.notesNarrowed.length === 0) return null;
+  if (capture.notes.length === 0 && capture.notesNarrowed.length === 0 && capture.notesHidden.length === 0) return null;
+  const discarding = deleting?.state === 'arrived';
   return (
     <View style={styles.section} testID="notes-outbox">
       {capture.notesNarrowed.length > 0 ? (
@@ -71,6 +94,7 @@ export function NoteOutbox(props: { onLookInNotes: () => void }) {
           />
         </Notice>
       ) : null}
+      <HiddenSaid names={capture.notesHidden} onShown={capture.sawNotesHidden} onDone={capture.dismissNotesHidden} />
       {capture.notes.length > 0 ? (
         <>
           <Text variant="secondary" weight="600" tone="soft" role="header">
@@ -97,11 +121,16 @@ export function NoteOutbox(props: { onLookInNotes: () => void }) {
         visible={deleting !== null}
         testID="queued-note-delete-question"
         icon={Trash2}
-        title={t('notesList.deleteTitle')}
-        words={t(deleting?.state === 'unsure' ? 'notesList.deleteWordsUnsure' : 'notesList.deleteWords', {
-          name: deleting ? queuedNoteName(deleting, untitled) : '',
-        })}
-        confirmLabel={t('notesList.deleteYes')}
+        title={t(discarding ? 'notesList.discardTitle' : 'notesList.deleteTitle')}
+        words={t(
+          discarding
+            ? 'notesList.discardWords'
+            : deleting?.state === 'unsure' || deleting?.payload?.sent
+              ? 'notesList.deleteWordsUnsure'
+              : 'notesList.deleteWords',
+          { name: deleting ? queuedNoteName(deleting, untitled) : '' },
+        )}
+        confirmLabel={t(discarding ? 'notesList.discardYes' : 'notesList.deleteYes')}
         busy={deleteBusy}
         problem={problem}
         onConfirm={() => {
@@ -125,6 +154,22 @@ export function NoteOutbox(props: { onLookInNotes: () => void }) {
   );
 }
 
+/** Notes said kept private now: once shown, no longer kept on the phone to say again. */
+function HiddenSaid(props: { names: string[]; onShown: () => void; onDone: () => void }) {
+  const { t } = useTranslation();
+  const { names, onShown } = props;
+  useEffect(() => {
+    if (names.length > 0) onShown();
+  }, [names, onShown]);
+  if (names.length === 0) return null;
+  return (
+    <Notice tone="info" testID="notes-hidden">
+      <Text>{names.map((name) => t('notesList.hidden', { name })).join(' ')}</Text>
+      <Button kind="quiet" size="small" label={t('row.done')} onPress={props.onDone} testID="notes-hidden-done" />
+    </Notice>
+  );
+}
+
 function QueuedRow(props: { note: QueuedNote; name: string; onDelete: () => void; onLookInNotes: () => void }) {
   const styles = useStyles(makeStyles);
   const colours = useColours();
@@ -135,14 +180,49 @@ function QueuedRow(props: { note: QueuedNote; name: string; onDelete: () => void
   const state = stateWords(n, t);
   const readable = n.payload !== null;
   const sending = n.state === 'sending';
-  const Icon = !readable ? FileWarning : n.state === 'unsure' ? CircleHelp : CloudUpload;
+  const arrived = n.state === 'arrived';
+  const Icon = !readable ? FileWarning : n.state === 'unsure' || arrived ? CircleHelp : CloudUpload;
+  // The question a row asks is read with it, never hidden behind the row's own label.
+  const why = !readable
+    ? null
+    : n.state === 'unsure'
+      ? t('notesList.unsureWhy')
+      : arrived
+        ? t(arrivedWhyKey(n.problem?.code))
+        : null;
+  const { guarded } = useStepUp();
+  const [putBusy, setPutBusy] = useState(false);
+  const [putProblem, setPutProblem] = useState<string | null>(null);
+  const landed = arrived && !n.problem ? n.payload?.landed : undefined;
+  // Into that note only with who can see it as it is there: never wider.
+  const canPut = !!landed && n.payload?.visibility === landed.visibility;
+  const putInto = async () => {
+    const p = n.payload;
+    if (!landed || !p || putBusy) return;
+    setPutBusy(true);
+    setPutProblem(null);
+    try {
+      const body = { title: p.title?.trim() || null, notes: p.notes?.trim() || null };
+      const saved = await guarded((a, tk) => a.updateDocument(tk, landed.id, body, landed.etag ?? undefined));
+      if (saved === null) return;
+      emit('documentChanged', saved.id);
+      // In that note now: nothing of it left to send.
+      await capture.removeNote(n.id);
+    } catch (err) {
+      setPutProblem(
+        err instanceof ApiRequestError && err.status === 409 ? t('notesList.putIntoChanged') : wordsFor(err, t),
+      );
+    } finally {
+      setPutBusy(false);
+    }
+  };
   return (
     <View style={styles.row} testID={`queued-note-${n.id}`}>
       <View style={styles.top}>
         <Pressable
           testID={`queued-note-open-${n.id}`}
           accessibilityRole="button"
-          accessibilityLabel={`${props.name}. ${state}`}
+          accessibilityLabel={why ? `${props.name}. ${state}. ${why}` : `${props.name}. ${state}`}
           {...(readable && !sending ? { accessibilityHint: t('notesList.openQueuedHint') } : {})}
           disabled={!readable || sending}
           accessibilityState={{ disabled: !readable || sending }}
@@ -166,12 +246,17 @@ function QueuedRow(props: { note: QueuedNote; name: string; onDelete: () => void
                 {t('notesList.unsureWhy')}
               </Text>
             ) : null}
+            {readable && arrived ? (
+              <Text variant="secondary" tone="soft" testID={`queued-note-arrived-${n.id}`}>
+                {t(arrivedWhyKey(n.problem?.code))}
+              </Text>
+            ) : null}
           </View>
         </Pressable>
         {!sending ? (
           <IconButton
             testID={`queued-note-delete-${n.id}`}
-            label={t('notesList.deleteLabel', { name: props.name })}
+            label={t(arrived ? 'notesList.discardChangesNamed' : 'notesList.deleteLabel', { name: props.name })}
             icon={Trash2}
             onPress={props.onDelete}
           />
@@ -203,11 +288,49 @@ function QueuedRow(props: { note: QueuedNote; name: string; onDelete: () => void
             kind="quiet"
             size="small"
             label={t('notesList.sendAgain')}
-            accessibilityLabel={t('notesList.sendAgainNamed', { name: props.name })}
+            accessibilityLabel={t(n.settles ? 'notesList.sendAgainSameNamed' : 'notesList.sendAgainNamed', {
+              name: props.name,
+            })}
             onPress={() => void capture.sendNoteAgain(n.id)}
             testID={`queued-note-send-again-${n.id}`}
           />
         </View>
+      ) : null}
+      {readable && arrived ? (
+        <View style={styles.actions}>
+          {canPut ? (
+            <Button
+              kind="quiet"
+              size="small"
+              label={t('notesList.putInto')}
+              accessibilityLabel={t('notesList.putIntoNamed', { name: props.name })}
+              onPress={() => void putInto()}
+              disabled={putBusy}
+              testID={`queued-note-put-into-${n.id}`}
+            />
+          ) : null}
+          <Button
+            kind="quiet"
+            size="small"
+            label={t('notesList.sendChanges')}
+            accessibilityLabel={t('notesList.sendChangesNamed', { name: props.name })}
+            onPress={() => void capture.sendNoteAgain(n.id)}
+            testID={`queued-note-send-changes-${n.id}`}
+          />
+          <Button
+            kind="quiet"
+            size="small"
+            label={t('notesList.discardChanges')}
+            accessibilityLabel={t('notesList.discardChangesNamed', { name: props.name })}
+            onPress={props.onDelete}
+            testID={`queued-note-discard-${n.id}`}
+          />
+        </View>
+      ) : null}
+      {putProblem ? (
+        <Notice tone="warn" testID={`queued-note-put-problem-${n.id}`}>
+          {putProblem}
+        </Notice>
       ) : null}
     </View>
   );

@@ -1,5 +1,5 @@
 import { ApiRequestError, multipartBody, type Api } from '@fdv/client';
-import { can, type CaptureMetadata, type DocumentTypeView, type Member } from '@fdv/shared';
+import { can, noteFirstWords, type CaptureMetadata, type DocumentTypeView, type Member } from '@fdv/shared';
 import { randomUUID } from 'expo-crypto';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { AppState } from 'react-native';
@@ -20,8 +20,31 @@ import {
 import i18n from '../i18n';
 import { NoBatchesError, sendToInbox, shortDay, type InboxOutcome } from '../queue/inbox';
 import { filedWithout as leftOut, type FiledWithout, type QueueItem } from '../queue/item';
-import { noteBytes, noteItem, readNote, type NotePayload } from '../queue/note';
-import { idempotentCreate, MaybeSentError, postNote } from '../queue/note-send';
+import {
+  noteBody,
+  noteBytes,
+  noteItem,
+  readNote,
+  sameBody,
+  type KeyedTry,
+  type Landed,
+  type NoteBody,
+  type NotePayload,
+} from '../queue/note';
+import {
+  ArrivedEarlierError,
+  CreatedNotVisibleError,
+  idempotentCreate,
+  keyLive,
+  KeyReusedError,
+  MaybeSentError,
+  NoAnswerError,
+  nextTry,
+  NotSentError,
+  postNote,
+  refusedOutright,
+  type Posted,
+} from '../queue/note-send';
 import { noConnection } from '../net/no-connection';
 import { openQueue } from '../queue/open';
 import type { QueueStore } from '../queue/store';
@@ -92,6 +115,12 @@ export interface QueuedNote {
   payload: NotePayload | null;
   state: QueueItem['state'];
   problem: QueueItem['problem'];
+  /**
+   * Might already be in the vault, and Send again can settle it under its
+   * own key (0.13.1): the key within the vault's 24 hours, to a vault that
+   * keeps keys. Otherwise Send again makes a new note.
+   */
+  settles: boolean;
 }
 
 /** A note put in the queue, or why not. */
@@ -99,8 +128,12 @@ export type NoteOutcome =
   | { kind: 'queued'; id: string; state: 'waiting' | 'unsure' }
   | { kind: 'refused'; problem: 'queue_unavailable' | 'not_allowed' };
 
-/** New note's Save (0.13.0): in the vault, or kept here, waiting or unsure, or refused by the vault. */
-export type NewNoteOutcome = { kind: 'made'; id: string } | NoteOutcome;
+/**
+ * New note's Save (0.13.0): in the vault, or kept here, waiting or unsure, or
+ * refused by the vault — or made, and already somebody else's to keep
+ * private (0.13.1, never on a first try in practice): said in Notes.
+ */
+export type NewNoteOutcome = { kind: 'made'; id: string } | { kind: 'hidden' } | NoteOutcome;
 
 /** A change asked of a queued note: done, or not — gone (sent or deleted), on its way now, or not this person's. */
 export type NoteChange = 'done' | 'gone' | 'sending';
@@ -201,6 +234,15 @@ interface CaptureValue {
   /** Notes sent with less than was asked — as Only me, not Adults only — said once, by their names. */
   notesNarrowed: string[];
   dismissNotesNarrowed: () => void;
+  /**
+   * Notes that reached the vault and are now kept private by the person they
+   * are about (404 created_not_visible, 0.13.1): sent, and said once, by
+   * their names.
+   */
+  notesHidden: string[];
+  /** Notes has said them: no longer kept on the phone to say next time. */
+  sawNotesHidden: () => void;
+  dismissNotesHidden: () => void;
   /** Bumped each time the vault takes one, so lists can load again. */
   delivered: number;
   saved: SavedNote | null;
@@ -244,10 +286,36 @@ const kindsKey = (cardKey: string) => `${cardKey}|kinds`;
 /** In front, or not yet known to be anywhere else (AppState says 'unknown' until its first event). */
 const inFront = () => AppState.currentState !== 'background' && AppState.currentState !== 'inactive';
 
+/** A note's name, as Notes says it: its title, its first words, or Untitled note. */
+const hiddenName = (p: Pick<NotePayload, 'title' | 'notes'> | null): string =>
+  p?.title?.trim() || noteFirstWords(p?.notes) || i18n.t('notesList.untitled');
+
+/** Where it is kept, per vault, whether the vault last said it keeps a new note's key: a hint, never a decision. */
+const keysKey = (origin: string) => `card|${origin}|idempotent_create`;
+/** Where it is kept, per person, which notes reached the vault and are kept private now, until Notes says so. */
+const hiddenKey = (origin: string, member: string) => `card|${origin}|${member}|notesHidden`;
+
+/** Why a try waited that was the phone's side, not the vault's: no Retry-After of the vault's to keep. */
+const PHONE_SIDE_WAITS: ReadonlySet<string> = new Set(['offline', 'signed_out']);
+/** A last-try answer that was the vault's own Retry-After, kept through a change. */
+const VAULT_SAID_WHEN = (why: string | null) => why !== null && !PHONE_SIDE_WAITS.has(why);
+
 export function CaptureProvider(props: { children: ReactNode; deps?: Partial<CaptureDeps> }) {
   const deps = useMemo<CaptureDeps>(() => ({ ...defaultDeps(), ...props.deps }), [props.deps]);
-  const { who, withToken, withTokenQuick, recheck, uploadApi, api, sessionOwner, vault, offline, caps, watchedHttp } =
-    useVault();
+  const {
+    who,
+    withToken,
+    withTokenQuick,
+    recheck,
+    recheckCaps,
+    uploadApi,
+    api,
+    sessionOwner,
+    vault,
+    offline,
+    caps,
+    watchedHttp,
+  } = useVault();
   // Leaving for the scanner or a picker is not leaving the app: it does not lock.
   const lock = useLock();
   const origin = vault?.origin ?? null;
@@ -259,6 +327,7 @@ export function CaptureProvider(props: { children: ReactNode; deps?: Partial<Cap
   const [notesHere, setNotesHere] = useState(0);
   const notesRef = useRef<QueuedNote[]>([]);
   const [notesNarrowed, setNotesNarrowed] = useState<string[]>([]);
+  const [notesHidden, setNotesHidden] = useState<string[]>([]);
   const [others, setOthers] = useState<QueueItem[]>([]);
   const [waitingHere, setWaitingHere] = useState(0);
   const [delivered, setDelivered] = useState(0);
@@ -316,6 +385,7 @@ export function CaptureProvider(props: { children: ReactNode; deps?: Partial<Cap
     withToken,
     withTokenQuick,
     recheck,
+    recheckCaps,
     uploadApi,
     api,
     sessionOwner,
@@ -330,6 +400,7 @@ export function CaptureProvider(props: { children: ReactNode; deps?: Partial<Cap
       withToken,
       withTokenQuick,
       recheck,
+      recheckCaps,
       uploadApi,
       api,
       sessionOwner,
@@ -338,24 +409,166 @@ export function CaptureProvider(props: { children: ReactNode; deps?: Partial<Cap
       caps,
       watchedHttp,
     };
-  }, [who, withToken, withTokenQuick, recheck, uploadApi, api, sessionOwner, origin, offline, caps, watchedHttp]);
+  }, [
+    who,
+    withToken,
+    withTokenQuick,
+    recheck,
+    recheckCaps,
+    uploadApi,
+    api,
+    sessionOwner,
+    origin,
+    offline,
+    caps,
+    watchedHttp,
+  ]);
+
+  /**
+   * Whether this vault last said it keeps a new note's key (0.13.1): what it
+   * says now, or — before it has said anything since the app started — what
+   * it said before, kept on the phone. A hint for what Notes offers; each
+   * try still asks the vault itself.
+   */
+  const keysHint = useRef<{ origin: string; takes: boolean } | null>(null);
+  const takesKeys = useCallback((): boolean | null => {
+    const c = current.current.caps;
+    if (c) return idempotentCreate(c);
+    const h = keysHint.current;
+    return h && h.origin === current.current.origin ? h.takes : null;
+  }, []);
+  useEffect(() => {
+    if (!store || !origin) return;
+    if (caps) {
+      const takes = idempotentCreate(caps);
+      keysHint.current = { origin, takes };
+      void store.cache(keysKey(origin), takes);
+      return;
+    }
+    void store.cached<boolean>(keysKey(origin)).then((takes) => {
+      if (typeof takes === 'boolean' && !current.current.caps) keysHint.current = { origin, takes };
+    });
+  }, [store, origin, caps]);
 
   /**
    * A note's POST (0.13.0), from the queue or from New note: after the vault
    * answered just now, and telling — with no answer — whether it ever left
-   * (queue/note-send.ts). Under its client id where the vault takes one.
+   * (queue/note-send.ts). Under its client id where the vault takes one, with
+   * the body frozen at its first try (`keyed`, 0.13.1).
    */
   const postNow = useCallback(
-    (token: string, p: NotePayload, owner: string, key: string): Promise<string> =>
+    (
+      token: string,
+      p: NotePayload,
+      owner: string,
+      key: string,
+      prepare?: (keyed: boolean) => Promise<{ body?: NoteBody }>,
+    ): Promise<Posted> =>
       postNote(p, {
         http: (watch) => current.current.watchedHttp(watch),
-        answers: () => current.current.recheck(),
+        // What the vault says in this very look decides the key: never a guess from before it answered.
+        answers: () => current.current.recheckCaps(),
         token,
         owner,
         key,
-        idempotent: idempotentCreate(current.current.caps),
+        ...(prepare ? { prepare } : {}),
       }),
     [],
+  );
+
+  /**
+   * One try of a note (0.13.1), from the queue or from New note, as its
+   * writer. The vault's answer to this try's own look decides whether it
+   * goes under its Idempotency-Key; under it, the body exactly as it first
+   * went (frozen with the key in its bytes, before anything goes) — never
+   * what it says now — so each try is the same request, and the vault's
+   * answer settles whether the first landed.
+   *
+   * - A note that went once under its key never goes without one: a vault
+   *   that says it keeps none now leaves it to its person.
+   * - Nothing goes by itself more than 23 hours after the first try.
+   * - Changed since, and the vault has it as it went: the change waits for
+   *   its person (ArrivedEarlierError), with where the note is when the
+   *   vault said (a 201).
+   * - "Not yet" (a 5xx, still being made, busy): again under the key when
+   *   the vault said, for as long as it keeps the key.
+   * - Refused outright on its first try: nothing was made — the note may go
+   *   as it is then. Refused on a later try: that says nothing of the
+   *   first, so its person decides.
+   */
+  const sendOne = useCallback(
+    async (
+      token: string,
+      s: QueueStore,
+      item: Pick<QueueItem, 'id' | 'account'>,
+      p: NotePayload,
+      key: string,
+    ): Promise<{ id: string | null; hidden: boolean }> => {
+      const clock = deps.now;
+      const now = clock();
+      const first = p.sent;
+      const asNow = noteBody(p, item.account);
+      const at: { tried: KeyedTry | null; changed: boolean } = { tried: null, changed: false };
+      // What the note says, with its key's try and where it landed (or neither): its own try, ending.
+      const keep = async (patch: { sent?: KeyedTry | null; landed?: Landed | null }) => {
+        const { sent: wasSent, landed: wasLanded, ...words } = p;
+        const sent = patch.sent === undefined ? wasSent : (patch.sent ?? undefined);
+        const landed = patch.landed === undefined ? wasLanded : (patch.landed ?? undefined);
+        const next = noteBytes({ ...words, clientId: key, ...(sent ? { sent } : {}), ...(landed ? { landed } : {}) });
+        await s.replaceBytes(item.id, next, { size: next.byteLength }, { evenIfSending: true });
+      };
+      try {
+        const made = await postNow(token, p, item.account, key, async (keyed) => {
+          if (!keyed) {
+            // Sent once under its key, to a vault that keeps none now: without one it could be made twice.
+            if (first) throw new MaybeSentError();
+            return {};
+          }
+          if (first && !keyLive(first, now)) throw new MaybeSentError();
+          at.changed = first ? !sameBody(first.body, asNow) : false;
+          at.tried = first ?? { body: asNow, firstAt: now, failed: 0, busy: 0 };
+          if (!first) await keep({ sent: at.tried });
+          return { body: at.tried.body };
+        });
+        if (!made.keyed || !at.changed) return { id: made.id, hidden: false };
+        // In the vault as it first went: the person's change is still theirs to put in, send, or not.
+        const landed: Landed = { id: made.id, etag: made.etag, visibility: first?.body.visibility ?? asNow.visibility };
+        await keep({ sent: null, landed });
+        emit('documentChanged', made.id);
+        throw new ArrivedEarlierError(null, landed);
+      } catch (err) {
+        if (err instanceof ArrivedEarlierError || err instanceof MaybeSentError) throw err;
+        if (err instanceof CreatedNotVisibleError) {
+          if (at.changed) {
+            await keep({ sent: null });
+            throw new ArrivedEarlierError('created_not_visible');
+          }
+          return { id: null, hidden: true };
+        }
+        if (err instanceof KeyReusedError) {
+          // Unchanged, as it first went: those words are there.
+          if (first && !at.changed) return { id: null, hidden: false };
+          await keep({ sent: null });
+          throw new ArrivedEarlierError('idempotency_key_reused');
+        }
+        const tried = at.tried;
+        if (err instanceof NoAnswerError && err.answer && tried) {
+          const next = nextTry(tried, err.answer, now);
+          await keep({ sent: next.tried });
+          if (next.inMs === null) throw new MaybeSentError();
+          throw new NoAnswerError(err.answer, next.inMs);
+        }
+        if (tried && !first && (err instanceof NotSentError || refusedOutright(err))) {
+          // This was its first try, and nothing was made by it: the note may go as it is then.
+          await keep({ sent: null });
+        } else if (first && refusedOutright(err)) {
+          // Refused on a later try: that says nothing of the first. Its 23 hours kept, its person decides.
+          throw new MaybeSentError();
+        }
+        throw err;
+      }
+    },
+    [deps, postNow],
   );
 
   /** The capture the Saved line is about. */
@@ -374,7 +587,10 @@ export function CaptureProvider(props: { children: ReactNode; deps?: Partial<Cap
     const written: QueuedNote[] = [];
     for (const i of w ? every.filter((n) => n.kind === 'note' && n.account === w.member_id) : []) {
       const bytes = await store.bytes(i.id);
-      written.push({ id: i.id, payload: bytes ? readNote(bytes) : null, state: i.state, problem: i.problem });
+      const payload = bytes ? readNote(bytes) : null;
+      const settles =
+        i.state === 'unsure' && !!payload?.sent && keyLive(payload.sent, deps.now()) && takesKeys() !== false;
+      written.push({ id: i.id, payload, state: i.state, problem: i.problem, settles });
     }
     notesRef.current = written;
     setNotes(written);
@@ -387,7 +603,28 @@ export function CaptureProvider(props: { children: ReactNode; deps?: Partial<Cap
     setOthers(w ? all.filter((i) => i.account !== w.member_id) : []);
     // Signed out, every scan waiting for this vault counts: they go when their person signs in.
     setWaitingHere(w ? mine.length : all.length);
-  }, [store]);
+  }, [store, deps, takesKeys]);
+
+  /**
+   * Notes that reached the vault and are kept private now (404
+   * created_not_visible): said in Notes, and kept on the phone, encrypted,
+   * until Notes has said so — an app closed first says it next time.
+   */
+  const hiddenRef = useRef<string[]>([]);
+  const persistHidden = useCallback((names: string[]) => {
+    const s = storeRef.current;
+    const w = current.current.who;
+    if (s && w) void s.cache(hiddenKey(w.origin, w.member_id), names);
+  }, []);
+  const addHidden = useCallback(
+    (name: string) => {
+      const next = [...hiddenRef.current, name];
+      hiddenRef.current = next;
+      setNotesHidden(next);
+      persistHidden(next);
+    },
+    [persistHidden],
+  );
 
   const uploader = useMemo(() => {
     if (!store) return null;
@@ -448,15 +685,19 @@ export function CaptureProvider(props: { children: ReactNode; deps?: Partial<Cap
       outcomes.set(item.id, 'filed');
       return made;
     };
+    // Notes the vault made and their writer can no longer see (404 created_not_visible): sent, and said.
+    const hidden = new Set<string>();
     /**
      * A note written offline (0.13.0): POST /documents, as New note sends it,
-     * as its writer and theirs, under its client id (queue/note-send.ts). Its
-     * bytes are what it says; unreadable, the phone's own fault, kept for a person.
+     * as its writer and theirs, under its client id (sendOne). Its bytes are
+     * what it says; unreadable, the phone's own fault, kept for a person.
      */
     const sendNote = async (token: string, item: QueueItem, bytes: Uint8Array) => {
       const p = readNote(bytes);
       if (!p) throw new Error('A note on this phone could not be read.');
-      return { document_id: await postNow(token, p, item.account, p.clientId ?? item.key) };
+      const out = await sendOne(token, store, item, p, p.clientId ?? item.key);
+      if (out.hidden) hidden.add(item.id);
+      return { document_id: out.id };
     };
     // The uploader reads the ref when it sends, not while rendering; the
     // compiler cannot see that from here.
@@ -516,6 +757,12 @@ export function CaptureProvider(props: { children: ReactNode; deps?: Partial<Cap
         );
         return done === 'ok';
       },
+      // Cut off while sending: it goes again only if that try went under its
+      // key, which its bytes say (sendOne sees to the vault and the 23 hours).
+      resumable: async (item) => {
+        const bytes = await store.bytes(item.id);
+        return !!(bytes && readNote(bytes)?.sent);
+      },
       who: () => {
         const w = current.current.who;
         return w ? { origin: w.origin, account: w.member_id } : null;
@@ -532,6 +779,8 @@ export function CaptureProvider(props: { children: ReactNode; deps?: Partial<Cap
             const words = name.title?.trim() || i18n.t('notesList.untitled');
             setNotesNarrowed((l) => [...l, words]);
           }
+          // In the vault, and kept private since by the person it's about: said, by its name.
+          if (hidden.delete(sent.id)) addHidden(hiddenName(name ?? null));
         } else if (e.kind === 'sent') {
           timings.created(e.item.id);
           setDelivered((n) => n + 1);
@@ -567,7 +816,7 @@ export function CaptureProvider(props: { children: ReactNode; deps?: Partial<Cap
     });
     if (!inFront()) u.stop();
     return u;
-  }, [store, deps.now, deps.schedule, timings, refresh, postNow]);
+  }, [store, deps.now, deps.schedule, timings, refresh, sendOne, addHidden]);
 
   // Signed in (again), or somebody else: their queue, and a look at it now.
   // What was saved or scanned for the one before is not theirs.
@@ -579,6 +828,8 @@ export function CaptureProvider(props: { children: ReactNode; deps?: Partial<Cap
     setSaved(null);
     setFiledWithout([]);
     setNotesNarrowed([]);
+    hiddenRef.current = [];
+    setNotesHidden([]);
     setPending((p) => {
       if (p && pendingFor.current !== whoKey) {
         for (const uri of sourceFiles(p)) void deps.discard(uri);
@@ -588,6 +839,16 @@ export function CaptureProvider(props: { children: ReactNode; deps?: Partial<Cap
       return p;
     });
   }, [whoKey, deps, timings]);
+  // Notes said to be kept private now, not yet said in Notes: from the phone, for this person.
+  useEffect(() => {
+    const w = who;
+    if (!store || !w) return;
+    void store.cached<string[]>(hiddenKey(w.origin, w.member_id)).then((kept) => {
+      if (!Array.isArray(kept) || kept.length === 0 || hiddenRef.current.length > 0) return;
+      hiddenRef.current = kept;
+      setNotesHidden(kept);
+    });
+  }, [store, who]);
   useEffect(() => {
     // Loading the queue for whoever is signed in: set after the store answers.
     void refresh();
@@ -982,20 +1243,64 @@ export function CaptureProvider(props: { children: ReactNode; deps?: Partial<Cap
       const key = deps.uuid();
       // Known to have no answer: kept here at once, nothing sent.
       if (current.current.offline) return keepNote(payload, key, 'waiting');
+      let s: QueueStore;
       try {
-        const id = await current.current.withToken((_a, token) =>
-          postNow(token, { ...payload, clientId: key }, w.member_id, key),
-        );
-        return { kind: 'made', id };
-      } catch (err) {
-        // It went, and no answer came: it may be there. Never sent again unseen.
-        if (err instanceof MaybeSentError) return keepNote(payload, key, 'unsure');
-        // It never left (or goes again safely under its key): it waits, and goes by itself.
-        if (noConnection(err)) return keepNote(payload, key, 'waiting');
-        throw err;
+        s = await openOnce();
+      } catch {
+        return { kind: 'refused', problem: 'queue_unavailable' };
+      }
+      // In the queue before anything goes (0.13.1): an app killed mid-Save
+      // keeps the note — gone on again under its key if it went with one, or
+      // Might already be in your vault — never lost.
+      const bytes = noteBytes({ ...payload, clientId: key });
+      const item = noteItem({
+        id: deps.uuid(),
+        key,
+        origin: w.origin,
+        account: w.member_id,
+        now: deps.now(),
+        size: bytes.byteLength,
+        state: 'sending',
+      });
+      uploader?.claim(item.id);
+      try {
+        await s.add(item, bytes);
+        const kept = async (patch: Partial<QueueItem> & { state: 'waiting' | 'unsure' }): Promise<NoteOutcome> => {
+          await s.update(item.id, { attempts: 1, ...patch });
+          await refresh();
+          if (patch.state === 'waiting' && inFront()) void uploader?.kick();
+          return { kind: 'queued', id: item.id, state: patch.state };
+        };
+        try {
+          const out = await current.current.withToken((_a, token) =>
+            sendOne(token, s, item, { ...payload, clientId: key }, key),
+          );
+          await s.remove(item.id);
+          await refresh();
+          if (out.hidden || !out.id) {
+            if (out.hidden) addHidden(hiddenName(payload));
+            return { kind: 'hidden' };
+          }
+          return { kind: 'made', id: out.id };
+        } catch (err) {
+          // The vault said "not yet" under its key: it goes again when it said.
+          if (err instanceof NoAnswerError && err.retryInMs !== undefined) {
+            return await kept({ state: 'waiting', nextAt: deps.now() + err.retryInMs, lastCode: err.answer?.code ?? null });
+          }
+          // It went, and no answer came: it may be there. Never sent again unseen.
+          if (err instanceof MaybeSentError) return await kept({ state: 'unsure' });
+          // It never left, or goes again safely under its key: it waits, and goes by itself.
+          if (noConnection(err)) return await kept({ state: 'waiting', lastCode: 'offline' });
+          // Refused: nothing kept here — New note says why, and what was typed is still on it.
+          await s.remove(item.id);
+          await refresh();
+          throw err;
+        }
+      } finally {
+        uploader?.unclaim(item.id);
       }
     },
-    [who, deps, keepNote, postNow],
+    [who, deps, keepNote, openOnce, refresh, uploader, sendOne, addHidden],
   );
 
   const changeNote = useCallback(
@@ -1004,19 +1309,31 @@ export function CaptureProvider(props: { children: ReactNode; deps?: Partial<Cap
       if (!store || !item) return 'gone';
       if (item.state === 'sending') return 'sending';
       const had = await store.bytes(id);
-      const bytes = noteBytes({ ...payload, clientId: (had ? readNote(had)?.clientId : undefined) ?? item.key });
+      const was = had ? readNote(had) : null;
+      // Sent once under its key and not settled: the try it made stays frozen
+      // with the key (its count begun again: the person is here), so the next
+      // try is the same request, and settles whether the first landed (0.13.1).
+      const sent = was?.sent ? { ...was.sent, failed: 0, busy: 0 } : undefined;
+      const bytes = noteBytes({ ...payload, clientId: was?.clientId ?? item.key, ...(sent ? { sent } : {}) });
       // Changed: as written now. One that might already be in the vault stays
-      // so — Send again sends what it says now; one the vault refused is tried again.
+      // so — Send again sends what it says now — unless its key can still
+      // settle it, safely, under the vault's 24 hours; one already in the
+      // vault as it first went stays so; one the vault refused is tried again.
+      const now = deps.now();
+      const settles = item.state === 'unsure' && !!sent && keyLive(sent, now) && takesKeys() !== false;
+      const stays = (item.state === 'unsure' && !settles) || item.state === 'arrived';
+      // The vault's own Retry-After, given just now, still holds.
+      const nextAt = item.state === 'waiting' && VAULT_SAID_WHEN(item.lastCode) && item.nextAt > now ? item.nextAt : 0;
       const out = await store.replaceBytes(id, bytes, {
         size: bytes.byteLength,
         dropped: [],
-        ...(item.state === 'unsure' ? {} : { state: 'waiting' as const, problem: null, attempts: 0, nextAt: 0 }),
+        ...(stays ? {} : { state: 'waiting' as const, problem: null, attempts: 0, nextAt }),
       });
       await refresh();
-      if (out === 'ok' && item.state !== 'unsure' && inFront()) void uploader?.kick();
+      if (out === 'ok' && !stays && inFront()) void uploader?.kick();
       return out === 'ok' ? 'done' : out;
     },
-    [store, theirNote, refresh, uploader],
+    [store, theirNote, deps, refresh, uploader, takesKeys],
   );
 
   const removeNote = useCallback(
@@ -1038,9 +1355,26 @@ export function CaptureProvider(props: { children: ReactNode; deps?: Partial<Cap
       if (item.state === 'sending') return 'sending';
       const p = readNote((await store.bytes(id)) ?? new Uint8Array());
       if (!p) return 'gone';
-      // A new note, by its person's choice: a new client id with it.
+      // Still within its key's day, to a vault that keeps keys: the same key
+      // and the words it first went with, so the vault's answer settles it —
+      // in the vault already, or made now, never twice (0.13.1).
+      if (p.sent && keyLive(p.sent, deps.now()) && takesKeys() !== false && p.clientId) {
+        const again = noteBytes({ ...p, sent: { ...p.sent, failed: 0, busy: 0 } });
+        const out = await store.replaceBytes(id, again, {
+          state: 'waiting',
+          problem: null,
+          attempts: 0,
+          nextAt: 0,
+          size: again.byteLength,
+        });
+        await refresh();
+        if (out === 'ok' && inFront()) void uploader?.kick();
+        return out === 'ok' ? 'done' : out;
+      }
+      // A new note, by its person's choice: a new client id with it, and nothing of the old key's try.
       const key = deps.uuid();
-      const bytes = noteBytes({ ...p, clientId: key });
+      const { sent: _old, landed: _where, ...words } = p;
+      const bytes = noteBytes({ ...words, clientId: key });
       const out = await store.replaceBytes(id, bytes, {
         key,
         state: 'waiting',
@@ -1053,7 +1387,7 @@ export function CaptureProvider(props: { children: ReactNode; deps?: Partial<Cap
       if (out === 'ok' && inFront()) void uploader?.kick();
       return out === 'ok' ? 'done' : out;
     },
-    [store, theirNote, deps, refresh, uploader],
+    [store, theirNote, deps, refresh, uploader, takesKeys],
   );
 
   const holdNote = useCallback((id: string) => uploader?.hold(id), [uploader]);
@@ -1136,6 +1470,13 @@ export function CaptureProvider(props: { children: ReactNode; deps?: Partial<Cap
       releaseNote,
       notesNarrowed,
       dismissNotesNarrowed: () => setNotesNarrowed([]),
+      notesHidden,
+      sawNotesHidden: () => persistHidden([]),
+      dismissNotesHidden: () => {
+        hiddenRef.current = [];
+        setNotesHidden([]);
+        persistHidden([]);
+      },
       delivered,
       saved,
       dismissSaved: () => setSaved(null),
@@ -1172,6 +1513,8 @@ export function CaptureProvider(props: { children: ReactNode; deps?: Partial<Cap
       holdNote,
       releaseNote,
       notesNarrowed,
+      notesHidden,
+      persistHidden,
       delivered,
       saved,
       filedWithout,

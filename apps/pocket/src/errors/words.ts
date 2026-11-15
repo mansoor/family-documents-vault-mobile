@@ -48,6 +48,14 @@ export const CATALOGUE: Readonly<Record<string, string>> = {
   batch_ended: 'errors.batchEnded',
   batch_full: 'errors.batchFull',
   already_decided: 'errors.alreadyDecided',
+  // A new note under its Idempotency-Key (0.9.0-dev.45; app 0.13.1): still
+  // being made, or busy a moment — sent again by itself, never a refusal;
+  // made, and kept private since by the person it's about; or an earlier
+  // version kept under the key. Notes says each in its own words.
+  idempotency_in_progress: 'errors.createInProgress',
+  busy_try_again: 'errors.unavailable',
+  created_not_visible: 'errors.createdNotVisible',
+  idempotency_key_reused: 'errors.earlierVersion',
   // Busy for now: a scan waiting on these is tried again by itself.
   unavailable: 'errors.unavailable',
   request_timeout: 'errors.timeout',
