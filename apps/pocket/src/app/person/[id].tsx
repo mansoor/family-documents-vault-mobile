@@ -4,6 +4,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FlatList, RefreshControl, StyleSheet, View } from 'react-native';
 import { DocumentRow, rowPlace } from '../../documents/row';
+import { CaregiversCard } from '../../caregivers/card';
+import { isCaregiverPaper } from '../../caregivers/rules';
 import { IdentityCard } from '../../identity/card';
 import { useVault } from '../../state/vault';
 import { Notice, Text } from '../../ui';
@@ -17,7 +19,7 @@ export default function PersonScreen() {
   const params = useLocalSearchParams<{ id: string; name?: string }>();
   const { id } = params;
   const { t } = useTranslation();
-  const { withToken, offline, api } = useVault();
+  const { withToken, offline, api, who } = useVault();
   const [docs, setDocs] = useState<DocumentView[] | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   // The token the list was fetched with: its pictures are fetched with it too.
@@ -74,6 +76,16 @@ export default function PersonScreen() {
         <View style={styles.header}>
           <Text variant="hero">{name ?? ''}</Text>
           {id ? <IdentityCard memberId={id} name={name ?? ''} /> : null}
+          {/* Who can see their medical papers (H1b): for the person, an owner, or a caregiver of theirs. */}
+          {id ? (
+            <CaregiversCard
+              key={`care-${id}`}
+              memberId={id}
+              name={name ?? ''}
+              mine={who?.member_id === id}
+              owner={who?.role === 'owner'}
+            />
+          ) : null}
           {offline && !docs ? <Notice tone="warn">{t('people.needsConnection')}</Notice> : null}
           {failed ? <LoadFailed words={failed} onRetry={() => void load()} /> : null}
           {!docs && !failed && !offline ? <Placeholder /> : null}
@@ -90,7 +102,10 @@ export default function PersonScreen() {
           doc={item}
           place={rowPlace(index, docs?.length ?? 0)}
           thumb={
-            api && token && item.latest_version_id ? { uri: api.thumbnailUrl(item.latest_version_id), token } : null
+            // None for a caregiver's paper: each fetched through a grant is a look (H1b).
+            api && token && item.latest_version_id && !isCaregiverPaper(item)
+              ? { uri: api.thumbnailUrl(item.latest_version_id), token }
+              : null
           }
         />
       )}

@@ -32,7 +32,7 @@ export function AlertCards(props: {
   onRenew: (documentId: string) => void;
   inboxOrigin: string | null;
 }) {
-  const styles = useStyles(makeStyles);
+  const styles = useStyles(cardStyles);
   const { t } = useTranslation();
   const router = useRouter();
   const [hidden, setHidden] = useState(() => readHidden(props.who));
@@ -154,7 +154,7 @@ function AlertCard(props: {
   renew: (() => void) | null;
   inboxOrigin: string | null;
 }) {
-  const styles = useStyles(makeStyles);
+  const styles = useStyles(cardStyles);
   const colours = useColours();
   const { t } = useTranslation();
   const router = useRouter();
@@ -238,7 +238,8 @@ function AlertCard(props: {
   );
 }
 
-const makeStyles = (colours: Palette) =>
+/** Home's cards, for its alerts and its turning-18 questions (H1b) alike. */
+export const cardStyles = (colours: Palette) =>
   StyleSheet.create({
     list: { gap: sp(8) },
     card: {
@@ -261,4 +262,5 @@ const makeStyles = (colours: Palette) =>
     undo: { flexDirection: 'row', alignItems: 'center', gap: sp(8), paddingHorizontal: sp(4) },
     undoButton: { minHeight: 32, justifyContent: 'center' },
     pressed: { opacity: 0.7 },
+    disabled: { opacity: 0.5 },
   });

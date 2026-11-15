@@ -66,6 +66,8 @@ import { IconButton } from '../ui/icon-button';
 import { Sheet } from '../ui/sheet';
 import { useTextScale } from '../ui/text-scale';
 import { VisibilityControl } from './visibility';
+import { CaregiverMark } from '../caregivers/mark';
+import { isCaregiverPaper } from '../caregivers/rules';
 import { sp } from '../ui/space';
 import { useColours, useStyles, type Palette } from '../ui/theme';
 import { dayWords, exactWords, familyZoneNow, relativeWords, useFamilyZone } from '../state/family-time';
@@ -141,14 +143,16 @@ export function DocumentDetail(props: { id: string }) {
   const shown = doc ?? kept?.document ?? null;
   // A teen changes only their own; the vault refuses the rest.
   const mine = !!who && shown?.owner_member_id === who.member_id;
-  const mayChange = !!who && can(who.role, 'document.edit') && (who.role !== 'teen' || mine);
+  // Seen only as its person's caregiver (H1b): read, its pages looked at and a copy saved; nothing more.
+  const caregiver = isCaregiverPaper(shown);
+  const mayChange = !!who && can(who.role, 'document.edit') && (who.role !== 'teen' || mine) && !caregiver;
   const renewing = capture.queue.some((i) => i.kind === 'version' && i.target === id);
   const note = shown?.type_key === NOTE_KIND;
   // Into the Trash: a teen, only their own (P8), as the web allows.
-  const mayTrash = !!who && can(who.role, 'document.delete') && (who.role !== 'teen' || mine);
+  const mayTrash = !!who && can(who.role, 'document.delete') && (who.role !== 'teen' || mine) && !caregiver;
   const hasCollections = caps?.features.collections === true;
   const mayAddVersion =
-    !!who && can(who.role, 'document.add') && (who.role !== 'teen' || mine) && !renewing && !note;
+    !!who && can(who.role, 'document.add') && (who.role !== 'teen' || mine) && !renewing && !note && !caregiver;
 
   const load = useCallback(async () => {
     try {
@@ -302,7 +306,8 @@ export function DocumentDetail(props: { id: string }) {
   // Whose · what kind · who can see it: what the old page said in three places, on one line.
   // Whose: a person, or the household's (0.9.0-dev.32); Not sure yet says nothing here (its status does).
   const whose = owner?.display_name ?? (shown.household_owned ? t('capture.household') : null);
-  const subline = [whose, note ? null : type?.label, t(`document.visibility_${shown.visibility}`)]
+  // Somebody else's Only me, seen as their caregiver, is never said to be "Only me" (H1b): its mark says whose.
+  const subline = [whose, note ? null : type?.label, caregiver ? null : t(`document.visibility_${shown.visibility}`)]
     .filter(Boolean)
     .join(' · ');
   // Sensitive, all said (0.9.0-dev.34, AIR2): the vault's answer, else the one rule; a lock beside its status.
@@ -316,9 +321,9 @@ export function DocumentDetail(props: { id: string }) {
   // No longer needed, and needed again, from the phone (the gaps review), where the vault has it.
   const mayUnneed = caps?.features.no_longer_needed === true && mayChange && !note;
   // Remind me (the gaps review): for whoever manages reminders, never on a document no longer needed.
-  const mayRemind = !!who && can(who.role, 'reminder.manage') && !shown?.no_longer_needed;
+  const mayRemind = !!who && can(who.role, 'reminder.manage') && !shown?.no_longer_needed && !caregiver;
   // Shared outside the family by whoever may (owners and adults), as on the web.
-  const mayShare = !!who && can(who.role, 'document.share');
+  const mayShare = !!who && can(who.role, 'document.share') && !caregiver;
   const hasMore = (mayTrash || mayUnneed || mayRemind || mayShare) && !!doc && !offline;
   // Two columns, until the text is so large that one reads better.
   const oneColumn = scale > 1.2;
@@ -327,7 +332,7 @@ export function DocumentDetail(props: { id: string }) {
     note
       ? []
       : [
-          ...(shown.is_essential
+          ...(shown.is_essential && !caregiver
             ? [{ key: 'show', testID: 'document-show', label: t('document.show'), icon: Eye, busy: preparing, onPress: () => void showIt() }]
             : []),
           { key: 'pages', testID: 'document-pages', label: t('document.pagesShort'), icon: FileText, onPress: () => void pages() },
@@ -351,7 +356,7 @@ export function DocumentDetail(props: { id: string }) {
   // Its note (5.35), read only, from a vault that has notes you can
   // write: an older one says nothing of when a note last changed.
   const notesCard =
-    shown.notes_updated_at !== undefined && shown.notes ? (
+    shown.notes_updated_at !== undefined && shown.notes && !caregiver ? (
       <View style={[styles.card, styles.notes]} testID="document-notes">
         {note ? null : (
           <Text variant="secondary" weight="700">
@@ -368,7 +373,14 @@ export function DocumentDetail(props: { id: string }) {
     {
       key: 'visibility',
       node:
-        doc && !offline ? (
+        caregiver ? (
+          <View style={styles.line} testID="document-visibility">
+            <Text style={styles.flex}>{t('document.whoCanSee')}</Text>
+            <Text variant="secondary" tone="soft" style={styles.value}>
+              {t('caregivers.whoCanSee', { name: whose ?? t('caregivers.someone') })}
+            </Text>
+          </View>
+        ) : doc && !offline ? (
           <VisibilityControl doc={doc} onChanged={load} line />
         ) : (
           <View style={styles.line} testID="document-visibility">
@@ -400,7 +412,7 @@ export function DocumentDetail(props: { id: string }) {
           },
         ]
       : []),
-    ...(inCollections.length > 0
+    ...(inCollections.length > 0 && !caregiver
       ? [
           {
             key: 'collections',
@@ -563,6 +575,7 @@ export function DocumentDetail(props: { id: string }) {
                 </Text>
               </View>
             ) : null}
+            {caregiver ? <CaregiverMark testID="document-caregiver" /> : null}
             {shown.is_essential && !note ? (
               <View style={styles.pill} testID="document-essential-pill">
                 <Text variant="small" tone="accent" weight="700">
@@ -578,6 +591,11 @@ export function DocumentDetail(props: { id: string }) {
           mark={shown.no_longer_needed}
           open={(to) => router.push({ pathname: '/document/[id]', params: { id: to } })}
         />
+      ) : null}
+      {caregiver ? (
+        <Text variant="secondary" tone="soft" testID="document-caregiver-words">
+          {whose ? t('caregivers.readOnlyOf', { name: whose }) : t('caregivers.readOnly')}
+        </Text>
       ) : null}
       {problem === 'offline' || offline ? (
         <Notice tone="warn" testID="document-offline">

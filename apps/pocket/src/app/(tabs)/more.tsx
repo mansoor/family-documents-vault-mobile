@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import {
   ChevronRight,
   ExternalLink,
+  HeartHandshake,
   Share2,
   FolderOpen,
   Inbox,
@@ -17,6 +18,7 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { caregiversOffered } from '../../caregivers/rules';
 import { collectionsOffered } from '../../collections/rules';
 import { waitingInInbox } from '../../queue/inbox';
 import { useVault } from '../../state/vault';
@@ -48,6 +50,8 @@ export default function MoreScreen() {
   // Sharing (the owner's ask of 11 Nov 2026): the links that still work, for whoever may share.
   const sharingOn = !!who && can(who.role, 'document.share');
   const notesOn = caps?.features.notes === true;
+  // Caregivers (H1b): whoever may name their own or be one, on a vault that has them.
+  const caregiversOn = caregiversOffered(caps, who?.role);
   useEffect(() => {
     if (!inboxOn || offline) return;
     let stopped = false;
@@ -95,6 +99,15 @@ export default function MoreScreen() {
               label={t('sharing.title')}
               hint={t('more.sharingHint')}
               onPress={() => router.push('/sharing')}
+            />
+          ) : null}
+          {caregiversOn ? (
+            <Row
+              testID="more-caregivers"
+              icon={HeartHandshake}
+              label={t('caregivers.title')}
+              hint={t('more.caregiversHint')}
+              onPress={() => router.push('/caregivers')}
             />
           ) : null}
           {trashOn ? (

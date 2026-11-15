@@ -6,6 +6,55 @@ app's own, tagged `vX.Y.Z` in this repository.
 
 ## [Unreleased]
 
+## [0.12.0] — Caregivers, and the question at 18
+
+The vault's **caregivers and turning 18** (0.9.0-dev.43, H1b) on the phone:
+somebody of the family can be let see a person's medical papers, read-only,
+and a person who is 18 is asked once whether their medical papers stay
+visible to the family.
+
+### Added
+- **More → Caregivers**, for owners, adults and teens: "Let someone see my
+  medical papers" — choose somebody who signs in as an owner or an adult,
+  and the phone says plainly what they'll see before it's done. Each
+  caregiver is listed with what they see; Revoke asks first. A caregiver an
+  owner named for you shows Keep, which asks first, as it adds your Only me
+  papers to what they see.
+- **Who looked**: who opened, saved or looked at the pages of which of your
+  papers as a caregiver, and when; a line opens the paper.
+- **Papers you can see as a caregiver**, on the same screen: whose, See them,
+  and Stop seeing them, asked first.
+- **On a person's page**, for the person, an owner, or one of their
+  caregivers: their caregivers. An owner names one for somebody without a
+  sign-in there, and sees who looked — never which Only me paper. More →
+  Caregivers lists the family for an owner, each opening their page.
+- **Shared with you as caregiver**: a paper you see only because of a grant
+  is marked so in Documents, on Home, in a search, on its page and over its
+  pages, and never said to be Only me. It offers Pages and Save a copy, and
+  nothing else: no edit, share, link, email, collection, Who can see it,
+  Trash, new version, renewal, no longer needed, reminder, notes, Show,
+  Essential or Sensitive. It's never offered in a collection's Add
+  documents, isn't counted in Home's numbers or Essentials, and isn't
+  "Only me" in the Documents filter, which means your own.
+- **Only real looks in "Who looked".** The vault writes down each time a
+  caregiver opens a paper, so the phone never asks for one of them except
+  when you open it: a list shows no picture of it, its ⋯ doesn't ask the
+  vault for it, and a search knows it from its person's list.
+- **The question at 18**, a card on Home: "Keep your medical papers visible
+  to the family, or make them Only me?" Keep them visible, or Make them
+  Only me, which asks first and says what changes: how many papers, that
+  nobody else in the family can open them, owners included, and that links
+  you made to them end. Nothing changes until you answer.
+- **An owner's cards** for somebody turned 18: with no sign-in, ask them in
+  person, then "They want them kept as they are" (an owner can only keep
+  them, and the card says the answer can't be changed), or Name a caregiver
+  on their page; still signing in as a teen,
+  change their role in the browser first.
+
+### Changed
+- A vault without caregivers is unchanged: nothing new is shown or asked.
+- Re-pinned to the vault's **v0.9.0-dev.43** (caregivers and turning 18).
+
 ## [0.11.0] — What Sensitive protects, when it's shared
 
 The vault's **what Sensitive protects** (0.9.0-dev.41, H1a) on the phone: a

@@ -27,6 +27,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode, type Ref } fr
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { focusOn } from '../capture/add-button';
+import { isCaregiverPaper } from '../caregivers/rules';
 import { mayChangeCollection } from '../collections/rules';
 import { renewWords } from '../capture/renew-words';
 import { wordsFor } from '../errors/words';
@@ -87,12 +88,16 @@ export interface RemoveFrom {
  *    makes them.
  *  - A note (a vault of 0.9.0) has no file: no version, and nothing for
  *    the phone to keep, so it is not made an Essential here either.
+ *  - A paper seen only as somebody's caregiver (H1b, `caregiver: true`)
+ *    is read, and a copy saved: nothing else — no edit, share, version,
+ *    Essential, collection, or Show from a copy kept on the phone.
  */
 export function rowActions(
   who: { role: Role; member_id: string } | null,
   doc:
     | (Pick<DocumentView, 'owner_member_id' | 'is_essential' | 'latest_version_id' | 'file_removed'> & {
         type_key?: string | null;
+        caregiver?: true | undefined;
       })
     | null,
   opts: { collections: boolean; renewing: boolean; edit?: boolean },
@@ -103,6 +108,7 @@ export function rowActions(
   const note = doc.type_key === NOTE_KIND;
   // A note has no file, whatever a list says of its versions.
   const hasFile = doc.latest_version_id !== null && doc.file_removed !== true && !note;
+  if (isCaregiverPaper(doc)) return hasFile ? ['save'] : [];
   const changes = can(who.role, 'document.edit');
   const mayChange = who.role !== 'teen' || doc.owner_member_id === who.member_id;
   if (opts.edit && changes && mayChange) actions.push('edit');
@@ -260,8 +266,12 @@ function DocumentMenu(props: {
   const lock = useLock();
   const kept = essentials.items.find((i) => i.id === id)?.document ?? null;
   const [doc, setDoc] = useState<DocumentView | null>(() => newer(kept, props.doc));
+  // A paper seen only as somebody's caregiver (H1b) is not asked for again: the vault writes each
+  // GET /documents/{id} through a grant down as a look, which its person reads. What the list knew
+  // is enough — a copy saved is all it offers.
+  const caregiver = isCaregiverPaper(props.doc);
   // The vault has answered (or could not): until then, nothing is changed from a copy that may be stale.
-  const [fetched, setFetched] = useState(false);
+  const [fetched, setFetched] = useState(caregiver);
   const [said, setSaid] = useState<Said | null>(null);
   const [busy, setBusy] = useState<RowAction | null>(null);
   // An Add to a collection on its way (U536-01).
@@ -290,16 +300,16 @@ function DocumentMenu(props: {
     }
   }, [withToken, id, fromVault]);
   useEffect(() => {
-    if (offline) return;
+    if (offline || caregiver) return;
     // Asked once it opens; the state is set when the vault answers.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void fetchDoc();
-  }, [fetchDoc, offline]);
+  }, [fetchDoc, offline, caregiver]);
 
   const renewing = capture.queue.some((i) => i.kind === 'version' && i.target === id);
   const actions: RowAction[] = [
     ...rowActions(who, doc, { collections: caps?.features.collections === true, renewing, edit: props.edit }),
-    ...(props.remove ? (['remove'] as const) : []),
+    ...(props.remove && !isCaregiverPaper(doc) ? (['remove'] as const) : []),
   ];
   const deps: ActionDeps = {
     withToken,
@@ -501,7 +511,7 @@ function DocumentMenu(props: {
           // A search hit's document is on its way: what it offers depends on it.
           fetched ? (
             <Text tone="soft" testID="row-sheet-nothing">
-              {t('document.needsConnection')}
+              {caregiver ? t('caregivers.nothingHere') : t('document.needsConnection')}
             </Text>
           ) : (
             <ActivityIndicator color={colours.accent} accessibilityLabel={t('common.loading')} testID="row-sheet-loading" />

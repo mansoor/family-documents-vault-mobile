@@ -216,6 +216,13 @@ export interface Library {
   /** Each POST /documents/{id}/stop-sharing, and what it answers. */
   stopped: string[];
   stopSharing: StopSharing;
+  /**
+   * Papers the person sees only as somebody's caregiver (0.9.0-dev.43, H1b):
+   * the client's fake keeps grants but not the reading exception, so the
+   * fake's own documents with these ids are answered — listed or one by one
+   * — with `caregiver: true` and Only me, as the vault answers a caregiver.
+   */
+  caregiver: Set<string>;
 }
 
 const JPEG = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x02, 0xff, 0xd9]);
@@ -304,6 +311,7 @@ export function testVault(origins: string[] = ['https://vault.test']): TestVault
       stillShared: new Map(),
       stopped: [],
       stopSharing: { ended: 2, left_out: 0, kept: 0 },
+      caregiver: new Set(),
     },
     fetch: async (url, init) => {
       t.calls.push(`${init.method} ${url}`);
@@ -323,10 +331,33 @@ export function testVault(origins: string[] = ['https://vault.test']): TestVault
         const me = (await res.json()) as Record<string, unknown>;
         return json({ ...me, totp_enabled: t.factors.totp, has_passkey: t.factors.passkey });
       }
-      return (await captured(t, url, path, init)) ?? vault.fetch(url, init);
+      const res = (await captured(t, url, path, init)) ?? (await vault.fetch(url, init));
+      return asCaregiver(t, path, init, res);
     },
   };
   return t;
+}
+
+/** A caregiver's papers (H1b), as the vault answers them: marked, Only me, with no notes of their person's. */
+async function asCaregiver(t: TestVault, path: string, init: Parameters<FetchLike>[1], res: Reply): Promise<Reply> {
+  const ids = t.library.caregiver;
+  if (ids.size === 0 || init.method !== 'GET' || !res.ok || !/^\/api\/v1\/documents(\/[^/?]+)?(\?|$)/.test(path)) {
+    return res;
+  }
+  const mark = (d: DocumentView): DocumentView =>
+    ids.has(d.id)
+      ? {
+          ...d,
+          caregiver: true,
+          visibility: 'private',
+          notes: null,
+          has_notes: false,
+          // With a file, as the paper a grant gives: the fake's own say none.
+          latest_version_id: d.latest_version_id ?? `${d.id}-v1`,
+        }
+      : d;
+  const body = (await res.json()) as DocumentView | { items: DocumentView[] };
+  return json('items' in body ? { ...body, items: body.items.map(mark) } : mark(body));
 }
 
 /**

@@ -7,6 +7,8 @@ import CollectionsScreen from '../app/collections';
 import EditScreen from '../app/edit/[id]';
 import NewNoteScreen from '../app/new-note';
 import NotesScreen from '../app/(tabs)/notes';
+import PersonScreen from '../app/person/[id]';
+import { CaregiversScreen } from '../caregivers/screen';
 import { ChecklistScreen } from '../collections/checklist-screen';
 import { ManagersScreen } from '../collections/managers';
 import { DocumentDetail } from '../documents/detail';
@@ -66,6 +68,10 @@ export function LookupApp(props: { start: ReactElement }) {
       <ChecklistScreen id={id} />
     ) : top?.pathname === '/managers/[id]' ? (
       <ManagersScreen id={id} name={top.params.name ?? ''} />
+    ) : top?.pathname === '/caregivers' ? (
+      <CaregiversScreen />
+    ) : top?.pathname === '/person/[id]' ? (
+      <PersonScreen />
     ) : top?.pathname === '/notes' ? (
       <NotesScreen />
     ) : top?.pathname === '/new-note' ? (
