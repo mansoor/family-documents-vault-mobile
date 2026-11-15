@@ -1,5 +1,5 @@
 import { ApiRequestError } from '@fdv/client';
-import { issuedByLabel, NOTE_KIND, NOTES_MAX, stopSharingWords, type DocumentView } from '@fdv/shared';
+import { CAREGIVER_READ_ONLY, issuedByLabel, NOTE_KIND, NOTES_MAX, stopSharingWords, type DocumentView } from '@fdv/shared';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -10,6 +10,7 @@ import { SensitiveChooser } from '../../capture/sensitive';
 import { Chip, ChipRow, detailInput } from '../../capture/ui';
 import { draftOf, editBody } from '../../documents/edit';
 import { NoteEdit } from '../../documents/note-edit';
+import { isCaregiverPaper } from '../../caregivers/rules';
 import { TagsEditor } from '../../documents/tags-edit';
 import { wordsFor } from '../../errors/words';
 import { StillSharedSheet } from '../../sharing/sensitive-confirm';
@@ -17,7 +18,7 @@ import { emit } from '../../state/events';
 import { feel } from '../../ui/feel';
 import { useStepUp } from '../../state/step-up';
 import { useVault } from '../../state/vault';
-import { Field, Notice, requiredLabel, Text } from '../../ui';
+import { Button, Field, Notice, requiredLabel, Text } from '../../ui';
 import { EditorFrame } from '../../ui/editor-frame';
 import { sp } from '../../ui/space';
 import { LoadFailed, loadFailure, Placeholder } from '../../ui/states';
@@ -99,6 +100,18 @@ export default function EditScreen() {
     return (
       <View style={styles.page} testID="edit">
         {failed ? <LoadFailed words={failed} onRetry={() => void load()} /> : <Placeholder rows={2} />}
+      </View>
+    );
+  }
+
+  // Seen only as its person's caregiver (H1b), opened here by a link: read-only, said so, and back to it.
+  if (isCaregiverPaper(doc)) {
+    return (
+      <View style={styles.page} testID="edit">
+        <Notice tone="info" testID="edit-caregiver">
+          {CAREGIVER_READ_ONLY}
+        </Notice>
+        <Button kind="quiet" label={t('common.back')} onPress={() => router.back()} testID="edit-caregiver-back" />
       </View>
     );
   }

@@ -1,9 +1,11 @@
-import { documentName, NOTE_KIND, radii, statusTone, type DocumentView, type Status } from '@fdv/shared';
+import { CAREGIVER_MARK, documentName, NOTE_KIND, radii, statusTone, type DocumentView, type Status } from '@fdv/shared';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { FileText, NotebookText } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, Text as RNText, View } from 'react-native';
+import { CaregiverMark } from '../caregivers/mark';
+import { isCaregiverPaper } from '../caregivers/rules';
 import { StatusLine, Text } from '../ui';
 import { font } from '../ui/fonts';
 import { useDocumentMenu, type RemoveFrom } from './menu';
@@ -49,10 +51,16 @@ export function DocumentRow(props: {
   const note = props.type_key === NOTE_KIND;
   const Kind = note ? NotebookText : FileText;
   const menu = useDocumentMenu({ id: props.id, title, doc: props.doc ?? null, remove: props.remove });
+  // Somebody else's, seen only as their caregiver (H1b): said so, never as theirs.
+  const caregiver = isCaregiverPaper(props.doc);
+  // And no picture in a list: the vault writes each one fetched through a grant down as a look,
+  // which its person reads. Its own page keeps its picture. Here, whatever list it is in.
+  const thumb = caregiver ? null : props.thumb;
   // Read out as it is shown: its name, its status, and where it matched.
   const said = [
     title,
     statusTone(props.status)?.words,
+    caregiver ? CAREGIVER_MARK : null,
     props.snippet ? snippetParts(props.snippet).map((p) => p.text).join('') : null,
   ]
     .filter(Boolean)
@@ -68,9 +76,10 @@ export function DocumentRow(props: {
         style={({ pressed }) => [styles.main, pressed ? styles.pressed : null]}
       >
         <View style={styles.thumb}>
-          {props.thumb ? (
+          {thumb ? (
             <Image
-              source={{ uri: props.thumb.uri, headers: { authorization: `Bearer ${props.thumb.token}` } }}
+              testID={`doc-thumb-${props.id}`}
+              source={{ uri: thumb.uri, headers: { authorization: `Bearer ${thumb.token}` } }}
               // Held in memory only: a document's picture never lands in the
               // phone's disk cache.
               cachePolicy="memory"
@@ -85,6 +94,7 @@ export function DocumentRow(props: {
         <View style={styles.words}>
         <Text weight="600">{title}</Text>
         <StatusLine status={props.status} />
+        {caregiver ? <CaregiverMark testID={`caregiver-mark-${props.id}`} /> : null}
         {props.snippet ? (
           <Text variant="secondary" tone="soft" testID={`snippet-${props.id}`}>
             {snippetParts(props.snippet).map((part, i) =>

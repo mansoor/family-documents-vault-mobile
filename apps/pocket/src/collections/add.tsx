@@ -3,6 +3,8 @@ import { Check } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { useCaregiving } from '../caregivers/caregiving';
+import { isCaregiverPaper } from '../caregivers/rules';
 import { wordsFor } from '../errors/words';
 import { useSensitiveConfirm } from '../sharing/sensitive-confirm';
 import { useVault } from '../state/vault';
@@ -42,8 +44,11 @@ export function AddDocuments(props: {
   const colours = useColours();
   const { t } = useTranslation();
   const { withToken, who } = useVault();
+  // Papers seen only as somebody's caregiver (H1b), from their lists: a search's are left out by them.
+  const cared = useCaregiving();
   const [q, setQ] = useState('');
-  const [found, setFound] = useState<Offered[] | null>(null);
+  const [asked, setFound] = useState<Offered[] | null>(null);
+  const found = asked ? asked.filter((d) => !cared.has(d.id)) : null;
   const [ticked, setTicked] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
@@ -60,6 +65,7 @@ export function AddDocuments(props: {
     // Typed words wait a moment, so each letter is not a search of its own.
     const timer = setTimeout(
       () => {
+        // A paper seen only as somebody's caregiver (H1b) goes in no collection: never offered.
         const ask = words
           ? withToken((a, tk) => a.search(tk, words)).then((r) =>
               r.items.map((h) => ({
@@ -69,7 +75,9 @@ export function AddDocuments(props: {
               })),
             )
           : withToken((a, tk) => a.documents(tk, { sort: 'recent', limit: RECENT })).then((r) =>
-              r.items.map((d) => ({ id: d.id, title: documentName(d, untitled), status: d.status })),
+              r.items
+                .filter((d) => !isCaregiverPaper(d))
+                .map((d) => ({ id: d.id, title: documentName(d, untitled), status: d.status })),
             );
         ask
           .then((items) => {

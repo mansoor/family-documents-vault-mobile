@@ -19,6 +19,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { countOn, listQuery, NO_FILTERS, searchQuery, type Filters, type Sort } from '../../documents/filter-model';
 import { FilterPanel, STATUSES } from '../../documents/filter-panel';
 import { DocumentRow, rowPlace } from '../../documents/row';
+import { useCaregiving } from '../../caregivers/caregiving';
+import { isCaregiverPaper } from '../../caregivers/rules';
 import { on } from '../../state/events';
 import { useFamilyZone } from '../../state/family-time';
 import { useVault } from '../../state/vault';
@@ -119,6 +121,9 @@ export default function DocumentsScreen() {
   const [unreachable, setUnreachable] = useState(false);
   const [searchFailed, setSearchFailed] = useState<string | null>(null);
   const [again, setAgain] = useState(0);
+  // Papers seen only as somebody's caregiver (H1b), from their lists — never one by one, which the
+  // vault would write down as a look: a search's hits are marked by them.
+  const cared = useCaregiving();
 
   // The filters' choices: the family, and the kinds there are.
   useEffect(() => {
@@ -312,7 +317,10 @@ export default function DocumentsScreen() {
   ];
 
   const noConnection = searching && (offline || unreachable);
-  const found = hits ? hits.length + sealed.items.length : null;
+  // Only me means the person's own (H1b): somebody else's Only me, seen as their caregiver, is left out.
+  const onlyMine = filters.visibilities.includes('private');
+  const shownHits = (hits ?? []).filter((h) => !(onlyMine && cared.has(h.document_id)));
+  const found = hits ? shownHits.length + sealed.items.length : null;
   type Row = {
     id: string;
     title: string | null;
@@ -326,23 +334,26 @@ export default function DocumentsScreen() {
   const rows: Row[] = searching
     ? noConnection
       ? []
-      : (hits ?? []).map((h) => ({
+      : shownHits.map((h) => ({
           id: h.document_id,
           title: h.title,
           type_key: h.type_key,
           note_name: h.note_name,
           status: h.status,
           snippet: h.snippet,
+          ...(cared.has(h.document_id) ? { doc: cared.get(h.document_id) as DocumentView } : {}),
         }))
-    : (docs ?? []).map((d) => ({
-        id: d.id,
-        title: d.title,
-        type_key: d.type_key,
-        note_name: d.note_name,
-        status: d.status,
-        doc: d,
-        latest: d.latest_version_id,
-      }));
+    : (docs ?? [])
+        .filter((d) => !(onlyMine && isCaregiverPaper(d)))
+        .map((d) => ({
+          id: d.id,
+          title: d.title,
+          type_key: d.type_key,
+          note_name: d.note_name,
+          status: d.status,
+          doc: d,
+          latest: d.latest_version_id,
+        }));
 
   return (
     <SafeAreaView style={styles.screen} edges={[]}>
@@ -523,7 +534,12 @@ export default function DocumentsScreen() {
             {...(item.snippet ? { snippet: item.snippet } : {})}
             {...(item.doc ? { doc: item.doc } : {})}
             place={rowPlace(index, rows.length)}
-            thumb={api && token && item.latest ? { uri: api.thumbnailUrl(item.latest), token } : null}
+            // A caregiver's paper has no picture in a list: the vault would write each one down as a look.
+            thumb={
+              api && token && item.latest && !isCaregiverPaper(item.doc)
+                ? { uri: api.thumbnailUrl(item.latest), token }
+                : null
+            }
           />
         )}
         ListFooterComponent={

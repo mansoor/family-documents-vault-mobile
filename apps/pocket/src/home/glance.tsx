@@ -10,6 +10,7 @@ import { Button, Text } from '../ui';
 import { Chip } from '../ui/chip';
 import { sp } from '../ui/space';
 import { useStyles, type Palette } from '../ui/theme';
+import { isCaregiverPaper } from '../caregivers/rules';
 
 /** How many documents, how many expire soon, how many need details, and how many notes. */
 export interface HomeCounts {
@@ -150,7 +151,12 @@ export function EssentialsSection(props: { docs: DocumentView[]; token: string }
             status={d.status}
             doc={d}
             place={rowPlace(i, shown.length)}
-            thumb={api && d.latest_version_id ? { uri: api.thumbnailUrl(d.latest_version_id), token: props.token } : null}
+            // None for a caregiver's paper: each fetched through a grant is a look (H1b).
+            thumb={
+              api && d.latest_version_id && !isCaregiverPaper(d)
+                ? { uri: api.thumbnailUrl(d.latest_version_id), token: props.token }
+                : null
+            }
           />
         ))}
       </View>

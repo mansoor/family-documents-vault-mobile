@@ -5,6 +5,8 @@ import { Image } from 'expo-image';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, View } from 'react-native';
+import { CaregiverMark } from '../caregivers/mark';
+import { isCaregiverPaper } from '../caregivers/rules';
 import { openOnline } from '../documents/online';
 import { useEssentials, type OpenCopy } from '../state/essentials';
 import { useScreenGuard } from '../state/lock';
@@ -115,6 +117,8 @@ export function EssentialPages(props: { id: string; mode?: string; online?: bool
         </Text>
         <IconButton testID="essential-close" label={t('essentials.close')} icon={X} onPress={close} />
       </View>
+      {/* Somebody else's, seen only as their caregiver (H1b): said over its pages too. */}
+      {ready && isCaregiverPaper(ready.document) ? <CaregiverMark testID="essential-caregiver" /> : null}
       {offline && e.checked ? (
         <Notice tone="warn" testID="essential-offline">
           {t('essentials.offlineBanner', { when: relativeWords(new Date(e.checked.at).toISOString(), zone) })}

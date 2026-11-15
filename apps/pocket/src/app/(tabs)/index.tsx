@@ -31,6 +31,9 @@ import { Button, Notice, Text } from '../../ui';
 import { DocumentRow, rowPlace } from '../../documents/row';
 import { countAlert, reminderAlert, type HomeAlert } from '../../home/alerts';
 import { AlertCards } from '../../home/alert-cards';
+import { GrownUpCards } from '../../home/grown-up';
+import { useCaregiving } from '../../caregivers/caregiving';
+import { isCaregiverPaper } from '../../caregivers/rules';
 import { Counts, ESSENTIALS_SHOWN, EssentialsLine, EssentialsSection, type HomeCounts } from '../../home/glance';
 import { sp } from '../../ui/space';
 import { VaultRead } from '../../capture/vault-read';
@@ -124,7 +127,8 @@ export default function Home() {
           let cursor: string | undefined;
           for (let page = 0; page < 25; page += 1) {
             const r = await a.documents(token, { status: 'needs_info', limit: 200, ...(cursor ? { cursor } : {}) });
-            n += r.items.filter((d) => !d.type_key).length;
+            // Somebody else's, seen as their caregiver (H1b), is not the person's to name.
+            n += r.items.filter((d) => !d.type_key && !isCaregiverPaper(d)).length;
             if (!r.has_more || !r.next_cursor) break;
             cursor = r.next_cursor;
           }
@@ -183,7 +187,8 @@ export default function Home() {
           access: await myAccess(me, async () => (await optional(a.profile(token)))?.timezone),
           counts,
           // Only what says it is one: a vault that does not narrow by it lists everything.
-          essentials: (essentials?.items ?? []).filter((d) => d.is_essential),
+          // The person's family's own, not somebody's seen as their caregiver (H1b).
+          essentials: (essentials?.items ?? []).filter((d) => d.is_essential && !isCaregiverPaper(d)),
         };
       });
       setData(next);
@@ -260,8 +265,13 @@ export default function Home() {
     due.findIndex((x) => x.document_id === r.document_id && offersNewScan(x)) === index;
 
   const essentials = useEssentials();
+  // Papers seen only as somebody's caregiver (H1b): left out of the numbers, which are the person's own.
+  const cared = useCaregiving();
+  // The turning-18 questions (H1b) are asked again with the rest of Home.
+  const [askAgain, setAskAgain] = useState(0);
   const refresh = async () => {
     setRefreshing(true);
+    setAskAgain((n) => n + 1);
     // The Essentials kept on the phone are brought up to date too.
     await Promise.all([load(), loadInbox(), essentials.sync()]);
     setRefreshing(false);
@@ -384,8 +394,10 @@ export default function Home() {
                 inboxOrigin={vault.origin}
               />
             ) : null}
+            {/* Turning 18 (H1b): the person's one question, and the owners' cards. */}
+            <GrownUpCards again={askAgain} />
             <OnThisPhone />
-            {data?.counts ? <Counts counts={data.counts} /> : null}
+            {data?.counts ? <Counts counts={withoutCared(data.counts, cared)} /> : null}
             {/* The Essentials, from the vault; without a connection, those kept on this phone. */}
             {data ? (
               <EssentialsSection docs={data.essentials} token={data.token} />
@@ -426,7 +438,8 @@ export default function Home() {
             // A note with no title is named by its first words (0.9.0); a scan with none needs a name.
             untitled={t('home.needsAName')}
             thumb={
-              api && data?.token && item.latest_version_id
+              // None for a caregiver's paper: each fetched through a grant is a look (H1b).
+              api && data?.token && item.latest_version_id && !isCaregiverPaper(item)
                 ? { uri: api.thumbnailUrl(item.latest_version_id), token: data.token }
                 : null
             }
@@ -560,6 +573,23 @@ function WideningNotice(props: { pending: NonNullable<IdentityAudienceView['pend
       ) : null}
     </Notice>
   );
+}
+
+/**
+ * Home's numbers without the papers the person sees only as somebody's
+ * caregiver (H1b): the vault counts them with the rest, and they are not
+ * the person's to keep up to date.
+ */
+function withoutCared(counts: HomeCounts, cared: ReadonlyMap<string, DocumentView>): HomeCounts {
+  if (cared.size === 0) return counts;
+  const papers = [...cared.values()];
+  const of = (status: string) => papers.filter((d) => d.status.value === status).length;
+  return {
+    ...counts,
+    total: Math.max(0, counts.total - papers.length),
+    expiring: Math.max(0, counts.expiring - of('expiring_soon')),
+    details: Math.max(0, counts.details - of('needs_info')),
+  };
 }
 
 /** What Home says once a capture is safe on the phone. */
