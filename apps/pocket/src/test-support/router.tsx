@@ -49,4 +49,6 @@ export const routerMock = {
   useRouter: () => ({ push, back, replace: push, canGoBack: () => nav.stack.length > 0 }),
   useNavigation: () => ({ addListener: () => () => undefined, dispatch: () => undefined }),
   useLocalSearchParams: () => nav.stack[nav.stack.length - 1]?.params ?? {},
+  // Each test's screen is the one in front.
+  useIsFocused: () => true,
 };

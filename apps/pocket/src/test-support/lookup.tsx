@@ -2,6 +2,8 @@ import type { DocumentView, VersionView } from '@fdv/shared';
 import { fireEvent, screen } from '@testing-library/react-native';
 import type { ReactElement } from 'react';
 import CaptureScreen from '../app/capture';
+import { CabinetLevel } from '../cabinet/level';
+import { FolderScreen } from '../cabinet/folder';
 import CollectionScreen from '../app/collection/[id]';
 import CollectionsScreen from '../app/collections';
 import EditScreen from '../app/edit/[id]';
@@ -76,6 +78,12 @@ export function LookupApp(props: { start: ReactElement }) {
       <NotesScreen />
     ) : top?.pathname === '/new-note' ? (
       <NewNoteScreen />
+    ) : top?.pathname === '/cabinet/[id]' ? (
+      <CabinetLevel level="cabinet" />
+    ) : top?.pathname === '/drawer/[id]' ? (
+      <CabinetLevel level="drawer" />
+    ) : top?.pathname === '/folder/[id]' ? (
+      <FolderScreen />
     ) : (
       props.start
     );

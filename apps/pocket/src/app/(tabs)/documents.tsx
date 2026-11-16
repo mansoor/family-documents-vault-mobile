@@ -10,21 +10,25 @@ import {
   type SearchHit,
   type StatusValue,
 } from '@fdv/shared';
-import { useLocalSearchParams } from 'expo-router';
-import { ArrowUpDown, Search, SlidersHorizontal, X } from 'lucide-react-native';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { ArrowUpDown, ScanQrCode, Search, SlidersHorizontal, X } from 'lucide-react-native';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, FlatList, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { CabinetBrowse } from '../../cabinet/browse';
+import { cabinetGate } from '../../cabinet/model';
 import { countOn, listQuery, NO_FILTERS, searchQuery, type Filters, type Sort } from '../../documents/filter-model';
 import { FilterPanel, STATUSES } from '../../documents/filter-panel';
 import { DocumentRow, rowPlace } from '../../documents/row';
 import { useCaregiving } from '../../caregivers/caregiving';
+import { readPrefs, writePrefs } from '../../platform/prefs';
 import { isCaregiverPaper } from '../../caregivers/rules';
 import { on } from '../../state/events';
 import { useFamilyZone } from '../../state/family-time';
 import { useVault } from '../../state/vault';
 import { Field, Notice, Text } from '../../ui';
+import { Chip, ChipRow } from '../../ui/chip';
 import { IconButton } from '../../ui/icon-button';
 import { PickerSheet } from '../../ui/picker';
 import { sp } from '../../ui/space';
@@ -46,6 +50,13 @@ import { useColours, useStyles, type Palette } from '../../ui/theme';
  *
  * A vault with the Documents table (0.6.0, `document_table`) sorts by its
  * columns and counts; an older one by its older sorts.
+ *
+ * Where the vault has My cabinet (0.9.0-dev.42, C1), List and Cabinet under
+ * the title, as the web's Table and Cabinet (C5): the same documents, as
+ * the person files them — cabinets, drawers and folders, browsed here and
+ * arranged on the web — with Scan a folder label beside the search where
+ * the vault prints labels (dev.50, C3). The choice is kept on this phone.
+ * An older vault shows the list, as before.
  */
 
 /** How long typing pauses before the vault is asked (FND). */
@@ -56,7 +67,98 @@ const SORTS: Sort[] = ['recent', 'title', 'expires'];
 
 type Sealed = { state: 'idle' | 'searching' | 'done'; items: SearchHit[]; searched: number };
 
+/** List or Cabinet, as last chosen on this phone. */
+const VIEW_PREF = 'documents-view';
+type Shown = 'list' | 'cabinet';
+
 export default function DocumentsScreen() {
+  const { t } = useTranslation();
+  const { caps } = useVault();
+  const gate = cabinetGate(caps);
+  const [view, setView] = useState<Shown>(() => (readPrefs<string>(VIEW_PREF, 'list') === 'cabinet' ? 'cabinet' : 'list'));
+  // The search, opened from the Cabinet's magnifier: the list, with its box open.
+  const [searchFirst, setSearchFirst] = useState(false);
+  const choose = (next: Shown) => {
+    setView(next);
+    try {
+      writePrefs(VIEW_PREF, next);
+    } catch {
+      // Kept until the app closes, then.
+    }
+  };
+  // Opened from Home's numbers, an alert or its Essentials: the list, narrowed as asked.
+  const { status, essential } = useLocalSearchParams<{ status?: string; essential?: string }>();
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (status || essential === '1') setView('list');
+  }, [status, essential]);
+
+  const switcher = gate.on ? (
+    <ChipRow label={t('cabinet.showAs')}>
+      <Chip
+        testID="documents-view-list"
+        label={t('cabinet.showList')}
+        selected={view === 'list'}
+        onPress={() => {
+          setSearchFirst(false);
+          choose('list');
+        }}
+      />
+      <Chip
+        testID="documents-view-cabinet"
+        label={t('cabinet.showCabinet')}
+        selected={view === 'cabinet'}
+        onPress={() => choose('cabinet')}
+      />
+    </ChipRow>
+  ) : null;
+  if (!gate.on || view === 'list') return <DocumentsList switcher={switcher} searchFirst={searchFirst} />;
+  return (
+    <CabinetDocuments
+      switcher={switcher}
+      labels={gate.labels}
+      onSearch={() => {
+        setSearchFirst(true);
+        choose('list');
+      }}
+    />
+  );
+}
+
+/** Documents as the cabinet (C5): the title, its buttons and the switch, over the person's cabinets. */
+function CabinetDocuments(props: { switcher: ReactNode; labels: boolean; onSearch: () => void }) {
+  const styles = useStyles(makeStyles);
+  const { t } = useTranslation();
+  const router = useRouter();
+  return (
+    <SafeAreaView style={styles.screen} edges={[]}>
+      <CabinetBrowse
+        header={
+          <View style={styles.header}>
+            <View style={styles.titleRow}>
+              <Text variant="hero" style={styles.flex}>
+                {t('documents.title')}
+              </Text>
+              {/* Not in the web build: its scanner would fetch its code reader from elsewhere. */}
+              {props.labels && Platform.OS !== 'web' ? (
+                <IconButton
+                  testID="cabinet-scan"
+                  label={t('cabinet.scan')}
+                  icon={ScanQrCode}
+                  onPress={() => router.push('/scan-label')}
+                />
+              ) : null}
+              <IconButton testID="documents-search" label={t('documents.searchOpen')} icon={Search} onPress={props.onSearch} />
+            </View>
+            {props.switcher}
+          </View>
+        }
+      />
+    </SafeAreaView>
+  );
+}
+
+function DocumentsList(props: { switcher: ReactNode; searchFirst: boolean }) {
   const styles = useStyles(makeStyles);
   const colours = useColours();
   const { t } = useTranslation();
@@ -80,7 +182,7 @@ export default function DocumentsScreen() {
   const [q, setQ] = useState('');
   const searching = q.trim() !== '';
   // The search box and the filters, shown from the title row's magnifier (the owner's ask of 11 Nov 2026).
-  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(props.searchFirst);
   const [sort, setSort] = useState<Sort>('recent');
   const [filters, setFilters] = useState<Filters>(NO_FILTERS);
   const [panel, setPanel] = useState(false);
@@ -392,6 +494,7 @@ export default function DocumentsScreen() {
                 }}
               />
             </View>
+            {props.switcher}
             {searchOpen ? (
             <View style={styles.searchRow}>
               <View style={styles.flex}>

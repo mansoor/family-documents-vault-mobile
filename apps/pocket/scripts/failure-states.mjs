@@ -63,6 +63,13 @@ const AREAS = [
   ['Changing a document', 'Edit details', 'edit', 'stillNeeded changed'],
   ['Collections', 'Collections, a collection', 'collections', 'needsConnection'],
   ['', '', 'collection', 'gone'],
+  [
+    'My cabinet',
+    'Documents → Cabinet, a cabinet, a drawer, a folder',
+    'cabinet',
+    'needsConnection showingLast empty allHidden noCabinet gone folderGone questionRefused',
+  ],
+  ['Scanning a folder label', 'Scan a folder label', 'cabinet', 'otherVault notALabel noCamera cameraOff'],
   ['Notes', 'Notes, New note', 'notesList', 'needsConnection'],
   ['', '', 'newNote', 'tooLong offline notKept sendingNow gone notWithItSending notWithItGone sentOnce'],
   [

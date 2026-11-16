@@ -41,7 +41,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     name,
     slug: 'family-vault',
     scheme: variant === 'release' ? 'familyvault' : `familyvault-${variant}`,
-    version: '0.13.1',
+    version: '0.14.0',
     orientation: 'portrait',
     icon: './assets/icon.png',
     // Light or dark, as the phone is set (P4); Settings can fix it to one.
@@ -93,6 +93,8 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       ['expo-secure-store', { configureAndroidBackup: false, faceIDPermission: FACE_ID }],
       ['expo-local-authentication', { faceIDPermission: FACE_ID }],
       ['@preeternal/react-native-document-scanner-plugin', { cameraPermission: CAMERA }],
+      // Scanning a folder label's code (C5): the camera only, never the microphone.
+      ['expo-camera', { cameraPermission: CAMERA, microphonePermission: false, recordAudioAndroid: false }],
       [
         'expo-font',
         {

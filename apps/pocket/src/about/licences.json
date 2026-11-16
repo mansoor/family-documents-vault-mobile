@@ -197,6 +197,7 @@
 {"name":"@types/babel__generator","versions":["7.27.0"],"licence":"MIT"},
 {"name":"@types/babel__template","versions":["7.4.4"],"licence":"MIT"},
 {"name":"@types/babel__traverse","versions":["7.28.0"],"licence":"MIT"},
+{"name":"@types/emscripten","versions":["1.41.6"],"licence":"MIT"},
 {"name":"@types/graceful-fs","versions":["4.1.9"],"licence":"MIT"},
 {"name":"@types/hammerjs","versions":["2.0.46"],"licence":"MIT"},
 {"name":"@types/istanbul-lib-coverage","versions":["2.0.6"],"licence":"MIT"},
@@ -241,6 +242,7 @@
 {"name":"babel-preset-expo","versions":["57.0.17"],"licence":"MIT"},
 {"name":"babel-preset-jest","versions":["29.6.3"],"licence":"MIT"},
 {"name":"balanced-match","versions":["1.0.2","4.0.4"],"licence":"MIT"},
+{"name":"barcode-detector","versions":["3.2.4"],"licence":"MIT"},
 {"name":"base64-js","versions":["1.5.1"],"licence":"MIT"},
 {"name":"baseline-browser-mapping","versions":["2.11.25"],"licence":"Apache-2.0"},
 {"name":"big-integer","versions":["1.6.52"],"licence":"Unlicense"},
@@ -329,6 +331,7 @@
 {"name":"expo-asset","versions":["57.0.21"],"licence":"MIT"},
 {"name":"expo-brightness","versions":["57.0.2"],"licence":"MIT"},
 {"name":"expo-build-properties","versions":["57.0.23"],"licence":"MIT"},
+{"name":"expo-camera","versions":["57.0.6"],"licence":"MIT"},
 {"name":"expo-constants","versions":["57.0.24"],"licence":"MIT"},
 {"name":"expo-crypto","versions":["57.0.4"],"licence":"MIT"},
 {"name":"expo-dev-client","versions":["57.0.21"],"licence":"MIT"},
@@ -647,6 +650,7 @@
 {"name":"supports-color","versions":["5.5.0","7.2.0","8.1.1"],"licence":"MIT"},
 {"name":"supports-hyperlinks","versions":["2.3.0"],"licence":"MIT"},
 {"name":"supports-preserve-symlinks-flag","versions":["1.0.0"],"licence":"MIT"},
+{"name":"tagged-tag","versions":["1.0.0"],"licence":"MIT"},
 {"name":"terminal-link","versions":["2.1.1"],"licence":"MIT"},
 {"name":"terser","versions":["5.51.2"],"licence":"BSD-2-Clause"},
 {"name":"test-exclude","versions":["6.0.0"],"licence":"ISC"},
@@ -660,7 +664,7 @@
 {"name":"tr46","versions":["0.0.3"],"licence":"MIT"},
 {"name":"tslib","versions":["1.14.1","2.8.1"],"licence":"0BSD"},
 {"name":"type-detect","versions":["4.0.8"],"licence":"MIT"},
-{"name":"type-fest","versions":["0.21.3","0.7.1"],"licence":"(MIT OR CC0-1.0)"},
+{"name":"type-fest","versions":["0.21.3","0.7.1","5.10.0"],"licence":"(MIT OR CC0-1.0)"},
 {"name":"typescript","versions":["6.0.3"],"licence":"Apache-2.0"},
 {"name":"ua-parser-js","versions":["0.7.41","1.0.41"],"licence":"MIT"},
 {"name":"undici-types","versions":["6.21.0"],"licence":"MIT"},
@@ -700,5 +704,6 @@
 {"name":"yaml","versions":["2.9.1"],"licence":"ISC"},
 {"name":"yargs","versions":["17.7.3"],"licence":"MIT"},
 {"name":"yargs-parser","versions":["21.1.1"],"licence":"ISC"},
-{"name":"yocto-queue","versions":["0.1.0"],"licence":"MIT"}
+{"name":"yocto-queue","versions":["0.1.0"],"licence":"MIT"},
+{"name":"zxing-wasm","versions":["3.1.7"],"licence":"MIT"}
 ]

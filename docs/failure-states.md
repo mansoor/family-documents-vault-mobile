@@ -161,6 +161,18 @@ Written by `node apps/pocket/scripts/failure-states.mjs`; CI fails if it is out 
 |  |  | `edit.changed` | Someone changed this document while you were editing. Here it is as it is now: check it and save again. |
 | Collections | Collections, a collection | `collections.needsConnection` | Collections need a connection to the vault. |
 |  |  | `collection.gone` | This collection isn't there any more, or isn't one you can see. |
+| My cabinet | Documents → Cabinet, a cabinet, a drawer, a folder | `cabinet.needsConnection` | Showing your cabinet needs a connection to your vault. |
+|  |  | `cabinet.showingLast` | Offline: showing your cabinet as it was when last opened. |
+|  |  | `cabinet.empty` | Your cabinet is empty. Arrange it on the web, and it shows here. |
+|  |  | `cabinet.allHidden` | Every cabinet is hidden. Show one again on the web. |
+|  |  | `cabinet.noCabinet` | This vault doesn't have cabinets yet. |
+|  |  | `cabinet.gone` | This isn't in your cabinet any more. It may have been taken out or hidden on the web. |
+|  |  | `cabinet.folderGone` | This folder isn't in your cabinet. It may have been taken out or hidden, or the label may be someone else's. |
+|  |  | `cabinet.questionRefused` | This folder asks for something you can't see any more. Change it on the web. |
+| Scanning a folder label | Scan a folder label | `cabinet.otherVault` | This label is from another vault ({{host}}). It opens only there. |
+|  |  | `cabinet.notALabel` | That code isn't a folder label. |
+|  |  | `cabinet.noCamera` | There's no camera here to scan with. |
+|  |  | `cabinet.cameraOff` | The camera is off for this app. Turn it on in the phone's settings to scan a label. |
 | Notes | Notes, New note | `notesList.needsConnection` | Your notes need a connection to your vault. You can still write a new one: it's sent once the vault can be reached. |
 |  |  | `newNote.tooLong` | Too long to save: {{count}} characters. |
 |  |  | `newNote.offline` | Your vault can't be reached right now. This note is kept on this phone, and sent once it can be. |
