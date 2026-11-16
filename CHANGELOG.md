@@ -6,6 +6,67 @@ app's own, tagged `vX.Y.Z` in this repository.
 
 ## [Unreleased]
 
+## [0.14.0] — My cabinet on the phone
+
+Re-pinned to the vault's **v0.9.0-dev.51**. Where the vault has My cabinet
+(`features.cabinets`, from 0.9.0-dev.42), Documents can show the same
+documents as the person files them, cabinet by cabinet, and a printed
+folder label opens its folder. The cabinet is browsed here and arranged on
+the web. A vault without cabinets shows Documents exactly as 0.13.1 did.
+
+### Added
+- **List and Cabinet** under the Documents title, as the web's Table and
+  Cabinet. Cabinet shows the person's own cabinets; a cabinet opens its
+  drawers, a drawer its folders (each with how many documents it holds), and
+  a folder its documents. Back goes up a level. What is hidden on the web is
+  left out. The choice is remembered on this phone. Opening Documents from
+  Home's numbers, an alert or the Essentials still shows the list, and the
+  magnifier on Cabinet opens the list with its search.
+- **A folder** says where it is (Cabinet › Drawer), what it holds in a
+  sentence ("P60s, for Sam."), and how many. The documents pinned there come
+  first, then its dividers, newest first: years by themselves, or the
+  folder's own date ranges. Each divider says how many are behind it and
+  opens to show them, 50 at a time; the first with any is open already.
+  Each document opens its own page. On a vault with cabinets but no
+  dividers (0.9.0-dev.42 and dev.43), a folder lists its question's
+  documents, newest first, from the documents list; a question that list
+  refuses says so, with no Try again.
+- Every screen showing the cabinet shares one request: a change asks the
+  vault once for the cabinet and once for its counts, however many are open.
+- **Arrange your cabinet on the web**, under the cabinets, opens the vault's
+  own Arrange page in the browser. An empty cabinet says so.
+- **Scan a folder label** (the code button beside the search, on a vault
+  that prints labels: `features.original_place`, dev.50). A label's code
+  holds only `{vault}/folder/{id}`. A label of this vault opens its folder in
+  place of the scanner, including one printed from another address of the
+  same vault when the folder is the person's own (the folder then says so,
+  once). Another vault's label says
+  "This label is from another vault (…). It opens only there.", and anything
+  else says it isn't a folder label, each with Scan another. Nothing is ever
+  asked of an address in a code. The camera is asked for the first time;
+  turned off for the app, the scanner says where to turn it on. The camera
+  looks only while the scanner is in front and the app is open: behind the
+  lock or its cover it is off, and a code seen then opens nothing. Not in
+  the web build, whose scanner would fetch its code reader from elsewhere.
+- **A link to a folder** in the app's own scheme (`familyvault://folder/{id}`)
+  opens it while signed in, as any of the app's screens' links do.
+- **Where the original is**, on a document's page (vault dev.50): its place
+  in a cabinet, then the words written for it ("Study › Drawer 2 › Tax 2025
+  · behind the blue divider"), as the vault answers them to whoever sees
+  where originals are kept. When it is the person's own folder, it opens.
+- Failure states: the cabinet without a connection, an empty or hidden
+  cabinet, a folder not in the person's cabinet, a folder whose question
+  can't be asked any more, another vault's label, a code that is no label,
+  no camera, and the camera turned off.
+
+### Changed
+- `expo-camera` (SDK 57) for the scanner: the camera only. Its config plugin
+  asks for no microphone and no audio recording.
+- The phone's theme takes every colour role the vault's tokens have,
+  `paperInk` (C3's labels) among them.
+- About lists `expo-camera` and what it brings (`barcode-detector`,
+  `zxing-wasm` for the web build).
+
 ## [0.13.1] — A note whose answer was lost is sent again safely
 
 Re-pinned to the vault's **v0.9.0-dev.45**, which keeps a new note's

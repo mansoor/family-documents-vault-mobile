@@ -13,6 +13,7 @@ import {
   radii,
   SENSITIVE_LABEL,
   sensitiveOf,
+  whereKeptWords,
   type DocumentTypeView,
   type DocumentView,
   type Member,
@@ -325,6 +326,8 @@ export function DocumentDetail(props: { id: string }) {
   // Shared outside the family by whoever may (owners and adults), as on the web.
   const mayShare = !!who && can(who.role, 'document.share') && !caregiver;
   const hasMore = (mayTrash || mayUnneed || mayRemind || mayShare) && !!doc && !offline;
+  // Where the original is, said on a vault that keeps places in cabinets (C3): before it, the page said nothing of it.
+  const placeWords = caps?.features.original_place === true && !note && !caregiver ? whereKeptWords(shown) : null;
   // Two columns, until the text is so large that one reads better.
   const oneColumn = scale > 1.2;
 
@@ -421,6 +424,39 @@ export function DocumentDetail(props: { id: string }) {
                 <Text style={styles.flex}>{t('document.collections')}</Text>
                 <Text variant="secondary" tone="soft" style={styles.value}>
                   {inCollections.map((c) => c.name).join(', ')}
+                </Text>
+              </View>
+            ),
+          },
+        ]
+      : []),
+    // Where the original is (0.9.0-dev.50, C3): its place in a cabinet, then the words written for it, as the
+    // vault answers them to whoever sees where originals are kept. Its folder opens, when it is the person's own.
+    ...(placeWords
+      ? [
+          {
+            key: 'original',
+            node: shown.original_place?.folder_id && !offline ? (
+              <Pressable
+                testID="document-original"
+                accessibilityRole="button"
+                accessibilityLabel={`${t('cabinet.original')}. ${placeWords}`}
+                accessibilityHint={t('cabinet.originalOpens')}
+                onPress={() =>
+                  router.push({ pathname: '/folder/[id]', params: { id: shown.original_place?.folder_id ?? '' } })
+                }
+                style={({ pressed }) => [styles.line, pressed ? styles.pressed : null]}
+              >
+                <Text style={styles.flex}>{t('cabinet.original')}</Text>
+                <Text variant="secondary" tone="soft" style={styles.value} testID="document-original-words">
+                  {`${placeWords} ›`}
+                </Text>
+              </Pressable>
+            ) : (
+              <View style={styles.line} testID="document-original">
+                <Text style={styles.flex}>{t('cabinet.original')}</Text>
+                <Text variant="secondary" tone="soft" style={styles.value} testID="document-original-words">
+                  {placeWords}
                 </Text>
               </View>
             ),

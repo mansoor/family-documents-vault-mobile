@@ -108,6 +108,11 @@ function Gates() {
         <Stack.Screen name="collection/[id]" options={{ title: '', headerBackVisible: true }} />
         <Stack.Screen name="checklist/[id]" options={{ title: '', headerShown: false }} />
         <Stack.Screen name="managers/[id]" options={{ title: '', headerBackVisible: true }} />
+        {/* My cabinet (C5): a cabinet, a drawer, a folder, each with ← to the level above; a label scanned. */}
+        <Stack.Screen name="cabinet/[id]" options={{ title: '', headerBackVisible: true }} />
+        <Stack.Screen name="drawer/[id]" options={{ title: '', headerBackVisible: true }} />
+        <Stack.Screen name="folder/[id]" options={{ title: '', headerBackVisible: true }} />
+        <Stack.Screen name="scan-label" options={{ title: '', headerShown: false }} />
         <Stack.Screen name="new-note" options={{ title: '', headerShown: false }} />
         <Stack.Screen name="person/[id]" options={{ title: '' }} />
         <Stack.Screen name="attention" options={{ title: t('attention.title') }} />
