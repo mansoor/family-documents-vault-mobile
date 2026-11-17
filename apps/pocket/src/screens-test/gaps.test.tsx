@@ -162,12 +162,45 @@ describe('no longer needed, and needed again (the gaps review)', () => {
     await fireEvent.press(screen.getByTestId('unneeded-yes'));
     expect(await screen.findByTestId('document-notice')).toHaveTextContent(/no longer needed/);
     expect(t.library.documents.get('passport')?.no_longer_needed?.reason).toBe('Replaced by the new one');
+    // What it says of it is behind the (i) beside its status (0.9.0-dev.53), closed at first.
+    expect(screen.queryByTestId('document-unneeded')).toBeNull();
+    await fireEvent.press(await screen.findByTestId('document-unneeded-info'));
     expect(await screen.findByTestId('document-unneeded')).toBeTruthy();
 
     await fireEvent.press(screen.getByTestId('document-more'));
     await fireEvent.press(await screen.findByTestId('document-needed-again'));
     await waitFor(() => expect(t.library.documents.get('passport')?.no_longer_needed).toBeNull());
     expect(await screen.findByTestId('document-notice')).toHaveTextContent(/^Needed again/);
+  });
+
+  it('inside the box its (i) opens: Change why, then Needed again', async () => {
+    const { t } = vault();
+    passport(t);
+    await unlocked(t, <DocumentDetail id="passport" />);
+    await fireEvent.press(await screen.findByTestId('document-more'));
+    await fireEvent.press(await screen.findByTestId('document-unneeded-mark'));
+    await fireEvent.changeText(await screen.findByTestId('unneeded-reason'), 'Replaced by the new one');
+    await fireEvent.press(screen.getByTestId('unneeded-yes'));
+    await screen.findByTestId('document-notice');
+    await fireEvent.press(await screen.findByTestId('document-unneeded-info'));
+
+    // Change why: asked with why as it is; only why goes, and it stays no longer needed.
+    await fireEvent.press(await screen.findByTestId('document-unneeded-change'));
+    const why = await screen.findByTestId('unneeded-reason');
+    expect(why.props.value).toBe('Replaced by the new one');
+    await fireEvent.changeText(why, 'The new passport came');
+    await fireEvent.press(screen.getByTestId('unneeded-yes'));
+    await waitFor(() =>
+      expect(t.library.documents.get('passport')?.no_longer_needed?.reason).toBe('The new passport came'),
+    );
+    expect(await screen.findByTestId('document-notice')).toHaveTextContent('Saved. It stays no longer needed.');
+    expect(await screen.findByTestId('document-unneeded-reason')).toHaveTextContent('Why: The new passport came');
+    expect(audit()).toEqual([]);
+
+    await fireEvent.press(screen.getByTestId('document-unneeded-again'));
+    await waitFor(() => expect(t.library.documents.get('passport')?.no_longer_needed).toBeNull());
+    expect(await screen.findByTestId('document-notice')).toHaveTextContent(/^Needed again/);
+    expect(screen.queryByTestId('document-unneeded-info')).toBeNull();
   });
 
   it('a vault without it offers neither', async () => {

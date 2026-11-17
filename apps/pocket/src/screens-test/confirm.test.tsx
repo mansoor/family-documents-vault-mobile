@@ -316,7 +316,7 @@ describe('who can see it when nobody chooses (A71, vault 0.5.19)', () => {
     expect(t.vault.state.documents[0]).toMatchObject({ visibility: 'private' });
   });
 
-  it('an adult capturing their own document of an Adults-only kind sends Adults only by default', async () => {
+  it('an adult capturing their own document of an Adults-only kind gets Adults only by default, as the vault starts it', async () => {
     const { t, rec } = await openCard({ after: signedInAs('adult', 'Omar') });
     await fireEvent.press(chip('Omar (Yours)'));
     await fireEvent.press(chip('Bank statement'));
@@ -327,8 +327,9 @@ describe('who can see it when nobody chooses (A71, vault 0.5.19)', () => {
     expect(rec.metadata()[0]).toMatchObject({
       type_key: 'bank_statement',
       owner_member_id: 'fake-member',
-      visibility: 'adults',
     });
+    // Nobody chose (the review of 0.15.0): nothing said, and the vault starts it by its own rule.
+    expect(rec.metadata()[0]).not.toHaveProperty('visibility');
     expect(t.vault.state.documents[0]).toMatchObject({ visibility: 'adults' });
   });
 });

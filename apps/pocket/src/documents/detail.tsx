@@ -11,9 +11,12 @@ import {
   NOTE_KIND,
   parseDateInput,
   radii,
+  recordFormatWords,
   SENSITIVE_LABEL,
+  TAP_MIN,
   sensitiveOf,
   whereKeptWords,
+  type CoreField,
   type DocumentTypeView,
   type DocumentView,
   type Member,
@@ -32,6 +35,7 @@ import {
   Eye,
   FilePlus,
   FileText,
+  Info,
   Lock,
   NotebookText,
   Pencil,
@@ -134,6 +138,8 @@ export function DocumentDetail(props: { id: string }) {
   const [reason, setReason] = useState('');
   const [marking, setMarking] = useState(false);
   const [markProblem, setMarkProblem] = useState<string | null>(null);
+  // No longer needed's box (0.9.0-dev.53, the owner's ask of 16 Nov 2026): closed at first, opened by its (i).
+  const [unneededOpen, setUnneededOpen] = useState(false);
   // Essential off: its copies leave the phones that keep them, so it asks first (R2).
   const [askOff, setAskOff] = useState(false);
   // The collections it is in (P8), of those the person may see.
@@ -296,14 +302,18 @@ export function DocumentDetail(props: { id: string }) {
   // set, so a kept copy) and opened there for its owner (0.5.8).
   const type = types.find((x) => x.key === shown.type_key);
   const details = doc ? detailFacts(type?.fields, doc.extra, { yes: t('document.yes'), no: t('document.no') }) : [];
+  // The fixed details under the kind's own names (H3: an advance directive's Issued is "Signed", an insurance
+  // card's Issued by its "Insurer"), and not at all where the kind hides one.
+  const core = (key: CoreField, fallback: string): string | null =>
+    type?.core?.[key]?.shown === false ? null : type?.core?.[key]?.label?.trim() || fallback;
   const facts = (
     [
-      [t('document.issuedBy'), shown.issued_by ?? null],
-      [t('document.issued'), shown.issued ? formatDate(shown.issued) : null],
-      [t('document.expires'), shown.expires ? formatDate(shown.expires) : null],
+      [core('issued_by', type?.issued_by_label?.trim() || t('document.issuedBy')), shown.issued_by ?? null],
+      [core('issued', t('document.issued')), shown.issued ? formatDate(shown.issued) : null],
+      [core('expires', t('document.expires')), shown.expires ? formatDate(shown.expires) : null],
       ...details,
-    ] as [string, string | null][]
-  ).filter((f): f is [string, string] => !!f[1]);
+    ] as [string | null, string | null][]
+  ).filter((f): f is [string, string] => !!f[0] && !!f[1]);
   // Whose · what kind · who can see it: what the old page said in three places, on one line.
   // Whose: a person, or the household's (0.9.0-dev.32); Not sure yet says nothing here (its status does).
   const whose = owner?.display_name ?? (shown.household_owned ? t('capture.household') : null);
@@ -316,11 +326,15 @@ export function DocumentDetail(props: { id: string }) {
     caps?.features.sensitive_documents === true && (shown.sensitive_effective ?? sensitiveOf(shown, type));
   const ordered = [...versions].sort((x, y) => y.version_no - x.version_no);
   const first = ordered[ordered.length - 1];
-  const thumb = api && token && latest && !note ? api.thumbnailUrl(latest.id) : null;
+  // A health record kept as it is (0.9.0-dev.51, H5): never drawn, so no picture, no pages and no Show; Save a copy only.
+  const asIs = latest?.stored_as_is === true;
+  const thumb = api && token && latest && !note && !asIs ? api.thumbnailUrl(latest.id) : null;
   // A note is edited too (the gaps review, 11 Nov 2026): its title and its words.
   const mayEdit = mayChange && !!doc && !offline;
   // No longer needed, and needed again, from the phone (the gaps review), where the vault has it.
   const mayUnneed = caps?.features.no_longer_needed === true && mayChange && !note;
+  // Needed again and Change why, inside the box: online, for whoever may change it.
+  const unneededActs = mayUnneed && !!doc && !offline;
   // Remind me (the gaps review): for whoever manages reminders, never on a document no longer needed.
   const mayRemind = !!who && can(who.role, 'reminder.manage') && !shown?.no_longer_needed && !caregiver;
   // Shared outside the family by whoever may (owners and adults), as on the web.
@@ -335,10 +349,12 @@ export function DocumentDetail(props: { id: string }) {
     note
       ? []
       : [
-          ...(shown.is_essential && !caregiver
+          ...(shown.is_essential && !caregiver && !asIs
             ? [{ key: 'show', testID: 'document-show', label: t('document.show'), icon: Eye, busy: preparing, onPress: () => void showIt() }]
             : []),
-          { key: 'pages', testID: 'document-pages', label: t('document.pagesShort'), icon: FileText, onPress: () => void pages() },
+          ...(asIs
+            ? []
+            : [{ key: 'pages', testID: 'document-pages', label: t('document.pagesShort'), icon: FileText, onPress: () => void pages() }]),
           { key: 'save', testID: 'document-save', label: t('document.saveCopyShort'), icon: Download, busy: saving, onPress: save },
           ...(mayAddVersion && doc
             ? [{ key: 'version', testID: 'document-add-version', label: t('document.newVersionShort'), icon: FilePlus, onPress: () => void addVersion() }]
@@ -598,6 +614,20 @@ export function DocumentDetail(props: { id: string }) {
           ) : null}
           <View style={styles.pills}>
             <StatusLine status={shown.status} />
+            {/* (i) beside "No longer needed": opens and closes what it says about it (0.9.0-dev.53). */}
+            {shown.no_longer_needed ? (
+              <Pressable
+                testID="document-unneeded-info"
+                accessibilityRole="button"
+                accessibilityLabel={t('document.unneededInfo')}
+                accessibilityState={{ expanded: unneededOpen }}
+                hitSlop={(TAP_MIN - 32) / 2}
+                onPress={() => setUnneededOpen((o) => !o)}
+                style={({ pressed }) => [styles.info, unneededOpen ? styles.infoOn : null, pressed ? styles.pressed : null]}
+              >
+                <Info color={colours.inkMuted} size={18} accessibilityElementsHidden importantForAccessibility="no" />
+              </Pressable>
+            ) : null}
             {sensitive ? (
               <View
                 style={[styles.pill, styles.lockPill]}
@@ -622,10 +652,18 @@ export function DocumentDetail(props: { id: string }) {
           </View>
         </View>
       </View>
-      {shown.no_longer_needed ? (
+      {shown.no_longer_needed && unneededOpen ? (
         <Unneeded
           mark={shown.no_longer_needed}
           open={(to) => router.push({ pathname: '/document/[id]', params: { id: to } })}
+          acts={unneededActs}
+          busy={marking}
+          onAgain={() => void neededAgain()}
+          onChange={() => {
+            setReason(shown.no_longer_needed?.reason ?? '');
+            setMarkProblem(null);
+            setMore('unneeded');
+          }}
         />
       ) : null}
       {caregiver ? (
@@ -682,6 +720,11 @@ export function DocumentDetail(props: { id: string }) {
             </Pressable>
           ))}
         </View>
+      ) : null}
+      {asIs && latest ? (
+        <Notice tone="info" testID="document-no-preview">
+          {t('document.recordNoPreview', { format: recordFormatWords(latest.mime) })}
+        </Notice>
       ) : null}
       {warning ? (
         <Notice tone="warn" announce={t('document.saveWarning')}>
@@ -807,7 +850,8 @@ export function DocumentDetail(props: { id: string }) {
           <View style={styles.menu} testID="unneeded-question">
             <Text variant="screen">{t('unneeded.title')}</Text>
             <Text variant="secondary" tone="soft">
-              {t('unneeded.words', { title: name })}
+              {/* Asked again (Change why): it stays no longer needed; only why changes. */}
+              {doc.no_longer_needed ? t('unneeded.changeWords', { title: name }) : t('unneeded.words', { title: name })}
             </Text>
             <Field
               label={t('unneeded.reason')}
@@ -822,7 +866,12 @@ export function DocumentDetail(props: { id: string }) {
                 {markProblem}
               </Notice>
             ) : null}
-            <Button label={t('unneeded.yes')} busy={marking} onPress={() => void markUnneeded()} testID="unneeded-yes" />
+            <Button
+              label={doc.no_longer_needed ? t('unneeded.save') : t('unneeded.yes')}
+              busy={marking}
+              onPress={() => void markUnneeded()}
+              testID="unneeded-yes"
+            />
             <Button kind="quiet" label={t('common.cancel')} disabled={marking} onPress={() => setMore(null)} testID="unneeded-cancel" />
           </View>
         ) : (
@@ -912,17 +961,27 @@ export function DocumentDetail(props: { id: string }) {
     }
   }
 
-  /** Kept, but no longer needed: its reminders stop, and its status says so. */
+  /**
+   * Kept, but no longer needed: its reminders stop, and its status says so.
+   * Asked again (Change why), only why is sent, and only when it changed:
+   * what replaced it is kept as it is, as the web keeps it.
+   */
   async function markUnneeded() {
     if (marking) return;
+    const was = doc?.no_longer_needed ?? null;
+    const why = reason.trim() || null;
+    if (was && why === (was.reason?.trim() || null)) {
+      setMore(null);
+      return;
+    }
     setMarking(true);
     setMarkProblem(null);
     try {
-      const saved = await withToken((a, tk) => a.markNoLongerNeeded(tk, id, { reason: reason.trim() || null }));
+      const saved = await withToken((a, tk) => a.markNoLongerNeeded(tk, id, { reason: why }));
       setDoc(saved);
       setMore(null);
       feel('done');
-      setNotice({ tone: 'ok', text: t('unneeded.done') });
+      setNotice({ tone: 'ok', text: was ? t('unneeded.changed') : t('unneeded.done') });
       emit('documentChanged', id);
     } catch (err) {
       setMarkProblem(wordsFor(err, t));
@@ -1010,45 +1069,102 @@ function OlderVersion(props: {
           {t('document.detailsNotKept')}
         </Text>
       ) : null}
-      <View style={styles.olderActions}>
-        <Button
-          size="small"
-          testID={`version-${v.version_no}-pages`}
-          kind="quiet"
-          label={t('document.itsPages')}
-          onPress={props.onPages}
-        />
-      </View>
+      {/* A health record kept as it is has no pages to open (H5). */}
+      {v.stored_as_is === true ? (
+        <Text tone="soft" variant="small" testID={`version-${v.version_no}-no-preview`}>
+          {t('document.olderNoPreview')}
+        </Text>
+      ) : (
+        <View style={styles.olderActions}>
+          <Button
+            size="small"
+            testID={`version-${v.version_no}-pages`}
+            kind="quiet"
+            label={t('document.itsPages')}
+            onPress={props.onPages}
+          />
+        </View>
+      )}
     </View>
   );
 }
 
 /**
- * Why a document is no longer needed (a vault of 0.9.0): when it was
- * marked, and by whom where the reader is told; why, as written; and what
- * replaced it, opened from here when the reader may see it. Marking it, or
- * needing it again, is done in the browser.
+ * What a document no longer needed says of it (a vault of 0.9.0), in the
+ * box its (i) opens (0.9.0-dev.53; the owner's ask of 16 Nov 2026), as the
+ * web's banner: "No longer needed since 30 Oct 2026 · Replaced by New
+ * passport · Needed again"; why, as written; then "Nothing reminds anyone of
+ * it. Marked by Sam." and Change why. What replaced it opens from here when
+ * the reader may see it. Needed again and Change why are for whoever may
+ * change it, online.
  */
-function Unneeded(props: { mark: NoLongerNeededView; open: (id: string) => void }) {
+function Unneeded(props: {
+  mark: NoLongerNeededView;
+  open: (id: string) => void;
+  acts: boolean;
+  busy: boolean;
+  onAgain: () => void;
+  onChange: () => void;
+}) {
   const styles = useStyles(makeStyles);
   const { t } = useTranslation();
   const zone = useFamilyZone();
   const { mark } = props;
-  const when = exactWords(mark.at, zone);
   const replaced = mark.replaced_by;
   const to = replaced?.id ?? null;
   const replacedWords = replaced ? t('document.unneededReplacedBy', { title: replaced.title ?? ANOTHER_DOCUMENT }) : null;
   return (
-    <View style={styles.unneeded} testID="document-unneeded">
-      <Text tone="soft" variant="secondary">
-        {mark.by_name ? t('document.unneededBy', { when, name: mark.by_name }) : t('document.unneeded', { when })}
-      </Text>
-      {mark.reason ? <Text testID="document-unneeded-reason">{t('document.unneededReason', { reason: mark.reason })}</Text> : null}
-      {replacedWords && to ? (
-        <Button testID="document-unneeded-replacement" kind="quiet" label={replacedWords} onPress={() => props.open(to)} />
-      ) : replacedWords ? (
-        <Text testID="document-unneeded-replacement">{replacedWords}</Text>
+    <View style={[styles.card, styles.unneeded]} testID="document-unneeded">
+      <View style={styles.unneededLine}>
+        <Text weight="600" testID="document-unneeded-since">
+          {t('document.unneededSince', { when: dayWords(mark.at, zone) })}
+        </Text>
+        {replacedWords && to ? (
+          <Button
+            size="small"
+            testID="document-unneeded-replacement"
+            kind="quiet"
+            label={replacedWords}
+            onPress={() => props.open(to)}
+          />
+        ) : replacedWords ? (
+          <Text testID="document-unneeded-replacement">{replacedWords}</Text>
+        ) : null}
+        {props.acts ? (
+          <Button
+            size="small"
+            kind="quiet"
+            testID="document-unneeded-again"
+            label={t('unneeded.again')}
+            busy={props.busy}
+            onPress={props.onAgain}
+          />
+        ) : null}
+      </View>
+      {mark.reason ? (
+        <Text testID="document-unneeded-reason">{t('document.unneededReason', { reason: mark.reason })}</Text>
+      ) : mark.has_reason ? (
+        <Text tone="soft" variant="secondary" testID="document-unneeded-reason-kept">
+          {t('document.unneededReasonKept')}
+        </Text>
       ) : null}
+      <View style={styles.unneededLine}>
+        <Text tone="soft" variant="secondary" style={styles.flex} testID="document-unneeded-nothing">
+          {mark.by_name
+            ? `${t('document.unneededNothing')} ${t('document.unneededMarkedBy', { name: mark.by_name })}`
+            : t('document.unneededNothing')}
+        </Text>
+        {props.acts ? (
+          <Button
+            size="small"
+            kind="quiet"
+            testID="document-unneeded-change"
+            label={t('document.unneededChange')}
+            disabled={props.busy}
+            onPress={props.onChange}
+          />
+        ) : null}
+      </View>
     </View>
   );
 }
@@ -1114,7 +1230,10 @@ const makeStyles = (colours: Palette) =>
     },
     version: { paddingHorizontal: sp(12), paddingBottom: sp(10), gap: 2 },
     notes: { padding: sp(12), gap: sp(6) },
-    unneeded: { gap: sp(4) },
+    unneeded: { gap: sp(6), padding: sp(12) },
+    unneededLine: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: sp(8) },
+    info: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+    infoOn: { backgroundColor: colours.border },
     older: { gap: 2, marginTop: sp(4) },
     olderActions: { flexDirection: 'row', marginTop: sp(4) },
     headerButtons: { flexDirection: 'row', alignItems: 'center' },

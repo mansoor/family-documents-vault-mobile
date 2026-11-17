@@ -20,7 +20,16 @@ import CollectionScreen from '../app/collection/[id]';
 import EditScreen from '../app/edit/[id]';
 import SharingScreen from '../app/sharing';
 import { fixtureScanner } from '../capture/scanner';
-import { chooseOwner, chooseType, newDraft, startsOnlyMe, toMetadata, visibilityOf, type Household } from '../capture/draft';
+import {
+  chooseOwner,
+  chooseType,
+  newDraft,
+  startsOnlyMe,
+  startsParentsKept,
+  toMetadata,
+  visibilityOf,
+  type Household,
+} from '../capture/draft';
 import { DocumentDetail } from '../documents/detail';
 import { useCapture } from '../state/capture';
 import { useVault } from '../state/vault';
@@ -521,6 +530,25 @@ describe('a new paper of one’s own, sensitive: where it starts (the vault’s 
     expect(visibilityOf(d, { ...base, keepsOwnSensitive: false })).toBe('household');
     const { keepsOwnSensitive: _unsaid, ...older } = base;
     expect(visibilityOf(d, older)).toBe('household');
+  });
+
+  it('a teen’s own vaccination record starts where their parents see it (H3), and says why; Only me if chosen', () => {
+    const vaccines = { ...kind('vaccination_record', true), category: 'medical', default_visibility: 'adults' as const };
+    const teen: Household = { ...base, types: [...base.types, vaccines], teenAdding: true };
+    const d = chooseType(newDraft('camera' as never, teen.me), 'vaccination_record', teen);
+    expect(visibilityOf(d, teen)).toBe('household');
+    // Sent without it: the vault starts it as it says when it arrives (a card kept offline past an 18th birthday
+    // arrives Only me, as the vault then starts it), never as the card guessed.
+    expect(toMetadata(d, teen).metadata).not.toHaveProperty('visibility');
+    expect(toMetadata({ ...d, visibility: 'household' }, teen).metadata.visibility).toBe('household');
+    expect(startsOnlyMe(d, teen)).toBe(false);
+    expect(startsParentsKept(d, teen)).toBe(true);
+    expect(visibilityOf({ ...d, visibility: 'private' }, teen)).toBe('private');
+    expect(startsParentsKept({ ...d, visibility: 'private' }, teen)).toBe(false);
+    // Any other sensitive paper of a teen's own is Only me as before.
+    const p = chooseType(d, 'passport', teen);
+    expect(visibilityOf(p, teen)).toBe('private');
+    expect(startsParentsKept(p, teen)).toBe(false);
   });
 });
 

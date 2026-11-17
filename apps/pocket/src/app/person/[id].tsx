@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { FlatList, RefreshControl, StyleSheet, View } from 'react-native';
 import { DocumentRow, rowPlace } from '../../documents/row';
 import { CaregiversCard } from '../../caregivers/card';
+import { EmergencyRow } from '../../emergency/row';
 import { isCaregiverPaper } from '../../caregivers/rules';
 import { IdentityCard } from '../../identity/card';
 import { useVault } from '../../state/vault';
@@ -75,6 +76,8 @@ export default function PersonScreen() {
       ListHeaderComponent={
         <View style={styles.header}>
           <Text variant="hero">{name ?? ''}</Text>
+          {/* Their emergency information (H4), where the vault shows it to the reader. */}
+          {id ? <EmergencyRow key={`emergency-${id}`} memberId={id} name={name ?? ''} /> : null}
           {id ? <IdentityCard memberId={id} name={name ?? ''} /> : null}
           {/* Who can see their medical papers (H1b): for the person, an owner, or a caregiver of theirs. */}
           {id ? (

@@ -1,4 +1,4 @@
-import { whenExactly, whenWords, type DocumentView } from '@fdv/shared';
+import { formatDate, whenExactly, whenWords, type DocumentView } from '@fdv/shared';
 import { fireEvent, screen, waitFor } from '@testing-library/react-native';
 import { DocumentDetail } from '../documents/detail';
 import { copySettings, saveCopyIo } from '../documents/save-copy';
@@ -427,8 +427,17 @@ describe('a document', () => {
     await unlocked(t, <DocumentDetail id="old" />);
     expect(await screen.findByText('No longer needed')).toBeTruthy();
     expect(screen.queryByText(/Expired/)).toBeNull();
-    expect(screen.getByText(`Marked no longer needed ${whenExactly(at)} by Sam`)).toBeTruthy();
+    // Closed at first (0.9.0-dev.53): the (i) beside its status opens it, and closes it again.
+    expect(screen.queryByTestId('document-unneeded')).toBeNull();
+    const info = screen.getByTestId('document-unneeded-info');
+    expect(info.props.accessibilityLabel).toBe('About No longer needed');
+    expect(info.props.accessibilityState).toEqual({ expanded: false });
+    await fireEvent.press(info);
+    expect(screen.getByTestId('document-unneeded-info').props.accessibilityState).toEqual({ expanded: true });
+    expect(screen.getByTestId('document-unneeded-since')).toHaveTextContent(`No longer needed since ${formatDate({ date: '2026-10-30', precision: 'day' })}`);
+    expect(screen.getByTestId('document-unneeded-nothing')).toHaveTextContent('Nothing reminds anyone of it. Marked by Sam.');
     expect(screen.getByTestId('document-unneeded-reason')).toHaveTextContent('Why: Renewed this year');
+    expect(audit()).toEqual([]);
     await fireEvent.press(screen.getByTestId('document-unneeded-replacement'));
     await waitFor(() => expect(routes().at(-1)).toEqual({ pathname: '/document/[id]', params: { id: 'new' } }));
   });
@@ -448,8 +457,9 @@ describe('a document', () => {
       },
     });
     await unlocked(t, <DocumentDetail id="gone" />);
+    await fireEvent.press(await screen.findByTestId('document-unneeded-info'));
     expect(await screen.findByTestId('document-unneeded-replacement')).toHaveTextContent('Replaced by another document');
-    expect(screen.getByText(`Marked no longer needed ${whenExactly('2026-10-30T09:14:00Z')}`)).toBeTruthy();
+    expect(screen.getByTestId('document-unneeded-nothing')).toHaveTextContent(/^Nothing reminds anyone of it\.$/);
     expect(screen.queryByTestId('document-unneeded-reason')).toBeNull();
     const before = routes().length;
     await fireEvent.press(screen.getByTestId('document-unneeded-replacement'));

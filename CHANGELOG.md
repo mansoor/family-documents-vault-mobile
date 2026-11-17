@@ -6,6 +6,73 @@ app's own, tagged `vX.Y.Z` in this repository.
 
 ## [Unreleased]
 
+## [0.15.0] — Health on the phone
+
+Re-pinned to the vault's **v0.9.0-dev.53**. Where the vault keeps them, the
+phone shows each person's emergency information and makes a link for a
+clinician (H4), shows the health kinds and their reminders as the vault
+words them (H3), and never tries to draw a health record kept as it is
+(H5). A document no longer needed says why behind an (i). A vault without
+these is shown exactly as by 0.14.0.
+
+### Added
+- **Emergency information** (vault 0.9.0-dev.47, `features.emergency_info`),
+  from **More → Emergency information** and from a person's page. More lists
+  the family whose page you may read, you first, each with what is on it;
+  anybody the vault doesn't show you is left out. A page shows what was typed,
+  in the vault's order — date of birth, blood type, allergies, medications,
+  conditions, insurance, doctors, emergency contacts and anything else — then
+  the person's advance directive, healthcare proxy and insurance card, which
+  open, who can see it, and that it is not medical advice. Read only on the
+  phone: **Change it on the web** opens the person's page in the browser.
+  Never kept on the phone, and screenshots are refused while it shows.
+- **Share with a clinician**, for whoever chooses who sees the page (the
+  person, or an owner for a child): a link to look at the parts ticked and
+  nothing else, for 1 to 24 hours (4 unless changed), with a PIN to tell them
+  unless you choose a password or nothing, who it is for, and whether the
+  page before it opens says whose it is. The vault asks who is holding the
+  phone first. Made, it is shown once: Send, Copy the link, the PIN apart,
+  and Email the link where the vault can. The person and the owners see each
+  link — working, paused, used up, ended or taken back — when it was opened
+  and from what browser, and **Take back** any not ended or taken back,
+  asked first. Links that couldn't be read say so, with Try again; a page
+  in More's list that couldn't be read leaves the others listed, with a
+  note and Try again. Nothing on the page can be selected and copied.
+- **A yearly review** of an advance directive, a healthcare proxy or a HIPAA
+  authorization shows on Home and in Needs attention as "Yearly review · Due
+  today". Done brings the next one a year on; it never offers Scan the new
+  one, and removing it is **Turn off**, asked first.
+
+### Changed
+- **No longer needed opens on asking** (vault 0.9.0-dev.53, the owner's ask).
+  On a document's page, the **(i)** beside "No longer needed" opens and
+  closes what is said about it, closed at first: "No longer needed since 30
+  Oct 2026 · Replaced by … · Needed again", why, and "Nothing reminds anyone
+  of it. Marked by Sam." with **Change why**, which changes why and keeps
+  what replaced it.
+- **A kind's own names for its details** on a document's page: an advance
+  directive's date is "Signed", an insurance card's issuer its "Insurer", and
+  a detail the kind hides is not shown.
+- **Health records kept as they are** (vault 0.9.0-dev.51: XML, JSON, DICOM
+  and ZIP files): their page says there is no preview and why, with no
+  picture, Pages or Show; **Save a copy** gives the file to open in the app
+  it's for. An older version kept so says the same, and Show from a row's ⋯
+  says it can't be shown. A list's picture the vault doesn't have falls back
+  to the file's icon.
+- The health kinds (vault 0.9.0-dev.46) come from the vault — their names,
+  details and reminders — and Next refill or Next dose due never offers
+  Scan the new one.
+
+### Fixed
+- **A teen's own vaccination record starts as Everyone**, as the vault
+  starts it (H3), so their parents can see it; the card says why, and Only
+  me can still be chosen. Before, the phone filed it as Only me, by the rule
+  for a teen's other sensitive papers.
+- **Who can see a new scan is left to the vault** unless somebody chose it
+  on the card (or it starts as Only me): the card shows where it will
+  start, and the vault starts it by its own rule when it arrives. A scan
+  kept offline across an 18th birthday now starts as the vault says then.
+
 ## [0.14.0] — My cabinet on the phone
 
 Re-pinned to the vault's **v0.9.0-dev.51**. Where the vault has My cabinet
