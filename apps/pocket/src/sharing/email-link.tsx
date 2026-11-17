@@ -1,4 +1,11 @@
-import { isShareAddress, SHARE_LINK_EMAIL_MESSAGE_MAX, shareLinkMessage, type Share } from '@fdv/shared';
+import {
+  isShareAddress,
+  SHARE_LINK_EMAIL_MESSAGE_MAX,
+  shareLinkMessage,
+  UPLOAD_REQUEST_EMAIL_NOTE,
+  type Share,
+  type UploadRequestView,
+} from '@fdv/shared';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { StyleSheet, View } from 'react-native';
@@ -31,8 +38,12 @@ export function canEmailLink(share: Share, emailing: boolean | undefined): boole
  * anything is sent; the vault checks again. Past the first 15 minutes it
  * asks to confirm it is them (`email_share`), as Show the link does. Sent,
  * it says where, masked, and how many more times today.
+ *
+ * A request's link too (0.9.0-dev.49, LK; `features.upload_request_email`),
+ * from Show the link on a request: the vault says who is asking and when it
+ * stops — never what is asked for, nor its password.
  */
-export function EmailTheLink(props: { share: Share; testID: string }) {
+export function EmailTheLink(props: ({ share: Share; request?: never } | { request: UploadRequestView; share?: never }) & { testID: string }) {
   const styles = useStyles(makeStyles);
   const { t } = useTranslation();
   const { caps } = useVault();
@@ -44,7 +55,11 @@ export function EmailTheLink(props: { share: Share; testID: string }) {
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const [sent, setSent] = useState<{ to: string; left: number } | null>(null);
-  if (!canEmailLink(props.share, caps?.features.share_link_email)) return null;
+  const target = props.share ?? props.request;
+  const offered = props.share
+    ? canEmailLink(props.share, caps?.features.share_link_email)
+    : caps?.features.upload_request_email === true && props.request.emailable === true;
+  if (!offered) return null;
 
   const id = props.testID;
   const address = to.trim();
@@ -59,8 +74,9 @@ export function EmailTheLink(props: { share: Share; testID: string }) {
     setBusy(true);
     try {
       // Confirming it is them first when the vault asks (email_share).
+      const body = { to: address, ...(words.message ? { message: words.message } : {}) };
       const done = await guarded((a, tk) =>
-        a.emailShare(tk, props.share.id, { to: address, ...(words.message ? { message: words.message } : {}) }),
+        props.share ? a.emailShare(tk, props.share.id, body) : a.emailUploadRequest(tk, target.id, body),
       );
       if (!done) return;
       feel('done');
@@ -69,7 +85,7 @@ export function EmailTheLink(props: { share: Share; testID: string }) {
       setTo('');
       setMessage('');
       setTried(false);
-      emit('sharesChanged');
+      emit(props.share ? 'sharesChanged' : 'requestsChanged');
     } catch (err) {
       setProblem(wordsFor(err, t));
     } finally {
@@ -85,7 +101,7 @@ export function EmailTheLink(props: { share: Share; testID: string }) {
     setProblem(null);
   };
 
-  const lastTo = sent?.to ?? props.share.emailed_to ?? null;
+  const lastTo = sent?.to ?? target.emailed_to ?? null;
   return (
     <View style={styles.box} testID={id}>
       {sent ? (
@@ -144,7 +160,7 @@ export function EmailTheLink(props: { share: Share; testID: string }) {
             {t('share.emailMessageRules', { max: SHARE_LINK_EMAIL_MESSAGE_MAX })}
           </Text>
           <Text variant="small" tone="soft">
-            {t('share.emailNote')}
+            {props.share ? t('share.emailNote') : UPLOAD_REQUEST_EMAIL_NOTE}
           </Text>
           {problem ? (
             <Notice tone="warn" testID={`${id}-problem`}>

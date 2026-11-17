@@ -1,7 +1,7 @@
 import { CAREGIVER_MARK, documentName, NOTE_KIND, radii, statusTone, type DocumentView, type Status } from '@fdv/shared';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
-import { FileText, NotebookText } from 'lucide-react-native';
+import { Check, FileText, NotebookText } from 'lucide-react-native';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, Text as RNText, View } from 'react-native';
@@ -21,6 +21,10 @@ import { useColours, useStyles, type Palette } from '../ui/theme';
  * opens the document; its ⋯, or a long press, opens what may be done with
  * it (5.36). A list that knows the document's newest version shows its
  * picture; a search hit does not, and shows what kind of thing it is.
+ *
+ * Ticked for a download (0.16.0, DL): with `selection`, the row is a box to
+ * tick — pressing it ticks or unticks it, and its ⋯ waits until the
+ * choosing is done.
  */
 export function DocumentRow(props: {
   id: string;
@@ -40,6 +44,8 @@ export function DocumentRow(props: {
   remove?: RemoveFrom;
   /** Where it sits in its list, which is drawn as one card (R1): `rowPlace`. Alone, a card of its own. */
   place?: RowPlace;
+  /** Choosing documents (DL): whether this one is ticked, and to tick it. */
+  selection?: { on: boolean; onToggle: () => void };
 }) {
   const colours = useColours();
   const styles = useStyles(makeStyles);
@@ -72,12 +78,22 @@ export function DocumentRow(props: {
     <View style={[styles.row, styles[props.place ?? 'only']]}>
       <Pressable
         testID={`doc-row-${props.id}`}
-        accessibilityRole="button"
+        accessibilityRole={props.selection ? 'checkbox' : 'button'}
         accessibilityLabel={said}
-        onPress={() => router.push({ pathname: '/document/[id]', params: { id: props.id } })}
-        onLongPress={menu.open}
+        {...(props.selection ? { accessibilityState: { checked: props.selection.on } } : {})}
+        onPress={
+          props.selection ? props.selection.onToggle : () => router.push({ pathname: '/document/[id]', params: { id: props.id } })
+        }
+        {...(props.selection ? {} : { onLongPress: menu.open })}
         style={({ pressed }) => [styles.main, pressed ? styles.pressed : null]}
       >
+        {props.selection ? (
+          <View style={[styles.box, props.selection.on ? styles.boxOn : null]} testID={`doc-tick-${props.id}`}>
+            {props.selection.on ? (
+              <Check color={colours.accent} size={16} accessibilityElementsHidden importantForAccessibility="no" />
+            ) : null}
+          </View>
+        ) : null}
         <View style={styles.thumb}>
           {thumb ? (
             <Image
@@ -114,7 +130,7 @@ export function DocumentRow(props: {
         ) : null}
         </View>
       </Pressable>
-      {menu.button}
+      {props.selection ? null : menu.button}
       {menu.sheet}
     </View>
   );
@@ -159,5 +175,15 @@ const makeStyles = (colours: Palette) =>
     middle: { borderRadius: 0, borderBottomWidth: 0, borderTopWidth: StyleSheet.hairlineWidth },
     last: { borderTopWidth: StyleSheet.hairlineWidth, borderTopLeftRadius: 0, borderTopRightRadius: 0 },
     pressed: { opacity: 0.8 },
+    box: {
+      width: 24,
+      height: 24,
+      borderRadius: 6,
+      borderWidth: 2,
+      borderColor: colours.borderInput,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    boxOn: { borderColor: colours.accent },
     bold: { ...font('700'), color: colours.ink },
   });

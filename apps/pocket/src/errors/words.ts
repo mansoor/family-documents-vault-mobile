@@ -84,6 +84,11 @@ export const CATALOGUE: Readonly<Record<string, string>> = {
   share_paused: 'share.linkPaused',
   share_ended: 'share.linkEnded',
   share_not_revealable: 'share.notRevealable',
+  // A download as one ZIP (DL) with nothing in it that has a file.
+  nothing_to_zip: 'download.nothingChosen',
+  // More than one ZIP holds: the phone's own words (the vault's point to an Export screen it hasn't got).
+  zip_too_large: 'download.tooLargePlain',
+  download_ticket_gone: 'download.ticketGone',
 };
 
 /** The vault's "not now" answers: a scan waiting on one of these is sent again later by itself. */

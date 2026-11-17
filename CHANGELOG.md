@@ -6,6 +6,78 @@ app's own, tagged `vX.Y.Z` in this repository.
 
 ## [Unreleased]
 
+## [0.16.0] — Downloads as a ZIP, changing a link, and requests
+
+Re-pinned to the vault's **v0.9.0-dev.60**. Where the vault has them, the
+phone downloads several documents, or a whole collection, as one ZIP (DL),
+changes a link after it is made (LK), and lists the requests to send
+documents with the links, as the web's Sharing does (RQ). A vault without
+these is shown exactly as by 0.15.0.
+
+### Added
+- **Download from Documents** (vault 0.9.0-dev.48, `features.zip_download`).
+  **Choose**, beside the search, turns the rows into boxes to tick, with
+  how many are chosen and **Download** at the foot of the screen. One
+  document with a file comes as itself, as Save a copy gives it; several
+  come as one ZIP with an index saying what each is, named as the vault
+  names it ("Family documents 2026-11-17.zip"). As on the web, the vault
+  is asked for a one-time download first: a Sensitive one among them asks
+  to confirm it's you, as an Only me or an Essential one does (cancelled,
+  nothing is downloaded and the choice stays), and too many for one
+  download says to choose fewer or use Export on the web. The ZIP — up to
+  1 GB — then streams straight into a file, never through the app's
+  memory; a one-time download that ran out is asked for once more, and a
+  connection lost part-way says so and leaves nothing. The file goes to
+  the phone's share sheet, the usual way for a file, and nothing is left
+  on the phone; the first time, it says the copy is outside the vault.
+  What a search or a filter leaves out is unticked, so nothing unseen is
+  downloaded, and one search result chosen — a sealed one too — comes as
+  itself.
+- **Download on a collection**, in its ⋯: everything in it you may
+  download, as one ZIP named for it, asking first when a Sensitive document
+  is in it. An empty collection offers none.
+- **Change a link** (vault 0.9.0-dev.49, `features.link_changes`). In More
+  → Sharing, a link you made — or, for an owner, anybody's — has
+  **Change**, which opens the form it was made with, filled in: who it is
+  for, when it stops (As now, Tonight, Friday 5 pm, In a week or another
+  day, never past the latest it may go to from when it was made), View
+  only or View and download, how many times it opens, its PIN or password,
+  and whether its page shows the title. Only what is changed is sent. A
+  change that lets it do more asks to confirm it's you. A new PIN or a
+  password the vault made up is shown once, with Copy, and Show the link
+  shows it again. An owner changing somebody else's link changes all but
+  its PIN or password, and a code by email or text, or "This browser only",
+  stays as it was made; the form says so. A clinician's link stays to
+  view. A link changed meanwhile, or ended, is read again, so Change
+  starts from it as it is now.
+- **Requests to send documents in Sharing** (vault 0.5.21 on; as a list of
+  their own since 0.9.0-dev.53, RQ), for whoever may ask for them: what
+  was asked for, who it is for, who asked when it was somebody else, what
+  came in and the visits used, and where it stands in words, under Working
+  now and No longer working. **Show the link** shows a request's link and
+  its password again after confirming it's you, to send, copy or **Email
+  the link** where the vault can (never what it asks for, nor its
+  password). **End this request** is asked first, and what was sent stays.
+  An owner turns on a request a restore paused. **Change** opens the
+  request's form on the web, and **Ask for documents on the web** starts
+  a new one there.
+- **Links that no longer work** stay in Sharing under No longer working,
+  20 at first and then Show N more, with how long the household keeps
+  them. A link ended here moves there.
+- **Settings → Links and requests that no longer work** (vault
+  0.9.0-dev.53, `features.ended_sharing`): an owner chooses how long they
+  are kept — 30 days, 90 (the default), a year, or never — and a shorter
+  time is asked first, saying what goes the next night. An adult reads it.
+- Failure states: downloading without a connection, nothing in the
+  choice or the collection with a file, too much for one download, a
+  one-time download that ran out, a document with no file, and a link's
+  end past its latest.
+
+### Changed
+- The vault's client of dev.55 on hands Web Crypto a plain `Uint8Array`,
+  which TypeScript 6's DOM library refuses: a declaration lets the vendored
+  source compile here. The phone never signs as a connected app.
+
 ## [0.15.0] — Health on the phone
 
 Re-pinned to the vault's **v0.9.0-dev.53**. Where the vault keeps them, the
