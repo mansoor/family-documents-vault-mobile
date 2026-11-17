@@ -5,6 +5,7 @@ import {
   ChevronRight,
   ExternalLink,
   HeartHandshake,
+  HeartPulse,
   Share2,
   FolderOpen,
   Inbox,
@@ -20,6 +21,7 @@ import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { caregiversOffered } from '../../caregivers/rules';
 import { collectionsOffered } from '../../collections/rules';
+import { emergencyOffered } from '../../emergency/rules';
 import { waitingInInbox } from '../../queue/inbox';
 import { useVault } from '../../state/vault';
 import { Text } from '../../ui';
@@ -52,6 +54,8 @@ export default function MoreScreen() {
   const notesOn = caps?.features.notes === true;
   // Caregivers (H1b): whoever may name their own or be one, on a vault that has them.
   const caregiversOn = caregiversOffered(caps, who?.role);
+  // Emergency information (H4): whoever may read a page — never a viewer or a guest.
+  const emergencyOn = emergencyOffered(caps, who?.role);
   useEffect(() => {
     if (!inboxOn || offline) return;
     let stopped = false;
@@ -99,6 +103,15 @@ export default function MoreScreen() {
               label={t('sharing.title')}
               hint={t('more.sharingHint')}
               onPress={() => router.push('/sharing')}
+            />
+          ) : null}
+          {emergencyOn ? (
+            <Row
+              testID="more-emergency"
+              icon={HeartPulse}
+              label={t('emergency.title')}
+              hint={t('more.emergencyHint')}
+              onPress={() => router.push('/emergency')}
             />
           ) : null}
           {caregiversOn ? (

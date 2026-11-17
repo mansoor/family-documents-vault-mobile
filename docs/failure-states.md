@@ -156,9 +156,20 @@ Written by `node apps/pocket/scripts/failure-states.mjs`; CI fails if it is out 
 |  |  | `document.pageFailed` | The pages couldn't be fetched. Check the connection and try again. |
 |  |  | `document.pending` | The vault is still preparing this document's pages. Try again in a minute. |
 |  |  | `document.noPreview` | This document's pages can't be shown on the phone. Save a copy to open it. |
+|  |  | `document.recordNoPreview` | No preview. This is {{format}}, kept as it is: the vault doesn’t open, read or draw it. Save a copy to open it in the app it’s for. Your patient portal’s PDF is the readable copy. |
 |  |  | `document.failed` | That didn't work. Try again. |
 | Changing a document | Edit details | `edit.stillNeeded` | Still needed: {{fields}}. |
 |  |  | `edit.changed` | Someone changed this document while you were editing. Here it is as it is now: check it and save again. |
+| Emergency information | More → Emergency information, a person, Share with a clinician | `emergency.needsConnection` | Emergency information is never kept on this phone. Connect to see it. |
+|  |  | `emergency.none` | {{name}}’s emergency information isn’t shared with you. |
+|  |  | `emergency.nobody` | No emergency information is shared with you yet. |
+|  |  | `emergency.someFailed` | Some people’s pages couldn’t be loaded. |
+|  |  | `emergency.empty` | Nothing entered yet. |
+|  |  | `emergency.tickOne` | Tick at least one part to show. |
+|  |  | `emergency.linkLocked` | Stopped: what it asks for was wrong too many times |
+|  |  | `emergency.linkPaused` | Paused: whoever made it can’t sign in just now |
+|  |  | `emergency.linkUsedUp` | Used up: opened as many times as it allows |
+|  |  | `emergency.linkEnded` | Ended |
 | Collections | Collections, a collection | `collections.needsConnection` | Collections need a connection to the vault. |
 |  |  | `collection.gone` | This collection isn't there any more, or isn't one you can see. |
 | My cabinet | Documents → Cabinet, a cabinet, a drawer, a folder | `cabinet.needsConnection` | Showing your cabinet needs a connection to your vault. |

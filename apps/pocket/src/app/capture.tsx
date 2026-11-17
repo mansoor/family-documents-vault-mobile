@@ -9,7 +9,9 @@ import {
   REMIND_ONCE,
   reminderOf,
   reminderSentence,
+  PARENTS_KEEP_NOTE,
   SENSITIVE_ONLY_ME_NOTE,
+  teenUploader,
   type DocumentTypeView,
   type TypeField,
 } from '@fdv/shared';
@@ -35,6 +37,7 @@ import {
   removePage,
   replacePage,
   startsOnlyMe,
+  startsParentsKept,
   suggestedTitle,
   toMetadata,
   typeOf,
@@ -232,6 +235,17 @@ function Card(props: { initial: CaptureSource }) {
         : false,
     [protects, me, liveBirth, liveRelationship],
   );
+  // A teen adding their own vaccination record: it starts where their parents see it (H3), as the vault starts it.
+  const teenAdding = useMemo(
+    () =>
+      protects && me !== null
+        ? teenUploader(
+            { role: me.role, date_of_birth: liveBirth, relationship: liveRelationship },
+            localToday(familyZoneNow()),
+          )
+        : false,
+    [protects, me, liveBirth, liveRelationship],
+  );
   const household = useMemo<Household | null>(
     () =>
       data && me
@@ -244,9 +258,10 @@ function Card(props: { initial: CaptureSource }) {
             householdOwner: householdOn,
             sensitive: sensitiveOn,
             keepsOwnSensitive: keeps,
+            teenAdding,
           }
         : null,
-    [data, me, issuedByOn, detailsOn, householdOn, sensitiveOn, keeps],
+    [data, me, issuedByOn, detailsOn, householdOn, sensitiveOn, keeps, teenAdding],
   );
 
   // The card can be used once its choices are in: that is when it counts as shown.
@@ -605,6 +620,11 @@ function Card(props: { initial: CaptureSource }) {
                 // Only me by H1a's rule, nobody having chosen: why, and that it can be changed.
                 <Text variant="secondary" tone="muted" testID="capture-sensitive-only-me">
                   {SENSITIVE_ONLY_ME_NOTE}
+                </Text>
+              ) : household && startsParentsKept(draft, household) ? (
+                // A teen's own vaccination record, where their parents see it (H3): why, and that it can be changed.
+                <Text variant="secondary" tone="muted" testID="capture-parents-keep">
+                  {PARENTS_KEEP_NOTE}
                 </Text>
               ) : null}
             </View>

@@ -7,7 +7,7 @@ import { useTranslation } from 'react-i18next';
 import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { renewWords } from '../capture/renew-words';
-import { offersNewScan, reminderHeadline } from '../documents/reminders';
+import { isReview, offersNewScan, reminderHeadline } from '../documents/reminders';
 import { Trash2 } from 'lucide-react-native';
 import { useCapture } from '../state/capture';
 import { emit, on } from '../state/events';
@@ -188,7 +188,7 @@ export default function AttentionScreen() {
                 </Text>
               ) : null}
               {/* One the person set themselves: its note, as they wrote it. */}
-              {r.kind === 'manual' && r.note ? (
+              {r.kind === 'manual' && r.note && !isReview(r) ? (
                 <Text variant="secondary" tone="soft" testID={`note-${r.id}`}>
                   {r.note}
                 </Text>
@@ -218,8 +218,9 @@ export default function AttentionScreen() {
                   <Button
                     size="small"
                     kind="quiet"
-                    label={t('attention.remove')}
-                    accessibilityLabel={t('attention.removeFor', { title })}
+                    // A yearly review (H3) is turned off: removing it ends the review.
+                    label={isReview(r) ? t('attention.reviewOff') : t('attention.remove')}
+                    accessibilityLabel={isReview(r) ? t('attention.reviewOffFor', { title }) : t('attention.removeFor', { title })}
                     disabled={offline}
                     onPress={() => {
                       setRemoveProblem(null);
@@ -338,9 +339,13 @@ export default function AttentionScreen() {
         visible={removing !== null}
         testID="remove-question"
         icon={Trash2}
-        title={t('attention.removeTitle')}
-        words={t('attention.removeWords', { title: removing?.document_title ?? t('document.untitled') })}
-        confirmLabel={t('attention.removeYes')}
+        title={removing && isReview(removing) ? t('attention.reviewOffTitle') : t('attention.removeTitle')}
+        words={
+          removing && isReview(removing)
+            ? t('attention.reviewOffWords', { title: removing.document_title ?? t('document.untitled') })
+            : t('attention.removeWords', { title: removing?.document_title ?? t('document.untitled') })
+        }
+        confirmLabel={removing && isReview(removing) ? t('attention.reviewOffYes') : t('attention.removeYes')}
         busy={removeBusy}
         problem={removeProblem}
         onConfirm={() => void removeIt()}

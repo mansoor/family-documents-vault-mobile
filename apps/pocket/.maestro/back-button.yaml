@@ -39,6 +39,10 @@ env:
 # Account (under More since P6): a question, then Back.
 - tapOn:
     id: tab-more
+# Below Emergency information (0.15.0) on a vault that has it: scrolled to.
+- scrollUntilVisible:
+    element:
+      id: more-account
 - tapOn:
     id: more-account
 - extendedWaitUntil:

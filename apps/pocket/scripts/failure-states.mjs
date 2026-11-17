@@ -58,9 +58,15 @@ const AREAS = [
     'A document',
     'Document',
     'document',
-    'conflict needsConnection notFound notConfirmed saveWarning saveFailed pageFailed pending noPreview failed',
+    'conflict needsConnection notFound notConfirmed saveWarning saveFailed pageFailed pending noPreview recordNoPreview failed',
   ],
   ['Changing a document', 'Edit details', 'edit', 'stillNeeded changed'],
+  [
+    'Emergency information',
+    'More → Emergency information, a person, Share with a clinician',
+    'emergency',
+    'needsConnection none nobody someFailed empty tickOne linkLocked linkPaused linkUsedUp linkEnded',
+  ],
   ['Collections', 'Collections, a collection', 'collections', 'needsConnection'],
   ['', '', 'collection', 'gone'],
   [

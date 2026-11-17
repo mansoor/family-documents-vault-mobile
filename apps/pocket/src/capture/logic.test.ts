@@ -217,7 +217,10 @@ describe('a teen’s card', () => {
     const adult: Household = { ...h, me: { member_id: 'mum', role: 'adult' } };
     const d = chooseOwner(chooseType(newDraft(source, adult.me), 'bank_statement'), 'mum', adult);
     expect(visibilityOf(d, adult)).toBe('adults');
-    expect(toMetadata(d, adult)).toMatchObject({ problem: null, metadata: { visibility: 'adults' } });
+    // Nobody chose: the vault starts it by its own rule, so nothing is said.
+    expect(toMetadata(d, adult)).toMatchObject({ problem: null, metadata: { owner_member_id: 'mum' } });
+    expect(toMetadata(d, adult).metadata).not.toHaveProperty('visibility');
+    expect(toMetadata({ ...d, visibility: 'adults' }, adult).metadata.visibility).toBe('adults');
   });
 
   it('says who issued it only to a vault that takes it', () => {

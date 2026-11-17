@@ -125,7 +125,7 @@ describe('a document, compact (R6)', () => {
     expect(screen.getByTestId('document-essential-pill')).toHaveTextContent('Essential');
     for (const id of ['document-show', 'document-pages', 'document-save', 'document-add-version'])
       expect(screen.getByTestId(id)).toBeTruthy();
-    expect(screen.getByTestId('document-facts')).toHaveTextContent(/Issued byHM Passport Office/);
+    expect(screen.getByTestId('document-facts')).toHaveTextContent(/Issuing countryHM Passport Office/);
     expect(screen.getByTestId('document-tags')).toHaveTextContent(/travel/);
     expect(screen.getByTestId('document-edit')).toBeTruthy();
     expect(screen.getByTestId('document-more')).toBeTruthy();

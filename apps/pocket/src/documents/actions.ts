@@ -52,6 +52,8 @@ export async function showDocument(deps: ActionDeps, id: string, latestId: strin
     const copy = await openOnline(deps.withToken, deps.guarded, id);
     if (copy === null) return 'document.pageFailed';
     if (copy === 'unconfirmed') return 'document.notConfirmed';
+    // Nothing the vault draws (a health record kept as it is, H5; a Word file): Show has nothing to show.
+    if (copy.pages === 0 && !copy.pending) return 'document.noPreview';
     const uris: string[] = [];
     for (let n = 1; n <= copy.pages; n += 1) {
       const uri = await copy.page(n);

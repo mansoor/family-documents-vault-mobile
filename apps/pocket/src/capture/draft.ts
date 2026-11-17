@@ -5,6 +5,7 @@ import {
   effectiveVisibility,
   missingFields,
   parseDateInput,
+  parentsKeep,
   sensitiveOf,
   sensitiveStartingVisibility,
   type CaptureMetadata,
@@ -86,6 +87,12 @@ export interface Household {
    * vault does so too (`sensitive_protects`, 0.9.0-dev.41, H1a).
    */
   keepsOwnSensitive?: boolean;
+  /**
+   * Whoever adds it is a teen (`teenUploader`), where the vault protects
+   * sensitive papers: their own vaccination record starts where their
+   * parents can see it (0.9.0-dev.46, H3; `parentsKeep`), not Only me.
+   */
+  teenAdding?: boolean;
 }
 
 /** The household, as a value a chip can carry: never a person's id. */
@@ -175,12 +182,20 @@ export function visibilityOf(d: Draft, h: Household): Visibility {
   return d.visibility ? base : sensitiveStartingVisibility(base, sensitiveStart(d, h));
 }
 
-/** What H1a's rule asks of a new paper: is it sensitive, all said; is it the adder's own; do they keep theirs. */
-function sensitiveStart(d: Draft, h: Household): { sensitive: boolean; own: boolean; keeps: boolean } {
+/**
+ * What H1a's rule asks of a new paper: is it sensitive, all said; is it the
+ * adder's own; do they keep theirs; and is it a teen's own of a kind their
+ * parents keep (H3: a vaccination record), which the rule leaves be.
+ */
+function sensitiveStart(
+  d: Draft,
+  h: Household,
+): { sensitive: boolean; own: boolean; keeps: boolean; parentsKept: boolean } {
   return {
     sensitive: sensitiveOf({ sensitive: d.sensitive }, typeOf(d, h) ?? null),
     own: d.ownerId !== null && d.ownerId === h.me.member_id,
     keeps: h.keepsOwnSensitive === true,
+    parentsKept: h.teenAdding === true && parentsKeep(typeOf(d, h)),
   };
 }
 
@@ -190,7 +205,17 @@ function sensitiveStart(d: Draft, h: Household): { sensitive: boolean; own: bool
  */
 export function startsOnlyMe(d: Draft, h: Household): boolean {
   const s = sensitiveStart(d, h);
-  return d.visibility === null && s.sensitive && s.own && s.keeps;
+  return d.visibility === null && s.sensitive && s.own && s.keeps && !s.parentsKept;
+}
+
+/**
+ * A teen's own vaccination record, nobody having chosen who can see it:
+ * where their parents see it, as the vault starts it (H3), and the card
+ * says why (`PARENTS_KEEP_NOTE`).
+ */
+export function startsParentsKept(d: Draft, h: Household): boolean {
+  const s = sensitiveStart(d, h);
+  return d.visibility === null && s.own && s.parentsKept && visibilityOf(d, h) !== 'private';
 }
 
 /** Which of Everyone, Adults only and Only me may be chosen now. */
@@ -391,7 +416,12 @@ export function toMetadata(
   else if (d.household && h.householdOwner) m.household_owned = true;
   // Sensitive, only where the vault has it and only when said: left out, it is as its kind says.
   if (h.sensitive && d.sensitive !== null) m.sensitive = d.sensitive;
-  m.visibility = visibilityOf(d, h);
+  // Who can see it, said only when somebody chose it — or when it starts as Only me, which is never wider than
+  // the vault would start it and keeps a refused scan from being given to somebody else (reassignChoices).
+  // Otherwise the vault starts it by its own rule when it arrives (the review of 0.15.0): a card made offline at
+  // 17 and sent after an 18th birthday starts as the vault says then, not as the card guessed.
+  const starts = visibilityOf(d, h);
+  if (d.visibility !== null || starts === 'private') m.visibility = starts;
   m.is_essential = essentialOf(d, h);
   const title = text(d.title) ?? suggestedTitle(d, h);
   if (title) m.title = title;

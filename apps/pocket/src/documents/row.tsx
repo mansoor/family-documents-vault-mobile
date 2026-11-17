@@ -2,6 +2,7 @@ import { CAREGIVER_MARK, documentName, NOTE_KIND, radii, statusTone, type Docume
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { FileText, NotebookText } from 'lucide-react-native';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, Text as RNText, View } from 'react-native';
 import { CaregiverMark } from '../caregivers/mark';
@@ -55,7 +56,9 @@ export function DocumentRow(props: {
   const caregiver = isCaregiverPaper(props.doc);
   // And no picture in a list: the vault writes each one fetched through a grant down as a look,
   // which its person reads. Its own page keeps its picture. Here, whatever list it is in.
-  const thumb = caregiver ? null : props.thumb;
+  // A file the vault draws no picture of (a health record kept as it is, H5) falls back to its icon.
+  const [noPicture, setNoPicture] = useState<string | null>(null);
+  const thumb = caregiver || (props.thumb && noPicture === props.thumb.uri) ? null : props.thumb;
   // Read out as it is shown: its name, its status, and where it matched.
   const said = [
     title,
@@ -86,6 +89,7 @@ export function DocumentRow(props: {
               style={styles.thumbImage}
               contentFit="cover"
               accessibilityIgnoresInvertColors
+              onError={() => setNoPicture(thumb.uri)}
             />
           ) : (
             <Kind color={colours.accent} size={18} accessibilityElementsHidden importantForAccessibility="no" />
