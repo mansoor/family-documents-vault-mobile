@@ -172,6 +172,17 @@ Written by `node apps/pocket/scripts/failure-states.mjs`; CI fails if it is out 
 |  |  | `emergency.linkEnded` | Ended |
 | Collections | Collections, a collection | `collections.needsConnection` | Collections need a connection to the vault. |
 |  |  | `collection.gone` | This collection isn't there any more, or isn't one you can see. |
+| Downloading as one ZIP | Documents → Choose, a collection’s ⋯ → Download | `download.needsConnection` | Downloading needs a connection to the vault. |
+|  |  | `download.failed` | The download couldn’t be made. Try again. |
+|  |  | `download.noFile` | This document has no file to download. |
+|  |  | `download.nothingChosen` | None of these has a file you can download: a note you can’t open, or a document kept without its file, isn’t included. |
+|  |  | `download.nothingInCollection` | Nothing in this collection has a file you can download: a note you can’t open, or a document kept without its file, isn’t included. |
+|  |  | `download.tooLarge` | That is more than one download holds: {{documents}} documents or {{gb}} GB. Choose fewer, or download everything from Export on the web. |
+|  |  | `download.tooLargePlain` | That is more than one download holds. Choose fewer, or download everything from Export on the web. |
+|  |  | `download.ticketGone` | The download ran out before it could start. Try Download again. |
+| Sharing | More → Sharing | `sharing.needsConnection` | Sharing needs a connection to the vault. |
+| Changing a link | More → Sharing → Change | `changeLink.latest` | It can last until {{end}} at the latest: as long as a link may from when it was made. |
+|  |  | `changeLink.passwordShort` | At least 8 characters. Something they can type, and you can say to them. |
 | My cabinet | Documents → Cabinet, a cabinet, a drawer, a folder | `cabinet.needsConnection` | Showing your cabinet needs a connection to your vault. |
 |  |  | `cabinet.showingLast` | Offline: showing your cabinet as it was when last opened. |
 |  |  | `cabinet.empty` | Your cabinet is empty. Arrange it on the web, and it shows here. |

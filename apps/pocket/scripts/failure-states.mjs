@@ -70,6 +70,14 @@ const AREAS = [
   ['Collections', 'Collections, a collection', 'collections', 'needsConnection'],
   ['', '', 'collection', 'gone'],
   [
+    'Downloading as one ZIP',
+    'Documents → Choose, a collection’s ⋯ → Download',
+    'download',
+    'needsConnection failed noFile nothingChosen nothingInCollection tooLarge tooLargePlain ticketGone',
+  ],
+  ['Sharing', 'More → Sharing', 'sharing', 'needsConnection'],
+  ['Changing a link', 'More → Sharing → Change', 'changeLink', 'latest passwordShort'],
+  [
     'My cabinet',
     'Documents → Cabinet, a cabinet, a drawer, a folder',
     'cabinet',

@@ -22,6 +22,8 @@ interface Events {
   managersChanged: [id: string];
   /** A link made or ended on the phone: Sharing looks again. */
   sharesChanged: [];
+  /** A request to send documents emailed, ended or turned back on (0.16.0): Sharing looks again. */
+  requestsChanged: [];
   /** The person's mobile number added, confirmed or removed (SMS4): what hangs on it looks again. */
   phoneChanged: [];
 }
@@ -40,6 +42,7 @@ const listeners: { [K in keyof Events]: Set<Listener<K>> } = {
   checklistChanged: new Set(),
   managersChanged: new Set(),
   sharesChanged: new Set(),
+  requestsChanged: new Set(),
 };
 
 export function on<K extends keyof Events>(event: K, fn: Listener<K>): () => void {

@@ -223,6 +223,21 @@ export interface Library {
    * — with `caregiver: true` and Only me, as the vault answers a caregiver.
    */
   caregiver: Set<string>;
+  /**
+   * A link changed (0.9.0-dev.49, LK): each PATCH /shares/{id}, with its
+   * If-Match, in order; whether the vault asks to confirm it is them first
+   * (a change that lets it do more).
+   */
+  shareChanges: { id: string; body: Record<string, unknown>; ifMatch: string | null }[];
+  changeStepUp: boolean;
+  /**
+   * Downloads as one ZIP (0.9.0-dev.48, DL): the client's fake makes them
+   * and their tickets, but keeps no Sensitive mark and asks nobody to
+   * confirm. The ids here are Sensitive: a selection, or a collection, with
+   * one of them asks to confirm it is them first (`download_sensitive`), as
+   * the vault does.
+   */
+  zipSensitive: Set<string>;
 }
 
 const JPEG = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x02, 0xff, 0xd9]);
@@ -312,6 +327,9 @@ export function testVault(origins: string[] = ['https://vault.test']): TestVault
       stopped: [],
       stopSharing: { ended: 2, left_out: 0, kept: 0 },
       caregiver: new Set(),
+      shareChanges: [],
+      changeStepUp: false,
+      zipSensitive: new Set(),
     },
     fetch: async (url, init) => {
       t.calls.push(`${init.method} ${url}`);
@@ -690,6 +708,59 @@ async function library(t: TestVault, path: string, init: Parameters<FetchLike>[1
       sends_left: 3 - lib.emailed.filter((e) => e.id === id).length,
     });
   }
+  // Downloads as one ZIP (DL), and their tickets: a Sensitive one among them asks to confirm it is
+  // them first; the fake makes the rest.
+  const zipAt = /^\/api\/v1\/(?:documents\/download|collections\/([^/]+)\/download)(?:\/ticket)?$/.exec(q);
+  if (zipAt && init.method === 'POST' && !lib.verified) {
+    const ids = zipAt[1]
+      ? (t.vault.state.collections.find((c) => c.id === zipAt[1])?.items ?? []).map((i) => i.document_id)
+      : Array.isArray(body.document_ids)
+        ? (body.document_ids as unknown[]).map(String)
+        : [];
+    if (ids.some((id) => lib.zipSensitive.has(id))) {
+      return failure(403, 'step_up_required', 'Please confirm it is you to download a sensitive document.', 'download_sensitive');
+    }
+  }
+  // A link changed (LK), as the vault of 0.9.0-dev.49 answers it.
+  m = /^\/api\/v1\/shares\/([^/]+)$/.exec(q);
+  if (m?.[1] && init.method === 'PATCH') {
+    const id = m[1];
+    const share = lib.shares.find((x) => x.id === id);
+    if (!share) return failure(404, 'not_found', 'There is no such link.');
+    const ifMatch = Object.entries(init.headers).find(([k]) => k.toLowerCase() === 'if-match')?.[1] ?? null;
+    if (ifMatch && share.version !== undefined && ifMatch !== `"${share.version}"`) {
+      return failure(409, 'conflict', 'Someone changed this link meanwhile.');
+    }
+    if (lib.changeStepUp && !lib.verified) {
+      return failure(403, 'step_up_required', 'Please confirm it is you to change this link.', 'change_share');
+    }
+    lib.shareChanges.push({ id, body, ifMatch });
+    if ('recipient_label' in body) share.recipient_label = (body.recipient_label as string | null) ?? null;
+    if (typeof body.expires_at === 'string') share.expires_at = body.expires_at;
+    if (body.permission === 'view' || body.permission === 'download') share.permission = body.permission;
+    if ('max_opens' in body) share.max_opens = (body.max_opens as number | null) ?? null;
+    if (typeof body.show_title === 'boolean') share.show_title = body.show_title;
+    let made: { pin?: string; password?: string } = {};
+    if (body.secret === 'none') {
+      share.has_pin = false;
+      share.protection = [];
+    } else if (body.secret === 'pin') {
+      share.has_pin = true;
+      share.protection = ['pin'];
+      made = { pin: '7356' };
+    } else if (body.secret === 'password') {
+      share.has_pin = false;
+      share.protection = ['password'];
+      made = typeof body.password === 'string' ? {} : { password: 'cedar-wren-58' };
+    }
+    const kept = lib.shareSecrets.get(id);
+    if (kept && body.secret) {
+      const { pin: _p, password: _w, ...rest } = kept;
+      lib.shareSecrets.set(id, { ...rest, ...made, ...(typeof body.password === 'string' ? { password: body.password } : {}) });
+    }
+    share.version = (share.version ?? 1) + 1;
+    return json({ share, changed: Object.keys(body), ...made });
+  }
   m = /^\/api\/v1\/shares\/([^/]+)$/.exec(q);
   if (m?.[1] && init.method === 'DELETE') {
     const id = m[1];
@@ -868,7 +939,7 @@ async function library(t: TestVault, path: string, init: Parameters<FetchLike>[1
   return null;
 }
 
-function json(body: unknown): Awaited<ReturnType<FetchLike>> {
+export function json(body: unknown): Awaited<ReturnType<FetchLike>> {
   return {
     ok: true,
     status: 200,

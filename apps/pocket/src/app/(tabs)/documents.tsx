@@ -4,6 +4,7 @@ import {
   localToday,
   NOTE_KIND,
   SENSITIVE_LABEL,
+  zipFileName,
   type DocumentTypeView,
   type DocumentView,
   type Member,
@@ -11,13 +12,14 @@ import {
   type StatusValue,
 } from '@fdv/shared';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ArrowUpDown, ScanQrCode, Search, SlidersHorizontal, X } from 'lucide-react-native';
+import { ArrowUpDown, ListChecks, ScanQrCode, Search, SlidersHorizontal, X } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, FlatList, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { CabinetBrowse } from '../../cabinet/browse';
 import { cabinetGate } from '../../cabinet/model';
+import { useDownload } from '../../documents/download';
 import { countOn, listQuery, NO_FILTERS, searchQuery, type Filters, type Sort } from '../../documents/filter-model';
 import { FilterPanel, STATUSES } from '../../documents/filter-panel';
 import { DocumentRow, rowPlace } from '../../documents/row';
@@ -27,7 +29,7 @@ import { isCaregiverPaper } from '../../caregivers/rules';
 import { on } from '../../state/events';
 import { useFamilyZone } from '../../state/family-time';
 import { useVault } from '../../state/vault';
-import { Field, Notice, Text } from '../../ui';
+import { Button, Field, Notice, Text } from '../../ui';
 import { Chip, ChipRow } from '../../ui/chip';
 import { IconButton } from '../../ui/icon-button';
 import { PickerSheet } from '../../ui/picker';
@@ -57,6 +59,12 @@ import { useColours, useStyles, type Palette } from '../../ui/theme';
  * arranged on the web — with Scan a folder label beside the search where
  * the vault prints labels (dev.50, C3). The choice is kept on this phone.
  * An older vault shows the list, as before.
+ *
+ * Download (a vault of 0.9.0-dev.48, DL; the owner's ask of 15 Nov 2026),
+ * as the web's Documents table has it: Choose, beside the search, turns the
+ * rows into boxes to tick; then Download gives one document as itself and
+ * several as one ZIP with an index, through the phone's share sheet. A
+ * Sensitive one among them asks to confirm it is you first.
  */
 
 /** How long typing pauses before the vault is asked (FND). */
@@ -226,6 +234,71 @@ function DocumentsList(props: { switcher: ReactNode; searchFirst: boolean }) {
   // Papers seen only as somebody's caregiver (H1b), from their lists — never one by one, which the
   // vault would write down as a look: a search's hits are marked by them.
   const cared = useCaregiving();
+
+  // Choosing documents to download (DL), where the vault gives a ZIP: the ticked ones, in the order ticked.
+  const zips = caps?.features.zip_download === true;
+  const [choosing, setChoosing] = useState(false);
+  const [chosen, setChosen] = useState<Map<string, { note: boolean }>>(new Map());
+  const [downloadSaid, setDownloadSaid] = useState<{ tone: 'ok' | 'warn'; text: string } | null>(null);
+  const download = useDownload();
+  // Looking for one document's newest version, before Download hands over: a second tap waits.
+  const [preparing, setPreparing] = useState(false);
+  const stopChoosing = () => {
+    setChoosing(false);
+    setChosen(new Map());
+  };
+  const toggle = (id: string, note: boolean) =>
+    setChosen((had) => {
+      const next = new Map(had);
+      if (next.has(id)) next.delete(id);
+      else next.set(id, { note });
+      return next;
+    });
+  /**
+   * One document (not a note) as itself, as its ⋯'s Save a copy gives it —
+   * from the list or a search, sealed hits too; several as one ZIP.
+   */
+  const downloadChosen = async () => {
+    const ids = [...chosen.keys()];
+    const first = chosen.get(ids[0] ?? '');
+    if (ids.length === 0 || !first || preparing || download.busy) return;
+    setDownloadSaid(null);
+    const done = (outcome: { saved: true } | { failed: string }) => {
+      if ('failed' in outcome) setDownloadSaid({ tone: 'warn', text: outcome.failed });
+      else {
+        setDownloadSaid({ tone: 'ok', text: t('download.done', { count: ids.length }) });
+        stopChoosing();
+      }
+    };
+    if (ids.length === 1 && !first.note) {
+      setPreparing(true);
+      try {
+        const versions = await withToken((a, tk) => a.versions(tk, ids[0] as string));
+        const newest = [...versions.items].sort((x, y) => y.version_no - x.version_no)[0];
+        if (!newest) {
+          setDownloadSaid({ tone: 'warn', text: t('download.noFile') });
+          return;
+        }
+        download.start({
+          fetch: (a, tk) => a.content(tk, newest.id),
+          name: newest.filename,
+          mime: newest.mime,
+          onDone: done,
+        });
+      } catch (err) {
+        setDownloadSaid({ tone: 'warn', text: loadFailure('download', err, t) ?? t('download.needsConnection') });
+      } finally {
+        setPreparing(false);
+      }
+      return;
+    }
+    download.start({
+      ticket: (a, tk) => a.downloadZipTicket(tk, { document_ids: ids }),
+      name: zipFileName(null, localToday(zone)),
+      nothing: t('download.nothingChosen'),
+      onDone: done,
+    });
+  };
 
   // The filters' choices: the family, and the kinds there are.
   useEffect(() => {
@@ -457,6 +530,18 @@ function DocumentsList(props: { switcher: ReactNode; searchFirst: boolean }) {
           latest: d.latest_version_id,
         }));
 
+  // What is chosen is only ever what is shown (the review of 0.16.0): a search, a filter or a sort
+  // that leaves one out unticks it, once the vault has answered, so nothing unseen is downloaded.
+  const settled = searching ? noConnection || hits !== null : docs !== null;
+  const shownIds = settled ? [...rows.map((r) => r.id), ...(searching ? sealed.items.map((h) => h.document_id) : [])].join('\n') : null;
+  useEffect(() => {
+    if (shownIds === null) return;
+    const shown = new Set(shownIds ? shownIds.split('\n') : []);
+    // Pruned as the list changes under the choice; a choice of what is shown is left as it is.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setChosen((had) => ([...had.keys()].every((id) => shown.has(id)) ? had : new Map([...had].filter(([id]) => shown.has(id)))));
+  }, [shownIds]);
+
   return (
     <SafeAreaView style={styles.screen} edges={[]}>
       <FlatList
@@ -483,6 +568,18 @@ function DocumentsList(props: { switcher: ReactNode; searchFirst: boolean }) {
               <Text variant="hero" style={styles.flex}>
                 {t('documents.title')}
               </Text>
+              {zips && !offline ? (
+                <IconButton
+                  testID="documents-choose"
+                  label={choosing ? t('download.chooseDone') : t('download.choose')}
+                  icon={choosing ? X : ListChecks}
+                  onPress={() => {
+                    setDownloadSaid(null);
+                    if (choosing) stopChoosing();
+                    else setChoosing(true);
+                  }}
+                />
+              ) : null}
               <IconButton
                 testID="documents-search"
                 label={searchOpen ? t('documents.searchClose') : t('documents.searchOpen')}
@@ -495,6 +592,16 @@ function DocumentsList(props: { switcher: ReactNode; searchFirst: boolean }) {
               />
             </View>
             {props.switcher}
+            {downloadSaid ? (
+              <Notice tone={downloadSaid.tone} testID="documents-download-said">
+                {downloadSaid.text}
+              </Notice>
+            ) : null}
+            {choosing ? (
+              <Text variant="secondary" tone="soft" testID="documents-choose-words">
+                {t('download.chooseWords')}
+              </Text>
+            ) : null}
             {searchOpen ? (
             <View style={styles.searchRow}>
               <View style={styles.flex}>
@@ -641,6 +748,14 @@ function DocumentsList(props: { switcher: ReactNode; searchFirst: boolean }) {
             status={item.status}
             {...(item.snippet ? { snippet: item.snippet } : {})}
             {...(item.doc ? { doc: item.doc } : {})}
+            {...(choosing
+              ? {
+                  selection: {
+                    on: chosen.has(item.id),
+                    onToggle: () => toggle(item.id, item.type_key === NOTE_KIND),
+                  },
+                }
+              : {})}
             place={rowPlace(index, rows.length)}
             // A caregiver's paper has no picture in a list: the vault would write each one down as a look.
             thumb={
@@ -669,6 +784,14 @@ function DocumentsList(props: { switcher: ReactNode; searchFirst: boolean }) {
                     note_name={h.note_name}
                     status={h.status}
                     snippet={h.snippet}
+                    {...(choosing
+                      ? {
+                          selection: {
+                            on: chosen.has(h.document_id),
+                            onToggle: () => toggle(h.document_id, h.type_key === NOTE_KIND),
+                          },
+                        }
+                      : {})}
                     place={rowPlace(i, sealed.items.length)}
                   />
                 ))}
@@ -684,6 +807,31 @@ function DocumentsList(props: { switcher: ReactNode; searchFirst: boolean }) {
           ) : null
         }
       />
+      {choosing ? (
+        <View style={styles.chooseBar} testID="documents-choose-bar">
+          <View style={styles.flex} accessibilityLiveRegion="polite">
+            <Text weight="600" testID="documents-chosen-count">
+              {t('download.chosen', { count: chosen.size })}
+            </Text>
+          </View>
+          <Button
+            size="small"
+            kind="quiet"
+            label={t('common.cancel')}
+            onPress={stopChoosing}
+            testID="documents-choose-cancel"
+          />
+          <Button
+            size="small"
+            label={download.busy || preparing ? t('download.preparing') : t('download.button')}
+            busy={download.busy || preparing}
+            disabled={chosen.size === 0 || offline}
+            onPress={() => void downloadChosen()}
+            testID="documents-download"
+          />
+        </View>
+      ) : null}
+      {download.sheet}
       <FilterPanel
         visible={panel}
         value={filters}
@@ -767,5 +915,15 @@ const makeStyles = (colours: Palette) =>
     },
     clearAll: { minHeight: 32, justifyContent: 'center', paddingHorizontal: sp(4) },
     countRow: { flexDirection: 'row', alignItems: 'center', gap: sp(8) },
+    chooseBar: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: sp(8),
+      paddingHorizontal: sp(20),
+      paddingVertical: sp(10),
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: colours.border,
+      backgroundColor: colours.surface,
+    },
     sortButton: { flexDirection: 'row', alignItems: 'center', gap: sp(6), minHeight: 32 },
   });

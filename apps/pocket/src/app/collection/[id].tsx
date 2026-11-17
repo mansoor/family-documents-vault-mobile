@@ -2,13 +2,15 @@ import { ApiRequestError } from '@fdv/client';
 import {
   can,
   documentName,
+  localToday,
   sharedOutsideWords,
+  zipFileName,
   type CollectionChecklist,
   type CollectionDetail,
   type CollectionItemView,
 } from '@fdv/shared';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { Ellipsis, Info, Pencil, Share2, Trash2, UsersRound } from 'lucide-react-native';
+import { Download, Ellipsis, Info, Pencil, Share2, Trash2, UsersRound } from 'lucide-react-native';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, View } from 'react-native';
@@ -21,9 +23,11 @@ import { Sheet } from '../../ui/sheet';
 import { IconButton } from '../../ui/icon-button';
 import { ShareSheet } from '../../sharing/share-sheet';
 import { audienceKey, managersShown, powersFor } from '../../collections/rules';
+import { useDownload } from '../../documents/download';
 import { DocumentRow, rowPlace } from '../../documents/row';
 import { wordsFor } from '../../errors/words';
 import { emit, on } from '../../state/events';
+import { useFamilyZone } from '../../state/family-time';
 import { useVault } from '../../state/vault';
 import { Button, Notice, Text } from '../../ui';
 import { sp } from '../../ui/space';
@@ -56,6 +60,11 @@ import { useColours, useStyles, type Palette } from '../../ui/theme';
  * Add documents and Fill from a checklist share one row, each label on one
  * line on a 360 dp phone (0.13.0); at a large text size the second goes
  * under the first rather than cutting a word.
+ *
+ * Download, in the ⋯ (a vault of 0.9.0-dev.48, DL), as the web's collection
+ * page has it: everything in it the person may download, as one ZIP with an
+ * index, through the phone's share sheet. A Sensitive document in it asks
+ * to confirm it is you first.
  */
 export default function CollectionScreen() {
   const styles = useStyles(makeStyles);
@@ -79,6 +88,8 @@ export default function CollectionScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [adding, setAdding] = useState(false);
   const [said, setSaid] = useState<{ tone: 'ok' | 'warn'; text: string } | null>(null);
+  const zone = useFamilyZone();
+  const download = useDownload();
   // Which asking is current: an answer to an older one is let go.
   const asking = useRef(0);
   // The checklist kept on it (app 0.8.0), where the vault has them.
@@ -184,7 +195,24 @@ export default function CollectionScreen() {
   const [about, setAbout] = useState(false);
   // Who manages it (0.10.0), in the ⋯ since 0.13.0: for whoever is told of them today.
   const mayManagers = !!detail && managersShown(caps, who?.role, detail);
-  const hasMenu = (mayShare || mayDelete || mayManagers) && !offline;
+  // The whole of it as one ZIP (DL), where the vault gives one and there is something in it.
+  const mayZip = !!detail && caps?.features.zip_download === true && detail.item_count > 0;
+  const hasMenu = (mayShare || mayDelete || mayManagers || mayZip) && !offline;
+  const downloadAll = () => {
+    if (!detail) return;
+    setSaid(null);
+    download.start({
+      ticket: (a, tk) => a.collectionZipTicket(tk, detail.id),
+      name: zipFileName(detail.name, localToday(zone)),
+      nothing: t('download.nothingInCollection'),
+      onDone: (outcome) =>
+        setSaid(
+          'failed' in outcome
+            ? { tone: 'warn', text: outcome.failed }
+            : { tone: 'ok', text: t('download.collectionDone', { name: detail.name }) },
+        ),
+    });
+  };
 
   const deleteIt = async () => {
     setDeleteBusy(true);
@@ -308,6 +336,19 @@ export default function CollectionScreen() {
                   {t('managers.youManage')}
                 </Text>
               ) : null}
+              {mayZip ? (
+                <MenuRow
+                  testID="collection-download"
+                  icon={Download}
+                  label={t('download.collection')}
+                  hint={t('download.collectionHint')}
+                  busy={download.busy}
+                  onPress={() => {
+                    setMenuOpen(false);
+                    downloadAll();
+                  }}
+                />
+              ) : null}
               {mayShare ? (
                 <MenuRow
                   testID="collection-share"
@@ -397,6 +438,12 @@ export default function CollectionScreen() {
           {detail.shared_outside ? (
             <Notice tone="warn" testID="collection-shared">
               {sharedOutsideWords(detail.shared_outside, who?.role ?? null)}
+            </Notice>
+          ) : null}
+          {download.sheet}
+          {download.busy ? (
+            <Notice tone="info" testID="collection-downloading">
+              {t('download.preparing')}
             </Notice>
           ) : null}
           {said ? (
