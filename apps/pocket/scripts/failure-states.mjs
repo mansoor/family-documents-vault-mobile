@@ -77,6 +77,13 @@ const AREAS = [
   ],
   ['Sharing', 'More → Sharing', 'sharing', 'needsConnection'],
   ['Changing a link', 'More → Sharing → Change', 'changeLink', 'latest passwordShort'],
+  ['Who opened a link', 'More → Sharing, a clinician’s link, a sensitive document', 'opens', 'notYet'],
+  [
+    'Activity',
+    'More → Activity, a document’s Activity',
+    'activity',
+    'needsConnection nothingYet nothingInStretch nothingMatches nothingLoadedMatches',
+  ],
   [
     'My cabinet',
     'Documents → Cabinet, a cabinet, a drawer, a folder',

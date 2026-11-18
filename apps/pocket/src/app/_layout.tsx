@@ -104,6 +104,7 @@ function Gates() {
         <Stack.Screen name="collections" options={{ title: t('collections.title'), headerTitle: '' }} />
         <Stack.Screen name="trash" options={{ title: t('trashList.title') }} />
         <Stack.Screen name="sharing" options={{ title: t('sharing.title') }} />
+        <Stack.Screen name="activity" options={{ title: t('activity.title') }} />
         <Stack.Screen name="caregivers" options={{ title: t('caregivers.title'), headerTitle: '' }} />
         {/* Emergency information (H4): the family's pages, and one person's, with ← to the list or the person. */}
         <Stack.Screen name="emergency/index" options={{ title: t('emergency.title') }} />

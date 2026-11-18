@@ -1,3 +1,4 @@
+import { claimedRecordFormat } from '@fdv/shared';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import type { ScanOutcome } from './scanner';
@@ -27,19 +28,45 @@ const BY_EXTENSION: Record<string, string> = {
   xlsx: ACCEPTED[7] as string,
 };
 
-/** A file's type from its name, when the picker could not say. */
-export function mimeOf(name: string, reported?: string | null): string {
+/**
+ * Health records kept as they are (the vault's 0.9.0-dev.51, H5): a C-CDA
+ * document (XML), a FHIR export (JSON), a DICOM image or a ZIP of them, as
+ * a phone's files app may call them. Offered only where the vault takes them.
+ */
+export const RECORD_TYPES = [
+  'application/xml',
+  'text/xml',
+  'application/json',
+  'application/fhir+json',
+  'application/dicom',
+  'application/zip',
+  'application/x-zip-compressed',
+  // A hospital CD's DICOM image has no ending (IM00001): the phone calls it this, and the vault knows it
+  // from its bytes, as the web's picker leaves it to (a file that is nothing it keeps is refused, and said).
+  'application/octet-stream',
+];
+
+/**
+ * A file's type from its name, when the picker could not say. Where the
+ * vault takes health records, one is the type the vault keeps it as
+ * (`text/xml` is XML; a `.json` the phone calls plain text is JSON), as the
+ * web's picker reads them; the vault checks the bytes bear it out.
+ */
+export function mimeOf(name: string, reported?: string | null, records = false): string {
+  const record = records ? claimedRecordFormat(reported ?? '', name) : null;
+  if (record) return record;
   if (reported && reported !== 'application/octet-stream') return reported;
   const ext = /\.([a-z0-9]+)$/i.exec(name)?.[1]?.toLowerCase() ?? '';
   return BY_EXTENSION[ext] ?? 'application/octet-stream';
 }
 
 /** A picker that fails (one already open, a file it cannot copy) has simply not picked anything. */
-export async function pickFile(): Promise<ScanOutcome> {
+export async function pickFile(opts: { records?: boolean } = {}): Promise<ScanOutcome> {
+  const records = opts.records === true;
   let r: DocumentPicker.DocumentPickerResult;
   try {
     r = await DocumentPicker.getDocumentAsync({
-      type: ACCEPTED,
+      type: records ? [...ACCEPTED, ...RECORD_TYPES] : ACCEPTED,
       copyToCacheDirectory: true,
       multiple: false,
     });
@@ -53,7 +80,7 @@ export async function pickFile(): Promise<ScanOutcome> {
     file: {
       uri: a.uri,
       name: a.name,
-      mime: mimeOf(a.name, a.mimeType),
+      mime: mimeOf(a.name, a.mimeType, records),
       size: a.size ?? null,
     },
   };

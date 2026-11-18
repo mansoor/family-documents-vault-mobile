@@ -6,26 +6,31 @@ import {
   NO_LONGER_NEEDED_REASON_MAX,
   can,
   documentName,
+  firstReview,
   formatDate,
   localToday,
   NOTE_KIND,
   parseDateInput,
   radii,
   recordFormatWords,
+  REVIEW_LABEL,
   SENSITIVE_LABEL,
   TAP_MIN,
   sensitiveOf,
   whereKeptWords,
+  yearlyReviewOffered,
   type CoreField,
   type DocumentTypeView,
   type DocumentView,
   type Member,
   type NoLongerNeededView,
+  type ReminderView,
   type VersionView,
 } from '@fdv/shared';
 import { Image } from 'expo-image';
 import { Stack, useRouter } from 'expo-router';
 import {
+  Activity,
   Download,
   ArchiveRestore,
   Archive,
@@ -35,6 +40,7 @@ import {
   Eye,
   FilePlus,
   FileText,
+  FolderInput,
   Info,
   Lock,
   NotebookText,
@@ -64,6 +70,7 @@ import { latestOf } from './online';
 import { warnedAboutCopies } from './save-copy';
 import { TrashConfirm } from './trash';
 import { MenuRow } from '../ui/menu-row';
+import { TheirLinksOpened } from '../sharing/opens';
 import { ShareSheet } from '../sharing/share-sheet';
 import { Chip, ChipRow } from '../ui/chip';
 import { ConfirmSheet } from '../ui/confirm';
@@ -142,6 +149,15 @@ export function DocumentDetail(props: { id: string }) {
   const [unneededOpen, setUnneededOpen] = useState(false);
   // Essential off: its copies leave the phones that keep them, so it asks first (R2).
   const [askOff, setAskOff] = useState(false);
+  // Its yearly review (H3, app 0.17.0): undefined until the vault has said; null, none on.
+  const [review, setReview] = useState<ReminderView | null | undefined>(undefined);
+  const [reviewBusy, setReviewBusy] = useState(false);
+  const [askReviewOff, setAskReviewOff] = useState(false);
+  const [reviewProblem, setReviewProblem] = useState<string | null>(null);
+  // The folder it came from, forgotten after asking (C4, app 0.17.0).
+  const [askForget, setAskForget] = useState(false);
+  const [forgetting, setForgetting] = useState(false);
+  const [forgetProblem, setForgetProblem] = useState<string | null>(null);
   // The collections it is in (P8), of those the person may see.
   const [inCollections, setInCollections] = useState<{ id: string; name: string }[]>([]);
   const warn = useCallback((text: string) => setNotice({ tone: 'warn', text }), []);
@@ -160,6 +176,8 @@ export function DocumentDetail(props: { id: string }) {
   const hasCollections = caps?.features.collections === true;
   const mayAddVersion =
     !!who && can(who.role, 'document.add') && (who.role !== 'teen' || mine) && !renewing && !note && !caregiver;
+  // A yearly review (H3), for whoever manages reminders, where the vault has health's kinds.
+  const reviewsOn = caps?.features.health_kinds === true && !!who && can(who.role, 'reminder.manage') && !caregiver;
 
   const load = useCallback(async () => {
     try {
@@ -205,6 +223,22 @@ export function DocumentDetail(props: { id: string }) {
   }, [load, offline, capture.delivered]);
   // Its details changed on Edit details: looked at again.
   useEffect(() => on('documentChanged', (changed) => (changed === id ? void load() : undefined)), [id, load]);
+
+  // Its own reminders (an older vault answers them all, so the review is looked for by its document).
+  const loadReview = useCallback(async () => {
+    if (!reviewsOn) return;
+    try {
+      const r = await withToken((a, tk) => a.reminders(tk, 'all', id));
+      setReview(r.items.find((x) => x.document_id === id && x.review === true) ?? null);
+    } catch {
+      // Not said: the switch waits until the vault answers.
+    }
+  }, [reviewsOn, withToken, id]);
+  useEffect(() => {
+    // Asked on arrival and when the connection returns; set once the vault answers.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void loadReview();
+  }, [loadReview, offline]);
 
   const latest = latestOf(versions);
   // What this page and a row's ⋯ do alike (5.36). The store itself is asked
@@ -342,6 +376,20 @@ export function DocumentDetail(props: { id: string }) {
   const hasMore = (mayTrash || mayUnneed || mayRemind || mayShare) && !!doc && !offline;
   // Where the original is, said on a vault that keeps places in cabinets (C3): before it, the page said nothing of it.
   const placeWords = caps?.features.original_place === true && !note && !caregiver ? whereKeptWords(shown) : null;
+  // The folder it came from (C4): the household's, as where it is kept; the vault leaves it out for anybody else.
+  const sourceFolder = caps?.features.source_folders === true && !caregiver ? (shown.source_folder ?? null) : null;
+  const mayForget = mayChange && !!doc && !doc.deleted_at && !offline;
+  // A yearly review (H3): on the kinds it is for, and wherever one is on (a paper moved to another kind since).
+  const reviewShown =
+    reviewsOn &&
+    !!doc &&
+    !doc.deleted_at &&
+    !doc.no_longer_needed &&
+    review !== undefined &&
+    (review !== null || yearlyReviewOffered(type));
+  // Its own Activity (0.9.0-dev.54, DA): for whoever reads the activity log, where the vault has it.
+  const activityOn =
+    caps?.features.document_activity === true && !!who && can(who.role, 'audit.read') && !caregiver && !!doc;
   // Two columns, until the text is so large that one reads better.
   const oneColumn = scale > 1.2;
 
@@ -479,6 +527,74 @@ export function DocumentDetail(props: { id: string }) {
           },
         ]
       : []),
+    // The folder it came from (0.9.0-dev.52, C4): kept as it came, never typed; whoever may change it can forget it.
+    ...(sourceFolder
+      ? [
+          {
+            key: 'source-folder',
+            node: (
+              <View style={styles.line} testID="document-source-folder">
+                <Text style={styles.flex}>{t('document.sourceFolder')}</Text>
+                <View style={styles.valueStack}>
+                  <Text variant="secondary" tone="soft" style={styles.value} testID="document-source-folder-words">
+                    {sourceFolder}
+                  </Text>
+                  {mayForget ? (
+                    <Button
+                      size="small"
+                      kind="quiet"
+                      label={t('document.forgetFolder')}
+                      accessibilityLabel={t('document.forgetFolderFor', { folder: sourceFolder })}
+                      onPress={() => {
+                        setForgetProblem(null);
+                        setAskForget(true);
+                      }}
+                      testID="document-source-folder-forget"
+                    />
+                  ) : null}
+                </View>
+              </View>
+            ),
+          },
+        ]
+      : []),
+    // A yearly review (0.9.0-dev.46, H3): off until somebody turns it on; turned off only once asked.
+    ...(reviewShown
+      ? [
+          {
+            key: 'review',
+            node: (
+              <View style={styles.line} testID="document-review">
+                <View style={styles.flex}>
+                  <Text>{REVIEW_LABEL}</Text>
+                  {review ? (
+                    <Text tone="soft" variant="small" testID="document-review-next">
+                      {t('document.reviewNext', { day: formatDate({ date: review.fire_at.slice(0, 10), precision: 'day' }) })}
+                    </Text>
+                  ) : null}
+                  {reviewProblem && !askReviewOff ? (
+                    <Text tone="danger" variant="small" role="alert" testID="document-review-problem">
+                      {reviewProblem}
+                    </Text>
+                  ) : null}
+                </View>
+                <Switch
+                  testID="document-review-switch"
+                  accessibilityLabel={REVIEW_LABEL}
+                  value={review !== null}
+                  disabled={offline || reviewBusy}
+                  onValueChange={(v) => {
+                    setReviewProblem(null);
+                    if (v) void turnReviewOn();
+                    else setAskReviewOff(true);
+                  }}
+                  trackColor={{ true: colours.accent, false: colours.border }}
+                />
+              </View>
+            ),
+          },
+        ]
+      : []),
     ...(!note && latest
       ? [
           {
@@ -550,6 +666,30 @@ export function DocumentDetail(props: { id: string }) {
                   trackColor={{ true: colours.accent, false: colours.border }}
                 />
               </View>
+            ),
+          },
+        ]
+      : []),
+    // Its own Activity (0.9.0-dev.54, DA): who added, changed, opened or shared it, as the web's Activity button.
+    ...(activityOn
+      ? [
+          {
+            key: 'activity',
+            node: (
+              <Pressable
+                testID="document-activity"
+                accessibilityRole="button"
+                accessibilityLabel={t('activity.title')}
+                accessibilityHint={t('document.activityHint')}
+                onPress={() => router.push({ pathname: '/activity', params: { document: id } })}
+                style={({ pressed }) => [styles.line, pressed ? styles.pressed : null]}
+              >
+                <Activity color={colours.inkMuted} size={18} accessibilityElementsHidden importantForAccessibility="no" />
+                <Text style={styles.flex}>{t('activity.title')}</Text>
+                <Text variant="secondary" tone="soft">
+                  ›
+                </Text>
+              </Pressable>
             ),
           },
         ]
@@ -763,6 +903,10 @@ export function DocumentDetail(props: { id: string }) {
 
       {note ? null : notesCard}
       {note ? edited : null}
+      {/* Their own sensitive paper's links, whoever made them, and who opened each (H5). */}
+      {mine && doc?.sensitive_effective === true && !caregiver ? (
+        <TheirLinksOpened documentId={id} style={styles.card} />
+      ) : null}
 
       {first && !note ? (
         <Text variant="small" tone="soft" testID="document-added">
@@ -785,6 +929,35 @@ export function DocumentDetail(props: { id: string }) {
         confirmID="essential-off-yes"
         cancelID="essential-off-cancel"
       />
+      <ConfirmSheet
+        visible={askReviewOff}
+        testID="review-off-question"
+        title={t('attention.reviewOffTitle')}
+        words={t('attention.reviewOffWords', { title: name })}
+        confirmLabel={t('attention.reviewOffYes')}
+        busy={reviewBusy}
+        problem={reviewProblem}
+        onConfirm={() => void turnReviewOff()}
+        onCancel={() => setAskReviewOff(false)}
+        confirmID="review-off-yes"
+        cancelID="review-off-cancel"
+        problemID="review-off-problem"
+      />
+      <ConfirmSheet
+        visible={askForget}
+        testID="forget-folder-question"
+        icon={FolderInput}
+        title={t('document.forgetFolderTitle')}
+        words={t('document.forgetFolderWords', { folder: sourceFolder ?? '' })}
+        confirmLabel={t('document.forgetFolderYes')}
+        busy={forgetting}
+        problem={forgetProblem}
+        onConfirm={() => void forgetFolder()}
+        onCancel={() => setAskForget(false)}
+        confirmID="forget-folder-yes"
+        cancelID="forget-folder-cancel"
+        problemID="forget-folder-problem"
+      />
       {sharing && doc ? (
         <ShareSheet
           target={{ kind: 'document', id, title: name, note, onlyMe: doc.visibility === 'private', sensitive }}
@@ -793,7 +966,13 @@ export function DocumentDetail(props: { id: string }) {
       ) : null}
       <Sheet visible={more !== null} onClose={() => setMore(null)} {...(more === 'menu' ? { outside: true as const } : {})} testID="document-more-sheet">
         {more === 'trash' && doc ? (
-          <TrashConfirm id={id} title={name} onGone={() => router.back()} onCancel={() => setMore(null)} />
+          <TrashConfirm
+            id={id}
+            title={name}
+            sensitive={doc.sensitive_effective === true}
+            onGone={() => router.back()}
+            onCancel={() => setMore(null)}
+          />
         ) : more === 'remind' && doc ? (
           <View style={styles.menu} testID="remind-question">
             <Text variant="screen">{t('remind.title')}</Text>
@@ -930,6 +1109,69 @@ export function DocumentDetail(props: { id: string }) {
       </Sheet>
     </ScrollView>
   );
+
+  /** The yearly review on (H3): first on the next anniversary of the day it was signed, else a year from today. */
+  async function turnReviewOn() {
+    if (reviewBusy || !doc) return;
+    setReviewBusy(true);
+    setReviewProblem(null);
+    try {
+      const made = await withToken((a, tk) =>
+        a.createReminder(tk, {
+          document_id: id,
+          fire_at: firstReview(doc.issued?.date ?? null, localToday(familyZoneNow())),
+          review: true,
+        }),
+      );
+      setReview(made);
+      feel('done');
+      emit('remindersChanged');
+    } catch (err) {
+      setReviewProblem(wordsFor(err, t));
+    } finally {
+      setReviewBusy(false);
+    }
+  }
+
+  /** The yearly review off, once asked: nobody is reminded of it any more. */
+  async function turnReviewOff() {
+    if (reviewBusy || !review) return;
+    setReviewBusy(true);
+    setReviewProblem(null);
+    try {
+      await withToken((a, tk) => a.deleteReminder(tk, review.id));
+      setReview(null);
+      setAskReviewOff(false);
+      feel('done');
+      emit('remindersChanged');
+    } catch (err) {
+      setReviewProblem(wordsFor(err, t));
+    } finally {
+      setReviewBusy(false);
+    }
+  }
+
+  /** The folder it came from, forgotten for everyone (C4), once asked; a change made meanwhile is shown. */
+  async function forgetFolder() {
+    if (forgetting || !doc) return;
+    setForgetting(true);
+    setForgetProblem(null);
+    try {
+      const saved = await withToken((a, tk) => a.forgetSourceFolder(tk, id, doc.etag));
+      setDoc(saved);
+      setAskForget(false);
+      feel('done');
+      emit('documentChanged', id);
+    } catch (err) {
+      if (err instanceof ApiRequestError && err.status === 409) {
+        setAskForget(false);
+        warn(t('document.conflict'));
+        await load();
+      } else setForgetProblem(wordsFor(err, t));
+    } finally {
+      setForgetting(false);
+    }
+  }
 
   /** Today on the family's calendar: where Remind me's quick choices count from. */
   function remindToday(): string {
@@ -1220,6 +1462,7 @@ const makeStyles = (colours: Palette) =>
     sep: { height: StyleSheet.hairlineWidth, backgroundColor: colours.border },
     flex: { flex: 1 },
     value: { flexShrink: 1, textAlign: 'right' },
+    valueStack: { flexShrink: 1, alignItems: 'flex-end', gap: 2 },
     tags: { flex: 1, flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', gap: sp(6) },
     tag: {
       paddingHorizontal: sp(8),

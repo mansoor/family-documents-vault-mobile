@@ -30,9 +30,11 @@ function sources(dir: string): string[] {
 /**
  * An error code in the code: compared (`code === 'x'`, `err.code !== "y"`),
  * or made by the client itself (`code: 'x'`, `new ApiRequestError(status, 'x'`).
+ * A type looked at (`typeof code === 'string'`, the client's network detail
+ * since 0.9.0-dev.61) is no code.
  */
 const COMPARED =
-  /\b[A-Za-z]*[cC]ode\s*[!=]==?\s*['"]([a-z_]+)['"]|\bcode:\s*['"]([a-z_]+)['"]|ApiRequestError\(\s*[^,()]+,\s*['"]([a-z_]+)['"]/g;
+  /(?<!typeof\s+)\b[A-Za-z]*[cC]ode\s*[!=]==?\s*['"]([a-z_]+)['"]|\bcode:\s*['"]([a-z_]+)['"]|ApiRequestError\(\s*[^,()]+,\s*['"]([a-z_]+)['"]/g;
 
 describe('every failure in words (4.17)', () => {
   it('every code the app or its client acts on has words in the catalogue', () => {

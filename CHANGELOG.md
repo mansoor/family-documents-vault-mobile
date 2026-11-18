@@ -6,6 +6,71 @@ app's own, tagged `vX.Y.Z` in this repository.
 
 ## [Unreleased]
 
+## [0.17.0] — Activity, who opened a link, yearly reviews and where a paper came from
+
+Re-pinned to the vault's **v0.9.0-dev.61**. Where the vault has them, the
+phone shows the activity log and a document's own Activity (DA), who opened
+a link (H5), a yearly review to turn on (H3) and the folder a paper came
+from (C4), and starts a sensitive link carefully, as the web does. Every
+vault keeps an activity log, so Activity is in More on any of them; the
+rest waits for the vault's say-so, and without it the phone is as 0.16.0.
+
+### Added
+- **Activity** (the vault's activity log; a document's own since 0.9.0-dev.54,
+  `features.document_activity`). In More, for owners, adults and teens as
+  on the web: everything anybody has done in the vault, newest first, in
+  the vault's own sentences and exactly when on the household's clock —
+  added, changed, looked at, downloaded, shared, a link opened, emailed or
+  taken back. A line about a document opens it. **Filters** slide out from
+  the side, as Documents' do: who (each of the family, or anybody else,
+  such as a link), what happened, and from and to which day on the
+  household's calendar; each filter on is a chip to take off, and the list
+  says how many of those loaded match. **Show older** loads more. Read only.
+- **A document's own Activity**, a line on its page: the same screen with
+  only the lines about that document — its own links and collections'
+  links that gave it too — said by a chip ("About ‘Passport’", or "About a
+  sensitive document"), whose × shows everything. When nothing is about it
+  yet, it says so. A viewer has none, as on the web.
+- **Who opened it** (vault 0.9.0-dev.51, `features.share_opens`). Under a
+  link in More → Sharing that has been opened, for whoever made it and the
+  owners: **Who opened it (N)**, closed at first, lists each time it was
+  opened and the browser it was opened in — never an address. A
+  clinician's link on a person's emergency page has the same disclosure,
+  closed at first, in place of the openings always shown.
+- **Shared outside the family**, on a sensitive document of your own: every
+  link to it somebody else made, who made it, whether it still works, and
+  who opened each, when.
+- **A yearly review, turned on** (vault 0.9.0-dev.46, `features.health_kinds`).
+  On an advance directive, a healthcare proxy or a HIPAA authorization,
+  **Remind us to review it every year** on its page: first on the next
+  anniversary of the day it was signed (or a year from today), and said
+  ("Next review: 10 Mar 2027"). Turning it off asks first, in the words
+  Needs attention uses. Shown wherever one is on, so it can be turned off.
+- **Came from the folder** (vault 0.9.0-dev.52, `features.source_folders`):
+  on a document's page, the folder a paper was filed from ("Taxes/2025"),
+  and **Forget it…** for whoever may change it, asked first, which takes
+  it off for everyone.
+- Where the vault emailed a link is said on its row in Sharing, for
+  whoever sees the link (vault 0.9.0-dev.54).
+- Failure states: Activity without a connection, nothing in it yet,
+  nothing matching the filters, and a link not opened yet.
+
+### Changed
+- **A sensitive document's link starts careful** (vault 0.9.0-dev.51): View
+  only, for a week, and says why; one the vault can't show starts as
+  download. A collection's link with a sensitive one ticked starts the same
+  way, unless a file it can't show is ticked too: then it starts as
+  download. Choosing View or download yourself stands.
+- **Moving a sensitive document to the Trash** says that older backups
+  still hold it until they age out, and for how long the vault keeps its
+  nightly ones, where the vault has said.
+- **Add a file** offers health record files from a patient portal — XML
+  (C-CDA), JSON (FHIR), DICOM images and ZIPs — where the vault keeps them
+  as they are, each sent as the type the vault keeps it as; a hospital
+  CD's image with no ending can be chosen too, and the vault knows it.
+- The client's Web Crypto declaration stays: the vault's client of dev.61
+  still needs it to compile here.
+
 ## [0.16.0] — Downloads as a ZIP, changing a link, and requests
 
 Re-pinned to the vault's **v0.9.0-dev.60**. Where the vault has them, the

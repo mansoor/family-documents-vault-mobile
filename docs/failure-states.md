@@ -183,6 +183,12 @@ Written by `node apps/pocket/scripts/failure-states.mjs`; CI fails if it is out 
 | Sharing | More → Sharing | `sharing.needsConnection` | Sharing needs a connection to the vault. |
 | Changing a link | More → Sharing → Change | `changeLink.latest` | It can last until {{end}} at the latest: as long as a link may from when it was made. |
 |  |  | `changeLink.passwordShort` | At least 8 characters. Something they can type, and you can say to them. |
+| Who opened a link | More → Sharing, a clinician’s link, a sensitive document | `opens.notYet` | Not opened yet. |
+| Activity | More → Activity, a document’s Activity | `activity.needsConnection` | Activity needs a connection to the vault. |
+|  |  | `activity.nothingYet` | Nothing yet. |
+|  |  | `activity.nothingInStretch` | Nothing in this stretch. Show older to look further back. |
+|  |  | `activity.nothingMatches` | Nothing matches these filters. |
+|  |  | `activity.nothingLoadedMatches` | Nothing loaded matches these filters. Show older to look further back. |
 | My cabinet | Documents → Cabinet, a cabinet, a drawer, a folder | `cabinet.needsConnection` | Showing your cabinet needs a connection to your vault. |
 |  |  | `cabinet.showingLast` | Offline: showing your cabinet as it was when last opened. |
 |  |  | `cabinet.empty` | Your cabinet is empty. Arrange it on the web, and it shows here. |
