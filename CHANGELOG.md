@@ -6,6 +6,71 @@ app's own, tagged `vX.Y.Z` in this repository.
 
 ## [Unreleased]
 
+## [0.18.0] — Asking for documents, changing any link, and papers from a folder
+
+Re-pinned to the vault's **v0.9.0-dev.65**. Requests to send documents are
+made and changed on the phone, as on the web (RQ); a document's own links
+and a clinician's link are changed where they are listed (LK); and the
+folder a paper came from opens the papers from it (C4). Each waits for the
+vault's say-so, and without it the phone is as 0.17.0.
+
+### Added
+- **Ask for documents** (vault 0.5.21 on; `features.upload_requests`), in
+  More → Sharing, for owners and adults: the web's form on the phone — what
+  you are asking for, a message and the things to send (up to 10), who it
+  is for and, for whoever looks at what comes in, whose documents they
+  probably are; when it stops (Tonight, Friday 5 pm, In a week or another
+  day, never past the longest the vault allows); a password the vault makes
+  up or one you type, a code emailed to them where the vault can send one
+  (and why not, where it can't), this browser only, and only so many
+  visits; how many files and how much, PDFs and photos or Word and Excel
+  too, and closing once they press Finish; and who looks at what comes in.
+  What needs putting right is said where it is, and Make the link moves to
+  the first of it. A typed password is 8 to 64 characters. Made, the link
+  and its password are shown once, with Send, Copy and Email the link where
+  the vault can, and what the request will do said under them; neither can
+  be selected, so nothing is left on the clipboard but what Copy clears.
+- **Change a request** (vault 0.9.0-dev.49, `features.link_changes`): on
+  the phone's own form, filled in as the request is now. Its title,
+  message, whom it is for, when it stops (never past the latest from when it
+  was made), its password (whoever asked only), its visits, what it takes
+  and whether it closes once sent can change; what it asks for, who looks
+  at what comes in, its emailed code and "this browser only" stay as made,
+  and are said. Only what is changed is sent; anything that lets it do more
+  asks to confirm it's you, and a new password the vault made up is shown
+  once. A request changed or ended meanwhile is read again and the form
+  starts again from it, saying so, so nothing somebody else changed is
+  undone; a connection coming back never starts it again by itself. Sharing
+  says what was changed.
+- **A document's own links, on its page** (with `features.link_changes`),
+  as the web's Share a link lists them: each that still works, newest first,
+  whom it is for, when it stops, how often it was opened and who opened it,
+  with **Change** where the vault lets you and **End this link**, asked
+  first. On a sensitive paper of your own, links somebody else made stay
+  under Shared outside the family, listed once.
+- **Change on a clinician's link**, on a person's emergency page, while it
+  works: whom it is for, when it stops, how often it opens, its PIN or
+  password. It stays to view, always.
+- **The papers from a folder** (vault 0.9.0-dev.52, `features.source_folders`):
+  a document's "Came from the folder" opens Documents with the papers from
+  that folder, said as a chip ("From the folder ‘Taxes/2025’") whose ✕
+  shows everything. With it on, the sort says "Newest first by the paper’s
+  date", as the vault sorts a folder's papers. The search looks through
+  every document, and says so while the chip is on. A folder, a status or
+  the Essentials asked for from elsewhere is taken once: clearing its chip
+  stays cleared, and asking again brings it back.
+- Failure states: asking for documents (what needs putting right, no
+  emailed code here, a request that can't be changed or has ended, a link
+  that isn't https://), and the search beside a folder's chip.
+
+### Changed
+- Sharing's **Ask for documents** and a request's **Change** open the
+  phone's own form, not the web.
+- The client's Web Crypto declaration is gone: the vault's client of
+  dev.63 on signs nothing, so it compiles here as it is. Connected apps
+  that act as themselves (dev.65) leave no person on their lines; the
+  phone's Activity already reads those as "anybody else".
+
 ## [0.17.0] — Activity, who opened a link, yearly reviews and where a paper came from
 
 Re-pinned to the vault's **v0.9.0-dev.61**. Where the vault has them, the

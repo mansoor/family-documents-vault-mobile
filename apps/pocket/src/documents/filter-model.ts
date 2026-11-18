@@ -16,6 +16,13 @@ import { addDays, type DocumentListParams, type SensitiveFilter, type StatusValu
  *
  * Sensitive or not (AIR4), where the vault keeps it (`sensitive_documents`,
  * 0.9.0-dev.34): `sensitive=yes`, `no`, or both, as V1's other filters.
+ *
+ * The papers that came from one folder (app 0.18.0; the vault's C4,
+ * `source_folders`), as the web's table has them from a document's "Came
+ * from the folder": exactly that folder, whatever the case. The vault takes
+ * it with a column sort only, so Recent asks for the newest first by the
+ * date a paper is about, as a cabinet's folder does. The search does not
+ * narrow by it, and the list says so.
  */
 
 export type DateWhich = 'added' | 'issued' | 'expires';
@@ -51,6 +58,8 @@ export interface Filters {
   sensitive?: SensitiveFilter[];
   /** Essentials only: Home's Essentials, See all (the owner's ask of 11 Nov 2026). */
   essential?: boolean;
+  /** Came from this folder ("Taxes/2025"), from a document's page (`source_folders`); absent, any. */
+  folder?: string | null;
   date: DateRange | null;
 }
 
@@ -126,6 +135,7 @@ export function countOn(f: Filters): number {
     (f.tags.length > 0 ? 1 : 0) +
     ((f.sensitive ?? []).length > 0 ? 1 : 0) +
     (f.essential ? 1 : 0) +
+    (f.folder ? 1 : 0) +
     (f.date ? 1 : 0)
   );
 }
@@ -164,12 +174,17 @@ export function listQuery(
   const kinds = asked(f.kinds, opts.several);
   const statuses = asked(f.statuses, opts.several);
   const visibilities = asked(f.visibilities, opts.several);
+  // A folder goes with a column sort only: Recent is then the newest first by the date it is about.
+  const folder = opts.table && f.folder ? f.folder : null;
   return {
     ...(opts.sort === 'recent'
-      ? { sort: 'recent' }
+      ? folder
+        ? { sort: 'dated', direction: 'desc' }
+        : { sort: 'recent' }
       : opts.table
         ? { sort: opts.sort, direction: 'asc' }
         : { sort: opts.sort === 'title' ? 'alpha' : 'expiring' }),
+    ...(folder ? { source_folder: folder } : {}),
     ...(people ? { member_id: people } : {}),
     ...(kinds ? { type_key: kinds } : {}),
     // Several statuses or people go as one comma-separated value: the type says one.

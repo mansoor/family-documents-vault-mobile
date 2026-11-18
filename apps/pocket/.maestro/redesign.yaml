@@ -321,6 +321,26 @@ env:
     visible:
       id: sharing-said
     timeout: 15000
+# Ask for documents (0.18.0): the phone's own form, looked at and left with Cancel.
+- scrollUntilVisible:
+    element:
+      id: requests-ask
+- tapOn:
+    id: requests-ask
+- extendedWaitUntil:
+    visible:
+      id: ask-title
+    timeout: 15000
+- takeScreenshot: shot-light-ask
+- scrollUntilVisible:
+    element:
+      id: ask-cancel
+- tapOn:
+    id: ask-cancel
+- extendedWaitUntil:
+    visible:
+      id: sharing
+    timeout: 15000
 - back
 - scrollUntilVisible:
     element:

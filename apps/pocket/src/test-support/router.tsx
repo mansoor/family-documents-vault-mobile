@@ -25,6 +25,18 @@ export function back() {
   nav.stack.pop();
   notify();
 }
+/** The route on top's params changed in place, as expo-router's setParams: undefined takes one off. */
+export function setParams(params: Record<string, string | undefined>) {
+  const top = nav.stack[nav.stack.length - 1];
+  if (!top) return;
+  const next = { ...top.params };
+  for (const [k, v] of Object.entries(params)) {
+    if (v === undefined) delete next[k];
+    else next[k] = v;
+  }
+  nav.stack[nav.stack.length - 1] = { ...top, params: next };
+  notify();
+}
 export function resetRoutes() {
   nav.stack = [];
 }
@@ -46,9 +58,10 @@ export const routerMock = {
   Link: (p: { children: unknown }) => p.children,
   // A screen's own header buttons (R6: Edit details and ⋯ on a document), drawn where the test can press them.
   Stack: { Screen: (p: { options?: { headerRight?: () => ReactNode } }) => p.options?.headerRight?.() ?? null },
-  useRouter: () => ({ push, back, replace: push, canGoBack: () => nav.stack.length > 0 }),
+  useRouter: () => ({ push, back, replace: push, setParams, canGoBack: () => nav.stack.length > 0 }),
   useNavigation: () => ({ addListener: () => () => undefined, dispatch: () => undefined }),
-  useLocalSearchParams: () => nav.stack[nav.stack.length - 1]?.params ?? {},
+  // As expo-router's: a screen reading its params is drawn again when they change (a push, setParams).
+  useLocalSearchParams: () => useTopRoute()?.params ?? {},
   // Each test's screen is the one in front.
   useIsFocused: () => true,
 };

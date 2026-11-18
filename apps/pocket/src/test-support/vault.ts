@@ -226,7 +226,9 @@ export interface Library {
   /**
    * A link changed (0.9.0-dev.49, LK): each PATCH /shares/{id}, with its
    * If-Match, in order; whether the vault asks to confirm it is them first
-   * (a change that lets it do more).
+   * (a change that lets it do more) — for a request's PATCH too (0.18.0),
+   * which the client's fake makes once that is answered. The vault decides
+   * which changes ask; this flag always asks.
    */
   shareChanges: { id: string; body: Record<string, unknown>; ifMatch: string | null }[];
   changeStepUp: boolean;
@@ -720,6 +722,12 @@ async function library(t: TestVault, path: string, init: Parameters<FetchLike>[1
     if (ids.some((id) => lib.zipSensitive.has(id))) {
       return failure(403, 'step_up_required', 'Please confirm it is you to download a sensitive document.', 'download_sensitive');
     }
+  }
+  // A request changed (LK): the client's fake makes the change but asks nobody to confirm it is them.
+  // The vault decides when to ask (a change that lets it do more); with `changeStepUp` this shim
+  // always asks first, whatever the change, until the step-up is answered.
+  if (/^\/api\/v1\/upload-requests\/[^/]+$/.test(q) && init.method === 'PATCH' && lib.changeStepUp && !lib.verified) {
+    return failure(403, 'step_up_required', 'Please confirm it is you to change this request.', 'change_share');
   }
   // A link changed (LK), as the vault of 0.9.0-dev.49 answers it.
   m = /^\/api\/v1\/shares\/([^/]+)$/.exec(q);

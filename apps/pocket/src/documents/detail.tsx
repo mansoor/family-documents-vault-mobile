@@ -70,6 +70,7 @@ import { latestOf } from './online';
 import { warnedAboutCopies } from './save-copy';
 import { TrashConfirm } from './trash';
 import { MenuRow } from '../ui/menu-row';
+import { DocumentLinks } from '../sharing/document-links';
 import { TheirLinksOpened } from '../sharing/opens';
 import { ShareSheet } from '../sharing/share-sheet';
 import { Chip, ChipRow } from '../ui/chip';
@@ -379,6 +380,8 @@ export function DocumentDetail(props: { id: string }) {
   // The folder it came from (C4): the household's, as where it is kept; the vault leaves it out for anybody else.
   const sourceFolder = caps?.features.source_folders === true && !caregiver ? (shown.source_folder ?? null) : null;
   const mayForget = mayChange && !!doc && !doc.deleted_at && !offline;
+  // Its words open the papers from that folder (app 0.18.0), as the web's do: the list asks for them with a column sort.
+  const folderOpens = !!sourceFolder && caps?.features.document_table === true && !doc?.deleted_at;
   // A yearly review (H3): on the kinds it is for, and wherever one is on (a paper moved to another kind since).
   const reviewShown =
     reviewsOn &&
@@ -536,9 +539,25 @@ export function DocumentDetail(props: { id: string }) {
               <View style={styles.line} testID="document-source-folder">
                 <Text style={styles.flex}>{t('document.sourceFolder')}</Text>
                 <View style={styles.valueStack}>
-                  <Text variant="secondary" tone="soft" style={styles.value} testID="document-source-folder-words">
-                    {sourceFolder}
-                  </Text>
+                  {folderOpens ? (
+                    <Pressable
+                      testID="document-source-folder-open"
+                      accessibilityRole="link"
+                      accessibilityLabel={t('document.sourceFolderOpen', { folder: sourceFolder })}
+                      accessibilityHint={t('document.sourceFolderHint')}
+                      hitSlop={6}
+                      onPress={() => router.push({ pathname: '/documents', params: { folder: sourceFolder } })}
+                      style={({ pressed }) => [styles.folderLink, pressed ? styles.pressed : null]}
+                    >
+                      <Text variant="secondary" weight="600" tone="accent" style={styles.value} testID="document-source-folder-words">
+                        {`${sourceFolder} ›`}
+                      </Text>
+                    </Pressable>
+                  ) : (
+                    <Text variant="secondary" tone="soft" style={styles.value} testID="document-source-folder-words">
+                      {sourceFolder}
+                    </Text>
+                  )}
                   {mayForget ? (
                     <Button
                       size="small"
@@ -903,6 +922,16 @@ export function DocumentDetail(props: { id: string }) {
 
       {note ? null : notesCard}
       {note ? edited : null}
+      {/* Its own links that work, with Change and End (app 0.18.0), for whoever may share it. */}
+      {mayShare && doc && !doc.deleted_at ? (
+        <DocumentLinks
+          documentId={id}
+          what={name}
+          // Somebody else's links to one's own sensitive paper are listed apart, just below (H5).
+          othersApart={mine && doc.sensitive_effective === true && caps?.features.share_opens === true}
+          style={styles.card}
+        />
+      ) : null}
       {/* Their own sensitive paper's links, whoever made them, and who opened each (H5). */}
       {mine && doc?.sensitive_effective === true && !caregiver ? (
         <TheirLinksOpened documentId={id} style={styles.card} />
@@ -1481,5 +1510,6 @@ const makeStyles = (colours: Palette) =>
     olderActions: { flexDirection: 'row', marginTop: sp(4) },
     headerButtons: { flexDirection: 'row', alignItems: 'center' },
     pressed: { opacity: 0.8 },
+    folderLink: { minHeight: 32, justifyContent: 'center' },
     menu: { gap: sp(10) },
   });

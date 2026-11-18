@@ -65,6 +65,10 @@ import { useColours, useStyles, type Palette } from '../../ui/theme';
  * rows into boxes to tick; then Download gives one document as itself and
  * several as one ZIP with an index, through the phone's share sheet. A
  * Sensitive one among them asks to confirm it is you first.
+ *
+ * The papers from a folder (app 0.18.0; the vault's C4): a document's "Came
+ * from the folder" opens the list narrowed to them, said as a chip ("From
+ * the folder ‘Taxes/2025’") taken off with its ✕, as the web's table does.
  */
 
 /** How long typing pauses before the vault is asked (FND). */
@@ -94,12 +98,12 @@ export default function DocumentsScreen() {
       // Kept until the app closes, then.
     }
   };
-  // Opened from Home's numbers, an alert or its Essentials: the list, narrowed as asked.
-  const { status, essential } = useLocalSearchParams<{ status?: string; essential?: string }>();
+  // Opened from Home's numbers, an alert or its Essentials, or a paper's folder: the list, narrowed as asked.
+  const { status, essential, folder } = useLocalSearchParams<{ status?: string; essential?: string; folder?: string }>();
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (status || essential === '1') setView('list');
-  }, [status, essential]);
+    if (status || essential === '1' || folder) setView('list');
+  }, [status, essential, folder]);
 
   const switcher = gate.on ? (
     <ChipRow label={t('cabinet.showAs')}>
@@ -186,7 +190,11 @@ function DocumentsList(props: { switcher: ReactNode; searchFirst: boolean }) {
   const [tags, setTags] = useState<string[]>([]);
 
   // Opened from Home's numbers or an alert (R4): narrowed to that status.
-  const { status: asked, essential: essentialAsked } = useLocalSearchParams<{ status?: string; essential?: string }>();
+  const {
+    status: asked,
+    essential: essentialAsked,
+    folder: folderAsked,
+  } = useLocalSearchParams<{ status?: string; essential?: string; folder?: string }>();
   const [q, setQ] = useState('');
   const searching = q.trim() !== '';
   // The search box and the filters, shown from the title row's magnifier (the owner's ask of 11 Nov 2026).
@@ -197,22 +205,41 @@ function DocumentsList(props: { switcher: ReactNode; searchFirst: boolean }) {
   const [sorting, setSorting] = useState(false);
   const [members, setMembers] = useState<Member[]>([]);
   const [types, setTypes] = useState<DocumentTypeView[]>([]);
+  // What the address asks is taken once, then taken off it (the review of 0.18.0): left on, it
+  // would be asked again whenever the list is drawn afresh — after the Cabinet and back — undoing
+  // the person's own filters, and the same ask a second time would change nothing.
+  const router = useRouter();
   useEffect(() => {
     if (asked && (STATUSES as string[]).includes(asked)) {
       // Set when Home asks for it, each time it does.
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setFilters({ ...NO_FILTERS, statuses: [asked as StatusValue] });
       setQ('');
+      router.setParams({ status: undefined });
     }
-  }, [asked]);
+  }, [asked, router]);
   // Home's Essentials, See all: the Essentials, and nothing else asked.
   useEffect(() => {
     if (essentialAsked === '1') {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setFilters({ ...NO_FILTERS, essential: true });
       setQ('');
+      router.setParams({ essential: undefined });
     }
-  }, [essentialAsked]);
+  }, [essentialAsked, router]);
+  // A paper's "Came from the folder" (C4): the papers from that folder, and nothing else asked.
+  const foldersOn = caps?.features.source_folders === true && table;
+  useEffect(() => {
+    if (folderAsked && foldersOn) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setFilters({ ...NO_FILTERS, folder: folderAsked });
+      setQ('');
+      router.setParams({ folder: undefined });
+    }
+  }, [folderAsked, foldersOn, router]);
+  // Recent, with a folder on, is the newest by the date each is about (the vault takes no folder
+  // with its newest-added sort): said so, not as Recent.
+  const sortWords = (s: Sort) => t(s === 'recent' && filters.folder && table ? 'documents.sort_recentDated' : `documents.sort_${s}`);
 
   const [docs, setDocs] = useState<DocumentView[] | null>(null);
   const [cursor, setCursor] = useState<string | null>(null);
@@ -471,6 +498,7 @@ function DocumentsList(props: { switcher: ReactNode; searchFirst: boolean }) {
       : []),
     ...(filters.tags.length > 0 ? [{ id: 'tags', label: named(filters.tags, (x) => x), clear: { tags: [] } }] : []),
     ...(filters.essential ? [{ id: 'essential', label: t('filters.essentials'), clear: { essential: false } }] : []),
+    ...(filters.folder ? [{ id: 'folder', label: t('filters.chipFolder', { folder: filters.folder }), clear: { folder: null } }] : []),
     ...((filters.sensitive ?? []).length > 0
       ? [
           {
@@ -675,6 +703,12 @@ function DocumentsList(props: { switcher: ReactNode; searchFirst: boolean }) {
 
             {searching ? (
               <>
+                {/* The search is not narrowed by a folder: said, so its results are not taken for the folder's. */}
+                {filters.folder ? (
+                  <Text variant="small" tone="soft" testID="search-not-folder">
+                    {t('filters.folderNotSearched', { folder: filters.folder })}
+                  </Text>
+                ) : null}
                 {noConnection ? (
                   <Notice tone="warn" testID="search-offline">
                     {t('search.needsConnection')}
@@ -707,14 +741,14 @@ function DocumentsList(props: { switcher: ReactNode; searchFirst: boolean }) {
                   <Pressable
                     testID="documents-sort"
                     accessibilityRole="button"
-                    accessibilityLabel={t('documents.sortNow', { sort: t(`documents.sort_${sort}`) })}
+                    accessibilityLabel={t('documents.sortNow', { sort: sortWords(sort) })}
                     hitSlop={6}
                     onPress={() => setSorting(true)}
                     style={({ pressed }) => [styles.sortButton, pressed ? styles.pressed : null]}
                   >
                     <ArrowUpDown color={colours.ink} size={15} accessibilityElementsHidden importantForAccessibility="no" />
                     <Text variant="secondary" weight="600">
-                      {t(`documents.sort_${sort}`)}
+                      {sortWords(sort)}
                     </Text>
                   </Pressable>
                 </View>
@@ -855,7 +889,7 @@ function DocumentsList(props: { switcher: ReactNode; searchFirst: boolean }) {
       <PickerSheet
         visible={sorting}
         title={t('documents.sortBy')}
-        options={SORTS.map((s) => ({ value: s, label: t(`documents.sort_${s}`) }))}
+        options={SORTS.map((s) => ({ value: s, label: sortWords(s) }))}
         chosen={[sort]}
         onDone={([s]) => {
           setSorting(false);

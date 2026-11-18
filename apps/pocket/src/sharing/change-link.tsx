@@ -22,7 +22,9 @@ import { readChange, startChange, type ChangeEnd, type ChangeOptions, type Secre
  * Sharing, as the web's Sharing does it: the form it was made with, filled
  * in as it is now — whom it is for, when it stops, View or View and
  * download, how often it opens, its PIN or password, and whether its page
- * shows the title. It stays the same link, to the same thing; a code by
+ * shows the title. From a document's page and a person's emergency page
+ * too (app 0.18.0), each link there with Change, as the web has them; a
+ * clinician's stays to view. It stays the same link, to the same thing; a code by
  * email or text, and "This browser only", stay as they were made, and the
  * sheet says so. Only what is changed is sent, If-Match its version.
  *
@@ -149,7 +151,7 @@ export function ChangeLinkSheet(props: { link: Share; what: string; onClose: () 
           {props.what}
         </Text>
         <Text variant="small" tone="soft">
-          {t(link.collection_id ? 'changeLink.wordsCollection' : 'changeLink.words')}
+          {t(read.emergency ? 'changeLink.wordsEmergency' : link.collection_id ? 'changeLink.wordsCollection' : 'changeLink.words')}
         </Text>
         <Field
           label={t('share.forWhom')}

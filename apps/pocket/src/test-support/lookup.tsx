@@ -2,6 +2,7 @@ import type { DocumentView, VersionView } from '@fdv/shared';
 import { fireEvent, screen } from '@testing-library/react-native';
 import type { ReactElement } from 'react';
 import CaptureScreen from '../app/capture';
+import { AskForDocuments, ChangeRequest } from '../sharing/ask';
 import { CabinetLevel } from '../cabinet/level';
 import { FolderScreen } from '../cabinet/folder';
 import CollectionScreen from '../app/collection/[id]';
@@ -84,6 +85,10 @@ export function LookupApp(props: { start: ReactElement }) {
       <CabinetLevel level="drawer" />
     ) : top?.pathname === '/folder/[id]' ? (
       <FolderScreen />
+    ) : top?.pathname === '/ask' ? (
+      <AskForDocuments {...(top.params.person ? { person: top.params.person } : {})} />
+    ) : top?.pathname === '/ask/[id]' ? (
+      <ChangeRequest key={id} id={id} />
     ) : (
       props.start
     );
