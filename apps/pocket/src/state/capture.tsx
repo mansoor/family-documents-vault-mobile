@@ -1032,7 +1032,12 @@ export function CaptureProvider(props: { children: ReactNode; deps?: Partial<Cap
       timings.start(how);
       const scanner = deps.scanner;
       const outcome = await run(
-        () => (how === 'scan' ? scanner.scan(MAX_PAGES) : how === 'file' ? scanner.pickFile() : scanner.pickPhoto()),
+        () =>
+          how === 'scan'
+            ? scanner.scan(MAX_PAGES)
+            : how === 'file'
+              ? scanner.pickFile({ records: current.current.caps?.features.record_formats === true })
+              : scanner.pickPhoto(),
         () => timings.mark('scanner_shown'),
       );
       if (outcome.kind === 'pages' || outcome.kind === 'file') {
@@ -1400,7 +1405,11 @@ export function CaptureProvider(props: { children: ReactNode; deps?: Partial<Cap
     async (documentId: string): Promise<StartOutcome | 'saved' | SaveProblem> => {
       if (!allowed() || busyScanning.current || !who) return 'cancelled';
       const scanner = deps.scanner;
-      const outcome = await run(() => (scanner.scans ? scanner.scan(MAX_PAGES) : scanner.pickFile()));
+      const outcome = await run(() =>
+        scanner.scans
+          ? scanner.scan(MAX_PAGES)
+          : scanner.pickFile({ records: current.current.caps?.features.record_formats === true }),
+      );
       if (outcome.kind !== 'pages' && outcome.kind !== 'file') return outcome.kind;
       const source: CaptureSource =
         outcome.kind === 'pages' ? { kind: 'pages', pages: outcome.pages } : { kind: 'file', file: outcome.file };

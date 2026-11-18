@@ -333,6 +333,19 @@ env:
     timeout: 15000
 - takeScreenshot: shot-light-trash
 - back
+# Activity (0.17.0): who did what, newest first; above the Trash in More.
+- scrollUntilVisible:
+    element:
+      id: more-activity
+    direction: UP
+- tapOn:
+    id: more-activity
+- extendedWaitUntil:
+    visible:
+      id: activity-count
+    timeout: 15000
+- takeScreenshot: shot-light-activity
+- back
 # The tidy-up (0.5.4): Notes with its + beside the bell; Home's four counts.
 - tapOn:
     id: tab-notes

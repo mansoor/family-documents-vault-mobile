@@ -21,7 +21,8 @@ export interface ScannerPort {
   /** Whether this one can scan pages with the camera; otherwise files only. */
   readonly scans: boolean;
   scan(maxPages: number): Promise<ScanOutcome>;
-  pickFile(): Promise<ScanOutcome>;
+  /** `records`: health record files too (H5), where the vault takes them. */
+  pickFile(opts?: { records?: boolean }): Promise<ScanOutcome>;
   pickPhoto(): Promise<ScanOutcome>;
 }
 
@@ -36,7 +37,7 @@ export function fixtureScanner(outcomes: ScanOutcome[], scans = true): ScannerPo
     scans,
     asked,
     scan: (maxPages) => next(`scan:${maxPages}`),
-    pickFile: () => next('file'),
+    pickFile: (opts) => next(opts?.records ? 'file+records' : 'file'),
     pickPhoto: () => next('photo'),
   };
 }

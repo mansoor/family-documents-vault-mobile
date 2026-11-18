@@ -16,6 +16,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useCapture, type StartOutcome } from '../state/capture';
+import { useVault } from '../state/vault';
 import { Button, Notice, Text } from '../ui';
 import { useReduceMotion } from '../ui/feel';
 import { useColours, useStyles, type Palette } from '../ui/theme';
@@ -201,6 +202,7 @@ export function AddMenu(props: {
   const colours = useColours();
   const styles = useStyles(makeStyles);
   const { t } = useTranslation();
+  const { caps } = useVault();
   const still = useReduceMotion();
   const first = useRef<View>(null);
   const [progress] = useState(() => new Animated.Value(0));
@@ -253,7 +255,14 @@ export function AddMenu(props: {
     testID: 'add-camera',
   };
   const choices: Choice[] = [
-    { how: 'file', icon: FileUp, label: t('add.file'), hint: t('add.fileHint'), testID: 'add-file' },
+    {
+      how: 'file',
+      icon: FileUp,
+      label: t('add.file'),
+      // Health record files too, where the vault keeps them as they are (H5).
+      hint: t(caps?.features.record_formats === true ? 'add.fileHintRecords' : 'add.fileHint'),
+      testID: 'add-file',
+    },
     ...(props.camera ? [camera] : []),
     { how: 'photo', icon: ImagePlus, label: t('add.picture'), hint: t('add.pictureHint'), testID: 'add-picture' },
   ];

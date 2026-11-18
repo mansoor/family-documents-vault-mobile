@@ -892,7 +892,7 @@ async function library(t: TestVault, path: string, init: Parameters<FetchLike>[1
     }
     return null;
   }
-  // A reminder somebody sets themselves (0.9.0-dev.27): due when its day has come, else coming up.
+  // A reminder somebody sets themselves (0.9.0-dev.27): due when its day has come, else coming up; a yearly review too.
   if (q === '/api/v1/reminders' && init.method === 'POST') {
     const today = new Date().toISOString().slice(0, 10);
     const fire = String(body.fire_at);
@@ -911,6 +911,8 @@ async function library(t: TestVault, path: string, init: Parameters<FetchLike>[1
       label: fire <= today ? 'Due today' : `In some days · ${fire}`,
       source: null,
       about: null,
+      // A yearly review (H3): every year, in the vault's words.
+      ...(body.review === true ? { review: true, note: 'Yearly review', recurrence: 'annual' } : {}),
     } as ReminderView;
     if (fire <= today) t.reminders.push(made);
     else t.upcoming.push(made);

@@ -2,6 +2,7 @@ import { can, radii } from '@fdv/shared';
 import * as Linking from 'expo-linking';
 import { useRouter } from 'expo-router';
 import {
+  Activity,
   ChevronRight,
   ExternalLink,
   HeartHandshake,
@@ -51,6 +52,8 @@ export default function MoreScreen() {
   const trashOn = !!who && can(who.role, 'document.delete');
   // Sharing (the owner's ask of 11 Nov 2026): the links that still work, for whoever may share.
   const sharingOn = !!who && can(who.role, 'document.share');
+  // Activity (app 0.17.0): who did what, for whoever reads the log (owners, adults, teens), as the web offers it.
+  const activityOn = !!who && can(who.role, 'audit.read');
   const notesOn = caps?.features.notes === true;
   // Caregivers (H1b): whoever may name their own or be one, on a vault that has them.
   const caregiversOn = caregiversOffered(caps, who?.role);
@@ -103,6 +106,15 @@ export default function MoreScreen() {
               label={t('sharing.title')}
               hint={t('more.sharingHint')}
               onPress={() => router.push('/sharing')}
+            />
+          ) : null}
+          {activityOn ? (
+            <Row
+              testID="more-activity"
+              icon={Activity}
+              label={t('activity.title')}
+              hint={t('more.activityHint')}
+              onPress={() => router.push('/activity')}
             />
           ) : null}
           {emergencyOn ? (

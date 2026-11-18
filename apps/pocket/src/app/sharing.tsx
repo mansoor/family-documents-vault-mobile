@@ -1,5 +1,6 @@
 import {
   can,
+  emailedToWords,
   ENDED_SHARING_KEPT_NOTE,
   endedSharingWords,
   radii,
@@ -18,6 +19,7 @@ import { RefreshControl, ScrollView, Share as SystemShare, StyleSheet, View } fr
 import { copyForAMinute, nativeClipboard } from '../identity/clipboard';
 import { ChangeLinkSheet } from '../sharing/change-link';
 import { EmailTheLink } from '../sharing/email-link';
+import { WhoOpened } from '../sharing/opens';
 import { RequestRow, requestResumable, requestWorking, ShownRequest } from '../sharing/requests';
 import { useSensitiveConfirm } from '../sharing/sensitive-confirm';
 import { Sheet } from '../ui/sheet';
@@ -65,6 +67,11 @@ export const ENDED_SHOWN = 20;
  * documents, Working now and No longer working — Show the link, Change (on
  * the web, where requests are made), Turn back on for an owner after a
  * restore, and End this request, asked first.
+ *
+ * Who opened it (app 0.17.0; the vault's 0.9.0-dev.51, H5): under a link
+ * opened at least once, for its maker and the owners, a disclosure closed
+ * at first — each opening's time and browser, never an address. Where the
+ * vault emailed a link is said on its row for whoever sees it (dev.54).
  */
 export default function SharingScreen() {
   const styles = useStyles(makeStyles);
@@ -295,6 +302,8 @@ export default function SharingScreen() {
         end: shareEndWords(new Date(s.expires_at), zone),
       }),
       shareUses(s),
+      // Where the vault emailed it, masked, for whoever sees the link (0.9.0-dev.54).
+      s.emailed_to ? emailedToWords(s.emailed_to, s.emailed_by_name, s.mine) : null,
       s.created_by_name ? t('sharing.by', { who: s.created_by_name }) : null,
     ].filter((x): x is string => !!x);
     return (
@@ -310,6 +319,8 @@ export default function SharingScreen() {
                 {l}
               </Text>
             ))}
+            {/* Who opened it, when (H5): its maker's and an owner's, asked for when opened. */}
+            <WhoOpened link={s} testID={`sharing-opens-${s.id}`} />
           </View>
         </View>
         <View style={styles.actions}>
@@ -376,6 +387,7 @@ export default function SharingScreen() {
     const lines = [
       s.recipient_label ? t('sharing.for', { who: s.recipient_label }) : null,
       s.summary || null,
+      s.emailed_to ? emailedToWords(s.emailed_to, s.emailed_by_name, s.mine) : null,
       s.created_by_name ? t('sharing.by', { who: s.created_by_name }) : null,
     ].filter((x): x is string => !!x);
     return (
@@ -391,6 +403,8 @@ export default function SharingScreen() {
                 {l}
               </Text>
             ))}
+            {/* Who opened it, when (H5): its maker's and an owner's, asked for when opened. */}
+            <WhoOpened link={s} testID={`sharing-opens-${s.id}`} />
           </View>
         </View>
       </View>

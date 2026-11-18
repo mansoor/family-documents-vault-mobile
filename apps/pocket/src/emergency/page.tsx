@@ -23,6 +23,7 @@ import { feel } from '../ui/feel';
 import { sp } from '../ui/space';
 import { LoadFailed, loadFailure, Placeholder } from '../ui/states';
 import { useColours, useStyles, type Palette } from '../ui/theme';
+import { OpensToggle } from '../sharing/opens';
 import { ClinicianSheet } from './clinician';
 import { audienceWords, browserWords, sections, shareable, showsWords } from './rules';
 
@@ -44,8 +45,9 @@ type State =
  * Read only on the phone: Change it on the web opens the person's page in
  * the browser. Whoever chooses who sees it (the person, or an owner for a
  * child) can Share with a clinician: a link to look at the parts ticked,
- * for hours. The person and the owners see each link, when it was opened
- * and from what browser, and Take back each, asked first.
+ * for hours. The person and the owners see each link, and Take back each,
+ * asked first; under "Who opened it" (closed at first, as in Sharing since
+ * app 0.17.0), when it was opened and from what browser.
  *
  * Never kept on the phone: the page lives in this screen's memory while it
  * is shown, and screenshots are refused (as identity details). With no
@@ -69,6 +71,8 @@ export function EmergencyPage(props: { id: string; name?: string }) {
   const [ending, setEnding] = useState<EmergencyLink | null>(null);
   const [endBusy, setEndBusy] = useState(false);
   const [endProblem, setEndProblem] = useState<string | null>(null);
+  // The links whose openings are shown: none at first.
+  const [opened, setOpened] = useState<Set<string>>(new Set());
   const mine = who?.member_id === id;
 
   const load = useCallback(async () => {
@@ -309,18 +313,35 @@ export function EmergencyPage(props: { id: string; name?: string }) {
                         {t('emergency.notOpened')}
                       </Text>
                     ) : (
-                      l.openings.map((o, i) => (
-                        <Text key={`${o.at}-${i}`} variant="small" tone="soft" testID={`emergency-link-${l.id}-opened-${i}`}>
-                          {o.network
-                            ? t('emergency.openedOn', {
-                                when: exactWords(o.at, zone),
-                                browser: browserWords(o.user_agent, t),
-                                network: o.network,
-                              })
-                            : t('emergency.opened', { when: exactWords(o.at, zone), browser: browserWords(o.user_agent, t) })}
-                        </Text>
-                      ))
+                      // Who opened it (0.17.0): behind the same disclosure as a link's in Sharing, closed at first.
+                      <OpensToggle
+                        count={l.openings.length}
+                        open={opened.has(l.id)}
+                        who={l.recipient_label}
+                        onToggle={() =>
+                          setOpened((now) => {
+                            const next = new Set(now);
+                            if (next.has(l.id)) next.delete(l.id);
+                            else next.add(l.id);
+                            return next;
+                          })
+                        }
+                        testID={`emergency-link-${l.id}-opens`}
+                      />
                     )}
+                    {opened.has(l.id)
+                      ? l.openings.map((o, i) => (
+                          <Text key={`${o.at}-${i}`} variant="small" tone="soft" testID={`emergency-link-${l.id}-opened-${i}`}>
+                            {o.network
+                              ? t('emergency.openedOn', {
+                                  when: exactWords(o.at, zone),
+                                  browser: browserWords(o.user_agent, t),
+                                  network: o.network,
+                                })
+                              : t('emergency.opened', { when: exactWords(o.at, zone), browser: browserWords(o.user_agent, t) })}
+                          </Text>
+                        ))
+                      : null}
                     {takable ? (
                       <View style={styles.linkActions}>
                         <Button

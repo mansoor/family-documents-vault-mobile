@@ -7,6 +7,7 @@ import {
   SENSITIVE_LABEL,
   SENSITIVE_SHARE_CONFIRM,
   sensitiveCollectionShareConfirm,
+  sensitiveLinkStartWords,
   SHARE_MAX_DAYS,
   shareEndWords,
   SHOW_TITLE_COLLECTION_HINT,
@@ -92,6 +93,8 @@ export function ShareSheet(props: { target: ShareTarget; onClose: () => void }) 
   // A code by text can be offered (SMS4): the vault texts links' codes and its texts are set up.
   const [texts, setTexts] = useState(false);
   const set = (change: Partial<ShareOptions>) => setOpts((o) => ({ ...o, ...change }));
+  // View or download chosen by the sharer: a sensitive link's careful start (H5) gives way to it.
+  const [permissionChosen, setPermissionChosen] = useState(false);
   // What Sensitive protects (H1a), where the vault has it.
   const protects = caps?.features.sensitive_protects === true;
   const sensitive = target.kind === 'document' && target.sensitive === true;
@@ -144,17 +147,29 @@ export function ShareSheet(props: { target: ShareTarget; onClose: () => void }) 
   }, [load]);
 
   const maxDays = Math.min(caps?.limits?.share_max_days ?? SHARE_MAX_DAYS, follow ? FOLLOW_MAX_DAYS : Infinity);
-  const read = readShareOptions(opts, {
+  const sensitiveTicked = (items ?? []).filter((i) => i.sensitive === true && ticked.has(i.document_id)).length;
+  // A sensitive link starts careful (the vault's 0.9.0-dev.51, H5), as the web's: View only, for a week (the
+  // end every link starts with), until the sharer chooses View or download; one the vault can't draw, download.
+  const careful =
+    caps?.features.share_opens === true &&
+    (target.kind === 'document' ? sensitive && !target.note : sensitiveTicked > 0);
+  const started: ShareOptions = careful && !permissionChosen ? { ...opts, permission: 'view' } : opts;
+  // As the web reads it: for a collection, whether every one ticked can be shown — a link to view gives
+  // nothing it can't draw (`422 view_not_possible`), so one Word file ticked makes it download.
+  const tickedViewable =
+    target.kind === 'document'
+      ? viewable
+      : (items ?? []).filter((i) => ticked.has(i.document_id)).every((i) => i.viewable);
+  const read = readShareOptions(started, {
     timezone: zone,
     maxDays,
-    viewable,
+    viewable: tickedViewable,
     note: target.kind === 'document' && target.note,
     options: caps?.features.share_options === true,
     passwords: caps?.features.share_second_factor === true,
     texts,
   });
   const nothingTicked = target.kind === 'collection' && ticked.size === 0 && !follow;
-  const sensitiveTicked = (items ?? []).filter((i) => i.sensitive === true && ticked.has(i.document_id)).length;
   // A collection's choice is offered with a sensitive one ticked, or a link that keeps up with it, as the web's.
   const titleChoice = protects && (target.kind === 'document' || sensitiveTicked > 0 || follow);
 
@@ -389,7 +404,7 @@ export function ShareSheet(props: { target: ShareTarget; onClose: () => void }) 
                   ) : null}
                 </View>
 
-                {caps?.features.share_options === true && !(target.kind === 'document' && target.note) && viewable ? (
+                {caps?.features.share_options === true && !(target.kind === 'document' && target.note) && tickedViewable ? (
                   <View style={styles.section}>
                     <Text variant="secondary" weight="600" tone="soft">
                       {t('share.theyCan')}
@@ -399,13 +414,22 @@ export function ShareSheet(props: { target: ShareTarget; onClose: () => void }) 
                         <Chip
                           key={p}
                           label={t(`share.permission_${p}`)}
-                          selected={opts.permission === p}
-                          onPress={() => set({ permission: p })}
+                          selected={started.permission === p}
+                          onPress={() => {
+                            set({ permission: p });
+                            setPermissionChosen(true);
+                          }}
                           testID={`share-permission-${p}`}
                         />
                       ))}
                     </ChipRow>
                   </View>
+                ) : null}
+                {/* Why it starts as it does (H5). */}
+                {careful ? (
+                  <Text variant="small" tone="soft" testID="share-careful">
+                    {sensitiveLinkStartWords({ viewable: tickedViewable, collection: target.kind === 'collection' })}
+                  </Text>
                 ) : null}
 
                 {caps?.features.share_options === true ? (
