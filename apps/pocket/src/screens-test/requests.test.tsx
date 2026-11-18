@@ -7,7 +7,7 @@ import { EndedSharingCard } from '../settings/ended-sharing';
 import { audit } from '../test-support/a11y';
 import { unlocked } from '../test-support/lookup';
 import { installed } from '../test-support/render';
-import { resetRoutes } from '../test-support/router';
+import { resetRoutes, routes } from '../test-support/router';
 import { caps0519, capabilities, testVault, type TestVault } from '../test-support/vault';
 
 jest.mock(
@@ -159,15 +159,17 @@ describe('Asking for documents, in Sharing (RQ)', () => {
     expect(screen.getByTestId('requests-none')).toHaveTextContent('No request works now.');
   });
 
-  it('Change opens the request’s form on the web; Ask for documents too', async () => {
+  it('Change and Ask for documents open the phone’s own form (0.18.0), never the web', async () => {
     const t = vault();
     t.vault.state.uploadRequests.push(request({ id: 'r1' }));
     const opened = jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
     await unlocked(t, <SharingScreen />);
     await fireEvent.press(await screen.findByTestId('request-change-r1'));
-    expect(opened).toHaveBeenLastCalledWith(`${ORIGIN}/sharing/ask/r1`);
-    await fireEvent.press(screen.getByTestId('requests-ask-web'));
-    expect(opened).toHaveBeenLastCalledWith(`${ORIGIN}/sharing/ask`);
+    expect(routes().at(-1)).toEqual({ pathname: '/ask/[id]', params: { id: 'r1' } });
+    await fireEvent.press(await screen.findByTestId('ask-cancel'));
+    await fireEvent.press(await screen.findByTestId('requests-ask'));
+    expect(routes().at(-1)).toEqual({ pathname: '/ask', params: {} });
+    expect(opened).not.toHaveBeenCalled();
     opened.mockRestore();
   });
 

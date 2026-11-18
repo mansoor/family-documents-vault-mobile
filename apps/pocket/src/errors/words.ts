@@ -89,6 +89,10 @@ export const CATALOGUE: Readonly<Record<string, string>> = {
   // More than one ZIP holds: the phone's own words (the vault's point to an Export screen it hasn't got).
   zip_too_large: 'download.tooLargePlain',
   download_ticket_gone: 'download.ticketGone',
+  // Asking for documents on the phone (0.18.0): an emailed code where the vault
+  // has no mail server, said under the address; a request ended meanwhile.
+  email_code_unavailable: 'ask.codeUnavailableWords',
+  request_ended: 'ask.requestEnded',
 };
 
 /** The vault's "not now" answers: a scan waiting on one of these is sent again later by itself. */
@@ -125,6 +129,8 @@ const VAULT_SAYS: ReadonlySet<string> = new Set([
   'share_paused',
   'share_ended',
   'share_not_revealable',
+  'email_code_unavailable',
+  'request_ended',
 ]);
 
 /** The words for a failure, as the person should read them. */

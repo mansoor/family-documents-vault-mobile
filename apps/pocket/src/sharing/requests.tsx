@@ -9,6 +9,7 @@ import { Button, Text } from '../ui';
 import { Sheet } from '../ui/sheet';
 import { sp } from '../ui/space';
 import { useColours, useStyles, type Palette } from '../ui/theme';
+import { emit } from '../state/events';
 import { EmailTheLink } from './email-link';
 
 /**
@@ -18,6 +19,24 @@ import { EmailTheLink } from './email-link';
  * else's, what came in, and where it stands — in words, never colour alone.
  * Working now, then No longer working.
  */
+
+/**
+ * What Sharing says when it is in front again, after a request is changed on
+ * its own screen (0.18.0): handed over with the event, and kept until
+ * Sharing takes it — so it is said whether Sharing stayed open underneath
+ * or is drawn afresh.
+ */
+let toSay: string | null = null;
+export function sayInSharing(words: string): void {
+  toSay = words;
+  emit('requestsChanged', words);
+}
+export const waitingSaid = (): string | null => toSay;
+export function takeSaid(): string | null {
+  const words = toSay;
+  toSay = null;
+  return words;
+}
 
 /** A request that can still be used, or is only paused: ending it still means something. */
 export const requestWorking = (r: UploadRequestView) =>

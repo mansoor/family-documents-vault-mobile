@@ -22,8 +22,12 @@ interface Events {
   managersChanged: [id: string];
   /** A link made or ended on the phone: Sharing looks again. */
   sharesChanged: [];
-  /** A request to send documents emailed, ended or turned back on (0.16.0): Sharing looks again. */
-  requestsChanged: [];
+  /**
+   * A request to send documents made, changed, emailed, ended or turned back
+   * on (0.16.0; made and changed on the phone since 0.18.0): Sharing looks
+   * again, and says what was done when it is given words.
+   */
+  requestsChanged: [said?: string];
   /** The person's mobile number added, confirmed or removed (SMS4): what hangs on it looks again. */
   phoneChanged: [];
 }

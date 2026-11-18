@@ -181,8 +181,26 @@ Written by `node apps/pocket/scripts/failure-states.mjs`; CI fails if it is out 
 |  |  | `download.tooLargePlain` | That is more than one download holds. Choose fewer, or download everything from Export on the web. |
 |  |  | `download.ticketGone` | The download ran out before it could start. Try Download again. |
 | Sharing | More → Sharing | `sharing.needsConnection` | Sharing needs a connection to the vault. |
-| Changing a link | More → Sharing → Change | `changeLink.latest` | It can last until {{end}} at the latest: as long as a link may from when it was made. |
+| Changing a link | More → Sharing → Change, a document’s links, a clinician’s link | `changeLink.latest` | It can last until {{end}} at the latest: as long as a link may from when it was made. |
 |  |  | `changeLink.passwordShort` | At least 8 characters. Something they can type, and you can say to them. |
+| Asking for documents | More → Sharing → Ask for documents, a request’s Change | `ask.needsConnection` | Asking for documents needs a connection to the vault. |
+|  |  | `ask.notAllowed` | Only an owner or an adult can ask someone to send documents. |
+|  |  | `ask.titleProblem` | Say what you are asking for. |
+|  |  | `ask.putRight` | Something above needs putting right first. |
+|  |  | `ask.emailProblem` | Their email address, which the code will go to: name@example.com. |
+|  |  | `ask.codeUnavailableWords` | This vault cannot email codes: whoever runs it has not given it a mail server. |
+|  |  | `ask.passwordProblem` | At least {{min}} characters. Something they can type, and you can say to them. |
+|  |  | `ask.passwordLong` | At most {{max}} characters. |
+|  |  | `ask.visitsProblem` | A number from 1 to {{max}}. |
+|  |  | `ask.filesProblem` | A number from 1 to {{max}}. |
+|  |  | `ask.sizeProblem` | A number of MB from 1 to {{max}}. |
+|  |  | `ask.latest` | It can last until {{end}} at the latest: as long as a request may from when it was made. |
+|  |  | `ask.changedMeanwhile` | This request was changed somewhere else while it was open here, so the form starts again from it as it is now. |
+|  |  | `ask.cannotChange` | That request can’t be changed: it has ended, or somebody else asked for it. Make a new one if you need to. |
+|  |  | `ask.cannotChangeOwner` | That request has ended, so it can’t be changed. Make a new one if you need to. |
+|  |  | `ask.requestEnded` | That request no longer works, so it can’t be changed. Make a new one if you need to. |
+|  |  | `ask.insecure` | This link starts with http://, not https://, so whoever you send it to will not be able to send anything: their browser will not open it over a connection that is not secure. Ask whoever looks after the vault to give it an https:// address first. |
+| The papers from a folder | Documents, opened from a document’s folder | `filters.folderNotSearched` | The search looks through every document, not only those from ‘{{folder}}’. |
 | Who opened a link | More → Sharing, a clinician’s link, a sensitive document | `opens.notYet` | Not opened yet. |
 | Activity | More → Activity, a document’s Activity | `activity.needsConnection` | Activity needs a connection to the vault. |
 |  |  | `activity.nothingYet` | Nothing yet. |

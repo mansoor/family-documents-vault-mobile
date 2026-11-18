@@ -11,7 +11,7 @@ import {
   type Share,
   type UploadRequestView,
 } from '@fdv/shared';
-import * as Linking from 'expo-linking';
+import { useRouter } from 'expo-router';
 import { FileText, FolderOpen, Link2Off } from 'lucide-react-native';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -20,7 +20,7 @@ import { copyForAMinute, nativeClipboard } from '../identity/clipboard';
 import { ChangeLinkSheet } from '../sharing/change-link';
 import { EmailTheLink } from '../sharing/email-link';
 import { WhoOpened } from '../sharing/opens';
-import { RequestRow, requestResumable, requestWorking, ShownRequest } from '../sharing/requests';
+import { RequestRow, requestResumable, requestWorking, ShownRequest, takeSaid, waitingSaid } from '../sharing/requests';
 import { useSensitiveConfirm } from '../sharing/sensitive-confirm';
 import { Sheet } from '../ui/sheet';
 import { wordsFor } from '../errors/words';
@@ -64,9 +64,10 @@ export const ENDED_SHOWN = 20;
  * As the web's Sharing since 0.9.0-dev.53 (RQ): the links that no longer
  * work under them, 20 and then Show N more, saying how long the household
  * keeps them; and, for whoever may ask for documents, the requests to send
- * documents, Working now and No longer working — Show the link, Change (on
- * the web, where requests are made), Turn back on for an owner after a
- * restore, and End this request, asked first.
+ * documents, Working now and No longer working — Show the link, Change,
+ * Turn back on for an owner after a restore, and End this request, asked
+ * first. Ask for documents makes a new one, and Change changes one, on the
+ * phone's own form (app 0.18.0; sharing/ask.tsx).
  *
  * Who opened it (app 0.17.0; the vault's 0.9.0-dev.51, H5): under a link
  * opened at least once, for its maker and the owners, a disclosure closed
@@ -79,6 +80,7 @@ export default function SharingScreen() {
   const { t } = useTranslation();
   const zone = useFamilyZone();
   const { withToken, offline, caps, vault, who } = useVault();
+  const router = useRouter();
   // Only an owner turns back on what a restore paused (`restore.review`), on a
   // vault that asks first about a sensitive document's link (H1a): an older
   // one, which never asks, is left to the web's After a restore, as before.
@@ -102,7 +104,9 @@ export default function SharingScreen() {
   const [ending, setEnding] = useState<Share | null>(null);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
-  const [said, setSaid] = useState<string | null>(null);
+  // A request changed on its own screen is said here once (0.18.0).
+  const [said, setSaid] = useState<string | null>(waitingSaid);
+  useEffect(() => void takeSaid(), []);
   // Change (LK): the link whose form is open.
   const changeOn = caps?.features.link_changes === true;
   const [changing, setChanging] = useState<Share | null>(null);
@@ -162,7 +166,19 @@ export default function SharingScreen() {
   }, [load, loadRequests, loadKept, offline]);
   // A link made meanwhile, from a document's or a collection's Share; a request emailed from its sheet.
   useEffect(() => on('sharesChanged', () => void load()), [load]);
-  useEffect(() => on('requestsChanged', () => void loadRequests()), [loadRequests]);
+  // Made or changed on the phone's form: said here once Sharing is in front again.
+  useEffect(
+    () =>
+      on('requestsChanged', (words) => {
+        if (words) {
+          takeSaid();
+          setProblem(null);
+          setSaid(words);
+        }
+        void loadRequests();
+      }),
+    [loadRequests],
+  );
 
   const what = (s: Share) =>
     s.collection_id ? (s.collection_name ?? t('sharing.aCollection')) : (s.document_title ?? t('document.untitled'));
@@ -492,14 +508,15 @@ export default function SharingScreen() {
             <Text variant="secondary" tone="soft">
               {t('requests.words')}
             </Text>
-            {vault ? (
-              <Button
-                kind="quiet"
-                label={t('requests.askOnWeb')}
-                onPress={() => void Linking.openURL(`${vault.origin}/sharing/ask`)}
-                testID="requests-ask-web"
-              />
-            ) : null}
+            <Button
+              label={t('requests.ask')}
+              disabled={offline}
+              onPress={() => {
+                setSaid(null);
+                router.push('/ask');
+              }}
+              testID="requests-ask"
+            />
             {requestsFailed ? <LoadFailed words={requestsFailed} onRetry={() => void loadRequests()} /> : null}
             {!requests && !requestsFailed && !offline ? <Placeholder rows={2} /> : null}
             {requests ? (
@@ -523,10 +540,12 @@ export default function SharingScreen() {
                       showing: requestBusy === `show:${r.id}`,
                       resuming: requestBusy === `resume:${r.id}`,
                       ...(changeOn && r.revealable === true ? { onShow: () => void showRequest(r) } : {}),
-                      ...(changeOn && r.changeable === true && vault
+                      ...(changeOn && r.changeable === true
                         ? {
-                            onChange: () =>
-                              void Linking.openURL(`${vault.origin}/sharing/ask/${encodeURIComponent(r.id)}`),
+                            onChange: () => {
+                              setSaid(null);
+                              router.push({ pathname: '/ask/[id]', params: { id: r.id } });
+                            },
                           }
                         : {}),
                       ...(requestResumable(r, owner) ? { onResume: () => void resumeRequest(r) } : {}),

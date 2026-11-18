@@ -23,6 +23,7 @@ import { feel } from '../ui/feel';
 import { sp } from '../ui/space';
 import { LoadFailed, loadFailure, Placeholder } from '../ui/states';
 import { useColours, useStyles, type Palette } from '../ui/theme';
+import { ChangeLinkSheet } from '../sharing/change-link';
 import { OpensToggle } from '../sharing/opens';
 import { ClinicianSheet } from './clinician';
 import { audienceWords, browserWords, sections, shareable, showsWords } from './rules';
@@ -47,7 +48,10 @@ type State =
  * child) can Share with a clinician: a link to look at the parts ticked,
  * for hours. The person and the owners see each link, and Take back each,
  * asked first; under "Who opened it" (closed at first, as in Sharing since
- * app 0.17.0), when it was opened and from what browser.
+ * app 0.17.0), when it was opened and from what browser. A link that works
+ * is changed here too (app 0.18.0; the vault's LK), as the web changes it:
+ * whom it is for, when it stops, how often it opens, its PIN or password —
+ * and it stays to view, always.
  *
  * Never kept on the phone: the page lives in this screen's memory while it
  * is shown, and screenshots are refused (as identity details). With no
@@ -61,7 +65,7 @@ export function EmergencyPage(props: { id: string; name?: string }) {
   const { t } = useTranslation();
   const router = useRouter();
   const zone = useFamilyZone();
-  const { withToken, offline, who, vault } = useVault();
+  const { withToken, offline, who, vault, caps } = useVault();
   const { id } = props;
   const [state, setState] = useState<State>({ kind: 'loading' });
   const [name, setName] = useState(props.name ?? '');
@@ -69,6 +73,9 @@ export function EmergencyPage(props: { id: string; name?: string }) {
   const [sharing, setSharing] = useState(false);
   const [said, setSaid] = useState<string | null>(null);
   const [ending, setEnding] = useState<EmergencyLink | null>(null);
+  // Change (LK): the link whose form is open.
+  const [changing, setChanging] = useState<EmergencyLink | null>(null);
+  const changeOn = caps?.features.link_changes === true;
   const [endBusy, setEndBusy] = useState(false);
   const [endProblem, setEndProblem] = useState<string | null>(null);
   // The links whose openings are shown: none at first.
@@ -302,6 +309,8 @@ export function EmergencyPage(props: { id: string; name?: string }) {
                             : t('emergency.linkEnded');
                 // Taken back unless it is already, or its end has passed: the vault takes back any link not taken back.
                 const takable = l.state !== 'revoked' && l.state !== 'expired';
+                // Changed while it works, where the vault says the person may (as the web).
+                const changeable = changeOn && l.state === 'active' && l.changeable === true;
                 return (
                   <View key={l.id} style={[styles.card, styles.link]} testID={`emergency-link-${l.id}`}>
                     <Text weight="600">{label}</Text>
@@ -344,6 +353,22 @@ export function EmergencyPage(props: { id: string; name?: string }) {
                       : null}
                     {takable ? (
                       <View style={styles.linkActions}>
+                        {changeable ? (
+                          <Button
+                            size="small"
+                            kind="quiet"
+                            label={t('emergency.change')}
+                            accessibilityLabel={
+                              l.recipient_label ? t('emergency.changeFor', { who: l.recipient_label }) : t('emergency.changeThis')
+                            }
+                            disabled={offline}
+                            onPress={() => {
+                              setSaid(null);
+                              setChanging(l);
+                            }}
+                            testID={`emergency-change-${l.id}`}
+                          />
+                        ) : null}
                         <Button
                           size="small"
                           kind="quiet"
@@ -366,6 +391,22 @@ export function EmergencyPage(props: { id: string; name?: string }) {
             </View>
           ) : null}
 
+          {changing ? (
+            <ChangeLinkSheet
+              link={changing}
+              what={mine ? t('emergency.linkWhatMine') : t('emergency.linkWhat', { name })}
+              onClose={() => {
+                setChanging(null);
+                // Read again, so Change opened again starts from the link as the vault has it now.
+                void load();
+              }}
+              onDone={(words) => {
+                setChanging(null);
+                setSaid(words);
+                void load();
+              }}
+            />
+          ) : null}
           {sharing ? (
             <ClinicianSheet
               view={view}
@@ -417,6 +458,6 @@ const makeStyles = (colours: Palette) =>
     actions: { gap: sp(8) },
     section: { gap: sp(8) },
     link: { padding: sp(12), gap: 2 },
-    linkActions: { flexDirection: 'row', justifyContent: 'flex-end', marginTop: sp(4) },
+    linkActions: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', gap: sp(8), marginTop: sp(4) },
     pressed: { opacity: 0.8 },
   });

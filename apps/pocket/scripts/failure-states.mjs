@@ -76,7 +76,19 @@ const AREAS = [
     'needsConnection failed noFile nothingChosen nothingInCollection tooLarge tooLargePlain ticketGone',
   ],
   ['Sharing', 'More → Sharing', 'sharing', 'needsConnection'],
-  ['Changing a link', 'More → Sharing → Change', 'changeLink', 'latest passwordShort'],
+  [
+    'Changing a link',
+    'More → Sharing → Change, a document’s links, a clinician’s link',
+    'changeLink',
+    'latest passwordShort',
+  ],
+  [
+    'Asking for documents',
+    'More → Sharing → Ask for documents, a request’s Change',
+    'ask',
+    'needsConnection notAllowed titleProblem putRight emailProblem codeUnavailableWords passwordProblem passwordLong visitsProblem filesProblem sizeProblem latest changedMeanwhile cannotChange cannotChangeOwner requestEnded insecure',
+  ],
+  ['The papers from a folder', 'Documents, opened from a document’s folder', 'filters', 'folderNotSearched'],
   ['Who opened a link', 'More → Sharing, a clinician’s link, a sensitive document', 'opens', 'notYet'],
   [
     'Activity',
