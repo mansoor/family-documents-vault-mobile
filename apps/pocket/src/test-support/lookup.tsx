@@ -15,6 +15,7 @@ import { CaregiversScreen } from '../caregivers/screen';
 import { ChecklistScreen } from '../collections/checklist-screen';
 import { ManagersScreen } from '../collections/managers';
 import { DocumentDetail } from '../documents/detail';
+import { EmergencyEditor } from '../emergency/editor';
 import type { Tier } from '../essentials/open';
 import { EssentialPages } from '../essentials/pages';
 import { MemoryEssentialsStore } from '../essentials/store';
@@ -89,6 +90,8 @@ export function LookupApp(props: { start: ReactElement }) {
       <AskForDocuments {...(top.params.person ? { person: top.params.person } : {})} />
     ) : top?.pathname === '/ask/[id]' ? (
       <ChangeRequest key={id} id={id} />
+    ) : top?.pathname === '/emergency/edit/[id]' ? (
+      <EmergencyEditor key={id} id={id} {...(top.params.name ? { name: top.params.name } : {})} />
     ) : (
       props.start
     );

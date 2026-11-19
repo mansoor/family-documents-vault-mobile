@@ -7,13 +7,13 @@ import {
   type EmergencyLink,
   type EmergencyView,
 } from '@fdv/shared';
-import * as Linking from 'expo-linking';
 import { useRouter } from 'expo-router';
 import { HeartPulse, Link2Off } from 'lucide-react-native';
 import { Fragment, useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { wordsFor } from '../errors/words';
+import { on } from '../state/events';
 import { endWords, exactWords, useFamilyZone } from '../state/family-time';
 import { useScreenGuard } from '../state/lock';
 import { useVault } from '../state/vault';
@@ -25,8 +25,11 @@ import { LoadFailed, loadFailure, Placeholder } from '../ui/states';
 import { useColours, useStyles, type Palette } from '../ui/theme';
 import { ChangeLinkSheet } from '../sharing/change-link';
 import { OpensToggle } from '../sharing/opens';
+import { AudienceSheet } from './audience';
 import { ClinicianSheet } from './clinician';
 import { audienceWords, browserWords, sections, shareable, showsWords } from './rules';
+import { takeSaid, waitingSaid } from './said';
+import { WalletSheet } from './wallet';
 
 type State =
   | { kind: 'loading' }
@@ -43,11 +46,14 @@ type State =
  * advance directive, healthcare proxy and insurance card as documents that
  * open, who can see it, and that it is not medical advice.
  *
- * Read only on the phone: Change it on the web opens the person's page in
- * the browser. Whoever chooses who sees it (the person, or an owner for a
- * child) can Share with a clinician: a link to look at the parts ticked,
- * for hours. The person and the owners see each link, and Take back each,
- * asked first; under "Who opened it" (closed at first, as in Sharing since
+ * Changed on the phone since app 0.19.0, as on the web: Edit (or Add
+ * emergency information) for the person and the owners (the vault's
+ * `can_edit`) opens the editor; Who can see it for whoever chooses (the
+ * person, or an owner for a child: `can_choose`); and Print a wallet card,
+ * for anybody who sees what is on it. Changing it needs a connection, and
+ * says so. Whoever chooses who sees it can Share with a clinician: a link
+ * to look at the parts ticked, for hours. The person and the owners see
+ * each link, and Take back each, asked first; under "Who opened it" (closed at first, as in Sharing since
  * app 0.17.0), when it was opened and from what browser. A link that works
  * is changed here too (app 0.18.0; the vault's LK), as the web changes it:
  * whom it is for, when it stops, how often it opens, its PIN or password —
@@ -65,13 +71,17 @@ export function EmergencyPage(props: { id: string; name?: string }) {
   const { t } = useTranslation();
   const router = useRouter();
   const zone = useFamilyZone();
-  const { withToken, offline, who, vault, caps } = useVault();
+  const { withToken, offline, who, caps } = useVault();
   const { id } = props;
   const [state, setState] = useState<State>({ kind: 'loading' });
   const [name, setName] = useState(props.name ?? '');
   const [refreshing, setRefreshing] = useState(false);
   const [sharing, setSharing] = useState(false);
-  const [said, setSaid] = useState<string | null>(null);
+  // Who can see it, and the wallet card (0.19.0): their sheets.
+  const [choosing, setChoosing] = useState(false);
+  const [carding, setCarding] = useState(false);
+  // Words waiting from the editor (0.19.0) are said at once; taken below.
+  const [said, setSaid] = useState<string | null>(() => waitingSaid(props.id));
   const [ending, setEnding] = useState<EmergencyLink | null>(null);
   // Change (LK): the link whose form is open.
   const [changing, setChanging] = useState<EmergencyLink | null>(null);
@@ -118,6 +128,21 @@ export function EmergencyPage(props: { id: string; name?: string }) {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void load();
   }, [load, offline]);
+
+  // Saved in the editor (0.19.0): read again, and said here.
+  useEffect(
+    () =>
+      on('emergencyChanged', (member, words) => {
+        if (member !== id) return;
+        setSaid(takeSaid(id) ?? words);
+        void load();
+      }),
+    [id, load],
+  );
+  // Drawn afresh after a save: what was waiting is taken, so it is said once.
+  useEffect(() => {
+    takeSaid(id);
+  }, [id]);
 
   const takeBack = async () => {
     const l = ending;
@@ -258,6 +283,41 @@ export function EmergencyPage(props: { id: string; name?: string }) {
           </Text>
 
           <View style={styles.actions}>
+            {view.can_edit ? (
+              <Button
+                kind={typed.length > 0 ? 'quiet' : 'primary'}
+                label={typed.length > 0 ? t('emergency.edit') : t('emergency.add')}
+                disabled={offline}
+                onPress={() => {
+                  setSaid(null);
+                  router.push({ pathname: '/emergency/edit/[id]', params: { id, ...(name ? { name } : {}) } });
+                }}
+                testID="emergency-edit-open"
+              />
+            ) : null}
+            {view.can_choose ? (
+              <Button
+                kind="quiet"
+                label={t('emergency.whoButton')}
+                disabled={offline}
+                onPress={() => {
+                  setSaid(null);
+                  setChoosing(true);
+                }}
+                testID="emergency-who-open"
+              />
+            ) : null}
+            {typed.length > 0 ? (
+              <Button
+                kind="quiet"
+                label={t('walletCard.title')}
+                onPress={() => {
+                  setSaid(null);
+                  setCarding(true);
+                }}
+                testID="emergency-wallet"
+              />
+            ) : null}
             {view.can_choose && typed.length > 0 && shareable(view).length > 0 ? (
               <Button
                 label={t('emergency.share')}
@@ -269,14 +329,10 @@ export function EmergencyPage(props: { id: string; name?: string }) {
                 testID="emergency-share"
               />
             ) : null}
-            {(view.can_edit || view.can_choose) && vault ? (
-              <Button
-                kind="quiet"
-                label={t('emergency.onTheWeb')}
-                hint={t('emergency.onTheWebHint')}
-                onPress={() => void Linking.openURL(`${vault.origin}/people/${encodeURIComponent(id)}`)}
-                testID="emergency-web"
-              />
+            {offline && (view.can_edit || view.can_choose) ? (
+              <Text variant="small" tone="soft" testID="emergency-change-offline">
+                {t('emergency.changeNeedsConnection')}
+              </Text>
             ) : null}
           </View>
 
@@ -407,6 +463,20 @@ export function EmergencyPage(props: { id: string; name?: string }) {
               }}
             />
           ) : null}
+          {choosing ? (
+            <AudienceSheet
+              view={view}
+              name={name}
+              mine={mine}
+              onClose={() => setChoosing(false)}
+              onSaved={() => {
+                setChoosing(false);
+                setSaid(t('emergencyWho.saved'));
+                void load();
+              }}
+            />
+          ) : null}
+          {carding ? <WalletSheet view={view} name={name} onClose={() => setCarding(false)} /> : null}
           {sharing ? (
             <ClinicianSheet
               view={view}

@@ -366,6 +366,37 @@ env:
     timeout: 15000
 - takeScreenshot: shot-light-activity
 - back
+# Emergency information (0.19.0): changed on the phone. One's own page (first in
+# the list), its Edit opened and left as it was. No screenshot: the page blocks them.
+- scrollUntilVisible:
+    element:
+      id: more-emergency
+- tapOn:
+    id: more-emergency
+- extendedWaitUntil:
+    visible:
+      id: emergency-person-.*
+    timeout: 15000
+- tapOn:
+    id: emergency-person-.*
+- extendedWaitUntil:
+    visible:
+      id: emergency-edit-open
+    timeout: 15000
+- tapOn:
+    id: emergency-edit-open
+- extendedWaitUntil:
+    visible:
+      id: emergency-edit-save
+    timeout: 15000
+- tapOn:
+    id: emergency-edit-cancel
+- extendedWaitUntil:
+    visible:
+      id: emergency-edit-open
+    timeout: 15000
+- back
+- back
 # The tidy-up (0.5.4): Notes with its + beside the bell; Home's four counts.
 - tapOn:
     id: tab-notes

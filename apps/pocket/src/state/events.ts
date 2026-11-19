@@ -30,6 +30,8 @@ interface Events {
   requestsChanged: [said?: string];
   /** The person's mobile number added, confirmed or removed (SMS4): what hangs on it looks again. */
   phoneChanged: [];
+  /** A person's emergency information saved on the phone (0.19.0): their page looks again, and says so. */
+  emergencyChanged: [memberId: string, said: string];
 }
 
 type Listener<K extends keyof Events> = (...args: Events[K]) => void;
@@ -47,6 +49,7 @@ const listeners: { [K in keyof Events]: Set<Listener<K>> } = {
   managersChanged: new Set(),
   sharesChanged: new Set(),
   requestsChanged: new Set(),
+  emergencyChanged: new Set(),
 };
 
 export function on<K extends keyof Events>(event: K, fn: Listener<K>): () => void {

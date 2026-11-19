@@ -128,6 +128,9 @@ describe('Asking for documents, in Sharing (RQ)', () => {
     await fireEvent.press(await screen.findByTestId('request-show-r1'));
     expect(await screen.findByTestId('request-shown-link')).toHaveTextContent(/drop#drop-tok$/);
     expect(screen.getByTestId('request-shown-password')).toHaveTextContent('plum-heron-27');
+    // Not selectable (0.19.0): only Copy puts it on the clipboard, and clears it in a minute.
+    expect(screen.getByTestId('request-shown-link').props.selectable).toBeFalsy();
+    expect(screen.getByTestId('request-shown-password').props.selectable).toBeFalsy();
     expect(screen.getByTestId('request-shown-send')).toBeTruthy();
     // Email the link, the vault's way for a request.
     await fireEvent.press(screen.getByTestId('request-shown-email-open'));

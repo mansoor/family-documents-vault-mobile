@@ -111,6 +111,8 @@ function Gates() {
         {/* Emergency information (H4): the family's pages, and one person's, with ← to the list or the person. */}
         <Stack.Screen name="emergency/index" options={{ title: t('emergency.title') }} />
         <Stack.Screen name="emergency/[id]" options={{ title: '', headerBackVisible: true }} />
+        {/* Editing it (0.19.0): Cancel and Save at its foot, as Edit details. */}
+        <Stack.Screen name="emergency/edit/[id]" options={{ title: '', headerShown: false }} />
         <Stack.Screen name="collection/[id]" options={{ title: '', headerBackVisible: true }} />
         <Stack.Screen name="checklist/[id]" options={{ title: '', headerShown: false }} />
         <Stack.Screen name="managers/[id]" options={{ title: '', headerBackVisible: true }} />

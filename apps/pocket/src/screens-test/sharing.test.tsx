@@ -102,6 +102,9 @@ describe('Share, from a document’s ⋯', () => {
     await fireEvent.press(screen.getByTestId('share-reveal'));
     expect(await screen.findByTestId('share-link')).toHaveTextContent('https://share.vault.test/s#tok-1');
     expect(screen.getByTestId('share-secret')).toHaveTextContent('4821');
+    // Not selectable (0.19.0): only Copy puts it on the clipboard, and clears it in a minute.
+    expect(screen.getByTestId('share-link').props.selectable).toBeFalsy();
+    expect(screen.getByTestId('share-secret').props.selectable).toBeFalsy();
     expect(screen.getByTestId('share-send')).toBeTruthy();
     expect(t.library.shareBodies).toEqual([
       {
@@ -252,6 +255,9 @@ describe('Show the link, in Sharing (0.9.0-dev.30)', () => {
     await fireEvent.press(screen.getByTestId('step-up-go'));
     expect(await screen.findByTestId('sharing-shown-link')).toHaveTextContent('https://share.vault.test/s#tok-1');
     expect(screen.getByTestId('sharing-shown-secret')).toHaveTextContent('4821');
+    // Not selectable (0.19.0): only Copy puts it on the clipboard, and clears it in a minute.
+    expect(screen.getByTestId('sharing-shown-link').props.selectable).toBeFalsy();
+    expect(screen.getByTestId('sharing-shown-secret').props.selectable).toBeFalsy();
     expect(screen.getByTestId('sharing-shown-send')).toBeTruthy();
     await fireEvent.press(screen.getByTestId('sharing-shown-done'));
     await waitFor(() => expect(screen.queryByTestId('sharing-shown-link')).toBeNull());

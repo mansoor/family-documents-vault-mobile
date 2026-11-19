@@ -21,7 +21,8 @@ import type { TFunction } from 'i18next';
  * (apps/web/src/emergency.tsx). Pure, so the rules are tested without
  * drawing a screen.
  *
- * Read only here: what is on a page is typed on the web. A clinician's
+ * What is on a page is typed here since app 0.19.0 (edit-model.ts), and
+ * who sees it chosen and its wallet card made, as on the web. A clinician's
  * link is made, shown and taken back here, as the web does it. It files and
  * shows what was typed: nothing is read into it, checked or suggested.
  * Never kept on the phone: a page lives in the screen's memory while it is

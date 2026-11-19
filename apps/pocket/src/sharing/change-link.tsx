@@ -91,7 +91,7 @@ export function ChangeLinkSheet(props: { link: Share; what: string; onClose: () 
           {t(`changeLink.newWords_${which}`)}
         </Text>
         <View style={styles.secretBox}>
-          <Text variant="title" selectable testID="change-link-new-secret">
+          <Text variant="title" testID="change-link-new-secret">
             {secret}
           </Text>
         </View>

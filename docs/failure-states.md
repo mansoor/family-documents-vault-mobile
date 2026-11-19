@@ -170,6 +170,15 @@ Written by `node apps/pocket/scripts/failure-states.mjs`; CI fails if it is out 
 |  |  | `emergency.linkPaused` | Paused: whoever made it can’t sign in just now |
 |  |  | `emergency.linkUsedUp` | Used up: opened as many times as it allows |
 |  |  | `emergency.linkEnded` | Ended |
+|  |  | `emergency.changeNeedsConnection` | Changing it needs a connection to the vault. |
+| Changing emergency information | A person’s emergency page → Edit, Who can see it | `emergencyEdit.needsConnection` | Changing it needs a connection to the vault. What you’ve typed stays here until you leave. |
+|  |  | `emergencyEdit.nameNeeded` | Give it a name, or leave the entry out. |
+|  |  | `emergencyEdit.putRight` | Something above needs putting right first. |
+|  |  | `emergencyEdit.changed` | Someone else changed this while you were editing. What you typed is still here: Save again puts it in place of their version, or Cancel and open it again to see theirs first. |
+|  |  | `emergencyEdit.listFull` | At most {{max}} of these. |
+| Printing a wallet card | A person’s emergency page → Print a wallet card | `walletCard.nothingTicked` | Tick at least one part to put on the card. |
+|  |  | `walletCard.letters` | Some letters can’t go on the printed card, and print as “?”: {{letters}} |
+|  |  | `walletCard.failed` | The card couldn’t be made. Try again. |
 | Collections | Collections, a collection | `collections.needsConnection` | Collections need a connection to the vault. |
 |  |  | `collection.gone` | This collection isn't there any more, or isn't one you can see. |
 | Downloading as one ZIP | Documents → Choose, a collection’s ⋯ → Download | `download.needsConnection` | Downloading needs a connection to the vault. |

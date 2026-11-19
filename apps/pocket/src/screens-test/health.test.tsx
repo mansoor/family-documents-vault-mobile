@@ -1,6 +1,5 @@
 import type { DocumentView, ReminderView } from '@fdv/shared';
 import { fireEvent, screen, waitFor } from '@testing-library/react-native';
-import * as Linking from 'expo-linking';
 import { Share } from 'react-native';
 import MoreScreen from '../app/(tabs)/more';
 import AttentionScreen from '../app/attention';
@@ -152,11 +151,10 @@ describe('emergency information (H4)', () => {
     expect(routes().at(-1)).toEqual({ pathname: '/emergency/[id]', params: { id: 'sara', name: 'Sara' } });
   });
 
-  it('a page, read only: its parts as typed, its papers opening, who sees it and that it is not advice', async () => {
+  it('a page: its parts as typed, its papers opening, who sees it and that it is not advice; changed here, not on the web', async () => {
     const v = vault();
     saraPage(v);
     saraDirective(v);
-    const open = jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
     await unlocked(v, <EmergencyPage id="sara" name="Sara" />);
     expect(await screen.findByTestId('emergency-date_of_birth')).toHaveTextContent(/Date of birth/);
     expect(screen.getByTestId('emergency-blood_type')).toHaveTextContent('Blood typeO+');
@@ -168,8 +166,10 @@ describe('emergency information (H4)', () => {
     expect(screen.getByTestId('emergency-not-advice')).toHaveTextContent(/Not checked by a doctor, and not medical advice/);
     expect(audit()).toEqual([]);
 
-    await fireEvent.press(screen.getByTestId('emergency-web'));
-    expect(open).toHaveBeenCalledWith(`${ORIGIN}/people/sara`);
+    // Edit, Who can see it and the wallet card are on the phone since 0.19.0 (emergency-editing.test).
+    expect(screen.queryByTestId('emergency-web')).toBeNull();
+    expect(screen.getByTestId('emergency-edit-open')).toBeTruthy();
+    expect(screen.getByTestId('emergency-who-open')).toBeTruthy();
     await fireEvent.press(screen.getByTestId('emergency-paper-directive'));
     expect(routes().at(-1)).toEqual({ pathname: '/document/[id]', params: { id: 'directive' } });
   });
@@ -216,6 +216,8 @@ describe('emergency information (H4)', () => {
     expect(audit()).toEqual([]);
     await fireEvent.press(screen.getByTestId('clinician-make'));
     expect(await screen.findByTestId('clinician-secret')).toHaveTextContent('4321');
+    // Not selectable (0.19.0): only Copy puts it on the clipboard, and clears it in a minute.
+    expect(screen.getByTestId('clinician-secret').props.selectable).toBeFalsy();
     const made = v.vault.state.emergencyLinks?.[0];
     expect(made?.fields).toEqual(['date_of_birth', 'blood_type', 'allergies', 'medications', 'emergency_contacts']);
     expect(made?.recipient_label).toBe('Dr Patel');
@@ -336,7 +338,8 @@ describe('emergency information (H4)', () => {
     await unlocked(v, <EmergencyPage id="sara" name="Sara" />);
     await screen.findByTestId('emergency-allergies');
     expect(screen.queryByTestId('emergency-share')).toBeNull();
-    expect(screen.queryByTestId('emergency-web')).toBeNull();
+    expect(screen.queryByTestId('emergency-edit-open')).toBeNull();
+    expect(screen.queryByTestId('emergency-who-open')).toBeNull();
     expect(screen.queryByTestId('emergency-links')).toBeNull();
   });
 });

@@ -6,6 +6,75 @@ app's own, tagged `vX.Y.Z` in this repository.
 
 ## [Unreleased]
 
+## [0.19.0] — Emergency information changed on the phone, who sees it, and the wallet card
+
+Re-pinned to the vault's **v0.9.0-dev.66**. A person's emergency
+information is now changed on the phone as on the web (H4): what is on it,
+who can see it, and a wallet card to print. It needs the vault's
+emergency information (`features.emergency_info`, 0.9.0-dev.47 on), as the
+page itself always has.
+
+### Added
+- **Edit emergency information**, on a person's emergency page, for the
+  person and the owners (the vault decides; nobody else sees Edit). Every
+  part the web's editor has, as one compact form with Cancel and Save at its
+  foot: blood type; allergies, medications, conditions, doctors and who to
+  call, each entry with its name and the web's other parts (a medication's
+  dose as written, a doctor's practice, who somebody is, a phone, a note);
+  insurance (insurer, member ID, group number, the insurer's phone); and
+  anything else, in your own words. A page with nothing on it offers **Add
+  emergency information**. The date of birth comes from the family's
+  details, and the form says so.
+- An entry with something typed but no name is said where it is ("Give it
+  a name, or leave the entry out."), and nothing is sent until it is put
+  right; an empty one is left out. Lists stop at the most the vault keeps.
+- Removing an entry with anything in it, and clearing a part (a list of
+  two or more, the insurance, anything else), is asked first; nothing goes
+  until Save, and Cancel with something changed asks before leaving.
+- Saved from the version read: if somebody else changed it meanwhile,
+  nothing of theirs is written over without your knowing. What you typed
+  stays in the form, and it says so: Save again puts yours in place of
+  theirs, or Cancel and open it again to see theirs first. The page says
+  "Saved." and shows it read again.
+- **Who can see it**, for whoever chooses (the person, signed in as a
+  grown-up; an owner for anybody else): only them and the owners, every
+  adult too, or everyone in the family, and these people too, named from
+  the family's adults and teens. The person and the owners always can, and
+  so can a caregiver they keep. Somebody named before who can no longer
+  be (made a viewer or an owner since) is taken off, and the form says
+  who. A choice that takes it from anybody says, above Save, that they lose
+  any export they made of it.
+- **Print a wallet card**, for anybody who sees what is on the page: tick
+  what goes on it (what a stranger needs first, ticked to begin with), see
+  it as it will print, and **Share or print**: a PDF made on the phone, the
+  size of a bank card on an A4 page, for the phone's own share sheet — a
+  printer, Files, another app — and then gone from the phone. It needs
+  nothing but the paper: no link and no code to scan, and no connection.
+  Letters the printed card can't draw (it uses the PDF's own Helvetica) are
+  said before it is made. Line breaks in what was typed are kept on the
+  card.
+- Failure states: changing emergency information (no connection, an entry
+  without a name, changed somewhere else, a list at its most) and the
+  wallet card (nothing ticked, letters it can't print, not made).
+
+### Changed
+- "Change it on the web" is gone from the emergency page: everything it
+  was for is on the phone. The words on an empty page no longer send you to
+  the web.
+- Changing emergency information, or who sees it, needs a connection, and
+  says so plainly; what was typed stays in the form until you leave it. As
+  before, the page itself is never kept on the phone, so with no connection
+  there is nothing to show; screenshots stay blocked on the page and in its
+  editor; the clinician's links are as in 0.18.0.
+
+### Fixed
+- **Links, PINs and passwords can no longer be selected** wherever the
+  phone shows one: a link made or revealed in Sharing or from a document, a
+  request's link and password, a new PIN or password after Change, a
+  clinician's link's PIN or password, and the two-step sign-in code to type.
+  A long press and the phone's own Copy left them on the clipboard for good;
+  now only Copy puts them there, and clears it a minute later.
+
 ## [0.18.1] — Notes stays a tab when the phone is offline
 
 Still pinned to the vault's **v0.9.0-dev.65**.

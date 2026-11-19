@@ -65,8 +65,15 @@ const AREAS = [
     'Emergency information',
     'More → Emergency information, a person, Share with a clinician',
     'emergency',
-    'needsConnection none nobody someFailed empty tickOne linkLocked linkPaused linkUsedUp linkEnded',
+    'needsConnection none nobody someFailed empty tickOne linkLocked linkPaused linkUsedUp linkEnded changeNeedsConnection',
   ],
+  [
+    'Changing emergency information',
+    'A person’s emergency page → Edit, Who can see it',
+    'emergencyEdit',
+    'needsConnection nameNeeded putRight changed listFull',
+  ],
+  ['Printing a wallet card', 'A person’s emergency page → Print a wallet card', 'walletCard', 'nothingTicked letters failed'],
   ['Collections', 'Collections, a collection', 'collections', 'needsConnection'],
   ['', '', 'collection', 'gone'],
   [

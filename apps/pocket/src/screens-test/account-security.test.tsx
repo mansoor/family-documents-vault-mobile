@@ -67,6 +67,8 @@ describe('Two-step sign-in', () => {
     await fireEvent.changeText(await screen.findByTestId('step-up-password'), t.vault.state.password as string);
     await fireEvent.press(screen.getByTestId('step-up-go'));
     expect(await screen.findByTestId('two-step-secret')).toHaveTextContent('JBSW Y3DP EHPK 3PXP');
+    // Not selectable (0.19.0): only Copy puts it on the clipboard, and clears it in a minute.
+    expect(screen.getByTestId('two-step-secret').props.selectable).toBeFalsy();
     expect(audit()).toEqual([]);
     await fireEvent.press(screen.getByTestId('two-step-open-app'));
     expect(open).toHaveBeenCalledWith(expect.stringMatching(/^otpauth:\/\/totp\//));

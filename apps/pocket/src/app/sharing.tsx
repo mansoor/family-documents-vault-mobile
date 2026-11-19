@@ -687,7 +687,7 @@ function ShownLink(props: {
           </Text>
         ) : null}
         <View style={styles.linkBox}>
-          <Text selectable testID="sharing-shown-link">
+          <Text testID="sharing-shown-link">
             {link}
           </Text>
         </View>
@@ -696,7 +696,7 @@ function ShownLink(props: {
             <Text variant="secondary" weight="600" tone="soft">
               {revealed.pin ? t('share.pin') : t('share.password')}
             </Text>
-            <Text variant="title" selectable testID="sharing-shown-secret">
+            <Text variant="title" testID="sharing-shown-secret">
               {secret}
             </Text>
           </View>

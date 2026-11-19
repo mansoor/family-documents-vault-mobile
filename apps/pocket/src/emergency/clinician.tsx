@@ -126,7 +126,7 @@ export function ClinicianSheet(props: {
               <Text variant="secondary" weight="600" tone="soft">
                 {made.pin ? t('share.pin') : t('share.password')}
               </Text>
-              <Text variant="title" selectable testID="clinician-secret">
+              <Text variant="title" testID="clinician-secret">
                 {secret}
               </Text>
               <Text variant="small" tone="soft">

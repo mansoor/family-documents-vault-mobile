@@ -125,7 +125,7 @@ export function TwoStep() {
           <Text variant="secondary" tone="soft">
             {t('twoStep.orType')}
           </Text>
-          <Text variant="title" selectable testID="two-step-secret">
+          <Text variant="title" testID="two-step-secret">
             {setup.secret.replace(/(.{4})/g, '$1 ').trim()}
           </Text>
           {clipboard ? (
