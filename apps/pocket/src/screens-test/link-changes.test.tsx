@@ -156,6 +156,8 @@ describe('Change, in Sharing (LK)', () => {
     expect(screen.getByTestId('change-link-old-stops')).toHaveTextContent(/old PIN stops working at once/);
     await fireEvent.press(screen.getByTestId('change-link-save'));
     expect(await screen.findByTestId('change-link-new-secret')).toHaveTextContent('7356');
+    // Not selectable (0.19.0): only Copy puts it on the clipboard, and clears it in a minute.
+    expect(screen.getByTestId('change-link-new-secret').props.selectable).toBeFalsy();
     expect(t.library.shareChanges).toEqual([
       { id: 's1', body: { recipient_label: 'Dr Rao', secret: 'pin' }, ifMatch: '"3"' },
     ]);

@@ -36,6 +36,11 @@ const SIZES: Record<Variant, number> = {
   small: TYPE.small,
 };
 
+/**
+ * Never selectable (0.19.0): a long press and the system's Copy would leave
+ * a link, a PIN or a password on the clipboard with nothing to clear it.
+ * What may be copied has its own Copy, which clears it in a minute.
+ */
 export function Text(props: {
   children: ReactNode;
   variant?: Variant;
@@ -44,8 +49,6 @@ export function Text(props: {
   style?: StyleProp<TextStyle>;
   role?: 'header' | 'text' | 'alert';
   testID?: string;
-  /** Long-pressed to select and copy (a link to send). */
-  selectable?: boolean;
   /** Cut to this many lines, the rest left for its page (a note's first line in Notes). */
   numberOfLines?: number;
 }) {
@@ -66,7 +69,6 @@ export function Text(props: {
   return (
     <RNText
       testID={props.testID}
-      {...(props.selectable ? { selectable: true } : {})}
       {...(props.numberOfLines ? { numberOfLines: props.numberOfLines } : {})}
       accessibilityRole={props.role ?? (display ? 'header' : 'text')}
       style={[

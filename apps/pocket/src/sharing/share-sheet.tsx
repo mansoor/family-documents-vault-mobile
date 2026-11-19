@@ -290,7 +290,7 @@ export function ShareSheet(props: { target: ShareTarget; onClose: () => void }) 
           {shown ? (
             <>
               <View style={styles.linkBox}>
-                <Text selectable testID="share-link">
+                <Text testID="share-link">
                   {link}
                 </Text>
               </View>
@@ -299,7 +299,7 @@ export function ShareSheet(props: { target: ShareTarget; onClose: () => void }) 
                   <Text variant="secondary" weight="600" tone="soft">
                     {made.pin ? t('share.pin') : t('share.password')}
                   </Text>
-                  <Text variant="title" selectable testID="share-secret">
+                  <Text variant="title" testID="share-secret">
                     {secret}
                   </Text>
                 </View>

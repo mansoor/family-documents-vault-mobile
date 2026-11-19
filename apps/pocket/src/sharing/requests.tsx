@@ -250,7 +250,7 @@ export function ShownRequest(props: {
           </Text>
         ) : null}
         <View style={styles.linkBox}>
-          <Text selectable testID="request-shown-link">
+          <Text testID="request-shown-link">
             {link}
           </Text>
         </View>
@@ -259,7 +259,7 @@ export function ShownRequest(props: {
             <Text variant="secondary" weight="600" tone="soft">
               {t('share.password')}
             </Text>
-            <Text variant="title" selectable testID="request-shown-password">
+            <Text variant="title" testID="request-shown-password">
               {revealed.password}
             </Text>
             <Text variant="small" tone="soft">
