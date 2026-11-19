@@ -1,6 +1,6 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react-native';
 import type { ReactElement } from 'react';
-import { AccessibilityInfo, StyleSheet } from 'react-native';
+import { AccessibilityInfo, Pressable, StyleSheet } from 'react-native';
 import Home from '../app/(tabs)/index';
 import { AppHeader } from '../ui/app-header';
 
@@ -15,8 +15,11 @@ import { MAX_PAGES } from '../queue/commit';
 import { reply } from '../test-support/capture';
 import { installed, renderApp, signedIn, testCapture } from '../test-support/render';
 import { resetRoutes, routes } from '../test-support/router';
-import { capabilities, testVault } from '../test-support/vault';
+import { useVault } from '../state/vault';
+import { forgetVault, keptCaps } from '../state/vaults';
+import { capabilities, testVault, type TestVault } from '../test-support/vault';
 import { TabBar } from '../ui/tab-bar';
+import { BANNER_DELAY_MS } from '../ui/reach-banner';
 
 /** Home under the bar every page has (11 Nov 2026): the bell is the bar's. */
 const WithBar = () => (
@@ -34,6 +37,8 @@ jest.mock(
 jest.mock('expo-linking', () => ({ openURL: jest.fn(async () => true), createURL: jest.fn(() => '') }));
 
 const ORIGIN = 'https://vault.test';
+/** The line about no answer shows once the vault has given none for a while. */
+const SHOWN = { timeout: BANNER_DELAY_MS + 3_000 };
 const STATE = {
   index: 0,
   routes: ['index', 'documents', 'people', 'more'].map((name) => ({ key: name, name })),
@@ -90,6 +95,8 @@ describe('the tab bar', () => {
     const navigated = await as('owner');
     const order = ['tab-home', 'tab-documents', 'home-add', 'tab-people', 'tab-more'];
     await screen.findByTestId('tab-more');
+    // A vault before 0.9.0, once it has said so (Notes, until it has: 0.18.1).
+    await screen.findByTestId('tab-people');
     const shown = screen.root
       ?.queryAll((n) => order.includes(String(n.props.testID)) && typeof n.type === 'string')
       .map((n) => String(n.props.testID));
@@ -297,5 +304,109 @@ describe('the + and its menu', () => {
     expect(screen.getByTestId('home-add').props.accessibilityState).toEqual({ expanded: false });
     expect(scanner.asked).toEqual([]);
     await waitFor(() => expect(focus).toHaveBeenCalledWith(expect.anything(), 'focus'));
+  });
+});
+
+describe('Notes stays a tab while the vault can’t be reached (0.18.1)', () => {
+  const EVERY_TAB = {
+    index: 0,
+    routes: ['index', 'documents', 'notes', 'people', 'more'].map((name) => ({ key: name, name })),
+  };
+  /** A vault of 0.9.0 on, which keeps notes. */
+  const notesVault = () => {
+    const t = testVault([ORIGIN]);
+    t.caps = capabilities({ features: { ...capabilities().features, notes: true } });
+    return t;
+  };
+
+  /** The tab bar and More, and a way to look at the vault again, as Try again does. */
+  function TabsAndMore() {
+    const { recheck } = useVault();
+    return (
+      <>
+        <MoreScreen />
+        <TabBar state={EVERY_TAB} navigation={{ navigate: () => undefined }} />
+        <Pressable testID="look-again" accessibilityRole="button" accessibilityLabel="Look again" onPress={() => void recheck()} />
+      </>
+    );
+  }
+
+  /** The app started, signed in; `offline`: the vault gives no answer from the start. */
+  async function start(t: TestVault, offline = false) {
+    if (offline) t.reachable.delete(ORIGIN);
+    await renderApp(<TabsAndMore />, { fetch: t.fetch });
+    await screen.findByTestId('tab-bar');
+    if (offline) expect(await screen.findByTestId('reach-banner', {}, SHOWN)).toBeTruthy();
+  }
+
+  /** Which of Notes and People is the tab, and whether More lists People. */
+  const shown = () => ({
+    notes: screen.queryByTestId('tab-notes') !== null,
+    people: screen.queryByTestId('tab-people') !== null,
+    morePeople: screen.queryByTestId('more-people') !== null,
+  });
+  const NOTES = { notes: true, people: false, morePeople: true };
+  const PEOPLE = { notes: false, people: true, morePeople: false };
+
+  /** The vault stops answering while the app is open. */
+  async function goesOffline(t: TestVault) {
+    t.reachable.delete(ORIGIN);
+    await fireEvent.press(screen.getByTestId('look-again'));
+    expect(await screen.findByTestId('reach-banner', {}, SHOWN)).toBeTruthy();
+  }
+
+  beforeEach(() => installed());
+
+  it('online, then no answer: Notes stays, and People stays in More', async () => {
+    const t = notesVault();
+    await signedIn(t);
+    await start(t);
+    await waitFor(() => expect(keptCaps(ORIGIN)?.features.notes).toBe(true));
+    expect(shown()).toEqual(NOTES);
+    await goesOffline(t);
+    expect(shown()).toEqual(NOTES);
+  });
+
+  it('a cold start with no answer, after an earlier session: Notes, as the vault said then', async () => {
+    const t = notesVault();
+    await signedIn(t);
+    await start(t);
+    await waitFor(() => expect(keptCaps(ORIGIN)?.features.notes).toBe(true));
+    await screen.unmount();
+
+    await start(t, true);
+    expect(shown()).toEqual(NOTES);
+  });
+
+  it('a cold start with no answer, with nothing kept (a new install): Notes', async () => {
+    const t = notesVault();
+    await signedIn(t);
+    await start(t, true);
+    expect(keptCaps(ORIGIN)).toBeNull();
+    expect(shown()).toEqual(NOTES);
+  });
+
+  it('a vault before 0.9.0 (no notes): People, online, offline, and on a cold start offline', async () => {
+    const t = testVault([ORIGIN]);
+    expect(t.caps.features.notes).toBeUndefined();
+    await signedIn(t);
+    await start(t);
+    await waitFor(() => expect(shown()).toEqual(PEOPLE));
+    expect(keptCaps(ORIGIN)).not.toBeNull();
+    await goesOffline(t);
+    expect(shown()).toEqual(PEOPLE);
+    await screen.unmount();
+
+    await start(t, true);
+    expect(shown()).toEqual(PEOPLE);
+  });
+
+  it('a vault forgotten (Change server) takes what it said with it', async () => {
+    const t = notesVault();
+    await signedIn(t);
+    await start(t);
+    await waitFor(() => expect(keptCaps(ORIGIN)).not.toBeNull());
+    forgetVault(ORIGIN);
+    expect(keptCaps(ORIGIN)).toBeNull();
   });
 });

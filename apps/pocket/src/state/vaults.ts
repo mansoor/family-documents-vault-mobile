@@ -1,3 +1,4 @@
+import type { Capabilities } from '@fdv/shared';
 import { readPrefs, writePrefs } from '../platform/prefs';
 import type { KnownVault } from '../net/policy';
 
@@ -52,6 +53,7 @@ export function forgetVault(origin: string): Vaults {
     known: now.known.filter((k) => k.origin !== origin),
   };
   writePrefs(NAME, next);
+  forgetCaps(origin);
   return next;
 }
 
@@ -59,4 +61,38 @@ export function leaveVault(): Vaults {
   const next = { ...readVaults(), current: null };
   writePrefs(NAME, next);
   return next;
+}
+
+/**
+ * The capability document each vault gave last (0.18.1), kept so the phone
+ * looks as it did while the vault can't be reached, and before it first
+ * answers after a launch. Nothing secret: anybody may ask a vault for it.
+ * Only for what is shown; how anything is sent is decided by what the vault
+ * says at the time.
+ */
+const CAPS = 'vault-capabilities';
+
+type KeptCaps = Record<string, Capabilities>;
+
+export const keptCaps = (origin: string): Capabilities | null => readPrefs<KeptCaps>(CAPS, {})[origin] ?? null;
+
+export function keepCaps(origin: string, caps: Capabilities): void {
+  try {
+    const now = readPrefs<KeptCaps>(CAPS, {});
+    if (JSON.stringify(now[origin]) === JSON.stringify(caps)) return;
+    writePrefs(CAPS, { ...now, [origin]: caps });
+  } catch {
+    // Kept the next time the vault answers.
+  }
+}
+
+function forgetCaps(origin: string): void {
+  try {
+    const kept = readPrefs<KeptCaps>(CAPS, {});
+    if (!(origin in kept)) return;
+    delete kept[origin];
+    writePrefs(CAPS, kept);
+  } catch {
+    // Nothing kept, or nothing to forget.
+  }
 }

@@ -31,7 +31,7 @@ import { forgetPreviousInstallation, installationId, SecureTokenStore } from '..
 import { wordsFor } from '../errors/words';
 import i18n from '../i18n';
 import { emit } from './events';
-import { leaveVault, readVaults, saveVault, updateVault, type VaultRecord } from './vaults';
+import { keepCaps, keptCaps, leaveVault, readVaults, saveVault, updateVault, type VaultRecord } from './vaults';
 
 /**
  * The app's one piece of shared state: which vault, whether somebody is
@@ -121,6 +121,14 @@ interface VaultValue {
   phase: Phase;
   vault: VaultRecord | null;
   caps: Capabilities | null;
+  /**
+   * What this vault said last (0.18.1): `caps` once it has answered since
+   * the app started, else what it said in an earlier session, kept on the
+   * phone; null where it never has. For what the phone shows while the
+   * vault can't be reached, or before it first answers — the tabs — never
+   * for how something is sent.
+   */
+  lastCaps: Capabilities | null;
   offline: boolean;
   /**
    * Why there is no answer, while there is none (0.13.0): the phone has no
@@ -302,9 +310,11 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
    * not have caught up — or not be there yet at all, just after a launch.
    */
   const capsRef = useRef<Capabilities | null>(null);
-  const knowCaps = useCallback((c: Capabilities | null) => {
+  const knowCaps = useCallback((c: Capabilities | null, from?: string) => {
     capsRef.current = c;
     setCaps(c);
+    // Kept for next time (0.18.1): a launch with no answer looks as the last one did.
+    if (c && from) keepCaps(from, c);
   }, []);
   const [offline, setOffline] = useState(false);
   const [reach, setReach] = useState<Reach>('online');
@@ -449,7 +459,7 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
       }
       verified.current = { at: deps.now(), network, epoch: started };
       setNotice((n) => (n === 'stranger' || n === 'wifi_only' ? null : n));
-      knowCaps(answered);
+      knowCaps(answered, vault.origin);
       return;
     }
     throw new NetworkError('offline');
@@ -557,7 +567,7 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
         const next = updateVault(vault.origin, { instanceId: answered.instance_id ?? null });
         setVault(next.known.find((k) => k.origin === vault.origin) ?? vault);
       }
-      knowCaps(answered);
+      knowCaps(answered, vault.origin);
       checkedAt.current = deps.now();
       if (identity.kind === 'reinstalled') {
         await session.clear();
@@ -838,7 +848,7 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
       saveVault(record);
       verified.current = null;
       setNotice(outcome.kind === 'reinstalled' ? 'reinstalled' : null);
-      knowCaps(outcome.caps);
+      knowCaps(outcome.caps, outcome.origin);
       setVault(record);
       setPhase('loading');
     },
@@ -996,6 +1006,9 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
     setPhase('connect');
   }, [session, runBeforeSignOut, knowCaps]);
 
+  // What this vault said this session, else what it said last time (0.18.1).
+  const lastCaps = useMemo(() => caps ?? (origin ? keptCaps(origin) : null), [caps, origin]);
+
   const sessionOwner = useCallback(() => {
     const info = session.info;
     return info && origin ? { origin, member_id: info.member_id } : null;
@@ -1014,6 +1027,7 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
       phase,
       vault,
       caps,
+      lastCaps,
       offline,
       reach,
       waiting,
@@ -1040,6 +1054,7 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
       phase,
       vault,
       caps,
+      lastCaps,
       offline,
       reach,
       waiting,

@@ -1,4 +1,5 @@
 import { fireEvent, screen, waitFor, within, act } from '@testing-library/react-native';
+import { useState } from 'react';
 import { StyleSheet, Text } from 'react-native';
 import NotesScreen from '../app/(tabs)/notes';
 import Settings from '../app/settings';
@@ -14,6 +15,8 @@ import { libraryDoc, unlocked } from '../test-support/lookup';
 import { installed, respond, testCapture } from '../test-support/render';
 import { push, resetRoutes, routes } from '../test-support/router';
 import { caps0519, capabilities, testVault, type TestVault } from '../test-support/vault';
+import { TabBar } from '../ui/tab-bar';
+import { BANNER_DELAY_MS } from '../ui/reach-banner';
 
 jest.mock(
   'expo-router',
@@ -21,6 +24,8 @@ jest.mock(
 );
 
 const ORIGIN = 'https://vault.test';
+/** The line about no answer shows once the vault has given none for a while. */
+const SHOWN = { timeout: BANNER_DELAY_MS + 3_000 };
 const DOCS = `${ORIGIN}/api/v1/documents`;
 
 beforeEach(() => {
@@ -509,6 +514,61 @@ describe('a new note written while the vault can’t be reached (0.13.0)', () =>
       /^Changing a note needs a connection to your vault\. New notes can be written now/,
     );
     expect(screen.queryAllByTestId(/^queued-note-/)).toHaveLength(0);
+  });
+});
+
+/**
+ * The tab bar, opening on Home as a launch does, with Notes when its tab is
+ * pressed; the tab chosen stays chosen while New note is over it, as the
+ * app's tabs keep it.
+ */
+function tabs() {
+  const names = ['index', 'documents', 'notes', 'people', 'more'];
+  const chosen = { tab: 'index' };
+  function Tabs() {
+    const [tab, setTab] = useState(chosen.tab);
+    const go = (name: string) => {
+      chosen.tab = name;
+      setTab(name);
+    };
+    const state = { index: names.indexOf(tab), routes: names.map((name) => ({ key: name, name })) };
+    return (
+      <>
+        {tab === 'notes' ? <NotesScreen /> : null}
+        <TabBar state={state} navigation={{ navigate: go }} />
+      </>
+    );
+  }
+  return <Tabs />;
+}
+
+describe('the Notes tab, on a phone started with no answer from the vault (0.18.1)', () => {
+  it('is there on a new install, and a note written from it waits, then goes when the vault is back', async () => {
+    const v = vault();
+    const store = new MemoryQueueStore();
+    await unlocked(v, tabs(), {
+      capture: testCapture({ openStore: async () => store }),
+      // Signed in before, and nothing heard from the vault since the app started.
+      before: () => void v.reachable.delete(ORIGIN),
+    });
+    expect(await screen.findByTestId('reach-banner', {}, SHOWN)).toBeTruthy();
+    expect(screen.queryByTestId('tab-people')).toBeNull();
+    await fireEvent.press(screen.getByTestId('tab-notes'));
+    expect(screen.getByTestId('tab-notes').props.accessibilityState).toEqual({ selected: true });
+
+    await writeNote('Gate code', 'The blue door, then left.', 'private');
+    const id = await queuedId();
+    expect(screen.getByTestId(`queued-note-state-${id}`)).toHaveTextContent('Waiting to send');
+    expect(posts(v)).toBe(0);
+    expect(audit()).toEqual([]);
+
+    v.reachable.add(ORIGIN);
+    await networkChanged();
+    await waitFor(() => expect(made(v, 'Gate code')).toHaveLength(1));
+    await waitFor(() => expect(queuedIds()).toEqual([]));
+    // The vault has said it keeps notes now: still the Notes tab.
+    expect(screen.getByTestId('tab-notes')).toBeTruthy();
+    expect(posts(v)).toBe(1);
   });
 });
 
