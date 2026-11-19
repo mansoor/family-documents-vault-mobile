@@ -6,6 +6,22 @@ app's own, tagged `vX.Y.Z` in this repository.
 
 ## [Unreleased]
 
+## [0.18.1] — Notes stays a tab when the phone is offline
+
+Still pinned to the vault's **v0.9.0-dev.65**.
+
+### Fixed
+- **Notes no longer turns into People when the vault can't be reached.**
+  Which of the two is a tab was decided by what the vault said since the
+  app started, so a phone started with no connection showed People, though
+  notes can be written offline (0.13.0). The phone now keeps what each
+  vault last said about itself, and uses it until the vault answers again:
+  Notes on a vault that keeps notes, People on one before 0.9.0, online or
+  not. With nothing heard from the vault at all (a new install started
+  offline), Notes. More lists People whenever Notes is the tab.
+- What the phone kept about a vault goes with it when the vault is
+  forgotten (Change server).
+
 ## [0.18.0] — Asking for documents, changing any link, and papers from a folder
 
 Re-pinned to the vault's **v0.9.0-dev.65**. Requests to send documents are

@@ -1,4 +1,4 @@
-import { can, TAP_MIN } from '@fdv/shared';
+import { can, TAP_MIN, type Capabilities } from '@fdv/shared';
 import { Files, House, Menu, NotebookText, Users, type LucideIcon } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, View } from 'react-native';
@@ -24,6 +24,16 @@ const TABS: Record<string, { label: string; name?: string; icon: LucideIcon; tes
   more: { label: 'tabs.more', name: 'tabs.moreName', icon: Menu, testID: 'tab-more' },
 };
 
+/**
+ * Whether Notes is a tab (0.18.1): yes, unless what the vault said last says
+ * it keeps no notes (a vault before 0.9.0) — People is the tab then. Said
+ * from what it said last, so a phone with no connection keeps its Notes tab,
+ * where notes are written offline (0.13.0) and wait for the vault; with
+ * nothing heard at all, a first start offline, Notes too.
+ */
+export const notesTab = (lastCaps: Capabilities | null | undefined): boolean =>
+  !lastCaps || lastCaps.features.notes === true;
+
 export interface TabBarProps {
   state: { index: number; routes: { key: string; name: string }[] };
   navigation: { navigate: (name: string) => void };
@@ -38,14 +48,14 @@ export function TabBar(props: TabBarProps) {
   const colours = useColours();
   const styles = useStyles(makeStyles);
   const { t } = useTranslation();
-  const { who, caps } = useVault();
+  const { who, lastCaps } = useVault();
   const insets = useSafeAreaInsets();
   // 10, as the mockup has it (R3): "Documents" in its fifth of a 360 dp
   // phone at Large text too. Large text still makes it 1.3 times the size.
   const { scale } = useTextScale();
   const canAdd = who ? can(who.role, 'document.add') : false;
   // One of Notes and People: Notes where the vault keeps them, else People.
-  const left = caps?.features.notes === true ? 'people' : 'notes';
+  const left = notesTab(lastCaps) ? 'people' : 'notes';
   const routes = props.state.routes.filter((r) => TABS[r.name] && r.name !== left);
   const current = props.state.routes[props.state.index]?.name;
   const tab = (route: { key: string; name: string }) => {

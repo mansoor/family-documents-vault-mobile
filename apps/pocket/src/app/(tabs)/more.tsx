@@ -27,6 +27,7 @@ import { waitingInInbox } from '../../queue/inbox';
 import { useVault } from '../../state/vault';
 import { Text } from '../../ui';
 import { sp } from '../../ui/space';
+import { notesTab } from '../../ui/tab-bar';
 import { useColours, useStyles, type Palette } from '../../ui/theme';
 
 /**
@@ -40,7 +41,7 @@ export default function MoreScreen() {
   const styles = useStyles(makeStyles);
   const { t } = useTranslation();
   const router = useRouter();
-  const { vault, caps, who, offline, withTokenQuick } = useVault();
+  const { vault, caps, lastCaps, who, offline, withTokenQuick } = useVault();
   // The Inbox, where the vault has batches and the person may add documents:
   // a viewer, and so a guest, has none.
   const inboxOn = caps?.features.batches === true && !!who && can(who.role, 'document.add');
@@ -54,7 +55,8 @@ export default function MoreScreen() {
   const sharingOn = !!who && can(who.role, 'document.share');
   // Activity (app 0.17.0): who did what, for whoever reads the log (owners, adults, teens), as the web offers it.
   const activityOn = !!who && can(who.role, 'audit.read');
-  const notesOn = caps?.features.notes === true;
+  // As the tab bar decides it, so People is always one or the other (0.18.1).
+  const notesOn = notesTab(lastCaps);
   // Caregivers (H1b): whoever may name their own or be one, on a vault that has them.
   const caregiversOn = caregiversOffered(caps, who?.role);
   // Emergency information (H4): whoever may read a page — never a viewer or a guest.
