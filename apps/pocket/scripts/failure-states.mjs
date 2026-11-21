@@ -21,12 +21,24 @@ const AREAS = [
     'invalid notAVault unreachable setupRequired serverTooOld clientTooOld apiVersion askHttp refusePublicHttp refuseMobileData stranger reinstalled certificateUntrusted certificateWrongName certificateExpired captivePortal linkJoin linkReset linkShared',
   ],
   ['The vault not answering', 'The tabs, Notes, Documents, People', 'reach', 'noNetwork unreachable wifiOnly stranger showingSaved'],
-  ['Signing in', 'Sign in', 'signIn', 'signedOutHere passkeyOnly startAgain paused pausedRestored accessEnded'],
+  [
+    'Signing in',
+    'Sign in',
+    'signIn',
+    'signedOutHere passkeyOnly passkeySecond throttledSeconds throttledMinutes startAgain paused pausedRestored accessEnded',
+  ],
+  [
+    'The app or the vault too old for the other',
+    'Over every screen, until one is updated',
+    'update',
+    'words needed thisVersion vaultWords kept signOutWords notYet',
+  ],
+  ['Two-step sign-in to set up first', 'Over every screen, until it is', 'twoStepNeeded', 'enrol browser confirm passkey notYet'],
   [
     'Any request that fails (wordsFor)',
     'Every screen',
     'errors',
-    'offline noNetwork timeout rateLimited unavailable internal storageUnreachable sessionEnded paused accessEnded stepUp twoStep setupRequired unexpected stranger wifiOnly invalidCredentials notFound previewPending noPreview uploadInProgress invalidExtra batchEnded batchFull alreadyDecided createInProgress createdNotVisible earlierVersion changedElsewhere linksChoice sensitiveConfirm sensitiveStillShared general',
+    'offline noNetwork timeout rateLimited unavailable internal storageUnreachable sessionEnded paused accessEnded stepUp twoStep twoStepSetup codeUsed updateApp setupRequired unexpected stranger wifiOnly invalidCredentials notFound previewPending noPreview uploadInProgress invalidExtra batchEnded batchFull alreadyDecided createInProgress createdNotVisible earlierVersion changedElsewhere linksChoice sensitiveConfirm sensitiveStillShared general',
   ],
   ['The lock', 'Lock screen, Settings', 'lock', 'tooMany noScreenLock weakBiometrics enrolmentChanged'],
   [

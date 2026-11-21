@@ -1,5 +1,6 @@
-import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
+import { apiToken, ready, signInOnPage, VAULT } from './vault';
 
 /**
  * Iteration 4.12's proof on a real vault, through the web build: a
@@ -7,10 +8,7 @@ import { randomUUID } from 'node:crypto';
  * you (it is an Essential), and its reminder put off a week on Needs
  * attention.
  */
-const VAULT = process.env.FDV_DEV_API ?? 'http://localhost:8099';
-const EMAIL = process.env.FDV_E2E_EMAIL ?? 'pocket-e2e@example.test';
 const PASSWORD = process.env.FDV_E2E_PASSWORD ?? 'correct horse battery staple';
-const FAMILY = 'The Pocket family';
 
 /** A one-page PDF with a line of text on it: the vault draws it. */
 function pdf(text: string): Buffer {
@@ -35,46 +33,16 @@ function pdf(text: string): Buffer {
   return Buffer.from(out, 'latin1');
 }
 
-async function token(request: APIRequestContext): Promise<string> {
-  let r = await request.post(`${VAULT}/api/v1/auth/password`, { data: { email: EMAIL, password: PASSWORD } });
-  // The specs before this one signed in too: the vault's limit is waited out, once.
-  if (r.status() === 429) {
-    const wait = Number(r.headers()['retry-after'] ?? 60);
-    await new Promise((done) => setTimeout(done, (wait + 1) * 1000));
-    r = await request.post(`${VAULT}/api/v1/auth/password`, { data: { email: EMAIL, password: PASSWORD } });
-  }
-  expect(r.ok(), await r.text()).toBe(true);
-  const body = (await r.json()) as { access_token?: string };
-  if (!body.access_token) throw new Error('two-step sign-in is on for the e2e account');
-  return body.access_token;
-}
-
-async function signIn(page: Page, address: string) {
-  await page.goto('/');
-  await page.getByLabel('Vault address').fill(address);
-  await page.getByRole('button', { name: 'Connect' }).click();
-  await page.getByRole('button', { name: 'Use it on this Wi-Fi' }).click();
-  await page.getByLabel('Email').fill(EMAIL);
-  await page.getByLabel('Password', { exact: true }).fill(PASSWORD);
-  await page.getByRole('button', { name: 'Sign in' }).click();
-  await expect(page.getByTestId('home-ready')).toBeVisible();
-}
-
 test.beforeAll(async ({ request }) => {
-  const caps = (await (await request.get(`${VAULT}/api/v1/capabilities`)).json()) as { setup_required: boolean };
-  if (caps.setup_required) {
-    const r = await request.post(`${VAULT}/api/v1/setup`, {
-      data: { household_name: FAMILY, display_name: 'Pocket Owner', email: EMAIL, password: PASSWORD },
-    });
-    expect(r.ok(), await r.text()).toBe(true);
-  }
+  test.setTimeout(120_000);
+  await ready(request);
 });
 
 test("search, open, confirm it's you, snooze", async ({ page, baseURL, request }) => {
   test.setTimeout(180_000);
   const word = `lookup${randomUUID().slice(0, 8)}`;
   const title = `Passport ${word}`;
-  await signIn(page, new URL(baseURL ?? '').host);
+  await signInOnPage(page, new URL(baseURL ?? '').host);
 
   // A passport added from the phone, as anybody would.
   const chooser = page.waitForEvent('filechooser');
@@ -88,7 +56,7 @@ test("search, open, confirm it's you, snooze", async ({ page, baseURL, request }
   await expect(page.getByText('On its way')).toHaveCount(0, { timeout: 30_000 });
 
   // In the vault: made an Essential (its pages then ask to confirm it is you), with a reminder due today.
-  const bearer = await token(request);
+  const bearer = await apiToken(request);
   const auth = { authorization: `Bearer ${bearer}` };
   // "On its way" can be absent for a moment before the scan is even queued:
   // the vault is asked until it has it (run 36230772547 read too soon).

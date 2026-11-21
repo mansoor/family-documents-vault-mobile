@@ -6,6 +6,61 @@ app's own, tagged `vX.Y.Z` in this repository.
 
 ## [Unreleased]
 
+## [0.20.0] — An app too old for the vault says so, and signing in as the vault of 0.9.0 asks
+
+Re-pinned to the vault's **v0.9.0-dev.79**. A vault from 0.9.0-dev.79 on
+tells a phone app older than it works with to update; this app now listens,
+everywhere, and says so on one screen. Signing in follows the vault's
+0.9.0 rules: two-step sign-in for owners (and adults, where the household
+asks), too many tries, a code taken once, and this phone remembered.
+
+### Added
+- **"Update the app"**, over everything else, when the app is too old for
+  the vault: whenever the app reads what the vault can do (as it starts,
+  coming back to the front, Try again), and whenever the vault answers any
+  request, a renewal of the session included, that it wants a newer app.
+  It says so plainly, with the version the vault needs and this one; **Update
+  the app** opens this app's releases page; **Try again** looks again; **Show
+  what's kept on this phone** opens the kept Essentials, which need no
+  vault; **Sign out** still works, and says first that the kept Essentials
+  go with it (signed out already: **Use a different vault**). Nothing kept
+  on the phone is removed, and nobody is signed out by it. It covers the
+  screens rather than closing them: a scan's card, a note or an edit being
+  written stays as it was, and once updated, the app carries on where it
+  was.
+- **"Your vault needs updating"**, the same way, when the vault is older than
+  the app works with: whoever runs the vault updates it (**Show how**).
+- **Set up two-step sign-in** when the vault asks it first (an owner, or an
+  adult where the household asks every adult): its own screen, before the
+  tabs, with the authenticator app set up right there, as in Settings, or a
+  passkey in the browser and then **Carry on**. A sign-in that has two-step
+  sign-in but used the password alone types a code to carry on. Started
+  again before it is set up, the app shows this screen at once, never the
+  tabs first.
+- **Too many tries** at signing in: how long to wait, in minutes or seconds
+  (read from the vault's own words where the browser hides the header),
+  and Sign in waits until then.
+- A second step that is **a passkey alone**: the app can't use passkeys
+  yet, and says to sign in in the browser, or to add an authenticator app
+  there.
+- **This phone remembered** by the vault: its proof that it signed in before
+  is kept in the phone's keystore, one per vault, through signing out, and
+  sent with the password, so failed tries from anywhere else never make it
+  wait. A vault reinstalled at the same address gets none of the old one's.
+- Connect: an app too old for the vault offers **Update the app** too.
+- Failure states: the update screens, two-step sign-in to set up first, the
+  wait after too many tries, a passkey as the only second step, and a code
+  used already.
+
+### Changed
+- A code from the authenticator app given twice says **"That code was used
+  already. Wait for the next one."**
+- Scans and notes waiting on the phone keep waiting while the app is to be
+  updated or two-step sign-in set up first — nothing is tried meanwhile, and
+  a note's day under its key starts only with a try that could make it —
+  and go once it is: neither is a refusal of them. A new note saved then
+  waits on the phone too.
+
 ## [0.19.0] — Emergency information changed on the phone, who sees it, and the wallet card
 
 Re-pinned to the vault's **v0.9.0-dev.66**. A person's emergency

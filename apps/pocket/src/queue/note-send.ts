@@ -1,5 +1,6 @@
 import { ApiRequestError, type FetchLike, type Http } from '@fdv/client';
 import type { DocumentView } from '@fdv/shared';
+import { sessionHeld } from '../update/held';
 import { noteBody, type KeyedTry, type Landed, type NoteBody, type NotePayload } from './note';
 
 export type { Landed } from './note';
@@ -224,6 +225,8 @@ export const busy = (err: ApiRequestError): boolean =>
  */
 export function refusedOutright(err: unknown): boolean {
   if (!(err instanceof ApiRequestError) || err.status < 400 || err.status >= 500) return false;
+  // The app to be updated, or two-step sign-in to set up first (0.20.0): about the app, not the note.
+  if (sessionHeld(err)) return false;
   if (err.status === 401 || err.status === 408 || err.status === 429 || busy(err)) return false;
   if (err.code === 'created_not_visible' || err.code === 'idempotency_key_reused') return false;
   return true;

@@ -25,6 +25,7 @@ import { EssentialsProvider, useEssentials } from '../state/essentials';
 import { LockProvider, useLock } from '../state/lock';
 import { StepUpProvider } from '../state/step-up';
 import { useVault, VaultProvider } from '../state/vault';
+import { Blockers } from '../update/gate';
 import { headerFor, type HeaderOptions } from '../ui/app-header';
 import { font } from '../ui/fonts';
 import { TextScaleProvider, useTextScale } from '../ui/text-scale';
@@ -80,71 +81,75 @@ function Gates() {
       </View>
     );
   }
+  // The app too old for the vault, or the vault for the app, or two-step
+  // sign-in to set up first (0.20.0): one screen over all of these, until not.
   return (
-    <Stack
-      screenOptions={{
-        headerStyle: { backgroundColor: colours.bg },
-        headerTitleStyle: { color: colours.ink, ...font('600') },
-        // Back and any other header button, in the theme in use (P4).
-        headerTintColor: colours.ink,
-        headerShadowVisible: false,
-        contentStyle: { backgroundColor: colours.bg },
-        // The vault's bar at the top of every page, the page's title and buttons below it
-        // (the owner's ask of 11 Nov 2026): no back arrow, Android's back goes back.
-        header: ({ options }) => headerFor(options as HeaderOptions),
-        ...(still ? { animation: 'none' as const } : {}),
-      }}
-    >
-      <Stack.Protected guard={phase === 'ready'}>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false, title: t('tabs.home') }} />
-        {/* A ← before its ✎ and ⋯ (the owner's ask of 12 Nov 2026): a document's page and a note's. */}
-        <Stack.Screen name="document/[id]" options={{ title: '', headerBackVisible: true }} />
-        <Stack.Screen name="edit/[id]" options={{ title: '', headerShown: false }} />
-        {/* Its title is its page's, with the + beside it, as Notes': no bar above it (the owner's ask of 11 Nov 2026). */}
-        <Stack.Screen name="collections" options={{ title: t('collections.title'), headerTitle: '' }} />
-        <Stack.Screen name="trash" options={{ title: t('trashList.title') }} />
-        <Stack.Screen name="sharing" options={{ title: t('sharing.title') }} />
-        <Stack.Screen name="activity" options={{ title: t('activity.title') }} />
-        <Stack.Screen name="ask/index" options={{ title: t('ask.title') }} />
-        <Stack.Screen name="ask/[id]" options={{ title: t('ask.changeTitle') }} />
-        <Stack.Screen name="caregivers" options={{ title: t('caregivers.title'), headerTitle: '' }} />
-        {/* Emergency information (H4): the family's pages, and one person's, with ← to the list or the person. */}
-        <Stack.Screen name="emergency/index" options={{ title: t('emergency.title') }} />
-        <Stack.Screen name="emergency/[id]" options={{ title: '', headerBackVisible: true }} />
-        {/* Editing it (0.19.0): Cancel and Save at its foot, as Edit details. */}
-        <Stack.Screen name="emergency/edit/[id]" options={{ title: '', headerShown: false }} />
-        <Stack.Screen name="collection/[id]" options={{ title: '', headerBackVisible: true }} />
-        <Stack.Screen name="checklist/[id]" options={{ title: '', headerShown: false }} />
-        <Stack.Screen name="managers/[id]" options={{ title: '', headerBackVisible: true }} />
-        {/* My cabinet (C5): a cabinet, a drawer, a folder, each with ← to the level above; a label scanned. */}
-        <Stack.Screen name="cabinet/[id]" options={{ title: '', headerBackVisible: true }} />
-        <Stack.Screen name="drawer/[id]" options={{ title: '', headerBackVisible: true }} />
-        <Stack.Screen name="folder/[id]" options={{ title: '', headerBackVisible: true }} />
-        <Stack.Screen name="scan-label" options={{ title: '', headerShown: false }} />
-        <Stack.Screen name="new-note" options={{ title: '', headerShown: false }} />
-        <Stack.Screen name="person/[id]" options={{ title: '' }} />
-        <Stack.Screen name="attention" options={{ title: t('attention.title') }} />
-        <Stack.Screen name="account" options={{ title: t('more.account') }} />
-        <Stack.Screen name="capture" options={{ title: '', gestureEnabled: false, headerShown: false }} />
-        <Stack.Screen name="settings" options={{ title: t('settings.title') }} />
-        <Stack.Screen name="licences" options={{ title: t('settings.licences') }} />
-        <Stack.Screen name="timings" options={{ title: t('timings.title') }} />
-      </Stack.Protected>
-      <Stack.Protected guard={reading}>
-        <Stack.Screen name="essential/[id]" options={{ title: '', headerShown: false }} />
-        <Stack.Screen name="show/[id]" options={{ headerShown: false, animation: still ? 'none' : 'fade', gestureEnabled: false }} />
-      </Stack.Protected>
-      <Stack.Protected guard={phase === 'sign_in'}>
-        <Stack.Screen name="sign-in" options={{ headerShown: false }} />
-      </Stack.Protected>
-      <Stack.Protected guard={phase === 'connect'}>
-        <Stack.Screen name="connect" options={{ headerShown: false }} />
-      </Stack.Protected>
-      <Stack.Protected guard={SPIKE}>
-        <Stack.Screen name="spike/index" options={{ title: 'Scanner spike' }} />
-        <Stack.Screen name="spike/probes" options={{ title: 'Probes' }} />
-      </Stack.Protected>
-    </Stack>
+    <Blockers>
+      <Stack
+        screenOptions={{
+          headerStyle: { backgroundColor: colours.bg },
+          headerTitleStyle: { color: colours.ink, ...font('600') },
+          // Back and any other header button, in the theme in use (P4).
+          headerTintColor: colours.ink,
+          headerShadowVisible: false,
+          contentStyle: { backgroundColor: colours.bg },
+          // The vault's bar at the top of every page, the page's title and buttons below it
+          // (the owner's ask of 11 Nov 2026): no back arrow, Android's back goes back.
+          header: ({ options }) => headerFor(options as HeaderOptions),
+          ...(still ? { animation: 'none' as const } : {}),
+        }}
+      >
+        <Stack.Protected guard={phase === 'ready'}>
+          <Stack.Screen name="(tabs)" options={{ headerShown: false, title: t('tabs.home') }} />
+          {/* A ← before its ✎ and ⋯ (the owner's ask of 12 Nov 2026): a document's page and a note's. */}
+          <Stack.Screen name="document/[id]" options={{ title: '', headerBackVisible: true }} />
+          <Stack.Screen name="edit/[id]" options={{ title: '', headerShown: false }} />
+          {/* Its title is its page's, with the + beside it, as Notes': no bar above it (the owner's ask of 11 Nov 2026). */}
+          <Stack.Screen name="collections" options={{ title: t('collections.title'), headerTitle: '' }} />
+          <Stack.Screen name="trash" options={{ title: t('trashList.title') }} />
+          <Stack.Screen name="sharing" options={{ title: t('sharing.title') }} />
+          <Stack.Screen name="activity" options={{ title: t('activity.title') }} />
+          <Stack.Screen name="ask/index" options={{ title: t('ask.title') }} />
+          <Stack.Screen name="ask/[id]" options={{ title: t('ask.changeTitle') }} />
+          <Stack.Screen name="caregivers" options={{ title: t('caregivers.title'), headerTitle: '' }} />
+          {/* Emergency information (H4): the family's pages, and one person's, with ← to the list or the person. */}
+          <Stack.Screen name="emergency/index" options={{ title: t('emergency.title') }} />
+          <Stack.Screen name="emergency/[id]" options={{ title: '', headerBackVisible: true }} />
+          {/* Editing it (0.19.0): Cancel and Save at its foot, as Edit details. */}
+          <Stack.Screen name="emergency/edit/[id]" options={{ title: '', headerShown: false }} />
+          <Stack.Screen name="collection/[id]" options={{ title: '', headerBackVisible: true }} />
+          <Stack.Screen name="checklist/[id]" options={{ title: '', headerShown: false }} />
+          <Stack.Screen name="managers/[id]" options={{ title: '', headerBackVisible: true }} />
+          {/* My cabinet (C5): a cabinet, a drawer, a folder, each with ← to the level above; a label scanned. */}
+          <Stack.Screen name="cabinet/[id]" options={{ title: '', headerBackVisible: true }} />
+          <Stack.Screen name="drawer/[id]" options={{ title: '', headerBackVisible: true }} />
+          <Stack.Screen name="folder/[id]" options={{ title: '', headerBackVisible: true }} />
+          <Stack.Screen name="scan-label" options={{ title: '', headerShown: false }} />
+          <Stack.Screen name="new-note" options={{ title: '', headerShown: false }} />
+          <Stack.Screen name="person/[id]" options={{ title: '' }} />
+          <Stack.Screen name="attention" options={{ title: t('attention.title') }} />
+          <Stack.Screen name="account" options={{ title: t('more.account') }} />
+          <Stack.Screen name="capture" options={{ title: '', gestureEnabled: false, headerShown: false }} />
+          <Stack.Screen name="settings" options={{ title: t('settings.title') }} />
+          <Stack.Screen name="licences" options={{ title: t('settings.licences') }} />
+          <Stack.Screen name="timings" options={{ title: t('timings.title') }} />
+        </Stack.Protected>
+        <Stack.Protected guard={reading}>
+          <Stack.Screen name="essential/[id]" options={{ title: '', headerShown: false }} />
+          <Stack.Screen name="show/[id]" options={{ headerShown: false, animation: still ? 'none' : 'fade', gestureEnabled: false }} />
+        </Stack.Protected>
+        <Stack.Protected guard={phase === 'sign_in'}>
+          <Stack.Screen name="sign-in" options={{ headerShown: false }} />
+        </Stack.Protected>
+        <Stack.Protected guard={phase === 'connect'}>
+          <Stack.Screen name="connect" options={{ headerShown: false }} />
+        </Stack.Protected>
+        <Stack.Protected guard={SPIKE}>
+          <Stack.Screen name="spike/index" options={{ title: 'Scanner spike' }} />
+          <Stack.Screen name="spike/probes" options={{ title: 'Probes' }} />
+        </Stack.Protected>
+      </Stack>
+    </Blockers>
   );
 }
 

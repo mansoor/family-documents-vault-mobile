@@ -18,7 +18,7 @@ import { sp } from '../ui/space';
  * app confirms it. Turned off with a code, unless the household requires it
  * (an owner's). Passkeys stay in the browser.
  */
-export function TwoStep() {
+export function TwoStep(props: { onTurnedOn?: () => void } = {}) {
   const { t } = useTranslation();
   const { withToken } = useVault();
   const { guarded } = useStepUp();
@@ -78,6 +78,8 @@ export function TwoStep() {
       setCode('');
       setSaid(t('twoStep.on'));
       await load();
+      // A sign-in held until it was set up (0.20.0) carries on now.
+      props.onTurnedOn?.();
     });
 
   const turnOff = () =>

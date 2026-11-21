@@ -1,8 +1,11 @@
 import {
   ApiRequestError,
+  AppUpdateRequired,
   createApi,
   createHttp,
+  isAppUpdateRequired,
   isSessionOver,
+  negotiate,
   NetworkError,
   serverOriginFrom,
   SessionCore,
@@ -13,21 +16,30 @@ import {
   type StoredSession,
   type TokenStore,
 } from '@fdv/client';
-import type { Capabilities } from '@fdv/shared';
+import { APP_UPDATE_REQUIRED_MESSAGE, type Capabilities, type Me } from '@fdv/shared';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { AppState, Platform } from 'react-native';
+import { APP_VERSION, MIN_SERVER_VERSION } from '../config';
 import { log } from '../log';
 import { appHeaders } from '../net/app-headers';
 import type { ConnectOutcome } from '../net/connect';
 import { REQUEST_TIMEOUT_MS, routeDownloads, withStallGuard } from '../net/deadline';
+import { withRetryAfterFromBody } from '../net/retry-after';
 import { currentNetwork, onNetworkChange } from '../net/network';
 import { httpDecision, identityCheck, type NetworkKind } from '../net/policy';
 import { unreachableAnswer } from '../net/no-connection';
 import { noNetwork, setPhoneOffline, type Reach } from '../net/reach';
 import { watched, type Departure } from '../queue/note-send';
-import { firstLaunch } from '../platform/prefs';
+import { firstLaunch, readPrefs, writePrefs } from '../platform/prefs';
 import { pushNative, type PushNative } from '../push/native';
-import { forgetPreviousInstallation, installationId, SecureTokenStore } from '../session/store';
+import {
+  forgetDeviceProof,
+  forgetPreviousInstallation,
+  installationId,
+  SecureTokenStore,
+  withDeviceProof,
+} from '../session/store';
+import { heeding, twoStepHeld } from '../update/held';
 import { wordsFor } from '../errors/words';
 import i18n from '../i18n';
 import { emit } from './events';
@@ -66,6 +78,25 @@ const endedNotice = (reason: string | undefined): Notice =>
 /** The reasons the person is told in words of their own, not "signed out". */
 const toldWhy = (reason: string | undefined) => reason === 'suspended' || reason === 'access_ended';
 
+/**
+ * The app and the vault can't work together until one of them is updated
+ * (0.20.0), whatever screen was showing: this app is older than the vault
+ * works with (its capability document said so, or a request was answered
+ * `426 app_update_required`, or a renewal was), or the vault is older than
+ * the app works with. One screen says which, over everything else; the
+ * session and what is kept on the phone stay as they are.
+ */
+export type Blocked =
+  | { kind: 'update_app'; needed: string | null }
+  | { kind: 'update_vault'; server: string; needed: string };
+
+/**
+ * This session may do nothing but set up two-step sign-in, or confirm it
+ * with a code, until it does (the vault's 0.9.0): `enrol`, none set up yet;
+ * `confirm`, one is, and this session never gave it.
+ */
+export type TwoStepNeeded = 'enrol' | 'confirm';
+
 export type SignInResult =
   | { kind: 'ok' }
   /**
@@ -75,6 +106,18 @@ export type SignInResult =
    */
   | { kind: 'code'; methods: ('totp' | 'text')[]; textTo: string | null; textSent: boolean }
   | { kind: 'refused'; message: string; passkeyHint: boolean }
+  /**
+   * The second step is a passkey and nothing else (the vault's 0.9.0): the
+   * phone has no passkeys, so it is done in the browser.
+   */
+  | { kind: 'passkey_only' }
+  /**
+   * Too many tries at signing in (`429 sign_in_throttled`): the seconds
+   * before the vault takes another, as it said.
+   */
+  | { kind: 'throttled'; seconds: number }
+  /** The vault wants this app updated first: the update screen says so. */
+  | { kind: 'update_app' }
   /**
    * The password (and code) were right, but an owner has locked this
    * sign-in, or a restore paused it until an owner turns it back on (5.28,
@@ -143,6 +186,20 @@ interface VaultValue {
    */
   waiting: number | null;
   notice: Notice;
+  /** Until one of them is updated, the app and this vault can't work together (0.20.0); else null. */
+  blocked: Blocked | null;
+  /** This session must set up two-step sign-in first (0.20.0); else null. */
+  twoStep: TwoStepNeeded | null;
+  /**
+   * Either, this instant (0.20.0): read by the queue before each try, so
+   * nothing is tried that could only be refused for it.
+   */
+  heldBack: () => boolean;
+  /**
+   * Asks the vault whether this session still must (GET /me): `done` once
+   * it need not, and the app carries on; what /me said, either way.
+   */
+  recheckTwoStep: () => Promise<{ done: boolean; me: Me }>;
   api: Api | null;
   /** The same vault, for uploads (longer timeout, bytes-safe fetch). */
   uploadApi: Api | null;
@@ -210,6 +267,14 @@ export const useVault = (): VaultValue => {
 };
 
 const IDENTITY_TTL = 5 * 60_000;
+
+/** Which session was last held to setting up two-step sign-in (0.20.0): nothing secret, kept as a pref. */
+const TWO_STEP_HELD = 'two-step-held';
+interface TwoStepHeld {
+  origin: string;
+  member: string;
+  reason: TwoStepNeeded;
+}
 /** How long signing out waits for a renewal already under way (I5-5). */
 const SIGN_OUT_WAIT_MS = 3_000;
 /** How long an https vault's capability document is believed before the front looks again. */
@@ -310,12 +375,93 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
    * not have caught up — or not be there yet at all, just after a launch.
    */
   const capsRef = useRef<Capabilities | null>(null);
-  const knowCaps = useCallback((c: Capabilities | null, from?: string) => {
+  const [blocked, setBlockedState] = useState<Blocked | null>(null);
+  const [twoStep, setTwoStepState] = useState<TwoStepNeeded | null>(null);
+  // Read when a request's answer comes back or a renewal is believed, never while rendering.
+  const twoStepRef = useRef<TwoStepNeeded | null>(null);
+  const blockedRef = useRef<Blocked | null>(null);
+  /** Blocked or not, known at once to whatever asks next (the queue), not only at the next render. */
+  const putBlocked = useCallback((next: Blocked | null) => {
+    const was = blockedRef.current !== null || twoStepRef.current !== null;
+    blockedRef.current = next;
+    setBlockedState(next);
+    // Held back no more: what was kept on screen underneath looks again.
+    if (was && next === null && twoStepRef.current === null) emit('carryOn');
+  }, []);
+  const heldBack = useCallback(() => blockedRef.current !== null || twoStepRef.current !== null, []);
+  const sessionRef = useRef<SessionCore | null>(null);
+  const originRef = useRef<string | null>(null);
+  /** What the last renewal said of two-step sign-in, until its session is in use (tokenFor). */
+  const renewalSaid = useRef<{ held: boolean; refresh: string } | null>(null);
+  // The session core outlives renders: it tells what a renewal said through this.
+  const renewalHeard = useRef<(held: boolean, refresh: string) => void>(() => undefined);
+  useEffect(() => {
+    renewalHeard.current = (held, refresh) => {
+      renewalSaid.current = { held, refresh };
+    };
+  }, []);
+  /**
+   * Held to setting up two-step sign-in, or no longer — and remembered for
+   * this vault and person (0.20.0), so a launch with the session kept shows
+   * its screen at once rather than the tabs first.
+   */
+  const putTwoStep = useCallback((next: TwoStepNeeded | null) => {
+    const was = blockedRef.current !== null || twoStepRef.current !== null;
+    twoStepRef.current = next;
+    if (was && next === null && blockedRef.current === null) emit('carryOn');
+    setTwoStepState(next);
+    const held = readPrefs<TwoStepHeld | null>(TWO_STEP_HELD, null);
+    if (next) {
+      const s = sessionRef.current?.info;
+      const at = originRef.current;
+      if (s && at) writePrefs(TWO_STEP_HELD, { origin: at, member: s.member_id, reason: next });
+    } else if (held) writePrefs(TWO_STEP_HELD, null);
+  }, []);
+  /**
+   * Every read of the capability document is numbered as it is asked
+   * (0.20.0): an answer to an older one never undoes what a newer one, or a
+   * 426 heard after it was asked, said.
+   */
+  const capsAsked = useRef(0);
+  const capsJudged = useRef(0);
+  const blockedAt = useRef(0);
+  /** The vault wants this app updated (a 426, or a renewal refused so): over everything, until it doesn't. */
+  const heardUpdate = useCallback((needed: string | null) => {
+    blockedAt.current = capsAsked.current;
+    const b = blockedRef.current;
+    if (b?.kind === 'update_app' && (needed === null || b.needed === needed)) return;
+    putBlocked({ kind: 'update_app', needed });
+  }, [putBlocked]);
+  /** Whatever any request met on its way back: either answer that holds the whole app back. */
+  const heard = useCallback(
+    (err: unknown) => {
+      if (isAppUpdateRequired(err)) heardUpdate(err.minClientVersion ?? null);
+      else if (twoStepHeld(err)) putTwoStep(err.reason === 'confirm' ? 'confirm' : 'enrol');
+    },
+    [heardUpdate, putTwoStep],
+  );
+  const heardRef = useRef(heard);
+  useEffect(() => {
+    heardRef.current = heard;
+  }, [heard]);
+  const knowCaps = useCallback((c: Capabilities | null, from?: string, asked?: number) => {
+    // An answer to a read older than one already judged: nothing it says stands.
+    if (asked !== undefined && asked < capsJudged.current) return;
+    if (asked !== undefined) capsJudged.current = asked;
     capsRef.current = c;
     setCaps(c);
     // Kept for next time (0.18.1): a launch with no answer looks as the last one did.
     if (c && from) keepCaps(from, c);
-  }, []);
+    if (!c) return;
+    // Whether the two can work together, on every look at the capability
+    // document (0.20.0) — at the start, coming back to the front, Try
+    // again — not only on Connect: either may have been updated since.
+    const n = negotiate(c, { clientVersion: APP_VERSION, minServerVersion: MIN_SERVER_VERSION });
+    if (n.kind === 'client_too_old') putBlocked({ kind: 'update_app', needed: n.needed });
+    else if (n.kind === 'server_too_old') putBlocked({ kind: 'update_vault', server: n.server, needed: n.needed });
+    // All is well: so said by a read asked after any 426 was heard, or by Connect's own.
+    else if (n.kind === 'ok' && (asked === undefined || asked > blockedAt.current)) putBlocked(null);
+  }, [putBlocked]);
   const [offline, setOffline] = useState(false);
   const [reach, setReach] = useState<Reach>('online');
   const [waiting, setWaiting] = useState<number | null>(null);
@@ -343,35 +489,49 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
   // must not make a new client, and with it a new session core that has
   // forgotten the access token it was just given.
   const origin = vault?.origin ?? null;
+  useEffect(() => {
+    originRef.current = origin;
+  }, [origin]);
   const api = useMemo(() => {
     if (!origin || !installation) return null;
     return createApi(
-      // onServerVersion reads its ref when an answer arrives, not while
-      // rendering; the compiler cannot see that from here.
-      // eslint-disable-next-line react-hooks/refs
-      createHttp({
-        baseUrl: origin,
-        // JSON by the phone's fetch; files by one whose bytes are watched as they come.
-        fetch: routeDownloads(deps.fetch, withStallGuard(deps.downloadFetch)),
-        headers: () => appHeaders(installation),
-        // No answer in this long, and none is waited for (0.13.0, net/deadline.ts).
-        timeoutMs: deps.requestTimeoutMs,
-        onServerVersion: (version) => versionHeard.current(version),
-      }),
+      heeding(
+        // onServerVersion reads its ref when an answer arrives, not while
+        // rendering; the compiler cannot see that from here.
+        // eslint-disable-next-line react-hooks/refs
+        createHttp({
+          baseUrl: origin,
+          // JSON by the phone's fetch; files by one whose bytes are watched as they come.
+          // A 429's wait read from its body too, where the header can't be (the web build).
+          fetch: withRetryAfterFromBody(routeDownloads(deps.fetch, withStallGuard(deps.downloadFetch))),
+          headers: () => appHeaders(installation),
+          // No answer in this long, and none is waited for (0.13.0, net/deadline.ts).
+          timeoutMs: deps.requestTimeoutMs,
+          onServerVersion: (version) => versionHeard.current(version),
+        }),
+        // What a request met is told when its answer comes back, not while
+        // rendering; as onServerVersion, the compiler cannot see that from here.
+        // eslint-disable-next-line react-hooks/refs
+        (err) => heardRef.current(err),
+      ),
     );
   }, [origin, installation, deps.fetch, deps.downloadFetch, deps.requestTimeoutMs]);
 
   const uploadApi = useMemo(() => {
     if (!origin || !installation) return null;
     return createApi(
-      // As above: onServerVersion reads its ref when an answer arrives.
-      // eslint-disable-next-line react-hooks/refs
-      createHttp({
-        baseUrl: origin,
-        fetch: withSizedTimeout(deps.uploadFetch),
-        headers: () => appHeaders(installation),
-        onServerVersion: (version) => versionHeard.current(version),
-      }),
+      heeding(
+        // As above: onServerVersion reads its ref when an answer arrives.
+        // eslint-disable-next-line react-hooks/refs
+        createHttp({
+          baseUrl: origin,
+          fetch: withSizedTimeout(deps.uploadFetch),
+          headers: () => appHeaders(installation),
+          onServerVersion: (version) => versionHeard.current(version),
+        }),
+        // eslint-disable-next-line react-hooks/refs
+        (err) => heardRef.current(err),
+      ),
     );
   }, [origin, installation, deps.uploadFetch]);
 
@@ -449,6 +609,7 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
       const v = verified.current;
       if (v && v.epoch === started && v.network === network && deps.now() - v.at < IDENTITY_TTL) return;
       verified.current = null;
+      const asked = ++capsAsked.current;
       const answered = await api.capabilities(); // NetworkError propagates: offline
       if (epoch.current !== started) continue;
       const identity = identityCheck(vault.origin, vault.instanceId, answered.instance_id);
@@ -459,7 +620,7 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
       }
       verified.current = { at: deps.now(), network, epoch: started };
       setNotice((n) => (n === 'stranger' || n === 'wifi_only' ? null : n));
-      knowCaps(answered, vault.origin);
+      knowCaps(answered, vault.origin, asked);
       return;
     }
     throw new NetworkError('offline');
@@ -491,16 +652,24 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
               if (unusable(err)) throw new NetworkError('offline');
               throw err;
             }
-            return api.refresh(refreshToken);
+            const tokens = await api.refresh(refreshToken);
+            // Held to setting up two-step sign-in, or no longer (0.20.0): a renewal
+            // says which, believed once its session is the one in use (tokenFor).
+            renewalHeard.current(tokens.two_step_setup_required === true, tokens.refresh_token);
+            return tokens;
           },
         },
-        deps.store,
+        // This vault's device proof beside the session (0.20.0): kept, and sent with the password.
+        origin ? withDeviceProof(deps.store, origin) : deps.store,
         // Called when a wait begins and ends, not while rendering.
         // eslint-disable-next-line react-hooks/refs
         { now: deps.now, onWait: heardWait },
       ),
-    [api, deps.store, deps.now, heardWait],
+    [api, origin, deps.store, deps.now, heardWait],
   );
+  useEffect(() => {
+    sessionRef.current = session;
+  }, [session]);
 
   // Each session core reads the store once. Anything that wants a token
   // waits for that read: a core that has not read it yet says "signed out",
@@ -559,6 +728,7 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
       }
     }
     try {
+      const asked = ++capsAsked.current;
       const answered = await api.capabilities();
       setOffline(false);
       const identity = identityCheck(vault.origin, vault.instanceId, answered.instance_id);
@@ -567,9 +737,11 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
         const next = updateVault(vault.origin, { instanceId: answered.instance_id ?? null });
         setVault(next.known.find((k) => k.origin === vault.origin) ?? vault);
       }
-      knowCaps(answered, vault.origin);
+      knowCaps(answered, vault.origin, asked);
       checkedAt.current = deps.now();
       if (identity.kind === 'reinstalled') {
+        // Another installation answers here now: this phone's proof was the old one's.
+        await forgetDeviceProof(vault.origin);
         await session.clear();
         setNotice('reinstalled');
         setPhase('sign_in');
@@ -602,12 +774,15 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
   const watchedHttp = useCallback(
     (watch: (d: Departure) => void): Http | null =>
       origin && installation
-        ? createHttp({
-            baseUrl: origin,
-            fetch: watched(deps.fetch, watch),
-            headers: () => appHeaders(installation),
-            timeoutMs: deps.requestTimeoutMs,
-          })
+        ? heeding(
+            createHttp({
+              baseUrl: origin,
+              fetch: watched(deps.fetch, watch),
+              headers: () => appHeaders(installation),
+              timeoutMs: deps.requestTimeoutMs,
+            }),
+            (err) => heardRef.current(err),
+          )
         : null,
     [origin, installation, deps.fetch, deps.requestTimeoutMs],
   );
@@ -671,6 +846,14 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
         await endedByPush();
         if (!cancelled) setPhase('sign_in');
         return;
+      }
+      // Held to setting up two-step sign-in when the app last ran (0.20.0): its
+      // screen first, not the tabs, until the vault says otherwise.
+      const held = readPrefs<TwoStepHeld | null>(TWO_STEP_HELD, null);
+      const info = session.info;
+      if (info && held && held.origin === vault.origin && held.member === info.member_id) {
+        twoStepRef.current = held.reason;
+        setTwoStepState(held.reason);
       }
       setPhase(session.signedIn ? 'ready' : 'sign_in');
       // Signed in from the start (a session kept from before): what the
@@ -781,9 +964,27 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
         throw err;
       }
       const t = await session.token({ wait });
+      if (t.kind === 'offline' && t.updateRequired) {
+        // The vault answered, and wants this app updated first: never offline,
+        // never signed out. The session waits, untouched, for the updated app.
+        const needed = t.updateRequired.minClientVersion;
+        heardUpdate(needed);
+        throw new AppUpdateRequired(APP_UPDATE_REQUIRED_MESSAGE, needed ?? undefined);
+      }
       if (t.kind === 'offline') {
         setOffline(true);
         throw new NetworkError('offline');
+      }
+      if (t.kind === 'ok') {
+        // What the renewal said of two-step sign-in, only if its session is the one in use.
+        const said = renewalSaid.current;
+        if (said) {
+          renewalSaid.current = null;
+          if (session.info?.refresh_token === said.refresh) {
+            if (said.held) putTwoStep(twoStepRef.current ?? 'enrol');
+            else if (twoStepRef.current) putTwoStep(null);
+          }
+        }
       }
       if (t.kind === 'ended' || t.kind === 'signed_out') {
         await session.clear();
@@ -816,7 +1017,7 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
         throw err;
       }
     },
-    [api, gate, session, hydrated, recheck],
+    [api, gate, session, hydrated, recheck, heardUpdate, putTwoStep],
   );
   const withToken = useCallback(
     <T,>(fn: (a: Api, token: string) => Promise<T>): Promise<T> => tokenFor(fn, true),
@@ -845,19 +1046,26 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
       // A session belongs to one vault; another vault, or this one
       // reinstalled, starts from nothing.
       if (before.current !== outcome.origin || outcome.kind === 'reinstalled') await session.clear();
+      if (outcome.kind === 'reinstalled') await forgetDeviceProof(outcome.origin);
       saveVault(record);
       verified.current = null;
+      putTwoStep(null);
+      // Connect's own look said these two work together: nothing older stands.
+      blockedAt.current = capsAsked.current;
+      putBlocked(null);
       setNotice(outcome.kind === 'reinstalled' ? 'reinstalled' : null);
       knowCaps(outcome.caps, outcome.origin);
       setVault(record);
       setPhase('loading');
     },
-    [session, knowCaps],
+    [session, knowCaps, putTwoStep, putBlocked],
   );
 
   const accepted = useCallback(
     async (tokens: Parameters<SessionCore['accept']>[0], email: string | null) => {
       await session.accept(tokens);
+      // Held to setting up two-step sign-in (0.20.0): said by the tokens; why, by GET /me.
+      putTwoStep(tokens.two_step_setup_required ? 'enrol' : null);
       if (vault && email)
         setVault(updateVault(vault.origin, { email }).known.find((k) => k.origin === vault.origin) ?? vault);
       mfaToken.current = null;
@@ -870,12 +1078,14 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
       // it (4.10). Over http the gate learns it before anything is sent.
       if (vault?.origin.startsWith('https://')) void recheckRef.current();
     },
-    [session, vault],
+    [session, vault, putTwoStep],
   );
 
   const pendingEmail = useRef<string | null>(null);
 
   const signInFailed = (err: unknown): SignInResult => {
+    // The update screen says it, over the sign-in (heeding heard it already).
+    if (isAppUpdateRequired(err)) return { kind: 'update_app' };
     if (err instanceof StrangerError) return { kind: 'stranger' };
     if (err instanceof WifiOnlyError) return { kind: 'wifi_only' };
     if (err instanceof NetworkError) return { kind: 'unreachable' };
@@ -892,6 +1102,10 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
       emit('sessionEnded', 'access_ended');
       return { kind: 'access_ended' };
     }
+    // Too many tries at signing in (the vault's 0.9.0): how long, as it said.
+    if (err instanceof ApiRequestError && err.code === 'sign_in_throttled') {
+      return { kind: 'throttled', seconds: Math.max(1, Math.ceil(err.retryAfterSeconds ?? 60)) };
+    }
     // The vault's words for a wrong password; the catalogue's for anything else (4.17).
     const words = wordsFor(err, i18n.t.bind(i18n));
     if (err instanceof ApiRequestError) {
@@ -905,13 +1119,19 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
       if (!api) return { kind: 'unreachable' };
       try {
         await gate();
-        const r = await api.signIn(email.trim(), password);
+        await hydrated(session);
+        // This phone's proof that it signed in here before (0.20.0): others' failed tries never make it wait.
+        const proof = await session.deviceProof().catch(() => null);
+        const r = await api.signIn(email.trim(), password, proof);
         if ('mfa_required' in r) {
+          // An older vault says nothing of the ways: the authenticator's, as before.
+          const said = r.methods && r.methods.length > 0 ? r.methods : (['totp'] as const);
+          // A passkey is the browser's: the phone offers the ways it has.
+          const methods = said.filter((m): m is 'totp' | 'text' => m === 'totp' || m === 'text');
+          if (methods.length === 0) return { kind: 'passkey_only' };
           mfaToken.current = r.mfa_token;
           pendingEmail.current = email.trim();
-          // An older vault says nothing of the ways: the authenticator's, as before.
-          const methods = r.methods && r.methods.length > 0 ? r.methods : (['totp'] as const);
-          return { kind: 'code', methods: [...methods], textTo: r.text_to ?? null, textSent: r.text_sent === true };
+          return { kind: 'code', methods, textTo: r.text_to ?? null, textSent: r.text_sent === true };
         }
         await accepted(r, email.trim());
         return { kind: 'ok' };
@@ -919,7 +1139,7 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
         return signInFailed(err);
       }
     },
-    [api, gate, accepted],
+    [api, gate, accepted, hydrated, session],
   );
 
   const signInCode = useCallback(
@@ -991,8 +1211,9 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
     await session.clear();
     emit('signedOut');
     setNotice(null);
+    putTwoStep(null);
     setPhase('sign_in');
-  }, [api, hydrated, withTokenNow, session, runBeforeSignOut]);
+  }, [api, hydrated, withTokenNow, session, runBeforeSignOut, putTwoStep]);
 
   const chooseAnotherVault = useCallback(async () => {
     await runBeforeSignOut();
@@ -1002,9 +1223,21 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
     verified.current = null;
     setVault(null);
     knowCaps(null);
+    putBlocked(null);
+    putTwoStep(null);
     setNotice(null);
     setPhase('connect');
-  }, [session, runBeforeSignOut, knowCaps]);
+  }, [session, runBeforeSignOut, knowCaps, putTwoStep, putBlocked]);
+
+  const recheckTwoStep = useCallback(async (): Promise<{ done: boolean; me: Me }> => {
+    const me = await withToken((a, token) => a.me(token));
+    if (me.two_step_setup_required === true) {
+      putTwoStep(me.two_step_reason === 'confirm' ? 'confirm' : 'enrol');
+      return { done: false, me };
+    }
+    putTwoStep(null);
+    return { done: true, me };
+  }, [withToken, putTwoStep]);
 
   // What this vault said this session, else what it said last time (0.18.1).
   const lastCaps = useMemo(() => caps ?? (origin ? keptCaps(origin) : null), [caps, origin]);
@@ -1032,6 +1265,10 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
       reach,
       waiting,
       notice,
+      blocked,
+      twoStep,
+      heldBack,
+      recheckTwoStep,
       api,
       uploadApi,
       who,
@@ -1059,6 +1296,10 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
       reach,
       waiting,
       notice,
+      blocked,
+      twoStep,
+      heldBack,
+      recheckTwoStep,
       api,
       uploadApi,
       who,

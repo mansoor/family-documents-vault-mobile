@@ -1,4 +1,4 @@
-import { ApiRequestError, createHttp, type FetchLike } from '@fdv/client';
+import { ApiRequestError, AppUpdateRequired, createHttp, type FetchLike } from '@fdv/client';
 import { noConnection } from '../net/no-connection';
 import { respond } from '../test-support/render';
 import { noteBody, noteBytes, noteItem, readNote, sameBody, type KeyedTry, type NotePayload } from './note';
@@ -286,9 +286,12 @@ describe('postNote', () => {
       [404, 'created_not_visible'],
       [422, 'idempotency_key_reused'],
       [500, 'internal'],
+      // The app to be updated, or two-step sign-in to set up first (0.20.0): about the app, never the note.
+      [403, 'two_step_setup_required'],
     ] as const) {
       expect([status, code, refusedOutright(e(status, code))]).toEqual([status, code, false]);
     }
+    expect(refusedOutright(new AppUpdateRequired('Update the app.', '0.21.0'))).toBe(false);
   });
 });
 

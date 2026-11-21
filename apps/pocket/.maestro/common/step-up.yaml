@@ -1,0 +1,28 @@
+# "Confirm it's you", if it is asked: the password where the sheet takes it,
+# or the owner's code where only a code will do (an owner with two-step
+# sign-in, the vault of 0.9.0), from the run's authenticator (totp-code.js).
+appId: io.github.mansoor.familyvault.e2e
+---
+- runFlow:
+    when:
+      visible:
+        id: step-up-password
+    commands:
+      - tapOn:
+          id: step-up-password
+      - inputText: ${PASSWORD}
+      - hideKeyboard
+      - tapOn:
+          id: step-up-go
+- runFlow:
+    when:
+      visible:
+        id: step-up-code
+    commands:
+      - runScript: totp-code.js
+      - tapOn:
+          id: step-up-code
+      - inputText: ${output.code}
+      - hideKeyboard
+      - tapOn:
+          id: step-up-go

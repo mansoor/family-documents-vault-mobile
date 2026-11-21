@@ -1,5 +1,6 @@
-import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
+import { expect, test, type APIRequestContext } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
+import { apiToken, Authenticator, ready, signInOnPage, VAULT } from './vault';
 
 /**
  * Iteration 4.4's proof on a real vault, through the web build's picker:
@@ -7,10 +8,6 @@ import { randomUUID } from 'node:crypto';
  * its owner's — whole, private from its first byte — and a second adult
  * of the same family can neither list it nor find it.
  */
-const VAULT = process.env.FDV_DEV_API ?? 'http://localhost:8099';
-const EMAIL = process.env.FDV_E2E_EMAIL ?? 'pocket-e2e@example.test';
-const PASSWORD = process.env.FDV_E2E_PASSWORD ?? 'correct horse battery staple';
-const FAMILY = 'The Pocket family';
 
 /** A one-page PDF with a line of text on it. */
 function pdf(text: string): Buffer {
@@ -35,14 +32,6 @@ function pdf(text: string): Buffer {
   return Buffer.from(out, 'latin1');
 }
 
-async function token(request: APIRequestContext, email: string, password: string): Promise<string> {
-  const r = await request.post(`${VAULT}/api/v1/auth/password`, { data: { email, password } });
-  expect(r.ok(), await r.text()).toBe(true);
-  const body = (await r.json()) as { access_token?: string };
-  if (!body.access_token) throw new Error('two-step sign-in is on for the e2e account');
-  return body.access_token;
-}
-
 const titlesFor = async (request: APIRequestContext, bearer: string) => {
   const r = await request.get(`${VAULT}/api/v1/documents?limit=200`, {
     headers: { authorization: `Bearer ${bearer}` },
@@ -54,15 +43,9 @@ const titlesFor = async (request: APIRequestContext, bearer: string) => {
 let second = { email: '', password: 'another correct horse battery' };
 
 test.beforeAll(async ({ request }) => {
-  const caps = (await (await request.get(`${VAULT}/api/v1/capabilities`)).json()) as { setup_required: boolean };
-  if (caps.setup_required) {
-    const r = await request.post(`${VAULT}/api/v1/setup`, {
-      data: { household_name: FAMILY, display_name: 'Pocket Owner', email: EMAIL, password: PASSWORD },
-    });
-    expect(r.ok(), await r.text()).toBe(true);
-  }
+  test.setTimeout(120_000);
   // A second adult in the same family.
-  const owner = await token(request, EMAIL, PASSWORD);
+  const owner = await ready(request);
   second = { ...second, email: `pocket-second-${randomUUID().slice(0, 8)}@example.test` };
   const invited = await request.post(`${VAULT}/api/v1/invitations`, {
     headers: { authorization: `Bearer ${owner}` },
@@ -76,20 +59,11 @@ test.beforeAll(async ({ request }) => {
   expect(accepted.ok(), await accepted.text()).toBe(true);
 });
 
-async function signIn(page: Page, address: string) {
-  await page.goto('/');
-  await page.getByLabel('Vault address').fill(address);
-  await page.getByRole('button', { name: 'Connect' }).click();
-  await page.getByRole('button', { name: 'Use it on this Wi-Fi' }).click();
-  await page.getByLabel('Email').fill(EMAIL);
-  await page.getByLabel('Password', { exact: true }).fill(PASSWORD);
-  await page.getByRole('button', { name: 'Sign in' }).click();
-  await expect(page.getByTestId('home-ready')).toBeVisible();
-}
-
 test('a PDF saved as Only me is invisible to the second adult', async ({ page, baseURL, request }) => {
   const title = `Only me proof ${randomUUID().slice(0, 8)}`;
-  await signIn(page, new URL(baseURL ?? '').host);
+  // The owner's codes, each a time step of its own, and the second adult's set-up: minutes at most.
+  test.setTimeout(180_000);
+  await signInOnPage(page, new URL(baseURL ?? '').host);
 
   // Add a file, from the tab bar's +: the browser's own file chooser.
   const chooser = page.waitForEvent('filechooser');
@@ -114,12 +88,13 @@ test('a PDF saved as Only me is invisible to the second adult', async ({ page, b
   await expect(page.getByText(/^Saved\./)).toBeVisible();
   await expect(page.getByText('On its way')).toHaveCount(0, { timeout: 30_000 });
 
-  const owner = await token(request, EMAIL, PASSWORD);
+  const owner = await apiToken(request);
   const mine = (await titlesFor(request, owner)).find((d) => d.title === title);
   expect(mine).toMatchObject({ visibility: 'private' });
   expect(mine?.owner_member_id).toBeTruthy();
 
-  const theirs = await token(request, second.email, second.password);
+  // A household made since 0.9.0 asks it of adults too: theirs is set up as they sign in.
+  const theirs = await apiToken(request, second.email, second.password, new Authenticator(null));
   expect((await titlesFor(request, theirs)).some((d) => d.title === title)).toBe(false);
   const searched = await request.get(`${VAULT}/api/v1/search?q=${encodeURIComponent(title)}`, {
     headers: { authorization: `Bearer ${theirs}` },

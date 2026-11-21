@@ -93,6 +93,16 @@ export const CATALOGUE: Readonly<Record<string, string>> = {
   // has no mail server, said under the address; a request ended meanwhile.
   email_code_unavailable: 'ask.codeUnavailableWords',
   request_ended: 'ask.requestEnded',
+  // The vault wants this app updated first (0.20.0): the update screen says so, over everything.
+  app_update_required: 'errors.updateApp',
+  // This sign-in must set up two-step sign-in first (the vault's 0.9.0): its own screen says so.
+  two_step_setup_required: 'errors.twoStepSetup',
+  // Too many tries at signing in (the vault's 0.9.0): Sign in says how long, and waits.
+  sign_in_throttled: 'errors.rateLimited',
+  // A connected app's own answers (the client's apps.ts): never the phone's, said generally if ever met.
+  app_token_expired: 'errors.general',
+  app_token_invalid: 'errors.general',
+  app_key_not_accepted: 'errors.general',
 };
 
 /** The vault's "not now" answers: a scan waiting on one of these is sent again later by itself. */
@@ -133,6 +143,14 @@ const VAULT_SAYS: ReadonlySet<string> = new Set([
   'request_ended',
 ]);
 
+/**
+ * A code from an authenticator app given a second time (the vault's 0.9.0
+ * takes each code once): the vault refuses it as a wrong one, in words that
+ * say so. The phone says it in its own, shorter.
+ */
+// TODO: the vault's next iteration gives a used code its own reason, `code_used`; read that, not the words.
+const CODE_USED = /^That code was used already/i;
+
 /** The words for a failure, as the person should read them. */
 export function wordsFor(err: unknown, t: TFunction, general = 'errors.general'): string {
   // No answer: the phone with no network at all is told so (0.13.0); with
@@ -147,6 +165,7 @@ export function wordsFor(err: unknown, t: TFunction, general = 'errors.general')
     return t(isPhoneOffline() ? 'errors.noNetwork' : 'errors.offline');
   }
   if (err instanceof ApiRequestError) {
+    if ((err.status === 401 || err.status === 422) && CODE_USED.test(err.message)) return t('errors.codeUsed');
     // The vault's own words first, where only it knows them — its limits among them.
     if (VAULT_SAYS.has(err.code) && err.message) return err.message;
     // Too many tries, however the vault's limiter phrased it: when to try again.

@@ -7,8 +7,8 @@
 set -eu
 V=http://localhost:8099
 PHONE=$(cat /proc/sys/kernel/random/uuid)
-TOKEN=$(curl -sf "$V/api/v1/auth/password" -H 'content-type: application/json' -H "x-fdv-installation: $PHONE" \
-  -d "{\"email\":\"$EMAIL\",\"password\":\"$PASSWORD\"}" | jq -r .access_token)
+. "$(dirname "$0")/owner-token.sh"
+TOKEN=$(owner_token -H "x-fdv-installation: $PHONE")
 ID=$(curl -sf "$V/api/v1/documents?limit=10" -H "authorization: Bearer $TOKEN" | jq -r '.items[0].id')
 test -n "$ID" && test "$ID" != null
 curl -sf -X PATCH "$V/api/v1/documents/$ID" -H "authorization: Bearer $TOKEN" -H 'content-type: application/json' \

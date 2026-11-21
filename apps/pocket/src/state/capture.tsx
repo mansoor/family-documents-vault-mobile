@@ -49,6 +49,7 @@ import { noConnection } from '../net/no-connection';
 import { openQueue } from '../queue/open';
 import type { QueueStore } from '../queue/store';
 import { NotThisAccountError, Uploader } from '../queue/uploader';
+import { sessionHeld } from '../update/held';
 import { emit, on } from './events';
 import { useLock } from './lock';
 import { useVault } from './vault';
@@ -315,6 +316,9 @@ export function CaptureProvider(props: { children: ReactNode; deps?: Partial<Cap
     offline,
     caps,
     watchedHttp,
+    blocked,
+    twoStep,
+    heldBack,
   } = useVault();
   // Leaving for the scanner or a picker is not leaving the app: it does not lock.
   const lock = useLock();
@@ -380,6 +384,8 @@ export function CaptureProvider(props: { children: ReactNode; deps?: Partial<Cap
 
   // The uploader reads who is signed in, and how to reach the vault, when
   // it runs — through a ref, so one uploader lives as long as the store.
+  /** Held back at the last render (0.20.0): once it is not, what waited goes. */
+  const heldRef = useRef(false);
   const current = useRef({
     who,
     withToken,
@@ -558,7 +564,9 @@ export function CaptureProvider(props: { children: ReactNode; deps?: Partial<Cap
           if (next.inMs === null) throw new MaybeSentError();
           throw new NoAnswerError(err.answer, next.inMs);
         }
-        if (tried && !first && (err instanceof NotSentError || refusedOutright(err))) {
+        // Held back (the app to be updated, two-step sign-in first: 0.20.0) is
+        // answered before anything is made, as a refusal is.
+        if (tried && !first && (err instanceof NotSentError || refusedOutright(err) || sessionHeld(err))) {
           // This was its first try, and nothing was made by it: the note may go as it is then.
           await keep({ sent: null });
         } else if (first && refusedOutright(err)) {
@@ -704,6 +712,7 @@ export function CaptureProvider(props: { children: ReactNode; deps?: Partial<Cap
     // eslint-disable-next-line react-hooks/refs
     const u = new Uploader({
       store,
+      heldBack,
       send: (item, bytes) =>
         asOwner(item, async (token) => {
           if (item.kind === 'note') return sendNote(token, item, bytes);
@@ -816,7 +825,7 @@ export function CaptureProvider(props: { children: ReactNode; deps?: Partial<Cap
     });
     if (!inFront()) u.stop();
     return u;
-  }, [store, deps.now, deps.schedule, timings, refresh, sendOne, addHidden]);
+  }, [store, deps.now, deps.schedule, timings, refresh, sendOne, addHidden, heldBack]);
 
   // Signed in (again), or somebody else: their queue, and a look at it now.
   // What was saved or scanned for the one before is not theirs.
@@ -989,6 +998,15 @@ export function CaptureProvider(props: { children: ReactNode; deps?: Partial<Cap
       uploader.stop();
     };
   }, [uploader]);
+
+  // Held back no longer (0.20.0: the app updated, two-step sign-in set up):
+  // what waited goes now.
+  const held = blocked !== null || twoStep !== null;
+  useEffect(() => {
+    const was = heldRef.current;
+    heldRef.current = held;
+    if (was && !held && inFront()) void uploader?.kick({ fresh: true });
+  }, [held, uploader]);
 
   // The vault answering again (Try again, or the app looking by itself):
   // notes written offline go now. Scans keep their own pace, as before.
@@ -1246,8 +1264,8 @@ export function CaptureProvider(props: { children: ReactNode; deps?: Partial<Cap
       const w = who;
       if (!w || !can(w.role, 'document.add')) return { kind: 'refused', problem: 'not_allowed' };
       const key = deps.uuid();
-      // Known to have no answer: kept here at once, nothing sent.
-      if (current.current.offline) return keepNote(payload, key, 'waiting');
+      // Known to have no answer, or the app held back (0.20.0): kept here at once, nothing sent.
+      if (current.current.offline || heldBack()) return keepNote(payload, key, 'waiting');
       let s: QueueStore;
       try {
         s = await openOnce();
@@ -1296,6 +1314,9 @@ export function CaptureProvider(props: { children: ReactNode; deps?: Partial<Cap
           if (err instanceof MaybeSentError) return await kept({ state: 'unsure' });
           // It never left, or goes again safely under its key: it waits, and goes by itself.
           if (noConnection(err)) return await kept({ state: 'waiting', lastCode: 'offline' });
+          // The app to be updated, or two-step sign-in first (0.20.0): nothing was
+          // made, and nothing is wrong with the note. It waits, and goes once that is put right.
+          if (sessionHeld(err)) return await kept({ state: 'waiting', lastCode: (err as { code: string }).code });
           // Refused: nothing kept here — New note says why, and what was typed is still on it.
           await s.remove(item.id);
           await refresh();
@@ -1305,7 +1326,7 @@ export function CaptureProvider(props: { children: ReactNode; deps?: Partial<Cap
         uploader?.unclaim(item.id);
       }
     },
-    [who, deps, keepNote, openOnce, refresh, uploader, sendOne, addHidden],
+    [who, deps, keepNote, openOnce, refresh, uploader, sendOne, addHidden, heldBack],
   );
 
   const changeNote = useCallback(

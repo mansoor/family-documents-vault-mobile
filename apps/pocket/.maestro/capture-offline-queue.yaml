@@ -29,6 +29,8 @@ env:
 - hideKeyboard
 - tapOn:
     id: sign-in-go
+# The owner's code: the vault of 0.9.0 asks every owner for two-step sign-in.
+- runFlow: common/sign-in-code.yaml
 # Home has what it needs from the vault, and the card's choices are kept
 # on the phone (a marker only the e2e build draws).
 - extendedWaitUntil:

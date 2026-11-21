@@ -76,6 +76,8 @@ export default function TrashScreen() {
   }, [load, offline]);
   // Something moved to the Trash meanwhile, from a page.
   useEffect(() => on('documentChanged', () => void load()), [load]);
+  // Held back meanwhile (0.20.0): looked at again once the app carries on.
+  useEffect(() => on('carryOn', () => void load()), [load]);
 
   const restore = async (item: Trashed) => {
     if (busy) return;

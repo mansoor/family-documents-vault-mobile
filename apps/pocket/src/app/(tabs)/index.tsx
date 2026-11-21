@@ -212,6 +212,8 @@ export default function Home() {
   useEffect(() => on('noticesChanged', () => void load()), [load]);
   // Changed or moved to the Trash on its page (P8).
   useEffect(() => on('documentChanged', () => void load()), [load]);
+  // Held back meanwhile (0.20.0: the app to update, two-step sign-in first): looked at again.
+  useEffect(() => on('carryOn', () => void load()), [load]);
 
   // How many of the person's own files wait in their Inbox (I5), where the
   // vault has batches and they may add documents: a viewer, and so a

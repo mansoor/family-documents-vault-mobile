@@ -106,8 +106,26 @@ jobs:
             curl -sf http://localhost:8099/readyz && break
             sleep 5
           done
+          # The setup code (the vault of 0.9.0): only whoever can read its .env has it.
+          SETUP=$(grep '^FDV_SETUP_TOKEN=' .env | cut -d= -f2-)
           curl -sf http://localhost:8099/api/v1/setup -H 'content-type: application/json' \
-            -d "{\"household_name\":\"The Pocket family\",\"display_name\":\"Pocket Owner\",\"email\":\"$EMAIL\",\"password\":\"$PASSWORD\"}" > /dev/null
+            -d "{\"household_name\":\"The Pocket family\",\"display_name\":\"Pocket Owner\",\"email\":\"$EMAIL\",\"password\":\"$PASSWORD\",\"setup_token\":\"$SETUP\"}" > /dev/null
+
+      - name: The owner's authenticator app, and its codes on :8097 for the flows and the scripts
+        # The vault of 0.9.0 asks every owner for two-step sign-in, and takes each
+        # code once. The key lives in $RUNNER_TEMP for this run only; one server
+        # hands out every code (never two of one time step): the flows ask it from
+        # Maestro's runScript (on this host, :8097), the scripts too (owner-token.sh).
+        env:
+          VAULT: http://localhost:8099
+        run: |
+          node .github/scripts/totp.mjs enrol
+          nohup node .github/scripts/totp.mjs serve > "$RUNNER_TEMP/totp.log" 2>&1 &
+          for i in $(seq 1 20); do
+            [ "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8097/ready)" = 404 ] && break
+            sleep 1
+          done
+          [ "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8097/ready)" = 404 ]
 
       - name: Maestro
         run: |
@@ -179,8 +197,9 @@ jobs:
 
       - name: Exactly one document, carrying the card's fields
         run: |
-          TOKEN=$(curl -sf http://localhost:8099/api/v1/auth/password -H 'content-type: application/json' \
-            -d "{\"email\":\"$EMAIL\",\"password\":\"$PASSWORD\"}" | jq -r .access_token)
+          V=http://localhost:8099
+          . .github/scripts/owner-token.sh
+          TOKEN=$(owner_token)
           curl -sf "http://localhost:8099/api/v1/documents?limit=200" -H "authorization: Bearer $TOKEN" > docs.json
           jq '.items | map({title, type_key, owner_member_id, identifier, expires, status})' docs.json
           test "$(jq '.items | length' docs.json)" = "1"
@@ -197,8 +216,9 @@ jobs:
 
       - name: One scan in the Inbox, in the phone's batch of the day (I5)
         run: |
-          TOKEN=$(curl -sf http://localhost:8099/api/v1/auth/password -H 'content-type: application/json' \
-            -d "{\"email\":\"$EMAIL\",\"password\":\"$PASSWORD\"}" | jq -r .access_token)
+          V=http://localhost:8099
+          . .github/scripts/owner-token.sh
+          TOKEN=$(owner_token)
           curl -sf http://localhost:8099/api/v1/batches -H "authorization: Bearer $TOKEN" > batches.json
           jq '.items | map({name, counts})' batches.json
           test "$(jq '.items | length' batches.json)" = "1"

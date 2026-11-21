@@ -5,8 +5,8 @@
 set -eu
 V=http://localhost:8099
 test "$(curl -sf "$V/api/v1/capabilities" | jq -r '.features.member_identity')" = true
-TOKEN=$(curl -sf "$V/api/v1/auth/password" -H 'content-type: application/json' \
-  -d "{\"email\":\"$EMAIL\",\"password\":\"$PASSWORD\"}" | jq -r .access_token)
+. "$(dirname "$0")/owner-token.sh"
+TOKEN=$(owner_token)
 ME=$(curl -sf "$V/api/v1/me" -H "authorization: Bearer $TOKEN" | jq -r .member_id)
 VERSION=$(curl -sf "$V/api/v1/members/$ME/identity" -H "authorization: Bearer $TOKEN" | jq -r .versions.shared)
 curl -sf -X PUT "$V/api/v1/members/$ME/identity" -H "authorization: Bearer $TOKEN" -H 'content-type: application/json' \

@@ -128,6 +128,8 @@ export default function CollectionScreen() {
   }, [load, offline]);
   // A document changed or moved to the Trash on its page: the first page again.
   useEffect(() => on('documentChanged', () => void load()), [load]);
+  // Held back meanwhile (0.20.0): looked at again once the app carries on.
+  useEffect(() => on('carryOn', () => void load()), [load]);
 
   /** The checklist kept on it, matched again now; none said if it can't be read (Fill from a checklist says why). */
   const loadChecklist = useCallback(async () => {

@@ -1,5 +1,6 @@
-import { expect, test, type APIRequestContext } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
+import { apiToken, ready, signInOnPage, VAULT } from './vault';
 
 /**
  * Iteration 4.5's proof on a real vault, through the web build: a file
@@ -9,42 +10,23 @@ import { randomUUID } from 'node:crypto';
  * insurance policy requires — its insurer and its expiry — and Save waits
  * for them.
  */
-const VAULT = process.env.FDV_DEV_API ?? 'http://localhost:8099';
-const EMAIL = process.env.FDV_E2E_EMAIL ?? 'pocket-e2e@example.test';
-const PASSWORD = process.env.FDV_E2E_PASSWORD ?? 'correct horse battery staple';
-const FAMILY = 'The Pocket family';
 
 const PDF = Buffer.from(
   '%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Kids[]/Count 0>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF\n',
   'latin1',
 );
 
-async function token(request: APIRequestContext): Promise<string> {
-  const r = await request.post(`${VAULT}/api/v1/auth/password`, { data: { email: EMAIL, password: PASSWORD } });
-  expect(r.ok(), await r.text()).toBe(true);
-  return ((await r.json()) as { access_token: string }).access_token;
-}
-
+// The vault set up, and the owner's two-step sign-in with it (the vault's 0.9.0 asks it of every owner).
 test.beforeAll(async ({ request }) => {
-  const caps = (await (await request.get(`${VAULT}/api/v1/capabilities`)).json()) as { setup_required: boolean };
-  if (caps.setup_required) {
-    const r = await request.post(`${VAULT}/api/v1/setup`, {
-      data: { household_name: FAMILY, display_name: 'Pocket Owner', email: EMAIL, password: PASSWORD },
-    });
-    expect(r.ok(), await r.text()).toBe(true);
-  }
+  test.setTimeout(120_000);
+  await ready(request);
 });
 
 test('saved with no connection, sent once when it is back', async ({ page, context, baseURL, request }) => {
+  // Two of the owner's codes, each a time step of its own: up to a minute's wait.
+  test.setTimeout(150_000);
   const title = `Offline proof ${randomUUID().slice(0, 8)}`;
-  await page.goto('/');
-  await page.getByLabel('Vault address').fill(new URL(baseURL ?? '').host);
-  await page.getByRole('button', { name: 'Connect' }).click();
-  await page.getByRole('button', { name: 'Use it on this Wi-Fi' }).click();
-  await page.getByLabel('Email').fill(EMAIL);
-  await page.getByLabel('Password', { exact: true }).fill(PASSWORD);
-  await page.getByRole('button', { name: 'Sign in' }).click();
-  await expect(page.getByTestId('home-ready')).toBeVisible();
+  await signInOnPage(page, new URL(baseURL ?? '').host);
 
   // The connection goes, after the app has seen the vault's choices.
   await page.waitForTimeout(1000);
@@ -78,7 +60,7 @@ test('saved with no connection, sent once when it is back', async ({ page, conte
   await expect(page.getByText('On its way')).toHaveCount(0, { timeout: 30_000 });
 
   const r = await request.get(`${VAULT}/api/v1/documents?limit=200`, {
-    headers: { authorization: `Bearer ${await token(request)}` },
+    headers: { authorization: `Bearer ${await apiToken(request)}` },
   });
   const made = ((await r.json()) as { items: { title: string | null; type_key: string | null }[] }).items.filter(
     (d) => d.title === title,
