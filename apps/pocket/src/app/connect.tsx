@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { APP_VERSION, MIN_SERVER_VERSION } from '../config';
+import { APP_RELEASES_URL, APP_VERSION, MIN_SERVER_VERSION } from '../config';
 import { CertificateTroubleNotice } from '../connect/certificate-guide';
 import { connect, type ConnectDeps, type ConnectOutcome } from '../net/connect';
 import { readPasted, type Pasted } from '../net/links';
@@ -141,7 +141,21 @@ function Outcome(props: { outcome: ConnectOutcome; busy: boolean; onApproveHttp:
         </Notice>
       );
     case 'client_too_old':
-      return <Notice tone="warn">{t('connect.clientTooOld', { client: o.client, needed: o.needed })}</Notice>;
+      return (
+        <Notice
+          tone="warn"
+          testID="connect-client-too-old"
+          announce={t('connect.clientTooOld', { client: o.client, needed: o.needed })}
+        >
+          <Text>{t('connect.clientTooOld', { client: o.client, needed: o.needed })}</Text>
+          <Button
+            testID="connect-update-app"
+            kind="quiet"
+            label={t('update.button')}
+            onPress={() => void Linking.openURL(APP_RELEASES_URL).catch(() => undefined)}
+          />
+        </Notice>
+      );
     case 'setup_required':
       return (
         <Notice tone="info" testID="connect-setup-required">

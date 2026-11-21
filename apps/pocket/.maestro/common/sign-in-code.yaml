@@ -1,0 +1,18 @@
+# After the password: the owner's code (the vault of 0.9.0 asks every owner
+# for two-step sign-in), from the run's authenticator (totp-code.js).
+appId: io.github.mansoor.familyvault.e2e
+---
+- extendedWaitUntil:
+    visible:
+      id: sign-in-code
+    timeout: 30000
+- runScript: totp-code.js
+- tapOn:
+    id: sign-in-code
+- inputText: ${output.code}
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      id: sign-in-go
+- tapOn:
+    id: sign-in-go

@@ -4,8 +4,8 @@
 # counts it, and Needs attention has it under Now.
 set -eu
 V=http://localhost:8099
-TOKEN=$(curl -sf "$V/api/v1/auth/password" -H 'content-type: application/json' \
-  -d "{\"email\":\"$EMAIL\",\"password\":\"$PASSWORD\"}" | jq -r .access_token)
+. "$(dirname "$0")/owner-token.sh"
+TOKEN=$(owner_token)
 ID=$(curl -sf "$V/api/v1/documents?limit=10" -H "authorization: Bearer $TOKEN" | jq -r '.items[0].id')
 test -n "$ID" && test "$ID" != null
 TODAY=$(date -u +%Y-%m-%d)

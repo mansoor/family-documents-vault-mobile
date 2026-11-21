@@ -24,3 +24,12 @@ export const APP_VERSION = Constants.expoConfig?.version ?? '0.0.0';
  * details sent with the file (0.4.9) and who issued it (0.4.10).
  */
 export const MIN_SERVER_VERSION = '0.4.10';
+
+/**
+ * Where the app is updated from (0.20.0): this repository's releases page,
+ * for now (the owner's choice). The update screen's button opens it.
+ *
+ * Publish the release there BEFORE the vault raises `min_client_version`
+ * past an app people have: a phone told to update must find the update.
+ */
+export const APP_RELEASES_URL = 'https://github.com/mansoor/family-documents-vault-mobile/releases';

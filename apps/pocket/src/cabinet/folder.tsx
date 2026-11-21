@@ -168,6 +168,8 @@ export function FolderScreen() {
   }, [load, offline]);
   // A paper changed on its page (its details, the Trash): what is behind each divider may have too.
   useEffect(() => on('documentChanged', () => void load()), [load]);
+  // Held back meanwhile (0.20.0): looked at again once the app carries on.
+  useEffect(() => on('carryOn', () => void load()), [load]);
 
   // The names in the folder's question: once, and none if they can't be read.
   useEffect(() => {

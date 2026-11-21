@@ -35,10 +35,25 @@ Written by `node apps/pocket/scripts/failure-states.mjs`; CI fails if it is out 
 |  |  | `reach.showingSaved` | Offline: showing what's saved on this phone. |
 | Signing in | Sign in | `signIn.signedOutHere` | You've been signed out on this phone. Sign in again to carry on. |
 |  |  | `signIn.passkeyOnly` | You sign in with a passkey. The app can't use passkeys yet, so set a password in the browser (Settings → Password), then sign in here with it. |
+|  |  | `signIn.passkeySecond` | Your second step is a passkey, and this app can't use passkeys yet. Sign in in the browser, or add an authenticator app there (Settings → Two-step sign-in) and sign in here with its code. |
+|  |  | `signIn.throttledSeconds` | Too many tries. Wait {{count}} second, then try again. / Too many tries. Wait {{count}} seconds, then try again. |
+|  |  | `signIn.throttledMinutes` | Too many tries. Wait a minute, then try again. / Too many tries. Wait {{count}} minutes, then try again. |
 |  |  | `signIn.startAgain` | Start again from your password. |
 |  |  | `signIn.paused` | An owner has paused your access. Ask them if you think this is a mistake. |
 |  |  | `signIn.pausedRestored` | Your access is paused after the vault was restored. Ask an owner to turn it back on. |
 |  |  | `signIn.accessEnded` | Your access to this family's vault has ended. Ask them to renew it if you still need it. |
+| The app or the vault too old for the other | Over every screen, until one is updated | `update.words` | This app is too old for your vault. Update it to keep using it. |
+|  |  | `update.needed` | Your vault needs version {{needed}} or newer. This is {{client}}. |
+|  |  | `update.thisVersion` | This is version {{client}}. |
+|  |  | `update.vaultWords` | Your vault is on version {{server}}, and this app needs {{needed}} or newer. Ask whoever runs your vault to update it. |
+|  |  | `update.kept` | You're still signed in, and nothing on this phone has been removed. |
+|  |  | `update.signOutWords` | This phone shows nothing of the vault until you sign in again, and the Essentials kept on it are removed. |
+|  |  | `update.notYet` | Nothing has changed yet. Try again once it is updated. |
+| Two-step sign-in to set up first | Over every screen, until it is | `twoStepNeeded.enrol` | Your vault asks you to turn on two-step sign-in before you carry on: a code from an authenticator app each time you sign in. |
+|  |  | `twoStepNeeded.browser` | Or set up a passkey in the browser, then tap Carry on. |
+|  |  | `twoStepNeeded.confirm` | This sign-in used your password only. Type a code from your authenticator app to carry on. |
+|  |  | `twoStepNeeded.passkey` | Your second step is a passkey, and this app can't use passkeys yet. Add an authenticator app in the browser (Settings → Two-step sign-in), then sign out and sign in here with its code. |
+|  |  | `twoStepNeeded.notYet` | Two-step sign-in isn't set up yet. |
 | Any request that fails (wordsFor) | Every screen | `errors.offline` | Can't reach your vault right now. Check you're on a network that can reach it. |
 |  |  | `errors.noNetwork` | This phone is offline. Connect to Wi-Fi or mobile data, then try again. |
 |  |  | `errors.timeout` | Your vault took too long to answer. Try again in a moment. |
@@ -51,6 +66,9 @@ Written by `node apps/pocket/scripts/failure-states.mjs`; CI fails if it is out 
 |  |  | `errors.accessEnded` | Your access to this family's vault has ended. Ask them to renew it if you still need it. |
 |  |  | `errors.stepUp` | Confirm it's you to carry on. |
 |  |  | `errors.twoStep` | Turn on two-step sign-in in the browser to see this. |
+|  |  | `errors.twoStepSetup` | Set up two-step sign-in to carry on. |
+|  |  | `errors.codeUsed` | That code was used already. Wait for the next one. |
+|  |  | `errors.updateApp` | This app is too old for your vault. Update it to keep using it. |
 |  |  | `errors.setupRequired` | This vault hasn't been set up yet. Open it in the browser first. |
 |  |  | `errors.unexpected` | Something went wrong between this phone and your vault. Try again in a moment; if it keeps happening, whoever looks after the vault can have a look. |
 |  |  | `errors.stranger` | Nothing was sent: something other than your vault is answering at its address on this network. |

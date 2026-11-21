@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -75,6 +75,19 @@ export default function SignIn() {
   };
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<Exclude<SignInResult, { kind: 'ok' } | { kind: 'code' }> | null>(null);
+  // Too many tries (the vault's 0.9.0): when it takes another, and the button waits until then.
+  const [waitUntil, setWaitUntil] = useState<number | null>(null);
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (waitUntil === null) return;
+    const timer = setInterval(() => {
+      const at = Date.now();
+      setNow(at);
+      if (at >= waitUntil) setWaitUntil(null);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [waitUntil]);
+  const left = waitUntil === null ? 0 : Math.max(0, Math.ceil((waitUntil - now) / 1000));
 
   const name = caps?.branding.display_name ?? vault?.displayName ?? '';
 
@@ -97,6 +110,11 @@ export default function SignIn() {
         void essentials.signedInWith(typed.current);
         typed.current = '';
       } else {
+        if (r.kind === 'throttled') {
+          const at = Date.now();
+          setNow(at);
+          setWaitUntil(at + r.seconds * 1000);
+        }
         setFailure(r);
       }
     } finally {
@@ -227,9 +245,10 @@ export default function SignIn() {
               onPress={() => void submit()}
               busy={busy}
               disabled={
-                step === 'password'
+                left > 0 ||
+                (step === 'password'
                   ? !email.trim() || !password
-                  : code.replace(/\s/g, '').length < 6 || (method === 'text' && !textedTo)
+                  : code.replace(/\s/g, '').length < 6 || (method === 'text' && !textedTo))
               }
             />
           </Card>
@@ -241,6 +260,18 @@ export default function SignIn() {
                   {t('signIn.passkeyOnly')}
                 </Text>
               ) : null}
+            </Notice>
+          ) : null}
+          {failure?.kind === 'throttled' && left > 0 ? (
+            <Notice tone="warn" testID="sign-in-throttled">
+              {left >= 60
+                ? t('signIn.throttledMinutes', { count: Math.ceil(left / 60) })
+                : t('signIn.throttledSeconds', { count: left })}
+            </Notice>
+          ) : null}
+          {failure?.kind === 'passkey_only' ? (
+            <Notice tone="warn" testID="sign-in-passkey-second">
+              {t('signIn.passkeySecond')}
             </Notice>
           ) : null}
           {failure?.kind === 'paused' ? (

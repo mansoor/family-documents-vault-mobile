@@ -2,6 +2,7 @@ import { ApiRequestError, isSessionOver, retryDelay } from '@fdv/client';
 import type { CaptureResult, UploadStatus } from '@fdv/shared';
 import { log } from '../log';
 import { noConnection } from '../net/no-connection';
+import { sessionHeld } from '../update/held';
 import { startable, type QueueItem } from './item';
 import { ArrivedEarlierError, MaybeSentError, NoAnswerError } from './note-send';
 import type { QueueStore } from './store';
@@ -35,6 +36,12 @@ export interface Owner {
 
 export interface UploaderDeps {
   store: QueueStore;
+  /**
+   * The whole app is held back (0.20.0): the app to be updated, or two-step
+   * sign-in to set up first. Nothing is tried meanwhile — a try could only be
+   * refused for it — and nothing is planned; kicked again once it is not.
+   */
+  heldBack?: () => boolean;
   /**
    * Sends one capture as its owner; throws what the client throws, or
    * NotThisAccountError. An Inbox item makes no document: null.
@@ -109,7 +116,7 @@ export class Uploader {
    * stopped: only resume() starts it again.
    */
   kick(opts: { fresh?: boolean } = {}): Promise<void> {
-    if (this.stopped) return Promise.resolve();
+    if (this.stopped || this.deps.heldBack?.()) return Promise.resolve();
     if (opts.fresh) this.freshen = true;
     if (this.draining) {
       this.again = true;
@@ -220,7 +227,7 @@ export class Uploader {
   private plan(): void {
     this.cancelTimer?.();
     this.cancelTimer = null;
-    if (this.stopped) return;
+    if (this.stopped || this.deps.heldBack?.()) return;
     void this.mine().then((items) => {
       if (this.stopped || this.draining) return;
       const next = Math.min(
@@ -356,6 +363,12 @@ export class Uploader {
       return;
     }
     if (err instanceof ApiRequestError) {
+      if (sessionHeld(err)) {
+        // The app to be updated, or two-step sign-in to set up first (0.20.0):
+        // nothing wrong with this one. It waits, and goes once that is put right.
+        this.phoneSide.delete(item.id);
+        return this.wait(item, { attempts, nextAt: later(err), lastCode: err.code });
+      }
       if (isSessionOver(err) || err.status === 401) {
         // Signed out: the item waits for whoever signs in next as this account.
         this.phoneSide.add(item.id);

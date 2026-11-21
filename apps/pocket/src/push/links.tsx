@@ -11,15 +11,17 @@ import { usePush } from './push';
  * action is taken for it.
  */
 export function PushLinks() {
-  const { phase } = useVault();
+  const { phase, blocked, twoStep } = useVault();
   const { status } = useLock();
   const { opened, takeOpen } = usePush();
   const router = useRouter();
   useEffect(() => {
     if (phase !== 'ready' || (status !== 'unlocked' && status !== 'none')) return;
+    // Held back (0.20.0: the app to update, two-step sign-in first): the tap waits, untaken, until not.
+    if (blocked !== null || twoStep !== null) return;
     const word = takeOpen();
     if (word === 'needs-attention') router.push('/attention');
     else if (word === 'devices') router.push('/settings');
-  }, [phase, status, opened, takeOpen, router]);
+  }, [phase, status, opened, takeOpen, router, blocked, twoStep]);
   return null;
 }

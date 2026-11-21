@@ -156,6 +156,24 @@ describe('the uploader', () => {
     expect(cv.calls.filter((c) => c === 'POST /api/v1/capture')).toHaveLength(1);
   });
 
+  it.each([
+    [426, 'app_update_required'],
+    [403, 'two_step_setup_required'],
+  ])('a %i %s holds the whole app back, not this scan: it waits, and goes once that is put right (0.20.0)', async (status, code) => {
+    const cv = await captureVault();
+    cv.turns.push({ status, code });
+    const store = await queued();
+    let now = 1_000;
+    const uploader = new Uploader(cv.deps(store, { now: () => now, random: () => 0 }));
+    await uploader.kick();
+    expect(await store.list()).toEqual([expect.objectContaining({ state: 'waiting', lastCode: code, problem: null })]);
+    // Later, with the app updated or two-step sign-in set up: sent, once.
+    now += 24 * 60 * 60 * 1000;
+    await uploader.kick();
+    expect(await store.list()).toEqual([]);
+    expect(cv.vault.state.documents).toHaveLength(1);
+  });
+
   it('only this vault’s and this account’s captures are sent', async () => {
     const cv = await captureVault();
     const store = await queued({ account: 'someone-else' });

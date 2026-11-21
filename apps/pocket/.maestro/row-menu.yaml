@@ -39,6 +39,8 @@ env:
 - hideKeyboard
 - tapOn:
     id: sign-in-go
+# The owner's code: the vault of 0.9.0 asks every owner for two-step sign-in.
+- runFlow: common/sign-in-code.yaml
 - extendedWaitUntil:
     visible:
       id: home-list

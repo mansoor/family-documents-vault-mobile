@@ -46,6 +46,9 @@ describe('Connect', () => {
     await renderApp(<Connect deps={{ fetch: t.fetch, network: async () => 'wifi' }} />);
     await go('vault.test');
     await screen.findByText(/This version of the app is too old for your vault\. It needs 9\.0\.0 or newer/);
+    // Where the update is (0.20.0): this repository's releases page.
+    await fireEvent.press(screen.getByTestId('connect-update-app'));
+    expect(Linking.openURL).toHaveBeenCalledWith('https://github.com/mansoor/family-documents-vault-mobile/releases');
   });
 
   it('setup_required sends you to the browser', async () => {

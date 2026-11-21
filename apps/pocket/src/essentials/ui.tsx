@@ -186,7 +186,7 @@ export function EssentialsNotice() {
 }
 
 /** What is kept: each with Open and Show, and how long it is kept for. */
-function KeptRows() {
+export function KeptRows() {
   const { t } = useTranslation();
   const zone = useFamilyZone();
   const router = useRouter();

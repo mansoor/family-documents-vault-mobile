@@ -97,6 +97,8 @@ export default function AttentionScreen() {
   }, [load, capture.delivered, offline]);
   // Changed or moved to the Trash on its page (P8).
   useEffect(() => on('documentChanged', () => void load()), [load]);
+  // Held back meanwhile (0.20.0): looked at again once the app carries on.
+  useEffect(() => on('carryOn', () => void load()), [load]);
 
   const act = async (fn: Parameters<typeof withToken>[0], felt = false) => {
     setProblem(null);

@@ -32,6 +32,11 @@ interface Events {
   phoneChanged: [];
   /** A person's emergency information saved on the phone (0.19.0): their page looks again, and says so. */
   emergencyChanged: [memberId: string, said: string];
+  /**
+   * The app held back no more (0.20.0: updated, or two-step sign-in set up):
+   * the screens kept underneath look again at what they could not load.
+   */
+  carryOn: [];
 }
 
 type Listener<K extends keyof Events> = (...args: Events[K]) => void;
@@ -50,6 +55,7 @@ const listeners: { [K in keyof Events]: Set<Listener<K>> } = {
   sharesChanged: new Set(),
   requestsChanged: new Set(),
   emergencyChanged: new Set(),
+  carryOn: new Set(),
 };
 
 export function on<K extends keyof Events>(event: K, fn: Listener<K>): () => void {

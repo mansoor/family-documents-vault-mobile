@@ -1,5 +1,7 @@
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react-native';
+import { Pressable, Text } from 'react-native';
 import NotesScreen from '../app/(tabs)/notes';
+import { useVault } from '../state/vault';
 import type { FetchLike } from '@fdv/client';
 import { setPhoneOffline } from '../net/reach';
 import type { QueueItem } from '../queue/item';
@@ -692,3 +694,67 @@ describe('a vault without idempotent_create (as 0.13.0)', () => {
   });
 });
 
+
+/** Looks at the vault again, as Try again does. */
+function Recheck() {
+  const { recheck, blocked } = useVault();
+  return (
+    <Pressable testID="recheck" accessibilityRole="button" onPress={() => void recheck()}>
+      <Text>{blocked ? 'blocked' : 'free'}</Text>
+    </Pressable>
+  );
+}
+
+describe('the app to be updated meanwhile (0.20.0)', () => {
+  it('a note refused with 426 on its first try waits — nothing tried while held — and goes once, a day later', async () => {
+    const v = vault();
+    const clock = fakeClock();
+    keysAsDev45(v, clock.now);
+    const refuse = { value: true };
+    scripted(v, (_n, send) =>
+      refuse.value
+        ? Promise.resolve(
+            respond(426, {
+              error: {
+                code: 'app_update_required',
+                message: 'The app on this phone is too old for this vault. Update the app to keep using it.',
+                min_client_version: '9.1.0',
+                retriable: false,
+              },
+            }),
+          )
+        : send(),
+    );
+    const sent = recordPosts(v);
+    const store = new MemoryQueueStore();
+    await unlocked(
+      v,
+      <>
+        <NotesScreen />
+        <Recheck />
+      </>,
+      { capture: testCapture({ now: clock.now, schedule: clock.schedule, openStore: async () => store }) },
+    );
+    await screen.findByTestId('notes-none');
+    await writeNote('Boiler', 'Ring Ann first.');
+    const id = await queuedId();
+    await waitFor(() => expect(screen.getByTestId('recheck')).toHaveTextContent('blocked'));
+    expect(sent).toHaveLength(1);
+    // Its first try made nothing: no key's day is counted against it.
+    await waitFor(async () => expect((await keptOf(store, id))?.sent ?? null).toBeNull());
+    expect(stateOf(id)).toHaveTextContent('Waiting to send');
+
+    // Held: a network change, or the app looking by itself, tries nothing.
+    await networkChanged();
+    expect(sent).toHaveLength(1);
+
+    // A day later, the app updated (the vault answering as it would then): it goes, once.
+    clock.advance(24 * 60 * 60 * 1000);
+    refuse.value = false;
+    await fireEvent.press(screen.getByTestId('recheck'));
+    await waitFor(() => expect(screen.getByTestId('recheck')).toHaveTextContent('free'));
+    await waitFor(() => expect(made(v, 'Boiler')).toHaveLength(1));
+    await waitFor(async () => expect(await store.list()).toEqual([]));
+    expect(sent).toHaveLength(2);
+  });
+});

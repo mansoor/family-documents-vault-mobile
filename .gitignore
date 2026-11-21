@@ -34,3 +34,7 @@ prototype/
 dist-*/
 test-results/
 playwright-report/
+
+# The e2e owner's authenticator key on a throwaway vault (e2e-web/vault.ts)
+.e2e-owner-totp
+.e2e-owner-totp-step

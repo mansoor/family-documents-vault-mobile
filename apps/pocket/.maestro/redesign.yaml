@@ -37,6 +37,8 @@ env:
 - hideKeyboard
 - tapOn:
     id: sign-in-go
+# The owner's code: the vault of 0.9.0 asks every owner for two-step sign-in.
+- runFlow: common/sign-in-code.yaml
 - extendedWaitUntil:
     visible:
       id: home-list
@@ -245,17 +247,8 @@ env:
 - tapOn:
     id: share-sensitive-yes
 # An Essential's link may ask to confirm it is you.
-- runFlow:
-    when:
-      visible:
-        id: step-up-password
-    commands:
-      - tapOn:
-          id: step-up-password
-      - inputText: ${PASSWORD}
-      - hideKeyboard
-      - tapOn:
-          id: step-up-go
+# The password, or the owner's code where only a code will do.
+- runFlow: common/step-up.yaml
 - extendedWaitUntil:
     visible:
       id: share-reveal
@@ -290,17 +283,8 @@ env:
 # Show the link (0.5.7, a vault of 0.9.0-dev.30): shown again after confirming it is you.
 - tapOn:
     id: sharing-show-.*
-- runFlow:
-    when:
-      visible:
-        id: step-up-password
-    commands:
-      - tapOn:
-          id: step-up-password
-      - inputText: ${PASSWORD}
-      - hideKeyboard
-      - tapOn:
-          id: step-up-go
+# The password, or the owner's code where only a code will do.
+- runFlow: common/step-up.yaml
 - extendedWaitUntil:
     visible:
       id: sharing-shown-link

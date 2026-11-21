@@ -78,7 +78,12 @@
     "textMe": "Text me a code",
     "textAgain": "Text me a new code",
     "useText": "Text me a code instead",
-    "useApp": "Use my authenticator app instead"
+    "useApp": "Use my authenticator app instead",
+    "throttledSeconds_one": "Too many tries. Wait {{count}} second, then try again.",
+    "throttledSeconds_other": "Too many tries. Wait {{count}} seconds, then try again.",
+    "throttledMinutes_one": "Too many tries. Wait a minute, then try again.",
+    "throttledMinutes_other": "Too many tries. Wait {{count}} minutes, then try again.",
+    "passkeySecond": "Your second step is a passkey, and this app can't use passkeys yet. Sign in in the browser, or add an authenticator app there (Settings → Two-step sign-in) and sign in here with its code."
   },
   "home": {
     "attentionTitle": "Needs attention",
@@ -776,7 +781,10 @@
     "earlierVersion": "An earlier version of this is already in your vault.",
     "linksChoice": "You have share links to this document. Say whether they end or keep working, then try again.",
     "sensitiveConfirm": "This is sensitive, so nothing was shared. Say you mean to share it, then try again.",
-    "sensitiveStillShared": "This paper is sensitive and still shared outside the family. See More → Sharing to keep or end its links."
+    "sensitiveStillShared": "This paper is sensitive and still shared outside the family. See More → Sharing to keep or end its links.",
+    "updateApp": "This app is too old for your vault. Update it to keep using it.",
+    "twoStepSetup": "Set up two-step sign-in to carry on.",
+    "codeUsed": "That code was used already. Wait for the next one."
   },
   "inbox": {
     "batchName": "From my phone, {{date}}"
@@ -1630,6 +1638,29 @@
     "showingSaved": "Offline: showing what's saved on this phone.",
     "wifiOnly": "This vault is used only on Wi-Fi. Join your Wi-Fi to reach it.",
     "stranger": "Something other than your vault is answering at its address on this network."
+  },
+  "update": {
+    "title": "Update the app",
+    "words": "This app is too old for your vault. Update it to keep using it.",
+    "needed": "Your vault needs version {{needed}} or newer. This is {{client}}.",
+    "thisVersion": "This is version {{client}}.",
+    "button": "Update the app",
+    "vaultTitle": "Your vault needs updating",
+    "vaultWords": "Your vault is on version {{server}}, and this app needs {{needed}} or newer. Ask whoever runs your vault to update it.",
+    "kept": "You're still signed in, and nothing on this phone has been removed.",
+    "notYet": "Nothing has changed yet. Try again once it is updated.",
+    "showKept": "Show what's kept on this phone",
+    "signOutWords": "This phone shows nothing of the vault until you sign in again, and the Essentials kept on it are removed."
+  },
+  "twoStepNeeded": {
+    "title": "Set up two-step sign-in",
+    "enrol": "Your vault asks you to turn on two-step sign-in before you carry on: a code from an authenticator app each time you sign in.",
+    "browser": "Or set up a passkey in the browser, then tap Carry on.",
+    "confirmTitle": "Confirm it's you",
+    "confirm": "This sign-in used your password only. Type a code from your authenticator app to carry on.",
+    "passkey": "Your second step is a passkey, and this app can't use passkeys yet. Add an authenticator app in the browser (Settings → Two-step sign-in), then sign out and sign in here with its code.",
+    "carryOn": "Carry on",
+    "notYet": "Two-step sign-in isn't set up yet."
   },
   "emergency": {
     "title": "Emergency information",
