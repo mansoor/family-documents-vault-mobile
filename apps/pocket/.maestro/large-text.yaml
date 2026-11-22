@@ -54,9 +54,22 @@ env:
       id: settings-large-text
 - tapOn:
     id: settings-large-text
+# An owner's Settings has Security & health (0.21.0) above Sign out, read
+# from the vault: let it arrive, then scroll the longer page, at large text,
+# for as long as it takes.
+- waitForAnimationToEnd
 - scrollUntilVisible:
     element:
       id: settings-sign-out
+    direction: DOWN
+    timeout: 60000
+    visibilityPercentage: 50
+- waitForAnimationToEnd
+- scrollUntilVisible:
+    element:
+      id: settings-sign-out
+    direction: DOWN
+    timeout: 30000
 - assertVisible:
     id: settings-sign-out
 - back

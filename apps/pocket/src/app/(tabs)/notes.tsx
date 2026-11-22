@@ -1,6 +1,6 @@
-import { can, radii, type NoteSummary } from '@fdv/shared';
+import { can, radii, SENSITIVE_LABEL, type NoteSummary } from '@fdv/shared';
 import { useRouter } from 'expo-router';
-import { History, List, NotebookText, Plus, Rows3, StickyNote, Trash2, type LucideIcon } from 'lucide-react-native';
+import { History, List, Lock, NotebookText, Plus, Rows3, StickyNote, Trash2, type LucideIcon } from 'lucide-react-native';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
@@ -37,6 +37,11 @@ import { useColours, useStyles, type Palette } from '../../ui/theme';
  * name on one line, cut with …), Detailed (as before) — remembered on this
  * phone; and what was looked for, remembered on this phone for each
  * person, behind the clock beside the box, with a way to forget it all.
+ *
+ * An Only me or an Essential note (a vault of 0.9.0-dev.87) asks
+ * "Confirm it's you" before its words are read: the vault lists it by its
+ * title and date alone, and its row says so, with a lock. Essential and
+ * Sensitive are said on its line.
  *
  * Written with no answer from the vault (0.13.0): a new note waits on the
  * phone, at the top here as "Waiting to send", and goes by itself once the
@@ -306,9 +311,25 @@ function NoteRow(props: { note: NoteSummary; layout: NoteLayout; onPress: () => 
   const n = props.note;
   const name = noteListName(n, t('notesList.untitled'));
   const when = n.notes_updated_at ? t('notesList.changed', { when: dayWords(n.notes_updated_at, zone) }) : null;
-  const line = [when, n.visibility !== 'household' ? t(`document.visibility_${n.visibility}`) : null]
+  const line = [
+    when,
+    n.visibility !== 'household' ? t(`document.visibility_${n.visibility}`) : null,
+    n.is_essential ? t('document.essentialPill') : null,
+    n.sensitive_effective ? SENSITIVE_LABEL : null,
+  ]
     .filter(Boolean)
     .join(' · ');
+  // Its words wait for "Confirm it's you" (0.9.0-dev.87): the list never has them, and says why.
+  const asks = !!n.confirm_to_read;
+  const asksLine = asks ? (
+    <View style={styles.asks} testID={`note-asks-${n.id}`}>
+      <Lock color={colours.inkMuted} size={14} accessibilityElementsHidden importantForAccessibility="no" />
+      <Text variant="small" tone="muted" style={styles.flex}>
+        {t('notesList.asks')}
+      </Text>
+    </View>
+  ) : null;
+  const asksWords = asks ? t('notesList.asks') : null;
   // The first words, unless they are what names it: one line of them, the rest on its page.
   const preview = n.title?.trim() ? (n.preview.trim().split('\n')[0] ?? '') : '';
   const menu = useDocumentMenu({ id: n.id, title: name, edit: true });
@@ -320,7 +341,7 @@ function NoteRow(props: { note: NoteSummary; layout: NoteLayout; onPress: () => 
         <Pressable
           testID={`note-${n.id}`}
           accessibilityRole="button"
-          accessibilityLabel={[name, words, line].filter(Boolean).join('. ')}
+          accessibilityLabel={[name, words, asksWords, line].filter(Boolean).join('. ')}
           onPress={props.onPress}
           onLongPress={menu.open}
           style={({ pressed }) => [styles.stickyMain, pressed ? styles.pressed : null]}
@@ -333,6 +354,7 @@ function NoteRow(props: { note: NoteSummary; layout: NoteLayout; onPress: () => 
               {words}
             </Text>
           ) : null}
+          {asksLine}
         </Pressable>
         <View style={styles.stickyMenu}>{menu.button}</View>
         {menu.sheet}
@@ -346,7 +368,7 @@ function NoteRow(props: { note: NoteSummary; layout: NoteLayout; onPress: () => 
         <Pressable
           testID={`note-${n.id}`}
           accessibilityRole="button"
-          accessibilityLabel={name}
+          accessibilityLabel={[name, asksWords].filter(Boolean).join('. ')}
           onPress={props.onPress}
           onLongPress={menu.open}
           style={({ pressed }) => [styles.listMain, pressed ? styles.pressed : null]}
@@ -355,6 +377,9 @@ function NoteRow(props: { note: NoteSummary; layout: NoteLayout; onPress: () => 
           <Text weight="600" numberOfLines={1} style={styles.flex} testID={`note-name-${n.id}`}>
             {name}
           </Text>
+          {asks ? (
+            <Lock color={colours.inkMuted} size={16} accessibilityElementsHidden importantForAccessibility="no" />
+          ) : null}
         </Pressable>
         {menu.button}
         {menu.sheet}
@@ -366,7 +391,7 @@ function NoteRow(props: { note: NoteSummary; layout: NoteLayout; onPress: () => 
     <Pressable
       testID={`note-${n.id}`}
       accessibilityRole="button"
-      accessibilityLabel={[name, preview, line].filter(Boolean).join('. ')}
+      accessibilityLabel={[name, preview, asksWords, line].filter(Boolean).join('. ')}
       onPress={props.onPress}
       onLongPress={menu.open}
       style={({ pressed }) => [styles.main, pressed ? styles.pressed : null]}
@@ -383,6 +408,7 @@ function NoteRow(props: { note: NoteSummary; layout: NoteLayout; onPress: () => 
             {preview}
           </Text>
         ) : null}
+        {asksLine}
         {line ? (
           <Text variant="small" tone="muted">
             {line}
@@ -441,5 +467,6 @@ const makeStyles = (colours: Palette) =>
     stickyName: { paddingRight: 40 },
     stickyMenu: { position: 'absolute', top: 0, right: 0 },
     history: { gap: sp(10) },
+    asks: { flexDirection: 'row', alignItems: 'center', gap: sp(6) },
     historyRow: { flexDirection: 'row', alignItems: 'center', gap: sp(10), minHeight: 44 },
   });

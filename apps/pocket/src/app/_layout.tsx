@@ -107,6 +107,8 @@ function Gates() {
           {/* Its title is its page's, with the + beside it, as Notes': no bar above it (the owner's ask of 11 Nov 2026). */}
           <Stack.Screen name="collections" options={{ title: t('collections.title'), headerTitle: '' }} />
           <Stack.Screen name="trash" options={{ title: t('trashList.title') }} />
+          {/* Its title is its page's: from My cabinet's "aren't in any folder". */}
+          <Stack.Screen name="unfiled" options={{ title: '', headerBackVisible: true }} />
           <Stack.Screen name="sharing" options={{ title: t('sharing.title') }} />
           <Stack.Screen name="activity" options={{ title: t('activity.title') }} />
           <Stack.Screen name="ask/index" options={{ title: t('ask.title') }} />

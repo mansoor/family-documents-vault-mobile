@@ -12,8 +12,12 @@ interface Events {
   remindersChanged: [];
   /** The vault pushed `notice` (5.31): something about the person's details is changing; Home looks again. */
   noticesChanged: [];
-  /** A document's details, who can see it, or the Trash changed on the phone (P8): lists showing it look again. */
-  documentChanged: [id: string];
+  /**
+   * A document's details, who can see it, or the Trash changed on the phone (P8): lists showing it look
+   * again. `essential`, where the one who says it knows: whether it is an Essential now (0.21.0), so the
+   * copies kept on the phone follow only a change that touches them.
+   */
+  documentChanged: [id: string, essential?: boolean];
   /** Documents put in a collection or taken out of it on the phone (P9): its list and its page look again. */
   collectionChanged: [id: string];
   /** A collection's checklist kept, cleared or filled from on the phone (0.8.0): its page looks again. */

@@ -1,4 +1,5 @@
-import { documentName, radii, type DocumentView } from '@fdv/shared';
+import { radii, type DocumentView } from '@fdv/shared';
+import { keptName } from '../essentials/kept-name';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, View } from 'react-native';
@@ -191,7 +192,7 @@ export function EssentialsLine() {
         {shown.map((k) => (
           <Chip
             key={k.id}
-            label={documentName(k.document, t('document.untitled'))}
+            label={keptName(k.document, t)}
             onPress={() => router.push({ pathname: '/document/[id]', params: { id: k.id } })}
             testID={`home-essential-${k.id}`}
           />

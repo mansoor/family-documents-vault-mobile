@@ -186,6 +186,27 @@ describe('signing in, with the vault of 0.9.0', () => {
     expect(screen.getByTestId('sign-in-code')).toBeTruthy();
   });
 
+  it('a used code is told apart by the vault’s reason, `code_used`, whatever its words', async () => {
+    const t = testVault();
+    const fetch = answering(t, async (path) => {
+      if (path === '/api/v1/auth/password') return respond(200, { mfa_required: true, mfa_token: 'mfa-1', methods: ['totp'] });
+      if (path === '/api/v1/auth/mfa') {
+        return respond(401, {
+          error: { code: 'totp_invalid', reason: 'code_used', message: 'Some other words.', retriable: false },
+        });
+      }
+      return null;
+    });
+    await renderApp(<SignIn />, { fetch });
+    await screen.findByTestId('sign-in-email');
+    await typeAndGo();
+    await fireEvent.changeText(await screen.findByTestId('sign-in-code'), '123456');
+    await fireEvent.press(screen.getByTestId('sign-in-go'));
+    expect(await screen.findByTestId('sign-in-refused')).toHaveTextContent(
+      'That code was used already. Wait for the next one.',
+    );
+  });
+
   it("the vault's device proof is kept in the keystore, outlives signing out, and goes with the next password", async () => {
     const t = testVault();
     const sent: Record<string, unknown>[] = [];

@@ -1,6 +1,6 @@
 {
   "name": "@fdv/pocket",
-  "version": "0.20.0",
+  "version": "0.21.0",
   "main": "expo-router/entry",
   "dependencies": {
     "@expo-google-fonts/figtree": "^0.4.1",
@@ -30,6 +30,7 @@
     "expo-localization": "~57.0.2",
     "expo-navigation-bar": "~57.0.3",
     "expo-network": "~57.0.3",
+    "expo-print": "~57.0.2",
     "expo-router": "~57.0.31",
     "expo-screen-capture": "~57.0.4",
     "expo-screen-orientation": "~57.0.3",

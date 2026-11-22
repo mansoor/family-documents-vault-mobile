@@ -1,4 +1,4 @@
-import { ApiRequestError, NetworkError } from '@fdv/client';
+import { ApiRequestError, NetworkError, type Api } from '@fdv/client';
 import {
   addDays,
   addMonths,
@@ -15,6 +15,9 @@ import {
   recordFormatWords,
   REVIEW_LABEL,
   SENSITIVE_LABEL,
+  SENSITIVE_MEANS,
+  stopSharingWords,
+  TEEN_KEEPS_SENSITIVE,
   TAP_MIN,
   sensitiveOf,
   whereKeptWords,
@@ -35,6 +38,7 @@ import {
   ArchiveRestore,
   Archive,
   Share2,
+  Printer,
   BellPlus,
   Ellipsis,
   Eye,
@@ -48,7 +52,7 @@ import {
   Trash2,
   type LucideIcon,
 } from 'lucide-react-native';
-import { Fragment, useCallback, useEffect, useState, type ReactNode } from 'react';
+import { Fragment, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Switch, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -56,7 +60,7 @@ import { renewWords } from '../capture/renew-words';
 import { useCapture } from '../state/capture';
 import { emit, on } from '../state/events';
 import { useEssentials } from '../state/essentials';
-import { useLock } from '../state/lock';
+import { useLock, useScreenGuard } from '../state/lock';
 import { useStepUp } from '../state/step-up';
 import { wordsFor } from '../errors/words';
 import { feel } from '../ui/feel';
@@ -66,13 +70,16 @@ import { Button, Field, Notice, StatusLine, Text } from '../ui';
 import { keptIsCurrent, saveVersion, setEssential as changeEssential, showDocument, type ActionDeps } from './actions';
 import { detailFacts } from './details';
 import { NoteText } from './notes';
+import { isStepUpRequired, keepWords, noteAsks, notesConfirm } from './note-confirm';
 import { latestOf } from './online';
 import { warnedAboutCopies } from './save-copy';
 import { TrashConfirm } from './trash';
 import { MenuRow } from '../ui/menu-row';
+import { PrintDocument, useNotePrint } from '../print/document-print';
 import { DocumentLinks } from '../sharing/document-links';
 import { TheirLinksOpened } from '../sharing/opens';
 import { ShareSheet } from '../sharing/share-sheet';
+import { StillSharedSheet } from '../sharing/sensitive-confirm';
 import { Chip, ChipRow } from '../ui/chip';
 import { ConfirmSheet } from '../ui/confirm';
 import { IconButton } from '../ui/icon-button';
@@ -86,7 +93,8 @@ import { useColours, useStyles, type Palette } from '../ui/theme';
 import { dayWords, exactWords, familyZoneNow, relativeWords, useFamilyZone } from '../state/family-time';
 import { LoadFailed, loadFailure, Placeholder } from '../ui/states';
 
-type Problem = 'offline' | 'not_found' | 'failed' | null;
+/** `confirm`: a note whose words wait for "Confirm it's you", which was not given (0.9.0-dev.87). */
+type Problem = 'offline' | 'not_found' | 'failed' | 'confirm' | null;
 
 /**
  * A document (4.12), compact (R6, the mockup's second screen): its
@@ -102,6 +110,13 @@ type Problem = 'offline' | 'not_found' | 'failed' | null;
  * asks. The Essential switch works online only: a change made meanwhile by
  * somebody else is shown, not overwritten. A note (a vault of 0.9.0) has
  * no file: its words, and none of what a file is for.
+ *
+ * An Only me or an Essential note (a vault of 0.9.0-dev.87) asks "Confirm
+ * it's you" before its words are read, once as the page opens; cancelled,
+ * the page says so with a button to ask again, and asks nothing by itself
+ * until it is pressed. A copy kept on the phone (an Essential note kept
+ * offline) is shown meanwhile, as a kept document's pages are. Such a note
+ * offers Essential and Sensitive, by the documents' rules.
  */
 export function DocumentDetail(props: { id: string }) {
   const colours = useColours();
@@ -134,7 +149,10 @@ export function DocumentDetail(props: { id: string }) {
   const [refreshing, setRefreshing] = useState(false);
   const [versionsOpen, setVersionsOpen] = useState(false);
   // The header's ⋯: its choices, then the question Move to the Trash asks, in the same sheet.
-  const [more, setMore] = useState<'menu' | 'trash' | 'unneeded' | 'remind' | null>(null);
+  const [more, setMore] = useState<'menu' | 'trash' | 'unneeded' | 'remind' | 'print' | null>(null);
+  // Print (0.21.0): a note prints straight from the ⋯; a document asks what to print, in the same sheet.
+  const printNote = useNotePrint();
+  const [printingNote, setPrintingNote] = useState(false);
   // Share (the owner's ask of 11 Nov 2026): its own sheet, opened from the ⋯.
   const [sharing, setSharing] = useState(false);
   // Remind me (a reminder set by the person themselves), asked in the same sheet: a day, and a note if they like.
@@ -150,6 +168,8 @@ export function DocumentDetail(props: { id: string }) {
   const [unneededOpen, setUnneededOpen] = useState(false);
   // Essential off: its copies leave the phones that keep them, so it asks first (R2).
   const [askOff, setAskOff] = useState(false);
+  // A note made sensitive while links outside the family still give it: how many, asked about (0.9.0-dev.87).
+  const [stillShared, setStillShared] = useState<number | null>(null);
   // Its yearly review (H3, app 0.17.0): undefined until the vault has said; null, none on.
   const [review, setReview] = useState<ReminderView | null | undefined>(undefined);
   const [reviewBusy, setReviewBusy] = useState(false);
@@ -172,6 +192,8 @@ export function DocumentDetail(props: { id: string }) {
   const mayChange = !!who && can(who.role, 'document.edit') && (who.role !== 'teen' || mine) && !caregiver;
   const renewing = capture.queue.some((i) => i.kind === 'version' && i.target === id);
   const note = shown?.type_key === NOTE_KIND;
+  // An Only me or an Essential note's words are never captured, as a kept Essential's pages are not.
+  useScreenGuard('note', noteAsks(shown));
   // Into the Trash: a teen, only their own (P8), as the web allows.
   const mayTrash = !!who && can(who.role, 'document.delete') && (who.role !== 'teen' || mine) && !caregiver;
   const hasCollections = caps?.features.collections === true;
@@ -179,10 +201,18 @@ export function DocumentDetail(props: { id: string }) {
     !!who && can(who.role, 'document.add') && (who.role !== 'teen' || mine) && !renewing && !note && !caregiver;
   // A yearly review (H3), for whoever manages reminders, where the vault has health's kinds.
   const reviewsOn = caps?.features.health_kinds === true && !!who && can(who.role, 'reminder.manage') && !caregiver;
+  // A note's Essential and Sensitive (0.9.0-dev.87), where the vault has notes that ask.
+  const noteMarks = note && notesConfirm(caps);
+  // A teen may make a note sensitive, never not.
+  const teenKeeps = who?.role === 'teen' && doc?.sensitive_effective === true;
 
-  const load = useCallback(async () => {
+  // "Confirm it's you", for a note that asks, only when somebody did something: the page opened, pulled
+  // to refresh, or its button pressed (`ask`). A reload nobody asked for (the connection back, a capture
+  // delivered, a change saved) asks nothing: refused, it keeps what is shown.
+  const arrived = useRef(false);
+  const load = useCallback(async (opts?: { ask: true }) => {
     try {
-      const [d, v, m, ty, c] = await withToken((a, tk) => {
+      const all = (a: Api, tk: string) => {
         // Its picture is fetched with the token, as a list's are.
         setToken(tk);
         return Promise.all([
@@ -195,7 +225,14 @@ export function DocumentDetail(props: { id: string }) {
             ? a.documentCollections(tk, id).catch(() => ({ items: [] }))
             : Promise.resolve({ items: [] }),
         ]);
-      });
+      };
+      // An Only me or an Essential note asks first (0.9.0-dev.87); a document's page never does.
+      const got = opts?.ask === true ? await guarded(all) : await withToken(all);
+      if (got === null) {
+        setProblem('confirm');
+        return;
+      }
+      const [d, v, m, ty, c] = got;
       setDoc(d);
       setVersions(v.items);
       setMembers(m.items);
@@ -204,6 +241,7 @@ export function DocumentDetail(props: { id: string }) {
       setProblem(null);
     } catch (err) {
       if (err instanceof ApiRequestError && (err.status === 404 || err.code === 'not_found')) setProblem('not_found');
+      else if (isStepUpRequired(err)) setProblem('confirm');
       else if (err instanceof NetworkError) setProblem('offline');
       else {
         // Anything else, said with Try again (P5): never a blank page.
@@ -214,16 +252,24 @@ export function DocumentDetail(props: { id: string }) {
         }
       }
     }
-  }, [withToken, id, t, hasCollections]);
+  }, [withToken, guarded, id, t, hasCollections]);
+  /** "Confirm it's you" pressed: asked again. */
+  const confirmAgain = () => {
+    setProblem(null);
+    void load({ ask: true });
+  };
 
   useEffect(() => {
-    // Loaded on arrival, again when the connection returns and when the
-    // vault takes a capture; the state is set after the requests answer.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    void load();
+    // Loaded on arrival (asking, for a note that asks), again when the connection
+    // returns and when the vault takes a capture; the state is set after the requests answer.
+    const ask = !arrived.current;
+    arrived.current = true;
+    void load(ask ? { ask: true } : undefined);
   }, [load, offline, capture.delivered]);
   // Its details changed on Edit details: looked at again.
   useEffect(() => on('documentChanged', (changed) => (changed === id ? void load() : undefined)), [id, load]);
+  // Never passed on as an event handler's argument: an `ask` only where this page says so.
+  const reload = useCallback(() => load(), [load]);
 
   // Its own reminders (an older vault answers them all, so the review is looked for by its document).
   const loadReview = useCallback(async () => {
@@ -276,12 +322,40 @@ export function DocumentDetail(props: { id: string }) {
     try {
       // Not confirmed, nothing changes.
       const outcome = await changeEssential(deps, doc, value, t);
-      if (outcome.kind === 'saved') setDoc(outcome.doc);
+      if (outcome.kind === 'saved') {
+        // A note made Essential keeps the words shown, whatever the answer gives (0.9.0-dev.87).
+        setDoc((had) => keepWords(had, outcome.doc));
+        // Kept on this phone, or no longer: brought up to date now, not at the next start.
+        void essentials.sync();
+      }
       else if (outcome.kind === 'conflict') {
         // Changed meanwhile by somebody else: theirs is shown, not overwritten.
         warn(t('document.conflict'));
         await load();
       } else if (outcome.kind === 'failed') warn(outcome.words);
+    } finally {
+      setToggling(false);
+    }
+  };
+
+  // A note's Sensitive (0.9.0-dev.87): saved as it is switched. Made sensitive while links outside
+  // the family still give it, it asks whether to end them, as Edit details does.
+  const setNoteSensitive = async (value: boolean) => {
+    if (!doc || toggling) return;
+    setNotice(null);
+    setToggling(true);
+    try {
+      const saved = await guarded((a, tk) => a.updateDocument(tk, doc.id, { sensitive: value }, doc.etag));
+      if (saved === null) return;
+      setDoc((had) => keepWords(had, saved));
+      emit('documentChanged', saved.id, saved.is_essential);
+      const shared = saved.warnings?.find((w) => w.code === 'sensitive_still_shared');
+      if (shared?.links) setStillShared(shared.links);
+    } catch (err) {
+      if (err instanceof ApiRequestError && err.status === 409) {
+        warn(t('document.conflict'));
+        await load();
+      } else warn(wordsFor(err, t, 'document.failed'));
     } finally {
       setToggling(false);
     }
@@ -314,9 +388,20 @@ export function DocumentDetail(props: { id: string }) {
     else setNotice(renewWords(outcome, t));
   };
 
+  // A note whose words wait for "Confirm it's you", not given: said, with the button that asks again.
+  // Only while no words are shown: a reload refused after they were keeps them, and says nothing.
+  const confirmNeeded =
+    problem === 'confirm' && !shown?.notes ? (
+      <Notice tone="info" testID="document-confirm-needed">
+        <Text>{t('document.noteAsks')}</Text>
+        <Button label={t('stepUp.title')} onPress={confirmAgain} testID="document-confirm" />
+      </Notice>
+    ) : null;
+
   if (!shown) {
     return (
       <View style={styles.page} testID="document">
+        {confirmNeeded}
         {problem === 'not_found' ? <Notice tone="warn">{t('document.notFound')}</Notice> : null}
         {problem === 'failed' ? <LoadFailed words={failedWords} onRetry={() => void load()} /> : null}
         {problem === null ? <Placeholder rows={2} /> : null}
@@ -374,7 +459,10 @@ export function DocumentDetail(props: { id: string }) {
   const mayRemind = !!who && can(who.role, 'reminder.manage') && !shown?.no_longer_needed && !caregiver;
   // Shared outside the family by whoever may (owners and adults), as on the web.
   const mayShare = !!who && can(who.role, 'document.share') && !caregiver;
-  const hasMore = (mayTrash || mayUnneed || mayRemind || mayShare) && !!doc && !offline;
+  // Print (0.21.0): a document for whoever sees it as one of the family (a caregiver saves a copy);
+  // a note only once its words are here.
+  const mayPrint = !!doc && !caregiver && (!note || !!doc.notes);
+  const hasMore = (mayTrash || mayUnneed || mayRemind || mayShare || mayPrint) && !!doc && !offline;
   // Where the original is, said on a vault that keeps places in cabinets (C3): before it, the page said nothing of it.
   const placeWords = caps?.features.original_place === true && !note && !caregiver ? whereKeptWords(shown) : null;
   // The folder it came from (C4): the household's, as where it is kept; the vault leaves it out for anybody else.
@@ -451,7 +539,7 @@ export function DocumentDetail(props: { id: string }) {
             </Text>
           </View>
         ) : doc && !offline ? (
-          <VisibilityControl doc={doc} onChanged={load} line />
+          <VisibilityControl doc={doc} onChanged={reload} line />
         ) : (
           <View style={styles.line} testID="document-visibility">
             <Text style={styles.flex}>{t('document.whoCanSee')}</Text>
@@ -664,7 +752,7 @@ export function DocumentDetail(props: { id: string }) {
           },
         ]
       : []),
-    ...(mayChange && doc && !note
+    ...(mayChange && doc && (!note || noteMarks)
       ? [
           {
             key: 'essential',
@@ -673,7 +761,7 @@ export function DocumentDetail(props: { id: string }) {
                 <View style={styles.flex}>
                   <Text>{t('document.essential')}</Text>
                   <Text tone="soft" variant="small">
-                    {t('document.essentialHint')}
+                    {note ? t('document.essentialNoteHint') : t('document.essentialHint')}
                   </Text>
                 </View>
                 <Switch
@@ -682,6 +770,33 @@ export function DocumentDetail(props: { id: string }) {
                   value={doc.is_essential}
                   disabled={offline || toggling}
                   onValueChange={(v) => (v ? void setEssential(true) : setAskOff(true))}
+                  trackColor={{ true: colours.accent, false: colours.border }}
+                />
+              </View>
+            ),
+          },
+        ]
+      : []),
+    // A note's own Sensitive (0.9.0-dev.87), switched here as the web's is under a note; a
+    // document's is chosen in Edit details. A teen may make one sensitive, never not.
+    ...(noteMarks && mayChange && doc && caps?.features.sensitive_documents === true
+      ? [
+          {
+            key: 'sensitive',
+            node: (
+              <View style={styles.line} testID="note-sensitive">
+                <View style={styles.flex}>
+                  <Text>{SENSITIVE_LABEL}</Text>
+                  <Text tone="soft" variant="small">
+                    {teenKeeps ? TEEN_KEEPS_SENSITIVE : SENSITIVE_MEANS}
+                  </Text>
+                </View>
+                <Switch
+                  testID="note-sensitive-switch"
+                  accessibilityLabel={SENSITIVE_LABEL}
+                  value={doc.sensitive_effective === true}
+                  disabled={offline || toggling || teenKeeps}
+                  onValueChange={(v) => void setNoteSensitive(v)}
                   trackColor={{ true: colours.accent, false: colours.border }}
                 />
               </View>
@@ -830,6 +945,7 @@ export function DocumentDetail(props: { id: string }) {
           {whose ? t('caregivers.readOnlyOf', { name: whose }) : t('caregivers.readOnly')}
         </Text>
       ) : null}
+      {confirmNeeded}
       {problem === 'offline' || offline ? (
         <Notice tone="warn" testID="document-offline">
           {t('document.offline')}
@@ -849,7 +965,7 @@ export function DocumentDetail(props: { id: string }) {
             setDoc(d);
             void load();
           }}
-          onStale={load}
+          onStale={reload}
         />
       ) : null}
 
@@ -958,6 +1074,19 @@ export function DocumentDetail(props: { id: string }) {
         confirmID="essential-off-yes"
         cancelID="essential-off-cancel"
       />
+      {stillShared !== null ? (
+        <StillSharedSheet
+          links={stillShared}
+          testID="note-still-shared"
+          onEnd={async () => {
+            const r = await guarded((a, tk) => a.stopSharing(tk, id));
+            if (!r) return t('sensitive.nothingChanged');
+            emit('sharesChanged');
+            return stopSharingWords(r);
+          }}
+          onDone={() => setStillShared(null)}
+        />
+      ) : null}
       <ConfirmSheet
         visible={askReviewOff}
         testID="review-off-question"
@@ -994,7 +1123,33 @@ export function DocumentDetail(props: { id: string }) {
         />
       ) : null}
       <Sheet visible={more !== null} onClose={() => setMore(null)} {...(more === 'menu' ? { outside: true as const } : {})} testID="document-more-sheet">
-        {more === 'trash' && doc ? (
+        {more === 'print' && doc ? (
+          <PrintDocument
+            id={id}
+            name={name}
+            subline={subline || null}
+            sheet={{
+              kind: note ? null : (type?.label ?? null),
+              whose,
+              status: shown.status,
+              whoCanSee: caregiver
+                ? t('caregivers.whoCanSee', { name: whose ?? t('caregivers.someone') })
+                : t(`document.visibility_${shown.visibility}`),
+              sensitive,
+              place: placeWords,
+              facts,
+              noteLabel: type?.core?.notes?.label?.trim() || t('document.notes'),
+              note: shown.notes_updated_at !== undefined && !caregiver ? (shown.notes ?? null) : null,
+            }}
+            latestId={latest?.id ?? null}
+            drawn={!asIs && !!latest}
+            deps={deps}
+            onDone={(said) => {
+              setMore(null);
+              if (said) setNotice(said);
+            }}
+          />
+        ) : more === 'trash' && doc ? (
           <TrashConfirm
             id={id}
             title={name}
@@ -1126,6 +1281,28 @@ export function DocumentDetail(props: { id: string }) {
                   setReason('');
                   setMarkProblem(null);
                   setMore('unneeded');
+                }}
+              />
+            ) : null}
+            {/* Print after the rest (0.21.0), so what was there keeps its place in the sheet. */}
+            {mayPrint && doc ? (
+              <MenuRow
+                testID="document-print"
+                icon={Printer}
+                label={t('print.menu')}
+                busy={printingNote}
+                onPress={() => {
+                  if (!note) {
+                    setMore('print');
+                    return;
+                  }
+                  // A note has no pages to ask about: printed as it is.
+                  setPrintingNote(true);
+                  void printNote(doc, name).then((failed) => {
+                    setPrintingNote(false);
+                    setMore(null);
+                    if (failed) warn(failed);
+                  });
                 }}
               />
             ) : null}
@@ -1282,7 +1459,7 @@ export function DocumentDetail(props: { id: string }) {
 
   async function refreshNow() {
     setRefreshing(true);
-    await load();
+    await load({ ask: true });
     setRefreshing(false);
   }
 

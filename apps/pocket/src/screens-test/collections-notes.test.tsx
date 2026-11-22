@@ -259,11 +259,17 @@ describe('Notes (P9)', () => {
   it('newest first, named by their title or first words; found by words; one opens as a document', async () => {
     const t = vault();
     note(t, 'n1', 'Boiler', 'Serviced in **March**.', { notes_updated_at: '2026-10-01T10:00:00Z' });
-    note(t, 'n2', null, 'Bins go out on Tuesday\nRecycling every other week', { visibility: 'private' });
+    note(t, 'n2', null, 'Bins go out on Tuesday\nRecycling every other week');
+    // An Only me note (0.9.0-dev.87) is listed by its title and date alone, and says it asks first.
+    note(t, 'n3', null, 'The safe is behind the boiler', { visibility: 'private' });
     await unlocked(t, <NotesScreen />);
     const second = await screen.findByTestId('note-n2');
     expect(second).toHaveTextContent(/^Bins go out on Tuesday/);
-    expect(second).toHaveTextContent(/Only me$/);
+    const third = screen.getByTestId('note-n3');
+    expect(third).toHaveTextContent(/^Untitled note/);
+    expect(third).not.toHaveTextContent(/safe/);
+    expect(third).toHaveTextContent(/Confirm it's you to read it/);
+    expect(third).toHaveTextContent(/Only me$/);
     expect(screen.getByTestId('note-n1')).toHaveTextContent(/^Boiler/);
     expect(audit()).toEqual([]);
 

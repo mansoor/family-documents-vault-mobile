@@ -277,6 +277,36 @@ describe('Change a request, on the phone (LK)', () => {
     expect(await screen.findByTestId('sharing-said')).toHaveTextContent('The request “Tax papers 2025” is changed.');
   });
 
+  it('a request’s PIN (where the vault makes one): asked for when made, shown once with Copy, never with a password', async () => {
+    const t = vault({ upload_request_pin: true });
+    await unlocked(t, <SharingScreen />);
+    await fireEvent.press(await screen.findByTestId('requests-ask'));
+    await fireEvent.changeText(await screen.findByTestId('ask-title'), 'Tax papers 2025');
+    await fireEvent(screen.getByTestId('ask-with-password'), 'valueChange', true);
+    await fireEvent(screen.getByTestId('ask-with-pin'), 'valueChange', true);
+    // A PIN takes the password away.
+    expect(screen.getByTestId('ask-with-password').props.value).toBe(false);
+    await fireEvent.press(screen.getByTestId('ask-make'));
+    expect(await screen.findByTestId('ask-made-pin-words')).toHaveTextContent(/^\d{4}$/);
+    expect(screen.queryByTestId('ask-made-password')).toBeNull();
+    expect(screen.getByTestId('ask-made-terms')).toHaveTextContent(/They will be asked for the PIN\./);
+    expect(t.vault.state.uploadRequests[0]?.protection).toEqual(['pin']);
+  });
+
+  it('a request’s PIN changed: a new one shown once, said as a PIN', async () => {
+    const t = vault({ upload_request_pin: true });
+    t.vault.state.uploadRequests.push(request({ id: 'r1', protection: ['pin'] }));
+    await unlocked(t, <SharingScreen />);
+    await fireEvent.press(await screen.findByTestId('request-change-r1'));
+    expect(await screen.findByTestId('ask-secret-keep')).toHaveTextContent('Keep its PIN');
+    await fireEvent.press(screen.getByTestId('ask-secret-pin'));
+    expect(screen.getByTestId('ask-old-stops')).toHaveTextContent(/old PIN stops working at once/);
+    await fireEvent.press(screen.getByTestId('ask-save'));
+    expect(await screen.findByTestId('ask-new-password-words')).toHaveTextContent(/^\d{4}$/);
+    expect(screen.getByTestId('ask-new-password')).toHaveTextContent(/^The new PIN/);
+    expect(t.vault.state.uploadRequests[0]?.protection).toEqual(['pin']);
+  });
+
   it('letting it do more confirms it is you first', async () => {
     const t = vault();
     t.vault.state.uploadRequests.push(request({ id: 'r1' }));

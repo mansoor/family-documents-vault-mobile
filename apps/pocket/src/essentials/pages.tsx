@@ -1,12 +1,14 @@
 import { Minimize2, X } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
-import { radii } from '@fdv/shared';
+import { NOTE_KIND, radii } from '@fdv/shared';
 import { Image } from 'expo-image';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { CaregiverMark } from '../caregivers/mark';
 import { isCaregiverPaper } from '../caregivers/rules';
+import { NoteText } from '../documents/notes';
+import { keptName } from './kept-name';
 import { openOnline } from '../documents/online';
 import { useEssentials, type OpenCopy } from '../state/essentials';
 import { useScreenGuard } from '../state/lock';
@@ -26,6 +28,9 @@ import { relativeWords, useFamilyZone } from '../state/family-time';
  * written out as a file, and nothing is cached. Buttons move between pages
  * and zoom; so do a swipe, a pinch and a double tap (0.7.1: on Gesture
  * Handler, which a real phone hands the touches to). Never captured.
+ *
+ * A kept Essential note (0.9.0-dev.87) has no pages: its words, from the
+ * same store, drawn as its own page draws them.
  */
 export function EssentialPages(props: { id: string; mode?: string; online?: boolean; version?: string }) {
   const router = useRouter();
@@ -94,6 +99,8 @@ export function EssentialPages(props: { id: string; mode?: string; online?: bool
         ? t('document.pageFailed')
         : null;
   const pages = ready ? ready.pages : 0;
+  // A kept note: its words, never pages.
+  const note = ready && ready.document.type_key === NOTE_KIND ? ready.document : null;
   // Another page starts at its own size.
   const go = (to: number) => {
     if (to < 1 || to > pages) return;
@@ -131,7 +138,13 @@ export function EssentialPages(props: { id: string; mode?: string; online?: bool
           <Button kind="quiet" label={t('document.tryAgain')} onPress={again} testID="essential-try-again" />
         </Notice>
       ) : null}
-      {ready && pages === 0 ? (
+      {note ? (
+        <ScrollView testID="essential-note" contentContainerStyle={styles.note}>
+          <Text variant="title">{keptName(note, t)}</Text>
+          {note.notes ? <NoteText source={note.notes} /> : null}
+        </ScrollView>
+      ) : null}
+      {ready && pages === 0 && !note ? (
         <Notice tone="info" testID={ready.pending ? 'essential-pending' : 'essential-no-preview'}>
           {t(
             ready.pending
@@ -242,6 +255,7 @@ const makeStyles = (colours: Palette) =>
     gap: { flex: 1 },
     frame: { flex: 1, borderRadius: radii.m, backgroundColor: colours.paper, overflow: 'hidden' },
     image: { width: '100%', height: '100%' },
+    note: { gap: sp(12), paddingBottom: sp(24) },
     fit: {
       width: 48,
       height: 48,

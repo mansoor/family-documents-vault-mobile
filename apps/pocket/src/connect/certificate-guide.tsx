@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Platform, StyleSheet, View } from 'react-native';
+import { userCertificates } from '../config';
 import type { CertificateTrouble } from '../net/tls';
 import { Button, Notice, Text } from '../ui';
 import { sp } from '../ui/space';
@@ -8,7 +9,9 @@ import { sp } from '../ui/space';
 /**
  * A certificate this phone will not accept (4.15), in words, and — for a
  * vault that makes its own — how to install it once: Android's steps, and
- * iPhone's (a profile, then Full Trust).
+ * iPhone's (a profile, then Full Trust). An Android release build made
+ * strict (plugins/with-network-security.js's switch) trusts none installed
+ * by hand, and says so instead.
  */
 export function CertificateTroubleNotice(props: { trouble: CertificateTrouble }) {
   const { t } = useTranslation();
@@ -24,6 +27,18 @@ export function CertificateTroubleNotice(props: { trouble: CertificateTrouble })
     return (
       <Notice tone="danger" testID="connect-certificate">
         {t('connect.certificateExpired')}
+      </Notice>
+    );
+  }
+  // A build that trusts no certificate installed by hand (Android's release, once its switch is strict):
+  // installing one would not help.
+  if (!userCertificates()) {
+    return (
+      <Notice tone="warn" testID="connect-certificate">
+        <Text>{t('connect.certificateNotAccepted')}</Text>
+        <Text tone="soft" variant="secondary" testID="connect-certificate-for-host">
+          {t('connect.certificateNotAcceptedHost')}
+        </Text>
       </Notice>
     );
   }

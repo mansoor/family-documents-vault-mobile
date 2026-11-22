@@ -362,8 +362,8 @@ export function useLock(): LockValue {
   return useContext(Ctx) ?? NO_LOCK;
 }
 
-/** This screen is never captured while it is shown, whatever the setting. */
-export function useScreenGuard(name: string): void {
+/** This screen is never captured while it is shown (and `on`), whatever the setting. */
+export function useScreenGuard(name: string, on = true): void {
   const { guard } = useLock();
-  useEffect(() => guard(name), [guard, name]);
+  useEffect(() => (on ? guard(name) : undefined), [guard, name, on]);
 }

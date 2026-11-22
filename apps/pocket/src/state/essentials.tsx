@@ -12,6 +12,7 @@ import { keptType, statusHere, type StatusType } from '../essentials/status';
 import type { EssentialsStore, OfflineDocument } from '../essentials/store';
 import {
   ageOf,
+  isKeptNote,
   lastChecked,
   PAGES_PENDING,
   PRIVATE_COUNT_KEY,
@@ -55,6 +56,8 @@ export interface KeptDocument {
   pages: number;
   keptAt: number;
   private: boolean;
+  /** An Essential note (0.9.0-dev.87): its words in `document.notes`, no pages. */
+  note: boolean;
 }
 
 export interface OpenCopy {
@@ -178,6 +181,8 @@ interface EssentialsValue {
 
 const DAY = 86_400_000;
 const RENEW_WITHIN = 3 * DAY;
+/** How long changes made here settle before the copies follow them: several are one sync. */
+export const CHANGE_SETTLES_MS = 1_500;
 /** The document types, as much as today's status needs: kept with the copies. */
 const TYPES_KEY = 'types';
 /** Openings not yet told when the copies were removed: told when the vault next answers. */
@@ -209,6 +214,7 @@ function listOf(docs: OfflineDocument[], isPrivate: boolean): KeptDocument[] {
     pages: Math.max(0, doc.pages),
     keptAt: doc.kept_at,
     private: isPrivate,
+    note: isKeptNote(doc.version_id),
   }));
 }
 
@@ -268,11 +274,16 @@ export function EssentialsProvider(props: { children: ReactNode; deps?: Partial<
   }, []);
 
   /** What the everyday store holds, as the list shows it. */
+  // Which documents are kept here, either store: a change to one of them is a change to the copies.
+  const keptIds = useRef(new Set<string>());
   const refresh = useCallback(async (s: EssentialsStore) => {
-    setEveryday(listOf(await s.documents(), false));
+    const docs = await s.documents();
+    const priv = await keptPrivate(s);
+    keptIds.current = new Set([...docs.map((x) => x.id), ...priv.map((k) => k.split('@')[0] ?? '')]);
+    setEveryday(listOf(docs, false));
     setChecked(await lastChecked(s));
     setPrivateInSet(Number((await s.state(PRIVATE_COUNT_KEY)) ?? 0));
-    setPrivateKept((await keptPrivate(s)).length);
+    setPrivateKept(priv.length);
   }, []);
 
   /** Nothing of the copies on screen: the lock closed, or they are gone. */
@@ -474,13 +485,25 @@ export function EssentialsProvider(props: { children: ReactNode; deps?: Partial<
   ]);
 
   /** The everyday store, once it is open (or soon after): what the Only me copies sync beside. */
+  // Whether the store is open or about to be: otherwise nothing is waited for.
+  const openable = ready && lock.status === 'unlocked' && prefs.enrolled && prefs.kept && readable;
+  const openableRef = useRef(openable);
+  useEffect(() => {
+    openableRef.current = openable;
+  }, [openable]);
+
   const whenOpen = useCallback(
     () =>
       storeRef.current
         ? Promise.resolve()
         : new Promise<void>((resolve) => {
-            waiting.current.push(resolve);
-            setTimeout(resolve, 10_000);
+            // Opened, or not within 10 seconds: either way the timer goes, so nothing is left running.
+            const timer = setTimeout(done, 10_000);
+            function done() {
+              clearTimeout(timer);
+              resolve();
+            }
+            waiting.current.push(done);
           }),
     [],
   );
@@ -596,6 +619,26 @@ export function EssentialsProvider(props: { children: ReactNode; deps?: Partial<
     });
     return () => sub.remove();
   }, [run]);
+  // A document or a note changed here (its words, made Essential or not, moved to the Trash): the
+  // copies follow within moments, so a note no longer Essential is not kept until the next start. Only
+  // a change that touches them: one that is an Essential now, one kept here, or one nobody could name.
+  // Several changes together are one sync.
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const off = on('documentChanged', (id, essential) => {
+      const touches = essential === true || keptIds.current.has(id) || (essential === undefined && id === '');
+      if (!touches) return;
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        timer = null;
+        void runRef.current();
+      }, CHANGE_SETTLES_MS);
+    });
+    return () => {
+      off();
+      if (timer) clearTimeout(timer);
+    };
+  }, []);
 
   /** The vault's offline grant, for this session. */
   const granted = useCallback(
@@ -670,11 +713,15 @@ export function EssentialsProvider(props: { children: ReactNode; deps?: Partial<
 
   const open = useCallback(
     async (id: string, mode: 'view' | 'show'): Promise<OpenCopy | null> => {
+      // Opened as the app unlocks (a link, the update screen): the store may still be opening.
+      // Asked of this render's own reading (a screen's effect runs before the ref is brought up to date).
+      if (!storeRef.current && openable) await whenOpen();
       for (const s of [storeRef.current, privateRef.current]) {
         if (!s) continue;
         const doc = await s.document(id);
         if (!doc) continue;
-        await s.recordOpen({
+        // A note has no version the vault could be told of: its openings are not recorded.
+        if (!isKeptNote(doc.version_id)) await s.recordOpen({
           id: d.uuid(),
           document_id: doc.id,
           version_id: doc.version_id,
@@ -698,15 +745,8 @@ export function EssentialsProvider(props: { children: ReactNode; deps?: Partial<
       }
       return null;
     },
-    [d, offline],
+    [d, offline, openable, whenOpen],
   );
-
-  // Whether the store is open or about to be: otherwise nothing is waited for.
-  const openable = ready && lock.status === 'unlocked' && prefs.enrolled && prefs.kept && readable;
-  const openableRef = useRef(openable);
-  useEffect(() => {
-    openableRef.current = openable;
-  }, [openable]);
 
   /** The version kept on this phone, asked of the store itself (it may still be opening). */
   const keptVersion = useCallback(

@@ -6,6 +6,67 @@ app's own, tagged `vX.Y.Z` in this repository.
 
 ## [Unreleased]
 
+## [0.21.0] — Notes that ask "Confirm it's you", Essential notes kept offline, and printing
+
+Re-pinned to the vault's **v0.9.0-dev.87**. The vault now asks "Confirm it's
+you" before an Only me or an Essential note's words are read or saved, as
+it does for a document's pages; this app asks with it. The phone's minimum
+vault stays 0.4.10: an older vault's notes simply never ask.
+
+### Added
+- **Notes that ask "Confirm it's you"**: opening an Only me or an Essential
+  note, or changing one, asks once (then not again for five minutes).
+  Cancelled, the note's page says so, with **Confirm it's you** to ask
+  again, and nothing asks by itself meanwhile. Sensitive alone never asks.
+  In Notes, such a note shows its title and date, a lock and "Confirm it's
+  you to read it", never its words.
+- **Essential and Sensitive on a note**, on its page, by the documents' rules
+  (a vault of 0.9.0-dev.87): turning Essential off asks first, and confirms
+  it's you; a teen can make a note sensitive, never not; made sensitive while
+  a link outside the family still gives it, it asks whether to end the link.
+  Notes show Essential and Sensitive on their line in Notes.
+- **Essential notes kept on the phone**, words and all, in the same encrypted
+  stores as the kept Essentials (an Only me one with the Only me ones, opened
+  with a fingerprint or face). They are listed under On this phone and open
+  on their own page with no connection, behind the same lock. One no longer
+  Essential, moved to the Trash or gone from sight leaves the phone at the
+  next sync (straight away when changed on this phone), and they all go on
+  signing out, as the Essentials do. A note kept here shows its words from
+  the phone while "Confirm it's you" is waiting. Kept notes are named by
+  their title (or "Untitled note") on Home and under On this phone, never
+  by their first words; an Only me note changed while its store is closed
+  catches up the next time it is opened.
+- **Print**: a document (its pages, a sheet of its details, or both; pages
+  that ask "Confirm it's you" ask first; the first 20 pages at most, and the
+  printout says when some were left out or couldn't be read), a note, a collection's contents as
+  a table (with a box to tick beside each, if wanted) and the Activity log
+  as its filters show it. It uses the phone's own print screen, which can
+  also save a PDF, with nothing of the app around the page, the family's
+  dates, and the vault's name and when it was printed at the foot. Never a
+  PIN or a link.
+- **My cabinet's total**: how many documents it holds, each once; how many
+  are in no folder, which opens them as a list (**Not in any folder**); and
+  how many are in more than one, which is why the folders add up to more.
+- **A PIN on a request for documents**, as on a share link, where the vault
+  offers one: made up by the vault, shown once with the link, never with a
+  password. A request's PIN can be kept, changed for a new one or taken
+  away when it is changed.
+- **Security & health** in Settings, for owners (a vault with it): the last
+  backup and its copy off-site, the restore drill, the activity log's
+  nightly check, failed sign-ins and sign-ins used from two places, each
+  fine or what to do, as the web says it; Activity opens from it.
+
+### Changed
+- **The release build reaches a vault over https only**: no plain
+  `http://`, and Connect asks for the vault's https address instead of
+  trying. It still accepts a certificate installed on the phone by hand (a
+  vault that makes its own), for now: one switch makes it strict before the
+  app goes live, and Connect then says plainly that such a certificate
+  can't be used. The test builds keep plain http on the home network and a
+  certificate installed by hand, for the throwaway vaults they reach.
+- A code given twice is told apart by the vault's own reason for it, as well
+  as by its words.
+
 ## [0.20.0] — An app too old for the vault says so, and signing in as the vault of 0.9.0 asks
 
 Re-pinned to the vault's **v0.9.0-dev.79**. A vault from 0.9.0-dev.79 on

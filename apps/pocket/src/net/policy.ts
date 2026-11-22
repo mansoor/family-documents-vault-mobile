@@ -38,6 +38,8 @@ export interface KnownVault {
 
 export type HttpDecision =
   | { kind: 'secure' }
+  /** This build never speaks plain http (the Android release build, 0.21.0): the vault's https address only. */
+  | { kind: 'refuse_this_build' }
   | { kind: 'refuse_public' }
   | { kind: 'refuse_mobile_data' }
   | { kind: 'ask' }
@@ -47,8 +49,10 @@ export function httpDecision(
   address: Pick<ServerAddress, 'origin' | 'host'>,
   network: NetworkKind,
   known: KnownVault | undefined,
+  build: { plainHttp: boolean } = { plainHttp: true },
 ): HttpDecision {
   if (address.origin.startsWith('https://')) return { kind: 'secure' };
+  if (!build.plainHttp) return { kind: 'refuse_this_build' };
   if (!isPrivateHost(address.host)) return { kind: 'refuse_public' };
   if (network === 'cellular' || network === 'unknown') return { kind: 'refuse_mobile_data' };
   if (!known?.httpApproved) return { kind: 'ask' };
