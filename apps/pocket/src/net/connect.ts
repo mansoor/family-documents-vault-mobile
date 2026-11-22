@@ -1,6 +1,7 @@
 import {
   createApi,
   createHttp,
+  isPrivateHost,
   negotiate,
   NetworkError,
   serverOriginFrom,
@@ -36,6 +37,12 @@ export interface ConnectDeps {
   whyFailed?: (url: string) => Promise<unknown>;
   /** Whether this network reaches the internet: false behind a Wi-Fi sign-in page. */
   validated?: () => Promise<boolean | null>;
+  /**
+   * Whether this build may speak plain http at all (0.21.0): the Android
+   * release build may not (its network security config refuses it), so a
+   * vault at an http address is said to need https, never tried.
+   */
+  plainHttp?: boolean;
 }
 
 export type ConnectOutcome =
@@ -49,6 +56,8 @@ export type ConnectOutcome =
   | { kind: 'setup_required'; origin: string }
   | { kind: 'refuse_public_http'; host: string }
   | { kind: 'refuse_mobile_data'; host: string }
+  /** This build speaks only https (the Android release build, 0.21.0), and http is all that was left to try. */
+  | { kind: 'refuse_plain_http'; host: string }
   /** Plain http to a private vault, first time: warn, then call again with approveHttp. */
   | { kind: 'ask_http'; origin: string; host: string; caps: Capabilities }
   /** Something other than the approved vault is answering at this address. */
@@ -84,7 +93,17 @@ export async function connect(
   for (const origin of candidates(address)) {
     const secure = origin.startsWith('https://');
     const known = deps.known(origin);
-    const decision = httpDecision({ origin, host: address.host }, network, known);
+    const decision = httpDecision({ origin, host: address.host }, network, known, {
+      plainHttp: deps.plainHttp !== false,
+    });
+    if (decision.kind === 'refuse_this_build') {
+      // Never tried: this build talks to a vault over https alone. Said when http was typed, or for a
+      // vault at home that https did not reach; a name on the internet that did not answer is "can't reach".
+      if (!address.assumedScheme || isPrivateHost(address.host)) {
+        refusal ??= { kind: 'refuse_plain_http', host: address.host };
+      }
+      continue;
+    }
     if (decision.kind === 'refuse_public') {
       // Typed http to a public host: refuse. Assumed https that failed:
       // the fallback is simply not tried, and the failure stands.

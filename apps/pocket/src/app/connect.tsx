@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { APP_RELEASES_URL, APP_VERSION, MIN_SERVER_VERSION } from '../config';
+import { APP_RELEASES_URL, APP_VERSION, MIN_SERVER_VERSION, PLAIN_HTTP } from '../config';
 import { CertificateTroubleNotice } from '../connect/certificate-guide';
 import { connect, type ConnectDeps, type ConnectOutcome } from '../net/connect';
 import { readPasted, type Pasted } from '../net/links';
@@ -34,6 +34,7 @@ export default function Connect(props: { deps?: Partial<ConnectDeps> }) {
     minServerVersion: MIN_SERVER_VERSION,
     whyFailed,
     validated: internetReachable,
+    plainHttp: PLAIN_HTTP,
     ...props.deps,
   };
 
@@ -167,6 +168,12 @@ function Outcome(props: { outcome: ConnectOutcome; busy: boolean; onApproveHttp:
       return <Notice tone="danger">{t('connect.refusePublicHttp')}</Notice>;
     case 'refuse_mobile_data':
       return <Notice tone="warn">{t('connect.refuseMobileData')}</Notice>;
+    case 'refuse_plain_http':
+      return (
+        <Notice tone="warn" testID="connect-https-only">
+          {t('connect.httpsOnly')}
+        </Notice>
+      );
     case 'stranger':
       return <Notice tone="danger">{t('connect.stranger', { host: o.host })}</Notice>;
     case 'certificate':

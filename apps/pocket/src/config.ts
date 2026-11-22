@@ -1,4 +1,5 @@
 import Constants from 'expo-constants';
+import { Platform } from 'react-native';
 
 /** What this build is, from app.config.ts's extra. */
 export const extra = (Constants.expoConfig?.extra ?? {}) as {
@@ -8,11 +9,31 @@ export const extra = (Constants.expoConfig?.extra ?? {}) as {
   fixtures?: boolean;
   /** The e2e build: a fake phone lock, opened by a tap (4.8). */
   fakeAuth?: boolean;
+  /** Android: this build trusts a certificate installed by hand (plugins/with-network-security.js's switch). */
+  userCertificates?: boolean;
 };
 
 /** The scanner spike's screens exist in dev and preview builds only. */
 // The spike screens: development builds only (P6), never one somebody installs to try.
 export const SPIKE = extra.variant === 'dev';
+
+/**
+ * Whether this build may reach a vault over plain http (0.21.0). Android's
+ * release build may not: its network security config trusts only the
+ * system's certificate authorities and refuses cleartext
+ * (plugins/with-network-security.js), so Connect asks for the vault's https
+ * address instead of trying. The test builds (dev, preview, e2e), the
+ * browser build and iPhone keep the home-network rules of net/policy.ts.
+ */
+export const PLAIN_HTTP = !(Platform.OS === 'android' && !['dev', 'preview', 'e2e'].includes(extra.variant ?? ''));
+
+/**
+ * Whether a certificate installed on the phone by hand is trusted: on
+ * Android, as the network security config was written
+ * (plugins/with-network-security.js, one switch); not in the release build
+ * unless that switch says so.
+ */
+export const USER_CERTIFICATES = Platform.OS !== 'android' || (extra.userCertificates ?? PLAIN_HTTP);
 
 /** The app's own version, for negotiating with the vault. */
 export const APP_VERSION = Constants.expoConfig?.version ?? '0.0.0';

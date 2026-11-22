@@ -10,7 +10,7 @@ import {
   type CollectionItemView,
 } from '@fdv/shared';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { Download, Ellipsis, Info, Pencil, Share2, Trash2, UsersRound } from 'lucide-react-native';
+import { Download, Ellipsis, Info, Pencil, Printer, Share2, Trash2, UsersRound } from 'lucide-react-native';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, View } from 'react-native';
@@ -22,6 +22,7 @@ import { MenuRow } from '../../ui/menu-row';
 import { Sheet } from '../../ui/sheet';
 import { IconButton } from '../../ui/icon-button';
 import { ShareSheet } from '../../sharing/share-sheet';
+import { PrintCollection } from '../../print/collection-print';
 import { audienceKey, managersShown, powersFor } from '../../collections/rules';
 import { useDownload } from '../../documents/download';
 import { DocumentRow, rowPlace } from '../../documents/row';
@@ -199,7 +200,9 @@ export default function CollectionScreen() {
   const mayManagers = !!detail && managersShown(caps, who?.role, detail);
   // The whole of it as one ZIP (DL), where the vault gives one and there is something in it.
   const mayZip = !!detail && caps?.features.zip_download === true && detail.item_count > 0;
-  const hasMenu = (mayShare || mayDelete || mayManagers || mayZip) && !offline;
+  // Print what is in it (0.21.0), for whoever sees it.
+  const [printing, setPrinting] = useState(false);
+  const hasMenu = (mayShare || mayDelete || mayManagers || mayZip || !!detail) && !offline;
   const downloadAll = () => {
     if (!detail) return;
     setSaid(null);
@@ -351,6 +354,16 @@ export default function CollectionScreen() {
                   }}
                 />
               ) : null}
+              <MenuRow
+                testID="collection-print"
+                icon={Printer}
+                label={t('print.menu')}
+                onPress={() => {
+                  setMenuOpen(false);
+                  setSaid(null);
+                  setPrinting(true);
+                }}
+              />
               {mayShare ? (
                 <MenuRow
                   testID="collection-share"
@@ -382,6 +395,18 @@ export default function CollectionScreen() {
                 testID="collection-more-cancel"
               />
             </View>
+          </Sheet>
+          <Sheet visible={printing} onClose={() => setPrinting(false)} testID="collection-print-sheet">
+            {printing ? (
+              <PrintCollection
+                id={detail.id}
+                name={detail.name}
+                onDone={(failed) => {
+                  setPrinting(false);
+                  if (failed) setSaid({ tone: 'warn', text: failed });
+                }}
+              />
+            ) : null}
           </Sheet>
           <Sheet visible={about} onClose={() => setAbout(false)} outside testID="collection-about-sheet">
             <View style={styles.menu}>

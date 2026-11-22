@@ -1,12 +1,45 @@
-// The operating system permits cleartext and trusts the system's and the
-// user's certificate authorities; the app's own policy decides per host
-// (iteration 4.2): plain http only to a vault on the home network, and only
-// after the person has said yes to it.
+// What the operating system lets the app reach, by build (app.config.ts's
+// extra.variant).
+//
+// The release build, the one families install, trusts only the system's
+// certificate authorities and never sends anything over plain http: a
+// certificate somebody was talked into installing on the phone, or one a
+// device manager put there, cannot read what goes to the vault, and nothing
+// inside the app can fall back to cleartext.
+//
+// The test builds (dev, preview, e2e) talk to throwaway vaults on a laptop
+// or in the emulator over plain http (and the dev build to Metro), and to
+// vaults whose certificate was installed by hand, so they keep what they
+// had: cleartext permitted (the app's own policy still decides per host,
+// net/policy.ts: plain http only to an approved vault at home) and
+// user-installed authorities trusted. A build with no variant is a release.
 const { withAndroidManifest, withDangerousMod } = require('expo/config-plugins');
 const fs = require('fs');
 const path = require('path');
 
-const XML = `<?xml version="1.0" encoding="utf-8"?>
+/**
+ * THE SWITCH: whether the release build also trusts a certificate installed
+ * on the phone by hand (a self-hosted vault's own `vault-ca.crt`). false:
+ * the system's authorities only. Flipping it is this one line: the file
+ * below, the manifest, and what the app says on Connect (config.ts reads
+ * `extra.userCertificates`) all follow it. Plain http stays off either way.
+ */
+const RELEASE_USER_CERTIFICATES = false;
+
+const USER_ANCHOR = `
+      <certificates src="user"/>`;
+
+const RELEASE_XML = `<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+  <base-config cleartextTrafficPermitted="false">
+    <trust-anchors>
+      <certificates src="system"/>${RELEASE_USER_CERTIFICATES ? USER_ANCHOR : ''}
+    </trust-anchors>
+  </base-config>
+</network-security-config>
+`;
+
+const TEST_XML = `<?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
   <base-config cleartextTrafficPermitted="true">
     <trust-anchors>
@@ -17,19 +50,33 @@ const XML = `<?xml version="1.0" encoding="utf-8"?>
 </network-security-config>
 `;
 
+const TEST_BUILDS = ['dev', 'preview', 'e2e'];
+
+/** Whether a build is one of the test builds, which may reach a laptop's vault over plain http. */
+function testBuild(variant) {
+  return TEST_BUILDS.includes(variant);
+}
+
 module.exports = function withNetworkSecurity(config) {
+  const test = testBuild(config.extra?.variant);
+  // What the app tells people about certificates installed by hand follows the file.
+  config.extra = { ...config.extra, userCertificates: test || RELEASE_USER_CERTIFICATES };
   config = withDangerousMod(config, [
     'android',
     async (c) => {
       const dir = path.join(c.modRequest.platformProjectRoot, 'app/src/main/res/xml');
       fs.mkdirSync(dir, { recursive: true });
-      fs.writeFileSync(path.join(dir, 'network_security_config.xml'), XML);
+      fs.writeFileSync(path.join(dir, 'network_security_config.xml'), test ? TEST_XML : RELEASE_XML);
       return c;
     },
   ]);
   return withAndroidManifest(config, (c) => {
     const app = c.modResults.manifest.application?.[0];
-    if (app) app.$['android:networkSecurityConfig'] = '@xml/network_security_config';
+    if (app) {
+      app.$['android:networkSecurityConfig'] = '@xml/network_security_config';
+      // Said in the manifest too, for anything that reads only the manifest.
+      app.$['android:usesCleartextTraffic'] = test ? 'true' : 'false';
+    }
     return c;
   });
 };

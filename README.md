@@ -29,6 +29,21 @@ Each has its own id, so they can sit on one phone side by side.
 **Test builds talk to throwaway vaults only** — a stack started for the test,
 on port 8099, never the family's own vault on 8080.
 
+**What each build may reach (0.21.0).** The release build reaches a vault
+over **https only**, with a certificate the phone already trusts (one from
+Let's Encrypt, or Tailscale's own): it sends nothing over plain `http://`,
+and a certificate installed on the phone by hand (a vault's own
+`vault-ca.crt`, or one a device manager put there) is not trusted
+(`apps/pocket/plugins/with-network-security.js`; whether the release build
+trusts a hand-installed certificate is one switch there,
+`RELEASE_USER_CERTIFICATES`). Connect says so in plain words. The test builds (dev, preview, e2e) keep what they had, for the
+throwaway vaults they reach: plain `http://` to an approved vault on the
+home network, and a certificate installed by hand. There is no certificate
+pinning: a self-hosted vault's certificate is its own and changes each time
+it is renewed, so a pin would lock families out at the first renewal, and
+checking one needs native networking code that can't be built and tested
+here.
+
 ## Installing a test build on an Android phone
 
 1. On the phone, open the repository's **Releases** page and download the APK

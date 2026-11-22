@@ -11,6 +11,14 @@ export interface CabinetRead {
   /** Null: nothing arranged yet. */
   arranged: { by: ArrangeBy | null; cabinets: Cabinet[]; hidden: number } | null;
   counts: Record<string, number | null>;
+  /**
+   * What the cabinet holds in all, each paper once (a vault of 19 Nov 2026,
+   * with a saved arrangement): the total, those in no shown folder, and those
+   * in more than one. Undefined where the vault does not say.
+   */
+  documents?: number;
+  unfiled?: number;
+  inSeveral?: number;
 }
 
 /** How long an answer is taken as current by a screen that opens: the next level down opens on it, unasked. */
@@ -111,6 +119,9 @@ export function useCabinet() {
                 ? { by: view.layout.arranged_by, cabinets, hidden: view.layout.cabinets.length - cabinets.length }
                 : null,
               counts: counted?.counts ?? {},
+              ...(typeof counted?.documents === 'number' ? { documents: counted.documents } : {}),
+              ...(typeof counted?.unfiled === 'number' ? { unfiled: counted.unfiled } : {}),
+              ...(typeof counted?.in_several === 'number' ? { inSeveral: counted.in_several } : {}),
             };
           },
           force,

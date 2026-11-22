@@ -2,6 +2,7 @@ import type { CabinetLayout, Capabilities, DocumentView } from '@fdv/shared';
 import { act, fireEvent, screen, waitFor } from '@testing-library/react-native';
 import { AppState, type AppStateStatus } from 'react-native';
 import DocumentsScreen from '../app/(tabs)/documents';
+import UnfiledScreen from '../app/unfiled';
 import { CabinetBrowse } from '../cabinet/browse';
 import { readLabel, shownLayout } from '../cabinet/model';
 import { forgetCabinets } from '../cabinet/use-cabinet';
@@ -211,6 +212,55 @@ describe('the cabinet on Documents (C5)', () => {
 
     await fireEvent.press(screen.getByTestId('doc-row-p60-2024'));
     expect(routes().at(-1)).toEqual({ pathname: '/document/[id]', params: { id: 'p60-2024' } });
+  });
+
+  it('says what it holds in all; those in no folder open as a list, and why folders add up to more', async () => {
+    const t = vault();
+    filed(t);
+    // A paper no shown folder asks for.
+    t.vault.state.documents.push({ id: 'stray', title: 'A stray receipt', type_key: 'receipt' } as never);
+    await unlocked(t, <DocumentsScreen />);
+    await fireEvent.press(await screen.findByTestId('documents-view-cabinet'));
+    await screen.findByTestId('cabinet-c-study');
+    // Each paper once: the two P60s, the letter and the stray.
+    await waitFor(() => expect(screen.getByTestId('cabinet-arranged-by')).toHaveTextContent(/^4 documents/));
+    expect(await screen.findByTestId('cabinet-unfiled')).toHaveTextContent('1 isn’t in any folder');
+    expect(screen.queryByTestId('cabinet-in-several')).toBeNull();
+    await fireEvent.press(screen.getByTestId('cabinet-unfiled'));
+    expect(routes().at(-1)).toEqual({ pathname: '/unfiled', params: {} });
+  });
+
+  it('the documents in no folder, newest first, each opening as any document does', async () => {
+    const t = vault();
+    filed(t);
+    t.vault.state.documents.push({ id: 'stray', title: 'A stray receipt', type_key: 'receipt' } as never);
+    await unlocked(t, <UnfiledScreen />);
+    expect(await screen.findByTestId('doc-row-stray')).toBeTruthy();
+    expect(screen.queryByTestId('doc-row-p60-2025')).toBeNull();
+    await fireEvent.press(screen.getByTestId('doc-row-stray'));
+    expect(routes().at(-1)).toEqual({ pathname: '/document/[id]', params: { id: 'stray' } });
+  });
+
+  it('the documents in no folder come a page at a time: Show more brings the rest, each once', async () => {
+    const t = vault();
+    filed(t);
+    for (let i = 0; i < 55; i += 1) {
+      t.vault.state.documents.push({
+        id: `stray-${i}`,
+        title: `Stray ${i}`,
+        type_key: 'receipt',
+        created_at: new Date(Date.UTC(2026, 0, 1) + i * 60_000).toISOString(),
+      } as never);
+    }
+    await unlocked(t, <UnfiledScreen />);
+    await screen.findByTestId('unfiled-more');
+    // The newest first: the first page's top row, and the oldest only after Show more.
+    expect(screen.getByTestId('doc-row-stray-54')).toBeTruthy();
+    await fireEvent.press(screen.getByTestId('unfiled-more'));
+    await waitFor(() => expect(screen.queryByTestId('unfiled-more')).toBeNull());
+    const asked = t.calls.filter((c) => c.includes('/api/v1/cabinet/unfiled'));
+    expect(asked[1]).toContain('cursor=50');
+    expect(t.calls.filter((c) => c.includes('/api/v1/cabinet/unfiled'))).toHaveLength(2);
   });
 
   it('remembers Cabinet on this phone, and the magnifier goes back to the list with the search open', async () => {

@@ -49,6 +49,17 @@ describe('plain http', () => {
 
   it('https is always fine', () => {
     expect(httpDecision(at('vault.example.com'), 'cellular', undefined)).toEqual({ kind: 'secure' });
+    expect(httpDecision(at('vault.example.com'), 'wifi', undefined, { plainHttp: false })).toEqual({ kind: 'secure' });
+  });
+
+  it('a build that never speaks plain http (the Android release) refuses it, even to an approved vault at home', () => {
+    const address = at('http://192.168.1.20:8099');
+    expect(httpDecision(address, 'wifi', known(address.origin), { plainHttp: false })).toEqual({
+      kind: 'refuse_this_build',
+    });
+    expect(httpDecision(at('http://vault.example.com'), 'wifi', undefined, { plainHttp: false })).toEqual({
+      kind: 'refuse_this_build',
+    });
   });
 });
 

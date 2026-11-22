@@ -1,7 +1,7 @@
-import type { DocumentView, OfflineItem, OfflineSet } from '@fdv/shared';
+import type { DocumentView, OfflineItem, OfflineNote, OfflineSet } from '@fdv/shared';
 import { sendOpens } from './opens';
 import { MemoryEssentialsStore } from './store';
-import { ageOf, lastChecked, syncEssentials, type PageFetch } from './sync';
+import { ageOf, isKeptNote, lastChecked, syncEssentials, type PageFetch } from './sync';
 import { endWipes } from './wipe';
 
 const GRANT = { granted_at: '2026-09-25T10:00:00Z', expires_at: '2026-10-25T10:00:00Z', include_private: false };
@@ -21,7 +21,23 @@ function item(id: string, over: { version?: string; pages?: number | null; priva
   };
 }
 
-function vault(items: OfflineItem[], opts: { grant?: boolean; serverTime?: string; maxDays?: number } = {}) {
+function note(id: string, words: string, over: { private?: boolean; changed?: string } = {}): OfflineNote {
+  return {
+    document: {
+      id,
+      title: `Note ${id}`,
+      type_key: 'note',
+      notes: words,
+      notes_updated_at: over.changed ?? '2026-09-20T10:00:00Z',
+    } as DocumentView,
+    private: over.private ?? false,
+  };
+}
+
+function vault(
+  items: OfflineItem[],
+  opts: { grant?: boolean; serverTime?: string; maxDays?: number; notes?: OfflineNote[] } = {},
+) {
   const fetched: string[] = [];
   const pending = new Set<string>();
   return {
@@ -34,6 +50,7 @@ function vault(items: OfflineItem[], opts: { grant?: boolean; serverTime?: strin
       max_offline_days: opts.maxDays ?? 90,
       server_time: opts.serverTime ?? '2026-09-25T12:00:00Z',
       truncated: false,
+      ...(opts.notes ? { notes: opts.notes } : {}),
     }),
     fetchPage: async (versionId: string, n: number): Promise<PageFetch> => {
       fetched.push(`${versionId}/${n}`);
@@ -158,6 +175,80 @@ describe('keeping the Essentials as the vault says', () => {
       removePrivate,
     });
     expect(removed).toBe(1);
+  });
+
+  it('Essential notes are kept with their words, no pages fetched, and go when they leave the set', async () => {
+    const everyday = new MemoryEssentialsStore();
+    const v = vault([item('passport')], { notes: [note('gate', 'The code is on the fridge.')] });
+    const r = await syncEssentials({ ...v, everyday, private: null, now: () => 1 });
+    expect(r.kept).toBe(2);
+    expect(v.fetched).toEqual(['passport-v1/1']);
+    const kept = await everyday.document('gate');
+    expect(kept?.pages).toBe(0);
+    expect(isKeptNote(kept?.version_id ?? '')).toBe(true);
+    expect((JSON.parse(kept?.view ?? '{}') as DocumentView).notes).toBe('The code is on the fridge.');
+
+    // Its words changed: the kept words follow.
+    const changed = vault([item('passport')], {
+      notes: [note('gate', 'The code is in the drawer.', { changed: '2026-09-24T10:00:00Z' })],
+    });
+    await syncEssentials({ ...changed, everyday, private: null, now: () => 2 });
+    expect((JSON.parse((await everyday.document('gate'))?.view ?? '{}') as DocumentView).notes).toBe(
+      'The code is in the drawer.',
+    );
+
+    // No longer Essential, or in the Trash: gone from the set, gone from the phone.
+    const r3 = await syncEssentials({ ...vault([item('passport')], { notes: [] }), everyday, private: null, now: () => 3 });
+    expect(r3.removed).toBe(1);
+    expect(await everyday.document('gate')).toBeNull();
+  });
+
+  it('an Only me Essential note goes to the Only me store; changed while it is closed, the store stays and catches up', async () => {
+    const everyday = new MemoryEssentialsStore();
+    const priv = new MemoryEssentialsStore();
+    const set = (changed?: string) =>
+      vault([item('passport')], { notes: [note('pin', 'Behind the clock.', { private: true, ...(changed ? { changed } : {}) })] });
+    const closed = await syncEssentials({ ...set(), everyday, private: null, now: () => 1 });
+    expect(closed.privateNotKept).toBe(1);
+    expect(await everyday.document('pin')).toBeNull();
+    await syncEssentials({ ...set(), everyday, private: priv, now: () => 2 });
+    expect((await priv.documents()).map((d) => d.id)).toEqual(['pin']);
+    expect(await everyday.document('pin')).toBeNull();
+
+    let removed = 0;
+    const removePrivate = async () => void (removed += 1);
+    await syncEssentials({ ...set(), everyday, private: null, now: () => 3, removePrivate });
+    expect(removed).toBe(0);
+    // Saved on this phone (or anywhere) while the store is closed: never a reason to remove it.
+    const r = await syncEssentials({ ...set('2026-09-24T10:00:00Z'), everyday, private: null, now: () => 4, removePrivate });
+    expect(removed).toBe(0);
+    expect(r.privateRemoved).toBe(false);
+    // Opened again: its words caught up.
+    const changed = vault([item('passport')], {
+      notes: [note('pin', 'Behind the mirror.', { private: true, changed: '2026-09-24T10:00:00Z' })],
+    });
+    await syncEssentials({ ...changed, everyday, private: priv, now: () => 5 });
+    expect((JSON.parse((await priv.document('pin'))?.view ?? '{}') as DocumentView).notes).toBe('Behind the mirror.');
+    // Gone from the set while closed: the store goes, as for a document.
+    await syncEssentials({ ...vault([item('passport')], { notes: [] }), everyday, private: null, now: () => 6, removePrivate });
+    expect(removed).toBe(1);
+  });
+
+  it('a kept note’s view never carries its first words, only its words', async () => {
+    const everyday = new MemoryEssentialsStore();
+    const n = note('gate', 'Gate code 4821');
+    (n.document as { note_name?: string }).note_name = 'Gate code 4821';
+    await syncEssentials({ ...vault([], { notes: [n] }), everyday, private: null, now: () => 1 });
+    const view = JSON.parse((await everyday.document('gate'))?.view ?? '{}') as DocumentView;
+    expect(view.note_name).toBeUndefined();
+    expect(view.notes).toBe('Gate code 4821');
+  });
+
+  it('an older vault’s set has no notes: nothing of notes is kept or removed', async () => {
+    const everyday = new MemoryEssentialsStore();
+    const r = await syncEssentials({ ...vault([item('passport')]), everyday, private: null, now: () => 1 });
+    expect(r.kept).toBe(1);
+    expect((await everyday.documents()).map((d) => d.id)).toEqual(['passport']);
   });
 
   it('a page that fails still leaves the copies checked, and stops only this sync’s fetching', async () => {

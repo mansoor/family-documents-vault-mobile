@@ -124,7 +124,9 @@ export function AskForDocuments(props: { person?: string }) {
   }
 
   const emailCode = data?.emailCode === true;
-  const read = readAsk(v, { timezone: zone, maxDays, emailCode });
+  // A PIN, where the vault makes one for a request.
+  const pins = caps?.features.upload_request_pin === true;
+  const read = readAsk(v, { timezone: zone, maxDays, emailCode, pins });
 
   const make = async () => {
     setTried(true);
@@ -258,13 +260,23 @@ export function AskForDocuments(props: { person?: string }) {
         <Small>{t('ask.endNote', { days: maxDays })}</Small>
 
         <Label>{t('ask.protect')}</Label>
+        {pins ? (
+          <SwitchRow
+            label={t('ask.withPin')}
+            value={v.withPin}
+            // Never both: a PIN takes the password away, as a share link's does.
+            onChange={(withPin) => set(withPin ? { withPin, withPassword: false } : { withPin })}
+            testID="ask-with-pin"
+          />
+        ) : null}
         <SwitchRow
           label={t('ask.withPassword')}
-          value={v.withPassword}
-          onChange={(withPassword) => set({ withPassword })}
+          value={v.withPassword && !(pins && v.withPin)}
+          onChange={(withPassword) => set(withPassword ? { withPassword, withPin: false } : { withPassword })}
           testID="ask-with-password"
         />
-        {v.withPassword ? (
+        {pins && v.withPin ? <Small>{t('ask.pinNote')}</Small> : null}
+        {v.withPassword && !(pins && v.withPin) ? (
           <PasswordFields
             mode={v.passwordMode}
             password={v.password}
@@ -451,7 +463,7 @@ function ChangeRequestForm(props: {
   const { t } = useTranslation();
   const router = useRouter();
   const zone = useFamilyZone();
-  const { offline } = useVault();
+  const { offline, caps } = useVault();
   const { guarded } = useStepUp();
   const r = props.request;
   const [v, setV] = useState<RequestChangeOptions>(() => startRequestChange(r, zone));
@@ -459,7 +471,13 @@ function ChangeRequestForm(props: {
   const [tried, setTried] = useState(false);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(props.said);
-  const [newPassword, setNewPassword] = useState<{ password: string; revealable: boolean; title: string } | null>(null);
+  // A new PIN or password, shown once: `pin` says which.
+  const [newPassword, setNewPassword] = useState<{
+    password: string;
+    pin: boolean;
+    revealable: boolean;
+    title: string;
+  } | null>(null);
   const [copied, setCopied] = useState(false);
   const [goTo, setGoTo] = useState<GoTo | null>(null);
   const at = (key: string) => (goTo?.key === key ? goTo : null);
@@ -486,8 +504,14 @@ function ChangeRequestForm(props: {
       feel('done');
       // Said of the request as it is now: its title may be what changed.
       sayInSharing(t('requests.saidChanged', { title: done.request.title }));
-      if (done.password) {
-        setNewPassword({ password: done.password, revealable: done.request.revealable === true, title: done.request.title });
+      const secret = done.pin ?? done.password;
+      if (secret) {
+        setNewPassword({
+          password: secret,
+          pin: !!done.pin,
+          revealable: done.request.revealable === true,
+          title: done.request.title,
+        });
       } else close();
     } catch (err) {
       const words = wordsFor(err, t);
@@ -506,9 +530,9 @@ function ChangeRequestForm(props: {
     const clipboard = nativeClipboard();
     return (
       <Form testID="ask-new-password">
-        <Text variant="screen">{t('changeLink.new_password')}</Text>
+        <Text variant="screen">{newPassword.pin ? t('changeLink.new_pin') : t('changeLink.new_password')}</Text>
         <Text variant="secondary" tone="soft">
-          {t('ask.newPasswordWords')}
+          {newPassword.pin ? t('ask.newPinWords') : t('ask.newPasswordWords')}
         </Text>
         <View style={styles.box}>
           {/* Not selectable: a copy would sit on the clipboard with nobody to clear it; Copy clears it in a minute. */}
@@ -519,7 +543,7 @@ function ChangeRequestForm(props: {
         {clipboard ? (
           <Button
             kind="quiet"
-            label={copied ? t('share.copied') : t('share.copyPassword')}
+            label={copied ? t('share.copied') : newPassword.pin ? t('share.copyPin') : t('share.copyPassword')}
             onPress={() => {
               if (copyForAMinute(clipboard, newPassword.password)) setCopied(true);
             }}
@@ -527,7 +551,7 @@ function ChangeRequestForm(props: {
           />
         ) : null}
         <Small>
-          {`${t('changeLink.tellApart_password')} ${newPassword.revealable ? t('changeLink.seeAgain') : t('changeLink.onlyNow')}`}
+          {`${newPassword.pin ? t('changeLink.tellApart_pin') : t('changeLink.tellApart_password')} ${newPassword.revealable ? t('changeLink.seeAgain') : t('changeLink.onlyNow')}`}
         </Small>
         <Button label={t('share.done')} onPress={close} testID="ask-new-password-done" />
       </Form>
@@ -540,10 +564,20 @@ function ChangeRequestForm(props: {
       : []),
     ...(r.protection.includes('this_device') ? [t('ask.deviceFixed')] : []),
   ];
+  // A PIN, where the vault makes one for a request (or it has one already).
+  const pins = caps?.features.upload_request_pin === true || read.hasPin;
+  const keepWords = read.hasPin
+    ? t('ask.keepPin')
+    : read.has
+      ? t('ask.keepPassword')
+      : pins
+        ? t('ask.noSecretAsNow')
+        : t('ask.noneAsNow');
   const secretChoices: [RequestSecret, string][] = [
-    ['keep', read.has ? t('ask.keepPassword') : t('ask.noneAsNow')],
-    ...(read.has ? [['none', t('ask.noPassword')] as [RequestSecret, string]] : []),
-    ['password', read.has ? t('ask.newPassword') : t('ask.aPassword')],
+    ['keep', keepWords],
+    ...(read.has ? [['none', pins ? t('ask.noSecret') : t('ask.noPassword')] as [RequestSecret, string]] : []),
+    ...(pins ? [['pin', read.hasPin ? t('ask.newPin') : t('ask.aPin')] as [RequestSecret, string]] : []),
+    ['password', read.has && !read.hasPin ? t('ask.newPassword') : t('ask.aPassword')],
   ];
   const endChoices = ['keep' as const, ...read.picks.map((p) => p.key), 'other' as const];
   const review = r.review_by === 'adults' ? 'adults' : r.mine ? 'mine' : 'theirs';
@@ -649,10 +683,14 @@ function ChangeRequestForm(props: {
                 madeNote={t('changeLink.madeNote')}
               />
             ) : null}
-            {v.secret !== 'keep' && read.has ? <Small testID="ask-old-stops">{t('ask.oldStops')}</Small> : null}
+            {v.secret !== 'keep' && read.has ? (
+              <Small testID="ask-old-stops">{read.hasPin ? t('ask.oldStopsPin') : t('ask.oldStops')}</Small>
+            ) : null}
           </>
         ) : (
-          <Small testID="ask-not-maker">{read.has ? t('ask.notMaker') : t('ask.notMakerNone')}</Small>
+          <Small testID="ask-not-maker">
+            {read.hasPin ? t('ask.notMakerPin') : read.has ? t('ask.notMaker') : t('ask.notMakerNone')}
+          </Small>
         )}
         {fixed.map((words) => (
           <Small key={words}>{words}</Small>
@@ -730,6 +768,7 @@ export function RequestHandOver(props: { created: CreatedUploadRequest; onDone: 
     }),
     visits,
     r.protection.includes('password') && !created.password ? t('ask.termsChosenPassword') : null,
+    r.protection.includes('pin') ? t('ask.termsPin') : null,
     r.protection.includes('email_code') && r.recipient_email ? t('ask.termsCode', { to: maskEmail(r.recipient_email) }) : null,
     r.protection.includes('this_device') ? t('ask.termsDevice') : null,
     r.close_after_submit ? t('ask.termsCloses') : null,
@@ -761,6 +800,23 @@ export function RequestHandOver(props: { created: CreatedUploadRequest; onDone: 
           testID="ask-made-copy-link"
         />
       ) : null}
+      {created.pin ? (
+        <View style={styles.secret} testID="ask-made-pin">
+          <Label>{t('ask.thePin')}</Label>
+          <Text variant="title" testID="ask-made-pin-words">
+            {created.pin}
+          </Text>
+          <Small>{t('ask.pinApart')}</Small>
+          {clipboard ? (
+            <Button
+              kind="quiet"
+              label={copied === 'secret' ? t('share.copied') : t('share.copyPin')}
+              onPress={() => copy('secret', created.pin as string)}
+              testID="ask-made-copy-pin"
+            />
+          ) : null}
+        </View>
+      ) : null}
       {created.password ? (
         <View style={styles.secret} testID="ask-made-password">
           <Label>{t('ask.thePassword')}</Label>
@@ -789,7 +845,7 @@ export function RequestHandOver(props: { created: CreatedUploadRequest; onDone: 
       <Small>{t('ask.anyone')}</Small>
       {r.revealable === true ? (
         <Notice tone="info" testID="ask-made-again-later">
-          {t('ask.againLater')}
+          {r.protection.includes('pin') ? t('ask.againLaterPin') : t('ask.againLater')}
         </Notice>
       ) : (
         <Notice tone="warn">{t('ask.onlyNow')}</Notice>

@@ -11,6 +11,7 @@ import { TextNotificationsCard } from '../push/texts-card';
 import { AiReaderCard } from '../settings/ai-reader-card';
 import { EndedSharingCard } from '../settings/ended-sharing';
 import { OfflineCopies } from '../settings/offline';
+import { SecurityHealthCard } from '../settings/security-health';
 import { useCapture } from '../state/capture';
 import { useLock, type LockTimeout } from '../state/lock';
 import { useVault } from '../state/vault';
@@ -26,7 +27,7 @@ import { Chip, ChipRow } from '../ui/chip';
  * Settings (4.15; only settings since P6): Large text, light or dark, the
  * lock, the offline copies, notifications, Reading (an owner's view of the
  * AI reader, AIR4), how long links and requests that no longer work are
- * kept (RQ), About, and the browser for
+ * kept (RQ), an owner's Security & health (0.21.0), About, and the browser for
  * everything else; and Sign out. Which vault, who is signed in and on which
  * devices are on Account, under More.
  */
@@ -152,6 +153,7 @@ export default function Settings() {
       <TextNotificationsCard />
       <AiReaderCard />
       <EndedSharingCard />
+      <SecurityHealthCard />
       <Card>
         <Text variant="title">{t('settings.about')}</Text>
         <Text tone="soft">{version}</Text>
