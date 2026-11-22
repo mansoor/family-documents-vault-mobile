@@ -358,6 +358,7 @@
 {"name":"expo-modules-jsi","versions":["57.1.3"],"licence":"MIT"},
 {"name":"expo-navigation-bar","versions":["57.0.3"],"licence":"MIT"},
 {"name":"expo-network","versions":["57.0.3"],"licence":"MIT"},
+{"name":"expo-print","versions":["57.0.2"],"licence":"MIT"},
 {"name":"expo-router","versions":["57.0.31"],"licence":"MIT"},
 {"name":"expo-screen-capture","versions":["57.0.4"],"licence":"MIT"},
 {"name":"expo-screen-orientation","versions":["57.0.3"],"licence":"MIT"},

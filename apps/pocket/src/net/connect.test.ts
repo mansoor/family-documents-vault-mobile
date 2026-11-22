@@ -75,6 +75,24 @@ describe('connect', () => {
     expect(t.calls).toEqual([]);
   });
 
+  it('a build that speaks only https (the Android release) never tries http, and says so', async () => {
+    const t = testVault(['http://192.168.1.20:8099']);
+    const https = { ...deps(t), plainHttp: false };
+    expect(await connect('http://192.168.1.20:8099', https)).toEqual({ kind: 'refuse_plain_http', host: '192.168.1.20' });
+    expect(t.calls).toEqual([]);
+    // No scheme typed: https is tried, and http after it is not.
+    expect(await connect('192.168.1.20:8099', https)).toEqual({ kind: 'refuse_plain_http', host: '192.168.1.20' });
+    expect(t.calls.some((c) => c.includes('http://'))).toBe(false);
+    const u = testVault(['https://vault.test']);
+    expect(await connect('vault.test', { ...deps(u), plainHttp: false })).toMatchObject({ kind: 'ok' });
+    // A name on the internet, typed with no scheme, that https did not reach: "can't reach", never "only https".
+    const v = testVault([]);
+    expect(await connect('vault.example.com', { ...deps(v), plainHttp: false })).toEqual({
+      kind: 'unreachable',
+      host: 'vault.example.com',
+    });
+  });
+
   it('on mobile data, a plain-http vault is not tried at all', async () => {
     const t = testVault(['http://192.168.1.20:8099']);
     const out = await connect('http://192.168.1.20:8099', deps(t, { network: 'cellular' }));

@@ -1,4 +1,4 @@
-import { ARRANGE_BY_WORDS } from '@fdv/shared';
+import { ARRANGE_BY_WORDS, inSeveralWords, unfiledWords } from '@fdv/shared';
 import { useRouter } from 'expo-router';
 import { Archive } from 'lucide-react-native';
 import { useState, type ReactNode } from 'react';
@@ -17,6 +17,11 @@ import { useCabinet } from './use-cabinet';
  * Documents as the person files them (C5): their cabinets, each opening its
  * drawers, as the web's Cabinet beside its table. Only browsed here;
  * arranging is done on the web, one tap away.
+ *
+ * What it holds in all, each paper once (a vault that counts it): the
+ * total, and — when some are in no folder or in more than one — how many,
+ * the first opening those papers, the second saying why the folders add up
+ * to more than the total.
  */
 export function CabinetBrowse(props: { header: ReactNode }) {
   const { t } = useTranslation();
@@ -26,6 +31,10 @@ export function CabinetBrowse(props: { header: ReactNode }) {
   const { read, failed, load } = useCabinet();
   const cabinets = read?.arranged?.cabinets ?? [];
   const arrangedBy = read?.arranged?.by ?? null;
+  const whole = read?.arranged ? read.documents : undefined;
+  const unfiled = read?.arranged ? (read.unfiled ?? 0) : 0;
+  const inSeveral = read?.arranged ? (read.inSeveral ?? 0) : 0;
+  const arrangedWords = arrangedBy ? ARRANGE_BY_WORDS[arrangedBy].title.replace(/^By/, 'Arranged by') : null;
 
   return (
     <ScrollView
@@ -59,9 +68,30 @@ export function CabinetBrowse(props: { header: ReactNode }) {
           {read.arranged ? t('cabinet.allHidden') : t('cabinet.empty')}
         </Text>
       ) : null}
-      {arrangedBy && cabinets.length > 0 ? (
+      {cabinets.length > 0 && (arrangedWords || typeof whole === 'number') ? (
         <Text variant="secondary" tone="soft" testID="cabinet-arranged-by">
-          {ARRANGE_BY_WORDS[arrangedBy].title.replace(/^By/, 'Arranged by')}
+          {[typeof whole === 'number' ? t('glance.documentsCount', { count: whole }) : null, arrangedWords]
+            .filter(Boolean)
+            .join(' · ')}
+        </Text>
+      ) : null}
+      {cabinets.length > 0 && unfiled > 0 ? (
+        <Button
+          kind="quiet"
+          testID="cabinet-unfiled"
+          label={unfiledWords(unfiled) ?? ''}
+          hint={t('cabinet.unfiledHint')}
+          onPress={() => router.push('/unfiled')}
+        />
+      ) : null}
+      {cabinets.length > 0 && inSeveral > 0 ? (
+        <Text variant="secondary" tone="soft" testID="cabinet-in-several">
+          {typeof whole === 'number'
+            ? t('cabinet.inSeveral', {
+                words: inSeveralWords(inSeveral) ?? '',
+                total: t('glance.documentsCount', { count: whole }),
+              })
+            : `${inSeveralWords(inSeveral) ?? ''}.`}
         </Text>
       ) : null}
       {cabinets.length > 0 ? (

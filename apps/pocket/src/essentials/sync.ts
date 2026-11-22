@@ -1,4 +1,4 @@
-import type { OfflineGrant, OfflineItem, OfflineSet } from '@fdv/shared';
+import type { DocumentView, OfflineGrant, OfflineItem, OfflineNote, OfflineSet } from '@fdv/shared';
 import type { EssentialsStore } from './store';
 
 /**
@@ -22,6 +22,14 @@ import type { EssentialsStore } from './store';
  * them (document and version ids, nothing more): one gone from the set,
  * or a newer version, or no grant, and the Only me store is removed
  * whole, to be fetched again the next time it is opened.
+ *
+ * Essential notes (a vault of 0.9.0-dev.87) come in the set with their
+ * words, by the same rules: kept in the same stores (an Only me one in the
+ * Only me store), as a document with no version and no pages, its words in
+ * the kept view, and removed when they leave the set. In what the Only me
+ * store is remembered to hold, a note is its id alone: changed while that
+ * store is closed, it is brought up to date when the store is next opened,
+ * and the store is never removed for it.
  *
  * The age is recorded as soon as the set has been applied, before any
  * page is fetched: a page that fails to arrive does not make the copies
@@ -78,6 +86,38 @@ export const PRIVATE_KEPT_KEY = 'private_kept';
 
 const keyOf = (i: OfflineItem) => `${i.document.id}@${i.version.id}`;
 
+/**
+ * A kept note's version: a note has none, so this stands in for one — the
+ * time its words last changed. Never a version the vault knows: nothing is
+ * fetched or told of it.
+ */
+export const NOTE_VERSION_PREFIX = 'note:';
+export function noteVersion(d: DocumentView): string {
+  return `${NOTE_VERSION_PREFIX}${d.notes_updated_at ?? d.updated_at ?? ''}`;
+}
+/** Whether a kept copy is a note, by its stand-in version. */
+export function isKeptNote(versionId: string): boolean {
+  return versionId.startsWith(NOTE_VERSION_PREFIX);
+}
+/**
+ * A note in what the Only me store is remembered to hold: by its id alone.
+ * A note changed while that store is closed (saved on this phone, say) is
+ * not a reason to remove the store: its words are brought up to date the
+ * next time the store is opened and synced.
+ */
+const noteKey = (n: OfflineNote) => `${n.document.id}@${NOTE_VERSION_PREFIX}`;
+
+/**
+ * A note's view as it is kept: without `note_name` (its first words), so
+ * nothing that names it in a list or a chip can show its words. They are in
+ * `notes`, read only on its own page.
+ */
+function keptNoteView(d: DocumentView): string {
+  const { note_name: _firstWords, ...view } = d;
+  void _firstWords;
+  return JSON.stringify(view);
+}
+
 /** What the everyday store remembers the Only me store holds. */
 export async function privateKept(everyday: EssentialsStore): Promise<string[]> {
   try {
@@ -106,13 +146,19 @@ export async function syncEssentials(d: SyncDeps): Promise<SyncResult> {
   };
 
   const privateItems = wanted.filter((i) => i.private);
-  const tiers: [EssentialsStore, OfflineItem[]][] = [[d.everyday, wanted.filter((i) => !i.private)]];
-  if (d.private) tiers.push([d.private, privateItems]);
+  // Essential notes, words and all (0.9.0-dev.87): absent from an older vault's set.
+  const notes = set.notes ?? [];
+  const privateNotes = notes.filter((n) => n.private);
+  const privateKeys = [...privateItems.map(keyOf), ...privateNotes.map(noteKey)];
+  const tiers: [EssentialsStore, OfflineItem[], OfflineNote[]][] = [
+    [d.everyday, wanted.filter((i) => !i.private), notes.filter((n) => !n.private)],
+  ];
+  if (d.private) tiers.push([d.private, privateItems, privateNotes]);
   else {
-    result.privateNotKept = privateItems.length;
+    result.privateNotKept = privateItems.length + privateNotes.length;
     // The Only me store, closed: checked by what it is remembered to hold.
     const kept = await privateKept(d.everyday);
-    const inSet = new Set(privateItems.map(keyOf));
+    const inSet = new Set(privateKeys);
     if (kept.length > 0 && (!set.grant || kept.some((k) => !inSet.has(k)))) {
       await d.removePrivate?.();
       await d.everyday.setState(PRIVATE_KEPT_KEY, '[]');
@@ -121,8 +167,8 @@ export async function syncEssentials(d: SyncDeps): Promise<SyncResult> {
   }
 
   // 1. Absence is the tombstone; 2. what is in the set, kept (its record).
-  for (const [store, items] of tiers) {
-    const ids = new Set(items.map((i) => i.document.id));
+  for (const [store, items, kept] of tiers) {
+    const ids = new Set([...items.map((i) => i.document.id), ...kept.map((n) => n.document.id)]);
     for (const doc of await store.documents()) {
       if (ids.has(doc.id)) continue;
       await store.removeDocument(doc.id);
@@ -138,12 +184,23 @@ export async function syncEssentials(d: SyncDeps): Promise<SyncResult> {
         kept_at: now,
       });
     }
+    // A note: its words in its view, no pages to fetch.
+    for (const n of kept) {
+      await store.putDocument({
+        id: n.document.id,
+        version_id: noteVersion(n.document),
+        view: keptNoteView(n.document),
+        pages: 0,
+        kept_at: now,
+      });
+      result.kept += 1;
+    }
   }
 
   // 3. Checked now: the copies' age counts from here.
   await d.everyday.setState(CHECKED_KEY, JSON.stringify(result.checked));
-  await d.everyday.setState(PRIVATE_COUNT_KEY, String(privateItems.length));
-  if (d.private) await d.everyday.setState(PRIVATE_KEPT_KEY, JSON.stringify(privateItems.map(keyOf)));
+  await d.everyday.setState(PRIVATE_COUNT_KEY, String(privateItems.length + privateNotes.length));
+  if (d.private) await d.everyday.setState(PRIVATE_KEPT_KEY, JSON.stringify(privateKeys));
 
   // 4. The pages, under a grant; one that fails stops this sync's fetching.
   if (!set.grant) return result;

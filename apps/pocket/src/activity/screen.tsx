@@ -7,11 +7,14 @@ import {
   type Member,
 } from '@fdv/shared';
 import { useRouter } from 'expo-router';
-import { Check, SlidersHorizontal, X } from 'lucide-react-native';
+import { Check, Printer, SlidersHorizontal, X } from 'lucide-react-native';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { wordsFor } from '../errors/words';
+import { activityHtml, wantsOlder } from '../print/activity-print';
+import { usePrint } from '../print/print';
+import { IconButton } from '../ui/icon-button';
 import { exactWords, useFamilyZone } from '../state/family-time';
 import { useVault } from '../state/vault';
 import { Button, Field, Notice, Text } from '../ui';
@@ -79,6 +82,9 @@ export function ActivityScreen(props: { document?: string }) {
   const [panel, setPanel] = useState(false);
   const [fromText, setFromText] = useState('');
   const [toText, setToText] = useState('');
+  // Print (0.21.0): the lines the filters keep; older ones down to a From day loaded first.
+  const { print, foot } = usePrint();
+  const [printing, setPrinting] = useState(false);
 
   // Each first page asked for is counted: a reply to an earlier ask (another document, the whole log,
   // a refresh since) is dropped, so a late one never overwrites the page or leaves the placeholder up.
@@ -147,6 +153,52 @@ export function ActivityScreen(props: { document?: string }) {
     } catch (err) {
       if (n === asking.current) setProblem(wordsFor(err, t));
     } finally {
+      setBusy(false);
+    }
+  };
+
+  const printLog = async () => {
+    if (!mine || busy || printing) return;
+    const from = mine;
+    const n = asking.current;
+    setPrinting(true);
+    setBusy(true);
+    setProblem(null);
+    try {
+      let items = from.items;
+      let older = from.next;
+      // Down to the From day, a page at a time, as Show older loads them (at most 50 pages).
+      for (let pages = 0; pages < 50 && wantsOlder(items, filters.from, older, zone); pages += 1) {
+        const at = older ?? undefined;
+        const r = await withToken((a, tk) =>
+          from.about ? a.documentActivity(tk, from.about, at) : a.activity(tk, at),
+        );
+        if (n !== asking.current) return;
+        const had = new Set(items.map((l) => l.id));
+        items = [...items, ...r.items.filter((l) => !had.has(l.id))];
+        older = r.next;
+      }
+      const loaded = { about: from.about, items, next: older };
+      setPage((p) => (p === from ? loaded : p));
+      const outcome = await print(
+        activityHtml({
+          shown: items.filter((l) => matches(l, filters, family, zone)),
+          loaded: items,
+          filters,
+          whoWords: filters.who ? whoName(filters.who) : null,
+          kindWords: filters.kind ? kindLabel(filters.kind) : null,
+          about: about ? chipWords || t('activity.aDocument') : null,
+          older: older !== null,
+          zone,
+          t,
+          foot: foot(),
+        }),
+      );
+      if (outcome === 'failed') setProblem(t('print.failed'));
+    } catch (err) {
+      if (n === asking.current) setProblem(wordsFor(err, t));
+    } finally {
+      setPrinting(false);
       setBusy(false);
     }
   };
@@ -247,6 +299,14 @@ export function ActivityScreen(props: { document?: string }) {
                 </View>
               ) : null}
             </Pressable>
+            {mine && !offline ? (
+              <IconButton
+                testID="activity-print"
+                label={printing ? t('print.activityPreparing') : t('print.menu')}
+                icon={Printer}
+                onPress={() => void printLog()}
+              />
+            ) : null}
           </View>
           {about || chips.length > 0 ? (
             <View style={styles.chips}>

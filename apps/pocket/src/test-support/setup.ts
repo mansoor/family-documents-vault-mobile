@@ -112,6 +112,8 @@ jest.mock('expo-sqlite', () => ({
   deleteDatabaseAsync: jest.fn(async () => undefined),
 }));
 jest.mock('expo-sharing', () => ({ shareAsync: jest.fn(async () => undefined) }));
+// The platform's print (0.21.0): what it was given, and nothing printed.
+jest.mock('expo-print', () => ({ printAsync: jest.fn(async () => undefined) }));
 jest.mock('expo-haptics', () => ({
   notificationAsync: jest.fn(async () => undefined),
   impactAsync: jest.fn(async () => undefined),

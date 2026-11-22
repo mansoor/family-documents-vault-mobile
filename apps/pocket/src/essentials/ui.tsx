@@ -2,7 +2,8 @@ import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, View } from 'react-native';
-import { useEssentials, type EnrolOutcome } from '../state/essentials';
+import { useEssentials, type EnrolOutcome, type KeptDocument } from '../state/essentials';
+import { keptName as nameOf } from './kept-name';
 import { useLock } from '../state/lock';
 import { Button, Card, Field, Notice, Text } from '../ui';
 import { Sheet } from '../ui/sheet';
@@ -185,7 +186,11 @@ export function EssentialsNotice() {
   );
 }
 
-/** What is kept: each with Open and Show, and how long it is kept for. */
+/**
+ * What is kept: each with Open and Show, and how long it is kept for. An
+ * Essential note (0.9.0-dev.87) opens the same way, its words from the
+ * phone with no connection needed; it has nothing for Show.
+ */
 export function KeptRows() {
   const { t } = useTranslation();
   const zone = useFamilyZone();
@@ -196,24 +201,31 @@ export function KeptRows() {
       <Pressable
         style={styles.rowText}
         accessibilityRole="button"
-        accessibilityLabel={`${t('essentials.open')}: ${item.document.title ?? t('essentials.untitled')}`}
+        accessibilityLabel={`${t('essentials.open')}: ${keptName(item)}`}
         onPress={() => router.push({ pathname: '/essential/[id]', params: { id: item.id } })}
       >
-        <Text weight="600">{item.document.title ?? t('essentials.untitled')}</Text>
+        <Text weight="600">{keptName(item)}</Text>
         {e.age ? (
           <Text tone="soft" variant="secondary">
             {t('essentials.keptUntil', { date: day(e.age.removeAt, zone) })}
           </Text>
         ) : null}
       </Pressable>
-      <Button
-        kind="quiet"
-        label={t('essentials.show')}
-        testID={`essential-show-${item.id}`}
-        onPress={() => router.push({ pathname: '/show/[id]', params: { id: item.id } })}
-      />
+      {item.note ? null : (
+        <Button
+          kind="quiet"
+          label={t('essentials.show')}
+          testID={`essential-show-${item.id}`}
+          onPress={() => router.push({ pathname: '/show/[id]', params: { id: item.id } })}
+        />
+      )}
     </View>
   ));
+
+  /** Its name: a note with no title by its first words, as everywhere. */
+  function keptName(item: KeptDocument): string {
+    return item.note ? nameOf(item.document, t) : (item.document.title ?? t('essentials.untitled'));
+  }
 }
 
 /**

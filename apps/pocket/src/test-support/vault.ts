@@ -526,6 +526,8 @@ async function library(t: TestVault, path: string, init: Parameters<FetchLike>[1
     lib.verified = true;
     if (body.code !== undefined) lib.factorVerified = true;
     lib.stepUps.push(String(body.password ?? body.code));
+    // The client's fake keeps it too: its notes that ask (0.9.0-dev.87) open for five minutes.
+    for (const x of t.vault.state.sessions) x.verifiedAt = Date.now();
     return json({ verified_at: new Date().toISOString(), expires_in: 300 });
   }
   // Two-step sign-in and passwords, as the vault answers them: setting it up asks who it is first.

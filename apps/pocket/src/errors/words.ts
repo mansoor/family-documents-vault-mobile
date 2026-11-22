@@ -1,4 +1,5 @@
 import { ApiRequestError, NetworkError } from '@fdv/client';
+import { CODE_USED_REASON } from '@fdv/shared';
 import type { TFunction } from 'i18next';
 import { unreachableAnswer } from '../net/no-connection';
 import { isPhoneOffline } from '../net/reach';
@@ -145,11 +146,19 @@ const VAULT_SAYS: ReadonlySet<string> = new Set([
 
 /**
  * A code from an authenticator app given a second time (the vault's 0.9.0
- * takes each code once): the vault refuses it as a wrong one, in words that
- * say so. The phone says it in its own, shorter.
+ * takes each code once): the vault refuses it with its own reason,
+ * `code_used` (0.9.0-dev.80), on signing in, confirming it's you, and
+ * setting up or turning off two-step sign-in. The phone says it in its own,
+ * shorter words. A vault between 0.9.0-dev.75 and dev.79 said it only in
+ * words: those are read too.
  */
-// TODO: the vault's next iteration gives a used code its own reason, `code_used`; read that, not the words.
 const CODE_USED = /^That code was used already/i;
+
+/** Whether the vault refused a code because it was used already. */
+export function codeWasUsed(err: ApiRequestError): boolean {
+  if (err.status !== 401 && err.status !== 422) return false;
+  return err.reason === CODE_USED_REASON || CODE_USED.test(err.message);
+}
 
 /** The words for a failure, as the person should read them. */
 export function wordsFor(err: unknown, t: TFunction, general = 'errors.general'): string {
@@ -165,7 +174,7 @@ export function wordsFor(err: unknown, t: TFunction, general = 'errors.general')
     return t(isPhoneOffline() ? 'errors.noNetwork' : 'errors.offline');
   }
   if (err instanceof ApiRequestError) {
-    if ((err.status === 401 || err.status === 422) && CODE_USED.test(err.message)) return t('errors.codeUsed');
+    if (codeWasUsed(err)) return t('errors.codeUsed');
     // The vault's own words first, where only it knows them — its limits among them.
     if (VAULT_SAYS.has(err.code) && err.message) return err.message;
     // Too many tries, however the vault's limiter phrased it: when to try again.

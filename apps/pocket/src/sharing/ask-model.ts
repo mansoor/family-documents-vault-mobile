@@ -28,6 +28,10 @@ import {
  * it takes and who looks at what comes in. Making one sends all of it;
  * changing one sends only what is changed. Pure, so the rules are tested
  * without drawing the form.
+ *
+ * A four-digit PIN (a vault with `upload_request_pin`), made up by the vault
+ * and shown once, as a share link's: never with a password, so choosing one
+ * takes the other away.
  */
 
 export const MB = 1024 * 1024;
@@ -53,6 +57,8 @@ export interface AskOptions {
   /** Another day and time, as typed. */
   day: string;
   time: string;
+  /** A four-digit PIN the vault makes up (never with a password). */
+  withPin: boolean;
   withPassword: boolean;
   passwordMode: 'made' | 'typed';
   password: string;
@@ -79,6 +85,7 @@ export const ASK_START: AskOptions = {
   end: null,
   day: '',
   time: '17:00',
+  withPin: false,
   withPassword: false,
   passwordMode: 'made',
   password: '',
@@ -161,6 +168,8 @@ export interface AskContext {
   maxDays?: number;
   /** The vault can email a code (`email_code_available`). */
   emailCode: boolean;
+  /** The vault makes a request's PIN (`features.upload_request_pin`). */
+  pins?: boolean;
   now?: Date;
 }
 
@@ -189,7 +198,10 @@ export function readAsk(v: AskOptions, ctx: AskContext) {
   const titleProblem = title ? null : ('title' as const);
   const items = v.items.map((i) => i.trim()).filter(Boolean);
   // Exactly as typed, as the vault checks it.
-  const passwordProblem = v.withPassword && v.passwordMode === 'typed' ? typedPasswordProblem(v.password) : null;
+  // A PIN where the vault makes one; never with a password.
+  const pin = ctx.pins === true && v.withPin;
+  const password = v.withPassword && !pin;
+  const passwordProblem = password && v.passwordMode === 'typed' ? typedPasswordProblem(v.password) : null;
   const code = ctx.emailCode && v.withCode;
   const address = v.email.trim();
   const codeProblem = code ? (!isShareAddress(address) ? 'address' : v.emailRefused) : null;
@@ -204,7 +216,8 @@ export function readAsk(v: AskOptions, ctx: AskContext) {
           ...(v.label.trim() ? { recipient_label: v.label.trim() } : {}),
           ...(code ? { email_code: true, recipient_email: address } : {}),
           expires_at: endAt.toISOString(),
-          ...(v.withPassword ? (v.passwordMode === 'made' ? { with_password: true } : { password: v.password }) : {}),
+          ...(pin ? { with_pin: true } : {}),
+          ...(password ? (v.passwordMode === 'made' ? { with_password: true } : { password: v.password }) : {}),
           ...(v.thisDeviceOnly ? { this_device_only: true } : {}),
           ...(k.visits !== null ? { max_visits: k.visits } : {}),
           max_files: k.maxFiles,
@@ -222,8 +235,8 @@ export function readAsk(v: AskOptions, ctx: AskContext) {
 
 // ------------------------------------------------------------- a change
 
-/** Its password: kept, taken away, or made new (by the vault, or typed). */
-export type RequestSecret = 'keep' | 'none' | 'password';
+/** Its PIN or password: kept, taken away, a new PIN (the vault's), or a new password (the vault's, or typed). */
+export type RequestSecret = 'keep' | 'none' | 'pin' | 'password';
 
 export interface RequestChangeOptions extends AskOptions {
   changeEnd: AskChangeEnd;
@@ -292,7 +305,8 @@ export function readRequestChange(r: UploadRequestView, v: RequestChangeOptions,
   const titleProblem = title ? null : ('title' as const);
   const k = takes(v);
   const maker = r.mine;
-  const has = r.protection.includes('password');
+  const hasPin = r.protection.includes('pin');
+  const has = hasPin || r.protection.includes('password');
   const secret: RequestSecret = maker ? v.secret : 'keep';
   const passwordProblem = secret === 'password' && v.passwordMode === 'typed' ? typedPasswordProblem(v.password) : null;
 
@@ -311,11 +325,12 @@ export function readRequestChange(r: UploadRequestView, v: RequestChangeOptions,
   if (v.accept !== r.accept_types) body.accept_types = v.accept;
   if (v.closeAfter !== r.close_after_submit) body.close_after_submit = v.closeAfter;
   if (secret === 'none' && has) body.secret = 'none';
+  if (secret === 'pin') body.secret = 'pin';
   if (secret === 'password') {
     body.secret = 'password';
     if (v.passwordMode === 'typed') body.password = v.password;
   }
   const nothing = Object.keys(body).length === 0;
   const problem = titleProblem ?? endProblem ?? k.visitsProblem ?? k.filesProblem ?? k.sizeProblem ?? passwordProblem ?? null;
-  return { picks, latest, endAt, endProblem, titleProblem, passwordProblem, ...k, body, nothing, problem, maker, has };
+  return { picks, latest, endAt, endProblem, titleProblem, passwordProblem, ...k, body, nothing, problem, maker, has, hasPin };
 }

@@ -10,12 +10,14 @@ import { SensitiveChooser } from '../../capture/sensitive';
 import { Chip, ChipRow, detailInput } from '../../capture/ui';
 import { draftOf, editBody } from '../../documents/edit';
 import { NoteEdit } from '../../documents/note-edit';
+import { noteAsks } from '../../documents/note-confirm';
 import { isCaregiverPaper } from '../../caregivers/rules';
 import { TagsEditor } from '../../documents/tags-edit';
 import { wordsFor } from '../../errors/words';
 import { StillSharedSheet } from '../../sharing/sensitive-confirm';
 import { emit } from '../../state/events';
 import { feel } from '../../ui/feel';
+import { useScreenGuard } from '../../state/lock';
 import { useStepUp } from '../../state/step-up';
 import { useVault } from '../../state/vault';
 import { Button, Field, Notice, requiredLabel, Text } from '../../ui';
@@ -43,6 +45,10 @@ import { useColours, useStyles, type Palette } from '../../ui/theme';
  * person is asked whether to keep them or end them now, as the web asks.
  * Ended, what was done is said before the screen goes back. Never in the
  * save's way: an older vault never says so, and nothing is asked.
+ *
+ * An Only me or an Essential note (a vault of 0.9.0-dev.87) asks "Confirm
+ * it's you" before it opens here, and its save asks again past five
+ * minutes; not confirmed, the screen says so with Try again.
  */
 export default function EditScreen() {
   const styles = useStyles(makeStyles);
@@ -50,7 +56,7 @@ export default function EditScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { t } = useTranslation();
   const router = useRouter();
-  const { withToken, caps, who } = useVault();
+  const { caps, who } = useVault();
   const { guarded } = useStepUp();
   const [doc, setDoc] = useState<DocumentView | null>(null);
   const [household, setHousehold] = useState<Household | null>(null);
@@ -64,13 +70,19 @@ export default function EditScreen() {
   const [tags, setTags] = useState<string[]>([]);
   // Saved, and still shared outside the family though now sensitive (H1a): asked, then gone back.
   const [stillShared, setStillShared] = useState<{ links: number; id: string; done: () => void } | null>(null);
+  // An Only me or an Essential note's words are never captured while written here.
+  useScreenGuard('note-edit', noteAsks(doc));
 
   const load = useCallback(async () => {
     if (!who) return;
     try {
-      const [d, ty, m] = await withToken((a, tk) =>
-        Promise.all([a.document(tk, id), a.documentTypes(tk), a.members(tk)]),
-      );
+      // An Only me or an Essential note asks "Confirm it's you" before its words are read (0.9.0-dev.87).
+      const got = await guarded((a, tk) => Promise.all([a.document(tk, id), a.documentTypes(tk), a.members(tk)]));
+      if (got === null) {
+        setFailed(t('edit.notConfirmed'));
+        return;
+      }
+      const [d, ty, m] = got;
       setDoc(d);
       setDraft(draftOf(d));
       setNotes(d.notes ?? '');
@@ -88,7 +100,7 @@ export default function EditScreen() {
     } catch (err) {
       setFailed(loadFailure('edit', err, t) ?? t('document.offline'));
     }
-  }, [withToken, id, who, caps, t]);
+  }, [guarded, id, who, caps, t]);
 
   useEffect(() => {
     // Loaded on arrival; the state is set after the requests answer.
@@ -178,7 +190,7 @@ export default function EditScreen() {
       const saved = await guarded((a, tk) => a.updateDocument(tk, doc.id, out.body ?? {}, doc.etag));
       if (saved === null) return null;
       feel('done');
-      emit('documentChanged', saved.id);
+      emit('documentChanged', saved.id, saved.is_essential);
       const shared = saved.warnings?.find((w) => w.code === 'sensitive_still_shared');
       if (shared?.links) {
         const links = shared.links;

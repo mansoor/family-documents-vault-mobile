@@ -60,7 +60,7 @@ export function NoteEdit(props: { doc: DocumentView; onStale: () => Promise<void
       const saved = await guarded((a, tk) => a.updateDocument(tk, doc.id, body, doc.etag));
       if (saved === null) return null;
       feel('done');
-      emit('documentChanged', saved.id);
+      emit('documentChanged', saved.id, saved.is_essential);
       return () => router.back();
     } catch (err) {
       if (err instanceof ApiRequestError && err.status === 409) {

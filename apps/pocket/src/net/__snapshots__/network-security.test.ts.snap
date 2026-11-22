@@ -1,9 +1,48 @@
 // Jest Snapshot v1, https://goo.gl/fbAQLP
 
-exports[`the network security config (config plugin) writes network_security_config.xml as it was reviewed 1`] = `
+exports[`the network security config (config plugin) the dev build keeps plain http and certificates installed by hand 1`] = `
 "<?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
   <base-config cleartextTrafficPermitted="true">
+    <trust-anchors>
+      <certificates src="system"/>
+      <certificates src="user"/>
+    </trust-anchors>
+  </base-config>
+</network-security-config>
+"
+`;
+
+exports[`the network security config (config plugin) the e2e build keeps plain http and certificates installed by hand 1`] = `
+"<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+  <base-config cleartextTrafficPermitted="true">
+    <trust-anchors>
+      <certificates src="system"/>
+      <certificates src="user"/>
+    </trust-anchors>
+  </base-config>
+</network-security-config>
+"
+`;
+
+exports[`the network security config (config plugin) the preview build keeps plain http and certificates installed by hand 1`] = `
+"<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+  <base-config cleartextTrafficPermitted="true">
+    <trust-anchors>
+      <certificates src="system"/>
+      <certificates src="user"/>
+    </trust-anchors>
+  </base-config>
+</network-security-config>
+"
+`;
+
+exports[`the network security config (config plugin) the release build: no plain http; certificates installed by hand trusted, as its switch says 1`] = `
+"<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+  <base-config cleartextTrafficPermitted="false">
     <trust-anchors>
       <certificates src="system"/>
       <certificates src="user"/>
