@@ -1,4 +1,4 @@
-import { ARRANGE_BY_WORDS, inSeveralWords, unfiledWords } from '@fdv/shared';
+import { inSeveralWords, levelsWords, unfiledWords } from '@fdv/shared';
 import { useRouter } from 'expo-router';
 import { Archive } from 'lucide-react-native';
 import { useState, type ReactNode } from 'react';
@@ -9,7 +9,7 @@ import { useVault } from '../state/vault';
 import { Button, Notice, Text } from '../ui';
 import { sp } from '../ui/space';
 import { LoadFailed, Placeholder } from '../ui/states';
-import { arrangeUrl } from './model';
+import { arrangeUrl, cabinetMark } from './model';
 import { NodeRow } from './rows';
 import { useCabinet } from './use-cabinet';
 
@@ -22,19 +22,42 @@ import { useCabinet } from './use-cabinet';
  * total, and — when some are in no folder or in more than one — how many,
  * the first opening those papers, the second saying why the folders add up
  * to more than the total.
+ *
+ * A vault with levels (dev.90) says what the cabinet is arranged by ("Topic
+ * › Year › Person", or by hand), and marks a cabinet with its own
+ * arrangement, or one arranged by hand beside the drawn ones; a cabinet of
+ * one drawer says how many folders it opens on, its drawer passed over.
  */
 export function CabinetBrowse(props: { header: ReactNode }) {
   const { t } = useTranslation();
   const [refreshing, setRefreshing] = useState(false);
   const router = useRouter();
   const { offline, vault } = useVault();
-  const { read, failed, load } = useCabinet();
+  const { gate, read, failed, load } = useCabinet();
   const cabinets = read?.arranged?.cabinets ?? [];
   const arrangedBy = read?.arranged?.by ?? null;
   const whole = read?.arranged ? read.documents : undefined;
   const unfiled = read?.arranged ? (read.unfiled ?? 0) : 0;
   const inSeveral = read?.arranged ? (read.inSeveral ?? 0) : 0;
-  const arrangedWords = arrangedBy ? ARRANGE_BY_WORDS[arrangedBy].title.replace(/^By/, 'Arranged by') : null;
+  const arrangedWords =
+    arrangedBy === 'hand'
+      ? t('cabinet.arrangedByHand')
+      : arrangedBy === 'web'
+        ? t('cabinet.arrangedOnWeb')
+        : arrangedBy
+        ? t('cabinet.arrangedBy', { levels: levelsWords(arrangedBy) })
+        : null;
+  /** A cabinet's line: its drawers, or — one drawer passed over — its folders; and how it is arranged, where its own. */
+  const lineOf = (c: (typeof cabinets)[number]) => {
+    const only = gate.levels && c.drawers.length === 1 ? c.drawers[0] : undefined;
+    const mark = cabinetMark(c, arrangedBy, gate);
+    return [
+      only ? t('cabinet.folders', { count: only.folders.length }) : t('cabinet.drawers', { count: c.drawers.length }),
+      mark === 'own' ? t('cabinet.ownArrangement') : mark === 'hand' ? t('cabinet.arrangedByHand') : null,
+    ]
+      .filter(Boolean)
+      .join(' · ');
+  };
 
   return (
     <ScrollView
@@ -102,7 +125,7 @@ export function CabinetBrowse(props: { header: ReactNode }) {
               testID={`cabinet-${c.id}`}
               icon={Archive}
               name={c.name}
-              line={t('cabinet.drawers', { count: c.drawers.length })}
+              line={lineOf(c)}
               place={rowPlace(i, cabinets.length)}
               onPress={() => router.push({ pathname: '/cabinet/[id]', params: { id: c.id } })}
             />

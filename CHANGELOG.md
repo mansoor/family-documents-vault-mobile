@@ -6,6 +6,46 @@ app's own, tagged `vX.Y.Z` in this repository.
 
 ## [Unreleased]
 
+## [0.22.0] — My cabinet arranged by levels, browsed on the phone
+
+Re-pinned to the vault's **v0.9.0-dev.91**. The vault now arranges a
+cabinet by 2 to 5 levels the person chooses and orders (Topic, Person,
+Year, Kind and Who issued it), a cabinet may have its own arrangement, and
+a folder's papers may be divided by two levels. This app browses all of
+it; arranging stays on the web, one tap away as before. Each change needs
+the vault's own (`features.cabinet_levels`, `features.cabinet_issuer`): an
+older vault's cabinet looks as it did. The phone's minimum vault stays
+0.4.10.
+
+### Added
+- **A level with only one group is passed over while browsing**, as on the
+  web: a cabinet with one drawer opens straight on its folders, under "In
+  the 2026 drawer.", and its line says how many folders it holds; a drawer
+  with one folder is one row, "2024 › Me", that opens the folder. Back
+  from the folder goes straight back to the cabinet. Nothing is saved: a
+  paper that brings a second drawer or folder just adds it. The folder's
+  path still names every level.
+- **Dividers by two levels**: a folder divided by, say, Who issued it and
+  then year shows a tab for each issuer, with its years inside it, each
+  with how many papers are behind it; the first with papers opens already.
+  A step with only one value is passed over, a folder with one value at
+  every step is one plain list, and past a hundred dividers the smallest
+  are behind **Everything else**.
+- **What a cabinet is arranged by**, beside its total: "Arranged by Topic ›
+  Year › Person", or "Arranged by hand" ("Arranged on the web" for a level
+  this app doesn't know yet); a cabinet with its own
+  arrangement says **Own arrangement**, and one arranged by hand beside the
+  drawn ones says so, on its line and on its own screen.
+- **Who issued it** in what a folder holds, by the household's own names
+  ("P60 from Barclays."), and "with no issuer given" for a folder of papers
+  with none; the household's names are asked for once, and only by a folder
+  that names an issuer. Folders for the household and for Not sure yet say
+  so too.
+
+### Changed
+- An older vault's arrangement is said in the same words as levels
+  ("Arranged by Person › Kind").
+
 ## [0.21.0] — Notes that ask "Confirm it's you", Essential notes kept offline, and printing
 
 Re-pinned to the vault's **v0.9.0-dev.87**. The vault now asks "Confirm it's

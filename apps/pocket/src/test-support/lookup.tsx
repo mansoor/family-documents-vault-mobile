@@ -186,6 +186,8 @@ export async function unlocked(
     /** A phone with push (4.14), and the vault's side of it. */
     push?: Partial<PushDeps>;
     deps?: Partial<VaultDeps>;
+    /** Large text on (or off) from the start. */
+    large?: boolean;
   } = {},
 ) {
   const parts = opts.parts ?? phoneParts();
@@ -199,6 +201,7 @@ export async function unlocked(
     capture: opts.capture ?? testCapture(),
     ...(opts.push ? { push: opts.push } : {}),
     ...(opts.deps ? { deps: opts.deps } : {}),
+    ...(opts.large !== undefined ? { large: opts.large } : {}),
   });
   await fireEvent.press(await screen.findByTestId('lock-unlock'));
   return { app, parts };

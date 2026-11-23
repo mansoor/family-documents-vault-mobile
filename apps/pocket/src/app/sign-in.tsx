@@ -158,6 +158,10 @@ export default function SignIn() {
                   autoComplete="email"
                 />
                 <Field
+                  // Its own native field: the code's field below must never
+                  // be this one reused, or Android can carry the password's
+                  // text into the code (seen in an emulator run).
+                  key="sign-in-password"
                   testID="sign-in-password"
                   label={t('signIn.password')}
                   value={password}
@@ -182,6 +186,7 @@ export default function SignIn() {
                   <Button testID="sign-in-text-send" label={t('signIn.textMe')} busy={texting} onPress={() => void sendText()} />
                 ) : (
                   <Field
+                    key="sign-in-code"
                     testID="sign-in-code"
                     label={t('signIn.code')}
                     value={code}
