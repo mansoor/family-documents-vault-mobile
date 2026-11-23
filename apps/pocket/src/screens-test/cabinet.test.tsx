@@ -1,19 +1,21 @@
-import type { CabinetLayout, Capabilities, DocumentView } from '@fdv/shared';
-import { act, fireEvent, screen, waitFor } from '@testing-library/react-native';
-import { AppState, type AppStateStatus } from 'react-native';
+import { storedIssuerKey, type CabinetLayout, type Capabilities, type DocumentView, type FolderDivider } from '@fdv/shared';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react-native';
+import { AppState, StyleSheet, type AppStateStatus } from 'react-native';
 import DocumentsScreen from '../app/(tabs)/documents';
 import UnfiledScreen from '../app/unfiled';
 import { CabinetBrowse } from '../cabinet/browse';
-import { readLabel, shownLayout } from '../cabinet/model';
-import { forgetCabinets } from '../cabinet/use-cabinet';
+import { CabinetLevel } from '../cabinet/level';
+import { arrangedOf, cabinetMark, dividerGroups, drawerRows, readLabel, shownLayout } from '../cabinet/model';
+import { forgetCabinets, issuerGroupsFor } from '../cabinet/use-cabinet';
 import { emit } from '../state/events';
 import { ScanLabel } from '../cabinet/scan';
 import { audit } from '../test-support/a11y';
 import { DocumentDetail } from '../documents/detail';
 import { libraryDoc, unlocked } from '../test-support/lookup';
 import { installed, respond } from '../test-support/render';
-import { push, resetRoutes, routes } from '../test-support/router';
+import { back, push, resetRoutes, routes } from '../test-support/router';
 import { capabilities, testVault, type TestVault } from '../test-support/vault';
+import { LARGE } from '../ui/text-scale';
 
 jest.mock(
   'expo-router',
@@ -87,23 +89,31 @@ const cabinetGets = (t: TestVault) => ({
   counts: t.calls.filter((c) => c === `GET ${ORIGIN}/api/v1/cabinet/counts`).length,
 });
 
-/** A vault of 0.9.0-dev.51 (or as old as `upTo` says): the cabinet, dividers and pins, labels and places. */
-function vault(upTo: 'dev51' | 'dev42' | 'none' = 'dev51'): TestVault {
+/**
+ * A vault of 0.9.0-dev.51 (or as old as `upTo` says): the cabinet, dividers
+ * and pins, labels and places; `dev91` adds levels (dev.90) and Who issued
+ * it (dev.91).
+ */
+function vault(upTo: 'dev91' | 'dev51' | 'dev42' | 'none' = 'dev51'): TestVault {
   const t = testVault([ORIGIN]);
   const f: Capabilities['features'] = { ...capabilities().features, document_table: true };
   if (upTo !== 'none') f.cabinets = true;
-  if (upTo === 'dev51') {
+  if (upTo === 'dev51' || upTo === 'dev91') {
     f.cabinet_dividers = true;
     f.cabinet_pins = true;
     f.original_place = true;
   }
-  t.caps = capabilities({ server_version: '0.9.0-dev.51', features: f });
+  if (upTo === 'dev91') {
+    f.cabinet_levels = true;
+    f.cabinet_issuer = true;
+  }
+  t.caps = capabilities({ server_version: upTo === 'dev91' ? '0.9.0-dev.91' : '0.9.0-dev.51', features: f });
   return t;
 }
 
 /** Study: Drawer 1 with Tax (P60s, by year) and a hidden folder; a hidden drawer; a hidden cabinet. */
 const LAYOUT: CabinetLayout = {
-  arranged_by: null,
+  levels: null,
   cabinets: [
     {
       id: 'c-study',
@@ -448,5 +458,562 @@ describe('where the original is, on a document’s page (C5)', () => {
     await unlocked(older, <DocumentDetail id="p60" />);
     await screen.findByTestId('document-visibility');
     expect(screen.queryByTestId('document-original')).toBeNull();
+  });
+});
+
+/**
+ * Drawn by Topic › Person › Year › Kind (dev.90): Financial of one drawer
+ * (Me) of two folders; Tax its own arrangement (Year › Person), a drawer of
+ * one folder and one of two; Loft arranged by hand beside them.
+ */
+const LEVELLED: CabinetLayout = {
+  levels: ['topic', 'person', 'year', 'kind'],
+  cabinets: [
+    {
+      id: 'c-fin',
+      name: 'Financial',
+      hidden: false,
+      drawn: { value: 'financial' },
+      drawers: [
+        {
+          id: 'd-me',
+          name: 'Me',
+          hidden: false,
+          folders: [
+            {
+              id: 'f-2025',
+              name: '2025',
+              hidden: false,
+              filter: { type_key: 'p60', dated_from: '2025-01-01', dated_to: '2025-12-31' },
+              dividers: { levels: ['kind'], ranges: [] },
+            },
+            {
+              id: 'f-2024',
+              name: '2024',
+              hidden: false,
+              filter: { type_key: 'p60', dated_from: '2024-01-01', dated_to: '2024-12-31' },
+              dividers: { levels: ['kind'], ranges: [] },
+            },
+          ],
+        },
+        { id: 'd-gone', name: 'Hidden', hidden: true, folders: [] },
+      ],
+    },
+    {
+      id: 'c-tax',
+      name: 'Tax',
+      hidden: false,
+      drawn: { value: 'tax', levels: ['year', 'person'] },
+      drawers: [
+        {
+          id: 'd-2024',
+          name: '2024',
+          hidden: false,
+          folders: [{ id: 'f-me-2024', name: 'Me', hidden: false, filter: { type_key: 'p60' } }],
+        },
+        {
+          id: 'd-2025',
+          name: '2025',
+          hidden: false,
+          folders: [
+            { id: 'f-me-2025', name: 'Me', hidden: false, filter: { type_key: 'p60' } },
+            { id: 'f-sara-2025', name: 'Sara', hidden: false, filter: { type_key: 'p60' } },
+          ],
+        },
+      ],
+    },
+    {
+      id: 'c-loft',
+      name: 'Loft',
+      hidden: false,
+      drawers: [
+        { id: 'd-a', name: 'A', hidden: false, folders: [] },
+        { id: 'd-b', name: 'B', hidden: false, folders: [] },
+      ],
+    },
+  ],
+};
+
+/** P60s from two employers and one with none given: a folder of them by Who issued it, then year. */
+const ISSUED = [
+  { id: 'acme-2025', title: 'Acme 2025', type_key: 'p60', issued_by: 'Acme Payroll', issued: { date: '2025-04-05', precision: 'day' } },
+  { id: 'acme-2024', title: 'Acme 2024', type_key: 'p60', issued_by: 'Acme Payroll', issued: { date: '2024-04-05', precision: 'day' } },
+  { id: 'bolt-2025', title: 'Bolt 2025', type_key: 'p60', issued_by: 'Bolt Works', issued: { date: '2025-04-05', precision: 'day' } },
+  { id: 'none-2023', title: 'Nobody 2023', type_key: 'p60', issued: { date: '2023-04-05', precision: 'day' } },
+];
+const ACME = storedIssuerKey('Acme Payroll') as string;
+const BOLT = storedIssuerKey('Bolt Works') as string;
+
+/** A layout of one cabinet, one drawer and the folders given: a folder of P60s by Who issued it, then year. */
+function issuerFolders(
+  t: TestVault,
+  folders: CabinetLayout['cabinets'][number]['drawers'][number]['folders'],
+  papers: readonly object[] = ISSUED,
+) {
+  const layout: CabinetLayout = {
+    levels: ['topic', 'person', 'year', 'issuer', 'kind'],
+    cabinets: [
+      {
+        id: 'c-work',
+        name: 'Employment',
+        hidden: false,
+        drawn: { value: 'employment' },
+        drawers: [{ id: 'd-me', name: 'Me', hidden: false, folders }],
+      },
+    ],
+  };
+  t.vault.state.cabinets = { [ME]: { layout, version: 1, updated_at: '2026-11-22T00:00:00Z' } };
+  t.vault.state.documents.push(...(papers as never[]));
+}
+
+/** A piece of the screen, as the queries give it. */
+type ReactTestInstance = ReturnType<typeof screen.getByTestId>;
+
+/** A P60 issued on `day` by `by`. */
+const p60 = (id: string, by: string | null, day: string) => ({
+  id,
+  title: id,
+  type_key: 'p60',
+  ...(by ? { issued_by: by } : {}),
+  issued: { date: day, precision: 'day' },
+});
+
+/** A folder of P60s divided by Who issued it, then year. */
+const BY_ISSUER = [
+  { id: 'f-p60', name: 'P60s', hidden: false, filter: { type_key: 'p60' }, dividers: { levels: ['issuer', 'year'], ranges: [] } },
+] as CabinetLayout['cabinets'][number]['drawers'][number]['folders'];
+
+/** The size a piece of text is drawn at, and whether it may be cut short. */
+const drawn = (n: ReactTestInstance) => {
+  const style = StyleSheet.flatten(n.props.style) ?? {};
+  return { size: Number(style.fontSize ?? 0), cut: n.props.numberOfLines !== undefined || n.props.adjustsFontSizeToFit === true };
+};
+
+describe('what the phone makes of cabinet levels (dev.90)', () => {
+  const on = { levels: true };
+  const off = { levels: false };
+
+  it('says what a layout is arranged by: its levels, by hand, or an older vault’s way as its levels', () => {
+    expect(arrangedOf(LEVELLED, on)).toEqual(['topic', 'person', 'year', 'kind']);
+    expect(arrangedOf({ levels: null, cabinets: [] }, on)).toBe('hand');
+    // A level this app doesn't know (a newer vault's): said neutrally, never as by hand, never left out.
+    expect(arrangedOf({ levels: ['topic', 'colour'], cabinets: [] } as unknown as CabinetLayout, on)).toBe('web');
+    expect(arrangedOf({ levels: [], cabinets: [] } as unknown as CabinetLayout, on)).toBe('web');
+    expect(arrangedOf(null, on)).toBeNull();
+    // An older vault's three ways (arranged_by, deprecated), read as their levels; anything else, nothing.
+    const older = (way: unknown) => ({ arranged_by: way, cabinets: [] }) as unknown as CabinetLayout;
+    expect(arrangedOf(older('person_kind'), off)).toEqual(['person', 'kind']);
+    expect(arrangedOf(older('category_year_person'), off)).toEqual(['topic', 'year', 'person']);
+    expect(arrangedOf(older(null), off)).toBeNull();
+    expect(arrangedOf(older('toString'), off)).toBeNull();
+  });
+
+  it('marks a cabinet with its own arrangement, or arranged by hand beside drawn ones; never on an older vault', () => {
+    const [fin, tax, loft] = LEVELLED.cabinets;
+    const by = arrangedOf(LEVELLED, on);
+    expect([fin, tax, loft].map((c) => c && cabinetMark(c, by, on))).toEqual([null, 'own', 'hand']);
+    // A layout wholly by hand marks none of its cabinets: the bar says it.
+    expect(loft && cabinetMark(loft, 'hand', on)).toBeNull();
+    expect(tax && cabinetMark(tax, by, off)).toBeNull();
+  });
+
+  it('passes over a cabinet’s only drawer and a drawer’s only folder; an older vault shows every level', () => {
+    const [fin, tax] = shownLayout(LEVELLED);
+    expect(fin && drawerRows(fin, on)).toMatchObject({ kind: 'only', drawer: { id: 'd-me' } });
+    const rows = tax && drawerRows(tax, on);
+    expect(rows?.kind === 'drawers' && rows.rows.map((r) => [r.drawer.id, r.folder?.id ?? null])).toEqual([
+      ['d-2024', 'f-me-2024'],
+      ['d-2025', null],
+    ]);
+    const before = fin && drawerRows(fin, off);
+    expect(before?.kind === 'drawers' && before.rows.map((r) => [r.drawer.id, r.folder])).toEqual([['d-me', null]]);
+  });
+
+  it('groups divider leaves by their first step; one step, Everything else and the one list stand alone', () => {
+    const leaf = (key: string, count: number, steps: [string, string][]): FolderDivider => ({
+      key,
+      kind: 'group',
+      name: steps.map(([, n]) => n).join(' · '),
+      from: null,
+      to: null,
+      count,
+      path: steps.map(([k, name]) => ({ level: k.startsWith('year') ? 'year' : 'kind', key: k, name })),
+    });
+    const groups = dividerGroups([
+      leaf('kind:bank/year:2025', 3, [['kind:bank', 'Bank statement'], ['year:2025', '2025']]),
+      leaf('kind:bank/year:2024', 2, [['kind:bank', 'Bank statement'], ['year:2024', '2024']]),
+      leaf('kind:payslip', 4, [['kind:payslip', 'Payslip']]),
+      { key: 'rest', kind: 'group', name: 'Everything else', from: null, to: null, count: 7, path: [] },
+    ]);
+    expect(groups.map((g) => [g.key, g.name, g.grouped, g.count, g.leaves.map((l) => l.label)])).toEqual([
+      ['kind:bank', 'Bank statement', true, 5, ['2025', '2024']],
+      ['kind:payslip', 'Payslip', false, 4, ['Payslip']],
+      ['rest', 'Everything else', false, 7, ['Everything else']],
+    ]);
+    // An older vault's dividers have no path: each its own, as before.
+    const all: FolderDivider = { key: 'all', kind: 'all', name: '', from: null, to: null, count: 2 };
+    expect(dividerGroups([all]).map((g) => [g.key, g.grouped])).toEqual([['all', false]]);
+  });
+});
+
+describe('browsing a cabinet arranged by levels (dev.90)', () => {
+  function levelled(t: TestVault) {
+    t.vault.state.cabinets = { [ME]: { layout: LEVELLED, version: 1, updated_at: '2026-11-22T00:00:00Z' } };
+  }
+
+  it('says its levels, a cabinet of one drawer its folders, and marks own and hand-made cabinets', async () => {
+    const t = vault('dev91');
+    levelled(t);
+    await unlocked(t, <DocumentsScreen />);
+    await fireEvent.press(await screen.findByTestId('documents-view-cabinet'));
+    await screen.findByTestId('cabinet-c-fin');
+    await waitFor(() =>
+      expect(screen.getByTestId('cabinet-arranged-by')).toHaveTextContent(/Arranged by Topic › Person › Year › Kind$/),
+    );
+    expect(screen.getByTestId('cabinet-c-fin')).toHaveTextContent('Financial2 folders');
+    expect(screen.getByTestId('cabinet-c-tax')).toHaveTextContent('Tax2 drawers · Own arrangement');
+    expect(screen.getByTestId('cabinet-c-loft')).toHaveTextContent('Loft2 drawers · Arranged by hand');
+    // Still arranged on the web, never here.
+    expect(screen.getByTestId('cabinet-arrange')).toBeTruthy();
+    expect(audit()).toEqual([]);
+  });
+
+  it('a cabinet of one drawer opens on its folders, and Back from a folder comes straight back to it', async () => {
+    const t = vault('dev91');
+    levelled(t);
+    push({ pathname: '/cabinet/[id]', params: { id: 'c-fin' } });
+    await unlocked(t, <CabinetLevel level="cabinet" />);
+    expect((await screen.findByTestId('cabinet-only-drawer')).props.children).toBe('In the Me drawer.');
+    expect(screen.queryByTestId('drawer-d-me')).toBeNull();
+    expect(screen.queryByTestId('cabinet-mark')).toBeNull();
+    expect(audit()).toEqual([]);
+    await fireEvent.press(await screen.findByTestId('folder-f-2025'));
+    // The folder is pushed from the cabinet: no drawer screen between them to go Back through.
+    expect(routes().at(-1)).toEqual({ pathname: '/folder/[id]', params: { id: 'f-2025' } });
+    expect(routes().some((r) => r.pathname === '/drawer/[id]')).toBe(false);
+  });
+
+  it('a drawer of one folder is one row that opens the folder; one of more opens as a drawer', async () => {
+    const t = vault('dev91');
+    levelled(t);
+    push({ pathname: '/cabinet/[id]', params: { id: 'c-tax' } });
+    await unlocked(t, <CabinetLevel level="cabinet" />);
+    expect((await screen.findByTestId('cabinet-mark')).props.children).toBe('Own arrangement');
+    const alone = await screen.findByTestId('folder-f-me-2024');
+    expect(alone).toHaveTextContent(/^2024 › Me/);
+    expect(alone.props.accessibilityLabel).toMatch(/^Me, in the 2024 drawer/);
+    expect(screen.getByTestId('drawer-d-2025')).toHaveTextContent('20252 folders');
+    expect(audit()).toEqual([]);
+    await fireEvent.press(alone);
+    expect(routes().at(-1)).toEqual({ pathname: '/folder/[id]', params: { id: 'f-me-2024' } });
+    // Back comes straight to the cabinet.
+    await act(async () => back());
+    await fireEvent.press(await screen.findByTestId('drawer-d-2025'));
+    expect(routes().at(-1)).toEqual({ pathname: '/drawer/[id]', params: { id: 'd-2025' } });
+  });
+
+  it('the folder’s path still names every level, the drawer passed over too', async () => {
+    const t = vault('dev91');
+    levelled(t);
+    push({ pathname: '/folder/[id]', params: { id: 'f-2025' } });
+    await unlocked(t, <DocumentsScreen />);
+    expect((await screen.findByTestId('folder-path')).props.children).toBe('Financial › Me');
+  });
+
+  it('an older vault shows its way as levels, and every drawer and folder as before', async () => {
+    const t = vault('dev51');
+    const older = { arranged_by: 'person_kind', cabinets: LEVELLED.cabinets } as unknown as CabinetLayout;
+    t.vault.state.cabinets = { [ME]: { layout: older, version: 1, updated_at: '2026-11-22T00:00:00Z' } };
+    const first = await unlocked(t, <CabinetBrowse header={null} />);
+    await screen.findByTestId('cabinet-c-fin');
+    await waitFor(() => expect(screen.getByTestId('cabinet-arranged-by')).toHaveTextContent(/ · Arranged by Person › Kind$/));
+    expect(screen.getByTestId('cabinet-c-fin')).toHaveTextContent('Financial1 drawer');
+    expect(screen.getByTestId('cabinet-c-tax')).toHaveTextContent('Tax2 drawers');
+    first.app.unmount();
+    push({ pathname: '/cabinet/[id]', params: { id: 'c-fin' } });
+    await unlocked(t, <CabinetLevel level="cabinet" />);
+    await screen.findByTestId('drawer-d-me');
+    expect(screen.queryByTestId('cabinet-only-drawer')).toBeNull();
+  });
+});
+
+describe('a folder divided by two levels, Who issued it first (dev.90, dev.91)', () => {
+  it('groups the leaves under their issuer’s tab, the first open; a lone step and No issuer given stand alone', async () => {
+    const t = vault('dev91');
+    issuerFolders(t, [
+      { id: 'f-p60', name: 'P60s', hidden: false, filter: { type_key: 'p60' }, dividers: { levels: ['issuer', 'year'], ranges: [] } },
+    ]);
+    push({ pathname: '/folder/[id]', params: { id: 'f-p60' } });
+    await unlocked(t, <DocumentsScreen />);
+    const acme = await screen.findByTestId(`divider-group-issuer:${ACME}`);
+    expect(acme).toHaveTextContent('Acme Payroll2');
+    expect(acme.props.accessibilityState).toEqual({ expanded: true });
+    // Inside it, its years, named by their own step; the newest open already.
+    const newest = screen.getByTestId(`divider-issuer:${ACME}/year:2025`);
+    expect(newest).toHaveTextContent('20251');
+    expect(newest.props.accessibilityLabel).toBe('Acme Payroll · 2025, 1 document');
+    await screen.findByTestId('doc-row-acme-2025');
+    await fireEvent.press(screen.getByTestId(`divider-issuer:${ACME}/year:2024`));
+    await screen.findByTestId('doc-row-acme-2024');
+    // Bolt has one year: that step passed over, a divider of its own; none given, last.
+    expect(screen.getByTestId(`divider-issuer:${BOLT}`)).toHaveTextContent('Bolt Works1');
+    expect(screen.getByTestId('divider-issuer:')).toHaveTextContent('No issuer given1');
+    expect(screen.queryByTestId(`divider-group-issuer:${BOLT}`)).toBeNull();
+    await fireEvent.press(screen.getByTestId('divider-issuer:'));
+    await screen.findByTestId('doc-row-none-2023');
+    // Closed, its leaves go with it.
+    await fireEvent.press(acme);
+    expect(screen.queryByTestId(`divider-issuer:${ACME}/year:2025`)).toBeNull();
+    expect(audit()).toEqual([]);
+  });
+
+  it('a folder with only one value at each step is one plain list', async () => {
+    const t = vault('dev91');
+    issuerFolders(t, [
+      {
+        id: 'f-acme',
+        name: 'Acme',
+        hidden: false,
+        filter: { type_key: 'p60', issuer: ACME, dated_from: '2025-01-01', dated_to: '2025-12-31' },
+        dividers: { levels: ['issuer', 'year'], ranges: [] },
+      },
+    ]);
+    push({ pathname: '/folder/[id]', params: { id: 'f-acme' } });
+    await unlocked(t, <DocumentsScreen />);
+    await screen.findByTestId('doc-row-acme-2025');
+    expect(screen.queryByTestId(/^divider-/)).toBeNull();
+  });
+
+  it('says who issued what a folder holds by the household’s names, and No issuer given', async () => {
+    const t = vault('dev91');
+    issuerFolders(t, [
+      { id: 'f-acme', name: 'Acme', hidden: false, filter: { type_key: 'p60', issuer: ACME } },
+      { id: 'f-none', name: 'None given', hidden: false, filter: { issuer: '_none', member_id: 'household' } },
+    ]);
+    push({ pathname: '/folder/[id]', params: { id: 'f-acme' } });
+    const first = await unlocked(t, <DocumentsScreen />);
+    await waitFor(() => expect(screen.getByTestId('folder-question')).toHaveTextContent(/from Acme Payroll\.$/));
+    expect(t.calls.some((c) => c.includes('/api/v1/issuers/groups'))).toBe(true);
+    first.app.unmount();
+    resetRoutes();
+    push({ pathname: '/folder/[id]', params: { id: 'f-none' } });
+    await unlocked(t, <DocumentsScreen />);
+    await waitFor(() =>
+      expect(screen.getByTestId('folder-question')).toHaveTextContent('Papers with no issuer given, for The household.'),
+    );
+  });
+
+  it('an older vault is never asked for the household’s issuers, and its dividers are each their own', async () => {
+    const t = vault('dev51');
+    issuerFolders(t, [
+      { id: 'f-p60', name: 'P60s', hidden: false, filter: { type_key: 'p60' }, dividers: { levels: ['issuer', 'year'], ranges: [] } },
+    ]);
+    push({ pathname: '/folder/[id]', params: { id: 'f-p60' } });
+    await unlocked(t, <DocumentsScreen />);
+    // The flat list an older app is sent, as it was: "Acme Payroll · 2025", each a divider of its own.
+    expect(await screen.findByTestId(`divider-issuer:${ACME}/year:2025`)).toHaveTextContent('Acme Payroll · 20251');
+    expect(screen.queryByTestId(`divider-group-issuer:${ACME}`)).toBeNull();
+    await screen.findByTestId('folder-question');
+    expect(t.calls.some((c) => c.includes('/api/v1/issuers/groups'))).toBe(false);
+  });
+});
+
+describe('the household’s issuers, asked once (dev.91)', () => {
+  it('is asked only for a folder that names an issuer, then shared by every folder after it', async () => {
+    const t = vault('dev91');
+    const BOLT_FOLDER = { id: 'f-bolt', name: 'Bolt', hidden: false, filter: { type_key: 'p60', issuer: BOLT } };
+    issuerFolders(t, [
+      ...BY_ISSUER,
+      { id: 'f-acme', name: 'Acme', hidden: false, filter: { type_key: 'p60', issuer: ACME } },
+      BOLT_FOLDER,
+      { id: 'f-none', name: 'None given', hidden: false, filter: { issuer: '_none' } },
+    ]);
+    const asked = () => t.calls.filter((c) => c.includes('/api/v1/issuers/groups')).length;
+    // Divided by issuer, but asking for none: the vault names its own dividers, so nothing is asked.
+    push({ pathname: '/folder/[id]', params: { id: 'f-p60' } });
+    await unlocked(t, <DocumentsScreen />);
+    await screen.findByTestId('folder-question');
+    await act(async () => push({ pathname: '/folder/[id]', params: { id: 'f-none' } }));
+    await waitFor(() => expect(screen.getByTestId('folder-question')).toHaveTextContent('Papers with no issuer given.'));
+    expect(asked()).toBe(0);
+    await act(async () => push({ pathname: '/folder/[id]', params: { id: 'f-acme' } }));
+    await waitFor(() => expect(screen.getByTestId('folder-question')).toHaveTextContent('p60 from Acme Payroll.'));
+    await act(async () => push({ pathname: '/folder/[id]', params: { id: 'f-bolt' } }));
+    await waitFor(() => expect(screen.getByTestId('folder-question')).toHaveTextContent('p60 from Bolt Works.'));
+    expect(asked()).toBe(1);
+  });
+
+  it('one asking for this vault and person, forgotten as the session ends or a document changes; a failure is not kept', async () => {
+    const groups = { items: [], same_as: [], may_change: false };
+    const ask = jest.fn(async () => groups);
+    await issuerGroupsFor('v|me', ask);
+    await issuerGroupsFor('v|me', ask);
+    expect(ask).toHaveBeenCalledTimes(1);
+    await issuerGroupsFor('v|sara', ask);
+    expect(ask).toHaveBeenCalledTimes(2);
+    await act(async () => emit('documentChanged', 'p60'));
+    await issuerGroupsFor('v|me', ask);
+    expect(ask).toHaveBeenCalledTimes(3);
+    await act(async () => emit('sessionEnded', 'expired'));
+    await issuerGroupsFor('v|me', ask);
+    expect(ask).toHaveBeenCalledTimes(4);
+    forgetCabinets();
+    const failing = jest.fn(async () => {
+      throw new Error('offline');
+    });
+    expect(await issuerGroupsFor('v|me', failing)).toBeNull();
+    expect(await issuerGroupsFor('v|me', ask)).toBe(groups);
+  });
+});
+
+describe('a folder’s dividers past a hundred, and a long one (dev.90)', () => {
+  it('Everything else comes last with the smallest, counted, and opens with divider=rest', async () => {
+    const t = vault('dev91');
+    const papers = [
+      p60('acme-25a', 'Acme Payroll', '2025-04-05'),
+      p60('acme-25b', 'Acme Payroll', '2025-05-05'),
+      p60('acme-24a', 'Acme Payroll', '2024-04-05'),
+      p60('acme-24b', 'Acme Payroll', '2024-05-05'),
+      ...Array.from({ length: 100 }, (_, i) => p60(`small-${i}`, `Issuer ${String(i).padStart(3, '0')}`, '2023-04-05')),
+    ];
+    issuerFolders(t, BY_ISSUER, papers);
+    push({ pathname: '/folder/[id]', params: { id: 'f-p60' } });
+    await unlocked(t, <DocumentsScreen />);
+    const rest = await screen.findByTestId('divider-rest');
+    // 102 leaves: the two of Acme kept under their tab, 97 of the rest, and three behind Everything else.
+    expect(rest).toHaveTextContent('Everything else3');
+    expect(screen.getByTestId(`divider-group-issuer:${ACME}`)).toHaveTextContent('Acme Payroll4');
+    const tabs = screen.getAllByTestId(/^divider-(group-)?(issuer|rest)/).filter((n) => !/\/year:/.test(String(n.props.testID)));
+    expect(tabs.at(-1)?.props.testID).toBe('divider-rest');
+    expect(tabs).toHaveLength(99);
+    await fireEvent.press(rest);
+    await screen.findByTestId('doc-row-small-99');
+    expect(screen.getByTestId('doc-row-small-97')).toBeTruthy();
+    expect(t.calls.some((c) => c.includes('/cabinet/folders/f-p60/documents?divider=rest'))).toBe(true);
+  });
+
+  it('Show more inside a leaf under a tab asks for its own key, a page at a time', async () => {
+    const t = vault('dev91');
+    const papers = [
+      ...Array.from({ length: 55 }, (_, i) =>
+        p60(`acme-25-${i}`, 'Acme Payroll', `2025-${String(1 + (i % 12)).padStart(2, '0')}-${String(1 + (i % 28)).padStart(2, '0')}`),
+      ),
+      p60('acme-24', 'Acme Payroll', '2024-04-05'),
+      p60('bolt-25', 'Bolt Works', '2025-04-05'),
+    ];
+    issuerFolders(t, BY_ISSUER, papers);
+    push({ pathname: '/folder/[id]', params: { id: 'f-p60' } });
+    await unlocked(t, <DocumentsScreen />);
+    const key = `issuer:${ACME}/year:2025`;
+    await fireEvent.press(await screen.findByTestId(`folder-more-${key}`));
+    await waitFor(() => expect(screen.queryByTestId(`folder-more-${key}`)).toBeNull());
+    const asked = t.calls.filter((c) => c.includes('/cabinet/folders/f-p60/documents?'));
+    expect(asked).toHaveLength(2);
+    expect(asked[0]).toContain(`divider=${encodeURIComponent(key)}`);
+    expect(asked[1]).toContain(`divider=${encodeURIComponent(key)}`);
+    expect(asked[1]).toContain('cursor=50');
+    expect(screen.getAllByTestId(/^doc-row-acme-25-/)).toHaveLength(55);
+  });
+});
+
+describe('a cabinet’s one drawer, as it changes (dev.89)', () => {
+  it('a drawer whose folders are all hidden says so, its name still said', async () => {
+    const t = vault('dev91');
+    const layout: CabinetLayout = {
+      levels: ['person', 'kind'],
+      cabinets: [
+        {
+          id: 'c-mine',
+          name: 'My cabinet',
+          hidden: false,
+          drawn: { value: null },
+          drawers: [
+            { id: 'd-me', name: 'Me', hidden: false, folders: [{ id: 'f-x', name: 'P60', hidden: true, filter: {} }] },
+            { id: 'd-gone', name: 'Sara', hidden: true, folders: [] },
+          ],
+        },
+      ],
+    };
+    t.vault.state.cabinets = { [ME]: { layout, version: 1, updated_at: '2026-11-22T00:00:00Z' } };
+    push({ pathname: '/cabinet/[id]', params: { id: 'c-mine' } });
+    await unlocked(t, <CabinetLevel level="cabinet" />);
+    expect((await screen.findByTestId('cabinet-only-drawer')).props.children).toBe('In the Me drawer.');
+    expect(screen.getByTestId('drawer-no-folders').props.children).toBe('Every folder in this drawer is hidden.');
+    expect(screen.queryByTestId('folder-f-x')).toBeNull();
+  });
+
+  it('a cabinet read again with a second drawer shows its drawers, where it was', async () => {
+    const t = vault('dev91');
+    const one = structuredClone(LEVELLED);
+    t.vault.state.cabinets = { [ME]: { layout: one, version: 1, updated_at: '2026-11-22T00:00:00Z' } };
+    push({ pathname: '/cabinet/[id]', params: { id: 'c-fin' } });
+    await unlocked(t, <CabinetLevel level="cabinet" />);
+    await screen.findByTestId('cabinet-only-drawer');
+    const two = structuredClone(LEVELLED);
+    two.cabinets[0]?.drawers.push({
+      id: 'd-sara',
+      name: 'Sara',
+      hidden: false,
+      folders: [
+        { id: 'f-sara-25', name: '2025', hidden: false, filter: { type_key: 'p60' } },
+        { id: 'f-sara-24', name: '2024', hidden: false, filter: { type_key: 'p60' } },
+      ],
+    });
+    t.vault.state.cabinets = { [ME]: { layout: two, version: 2, updated_at: '2026-11-22T01:00:00Z' } };
+    // A paper saved brings the second drawer: the cabinet is read again, and shown as drawers.
+    await act(async () => emit('documentChanged', 'p60'));
+    await screen.findByTestId('drawer-d-sara');
+    expect(screen.getByTestId('drawer-d-me')).toHaveTextContent('Me2 folders');
+    expect(screen.queryByTestId('cabinet-only-drawer')).toBeNull();
+    expect(screen.queryByTestId('folder-f-2025')).toBeNull();
+    expect(routes()).toEqual([{ pathname: '/cabinet/[id]', params: { id: 'c-fin' } }]);
+  });
+});
+
+describe('Large text, in the cabinet (dev.89, dev.90)', () => {
+  /** The words given, on the screen as `open` leaves it, with and without Large text. */
+  async function both(t: TestVault, route: string, id: string, find: () => Promise<ReactTestInstance[]>) {
+    const out: ReturnType<typeof drawn>[][] = [];
+    for (const large of [false, true]) {
+      resetRoutes();
+      forgetCabinets();
+      push({ pathname: route, params: { id } });
+      const r = await unlocked(t, route === '/folder/[id]' ? <DocumentsScreen /> : <CabinetLevel level="cabinet" />, { large });
+      out.push((await find()).map(drawn));
+      r.app.unmount();
+    }
+    const [normal, large] = out;
+    expect(normal?.length).toBeGreaterThan(0);
+    large?.forEach((l, i) => {
+      const n = normal?.[i];
+      expect(n?.size).toBeGreaterThan(0);
+      expect(l.size).toBeCloseTo((n?.size ?? 0) * LARGE, 5);
+      expect(l.cut).toBe(false);
+    });
+  }
+
+  it('a drawer’s one-folder row, "2024 › Me", and a cabinet’s mark grow, never cut short', async () => {
+    const t = vault('dev91');
+    t.vault.state.cabinets = { [ME]: { layout: LEVELLED, version: 1, updated_at: '2026-11-22T00:00:00Z' } };
+    await both(t, '/cabinet/[id]', 'c-tax', async () => {
+      const row = await screen.findByTestId('folder-f-me-2024');
+      return [within(row).getByText('2024 › Me'), screen.getByTestId('cabinet-mark')];
+    });
+  });
+
+  it('"In the … drawer." grows, never cut short', async () => {
+    const t = vault('dev91');
+    t.vault.state.cabinets = { [ME]: { layout: LEVELLED, version: 1, updated_at: '2026-11-22T00:00:00Z' } };
+    await both(t, '/cabinet/[id]', 'c-fin', async () => [await screen.findByTestId('cabinet-only-drawer')]);
+  });
+
+  it('a group’s tab and a leaf inside it grow, never cut short', async () => {
+    const t = vault('dev91');
+    issuerFolders(t, BY_ISSUER);
+    await both(t, '/folder/[id]', 'f-p60', async () => {
+      const tab = await screen.findByTestId(`divider-group-issuer:${ACME}`);
+      const leaf = screen.getByTestId(`divider-issuer:${ACME}/year:2025`);
+      return [within(tab).getByText('Acme Payroll'), within(leaf).getByText('2025')];
+    });
   });
 });

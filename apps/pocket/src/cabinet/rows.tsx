@@ -17,6 +17,8 @@ export function NodeRow(props: {
   testID: string;
   icon: LucideIcon;
   name: string;
+  /** What a screen reader says for its name, where the name shown is not the words for it. */
+  spoken?: string;
   line?: string | null;
   place: RowPlace;
   onPress: () => void;
@@ -28,7 +30,7 @@ export function NodeRow(props: {
     <Pressable
       testID={props.testID}
       accessibilityRole="button"
-      accessibilityLabel={props.line ? `${props.name}. ${props.line}` : props.name}
+      accessibilityLabel={props.line ? `${props.spoken ?? props.name}. ${props.line}` : (props.spoken ?? props.name)}
       onPress={props.onPress}
       style={({ pressed }) => [styles.row, styles[props.place], pressed ? styles.pressed : null]}
     >

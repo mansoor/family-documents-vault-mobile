@@ -1,15 +1,19 @@
-import type { ArrangeBy, Cabinet } from '@fdv/shared';
+import type { Cabinet, IssuerGroups } from '@fdv/shared';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { on } from '../state/events';
 import { useVault } from '../state/vault';
 import { loadFailure } from '../ui/states';
-import { cabinetGate, shownLayout } from './model';
+import { arrangedOf, cabinetGate, shownLayout, type Arranged } from './model';
 
 /** The person's cabinet as last read: what is shown, and each shown folder's count (null: the vault won't count it now). */
 export interface CabinetRead {
-  /** Null: nothing arranged yet. */
-  arranged: { by: ArrangeBy | null; cabinets: Cabinet[]; hidden: number } | null;
+  /**
+   * Null: nothing arranged yet. `by`: its levels, `hand` for arranged by
+   * hand, `web` for levels this app doesn't know, or null where the vault
+   * says none (`arrangedOf`).
+   */
+  arranged: { by: Arranged | null; cabinets: Cabinet[]; hidden: number } | null;
   counts: Record<string, number | null>;
   /**
    * What the cabinet holds in all, each paper once (a vault of 19 Nov 2026,
@@ -41,13 +45,38 @@ export function forgetCabinets(): void {
   lastRead.clear();
   readAt.clear();
   asking.clear();
+  issuers.clear();
   generation += 1;
 }
 on('signedOut', forgetCabinets);
 on('sessionEnded', forgetCabinets);
 // A document changed: what was read is no longer current, and the next look asks again (once, for every screen).
 // Listened to here, before any screen's own listener, so theirs finds it stale.
-on('documentChanged', () => readAt.clear());
+on('documentChanged', () => {
+  readAt.clear();
+  // Who issued it may have changed with it: the household's issuers are asked again when next needed.
+  issuers.clear();
+});
+
+/**
+ * The household's issuers (GET /issuers/groups, a vault of 0.9.0-dev.91),
+ * for this vault and this person: asked once, by the first folder that
+ * names an issuer, and shared by every one after it while the app runs.
+ * Forgotten as the session ends, and when a document changes. A failure is
+ * not kept: the next folder asks again.
+ */
+const issuers = new Map<string, Promise<IssuerGroups | null>>();
+
+export function issuerGroupsFor(key: string, ask: () => Promise<IssuerGroups>): Promise<IssuerGroups | null> {
+  const had = issuers.get(key);
+  if (had) return had;
+  const p: Promise<IssuerGroups | null> = ask().catch(() => {
+    if (issuers.get(key) === p) issuers.delete(key);
+    return null;
+  });
+  issuers.set(key, p);
+  return p;
+}
 
 /** The cabinet for `key`: the asking under way, else a current answer (unless `force`), else asked now. */
 function readCabinet(key: string, ask: () => Promise<CabinetRead>, force: boolean): Promise<CabinetRead> {
@@ -116,7 +145,11 @@ export function useCabinet() {
             const cabinets = shownLayout(view.layout);
             return {
               arranged: view.layout
-                ? { by: view.layout.arranged_by, cabinets, hidden: view.layout.cabinets.length - cabinets.length }
+                ? {
+                    by: arrangedOf(view.layout, { levels: gate.levels }),
+                    cabinets,
+                    hidden: view.layout.cabinets.length - cabinets.length,
+                  }
                 : null,
               counts: counted?.counts ?? {},
               ...(typeof counted?.documents === 'number' ? { documents: counted.documents } : {}),
@@ -134,7 +167,7 @@ export function useCabinet() {
         setLoading(false);
       }
     },
-    [gate.on, key, withToken, t],
+    [gate.on, gate.levels, key, withToken, t],
   );
   const load = useCallback(() => look(true), [look]);
 
