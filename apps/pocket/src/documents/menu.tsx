@@ -429,6 +429,9 @@ function DocumentMenu(props: {
           const outcome = await setEssential(deps, doc, value, t);
           if (outcome.kind === 'saved') {
             fromVault(outcome.doc);
+            // Its page, the lists and the copies kept on this phone follow now, not
+            // at the next start: from the pages' ⋮, ← lands on that page.
+            emit('documentChanged', outcome.doc.id, outcome.doc.is_essential);
             setSaid({ tone: 'ok', text: t(value ? 'row.essentialMade' : 'row.essentialTaken') });
           } else if (outcome.kind === 'conflict') {
             warn(t('document.conflict'));

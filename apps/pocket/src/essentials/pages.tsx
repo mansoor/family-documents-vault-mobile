@@ -8,6 +8,7 @@ import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { CaregiverMark } from '../caregivers/mark';
 import { isCaregiverPaper } from '../caregivers/rules';
 import { useDocumentMenu } from '../documents/menu';
+import { on } from '../state/events';
 import { NoteText } from '../documents/notes';
 import { keptName } from './kept-name';
 import { openOnline } from '../documents/online';
@@ -37,8 +38,10 @@ import { relativeWords, useFamilyZone } from '../state/family-time';
  * name, going back where it was opened from, and a ⋮ in the corner where
  * the ✕ was, opening the same sheet as the document's ⋯ in a list — its
  * permissions, "Confirm it's you" and questions with it. Only for whoever
- * is signed in, once the document is here: a kept Essential read while
- * signed out has nothing to offer it.
+ * is signed in, once the document is here (offline too, as the ⋯ is: what
+ * needs the vault says so): a kept Essential read while signed out has
+ * nothing to offer it, and an older version none, as the ⋯ acts on the
+ * latest.
  */
 export function EssentialPages(props: { id: string; mode?: string; online?: boolean; version?: string }) {
   const router = useRouter();
@@ -57,7 +60,8 @@ export function EssentialPages(props: { id: string; mode?: string; online?: bool
   const [copy, setCopy] = useState<OpenCopy | 'missing' | 'unconfirmed' | 'failed' | null>(null);
   const [n, setN] = useState(1);
   const [uri, setUri] = useState<string | null>(null);
-  const [pageProblem, setPageProblem] = useState<'unconfirmed' | 'failed' | null>(null);
+  // `gone`: a kept page no longer in the phone's store (no longer Essential, and synced away).
+  const [pageProblem, setPageProblem] = useState<'unconfirmed' | 'failed' | 'gone' | null>(null);
   const [zoom, setZoom] = useState<number>(MIN_ZOOM);
   const [aspect, setAspect] = useState<number | undefined>(undefined);
   const [attempt, setAttempt] = useState(0);
@@ -84,8 +88,9 @@ export function EssentialPages(props: { id: string; mode?: string; online?: bool
       .then((u) => {
         if (cancelled) return;
         setUri(u);
-        // From the vault, a page is null only when it was not confirmed.
-        setPageProblem(u === null && online ? 'unconfirmed' : null);
+        // From the vault, a page is null only when it was not confirmed; kept, when
+        // it is kept no longer.
+        setPageProblem(u === null ? (online ? 'unconfirmed' : 'gone') : null);
       })
       .catch(() => {
         if (!cancelled) setPageProblem('failed');
@@ -94,6 +99,22 @@ export function EssentialPages(props: { id: string; mode?: string; online?: bool
       cancelled = true;
     };
   }, [ready, n, online, attempt]);
+
+  // Changed on the phone while open (its words edited, a new version, Essential or
+  // not, from the ⋮ or a page over these): opened again, from its first page.
+  useEffect(
+    () =>
+      on('documentChanged', (changed) => {
+        if (changed !== id) return;
+        setPageProblem(null);
+        setUri(null);
+        setAspect(undefined);
+        setZoom(MIN_ZOOM);
+        setN(1);
+        setAttempt((x) => x + 1);
+      }),
+    [id],
+  );
 
   const again = () => {
     setPageProblem(null);
@@ -139,7 +160,8 @@ export function EssentialPages(props: { id: string; mode?: string; online?: bool
         <Text variant="title" style={styles.flex} numberOfLines={2}>
           {pages > 0 ? title : ''}
         </Text>
-        {who && ready ? menu.button : null}
+        {/* Not over an older version: the ⋯'s choices act on the latest. */}
+        {who && ready && !version ? menu.button : null}
       </View>
       {menu.sheet}
       {/* Somebody else's, seen only as their caregiver (H1b): said over its pages too. */}
@@ -149,7 +171,11 @@ export function EssentialPages(props: { id: string; mode?: string; online?: bool
           {t('essentials.offlineBanner', { when: relativeWords(new Date(e.checked.at).toISOString(), zone) })}
         </Notice>
       ) : null}
-      {copy === 'missing' ? <Notice tone="warn">{t('essentials.notKept')}</Notice> : null}
+      {copy === 'missing' || pageProblem === 'gone' ? (
+        <Notice tone="warn" testID="essential-not-kept">
+          {t('essentials.notKept')}
+        </Notice>
+      ) : null}
       {problem ? (
         <Notice tone="warn" testID="essential-problem">
           <Text>{problem}</Text>

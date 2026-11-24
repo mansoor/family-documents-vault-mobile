@@ -1,6 +1,8 @@
 import type { DocumentView } from '@fdv/shared';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react-native';
 import { DocumentDetail } from '../documents/detail';
+import { EssentialPages } from '../essentials/pages';
+import { on } from '../state/events';
 import { rowActions } from '../documents/menu';
 import { SecureTokenStore } from '../session/store';
 import { audit } from '../test-support/a11y';
@@ -120,6 +122,8 @@ describe('a document’s pages: ← and ⋮', () => {
     const t = vault();
     libraryDoc(t, { id: 'passport', title: 'Passport', is_essential: true });
     await pagesOf(t, 'passport');
+    const changed: unknown[][] = [];
+    const off = on('documentChanged', (...args) => void changed.push(args));
     await fireEvent.press(screen.getByTestId('essential-more'));
     const got = await choices();
     expect(got[0]).toBe('row-sheet-show');
@@ -139,6 +143,18 @@ describe('a document’s pages: ← and ⋮', () => {
     expect(await screen.findByText("It's not an Essential any more.")).toBeTruthy();
     expect(t.library.documents.get('passport')?.is_essential).toBe(false);
     expect(t.library.stepUps).toEqual([PASSWORD]);
+    // Said to its page beneath, the lists and the copies kept on the phone, as it is now.
+    expect(changed).toEqual([['passport', false]]);
+    off();
+  });
+
+  it('no ⋮ over an older version: the ⋯’s choices act on the latest', async () => {
+    const t = vault();
+    libraryDoc(t, { id: 'passport', title: 'Passport' });
+    await unlocked(t, <EssentialPages id="passport" online version="passport-v1" />);
+    await screen.findByTestId('essential-image');
+    expect(screen.getByTestId('essential-back')).toBeTruthy();
+    expect(screen.queryByTestId('essential-more')).toBeNull();
   });
 
   it('a viewer is offered what a list offers them: Save a copy', async () => {
