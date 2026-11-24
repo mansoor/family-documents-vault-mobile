@@ -13,6 +13,7 @@ import { useRouter } from 'expo-router';
 import {
   Download,
   Ellipsis,
+  EllipsisVertical,
   Eye,
   FilePlus,
   FolderMinus,
@@ -137,6 +138,10 @@ function newer(a: DocumentView | null, b: DocumentView | null): DocumentView | n
  * or saved by it — so that opened again, the sheet starts from that and
  * not from the list's, which nobody reloaded: an Essential made a moment
  * ago is offered as one (U536-02).
+ *
+ * `vertical`: the ⋮ at the top of a document's pages (app 0.24.0, the
+ * owner's ask of 24 Nov 2026) — the same sheet, drawn as ⋮ in the corner
+ * where the pages' ✕ was, with its own test ID.
  */
 export function useDocumentMenu(props: {
   id: string;
@@ -145,6 +150,7 @@ export function useDocumentMenu(props: {
   remove?: RemoveFrom | undefined;
   /** Edit offered first (Notes' ⋯). */
   edit?: boolean;
+  vertical?: { testID: string };
 }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
@@ -171,10 +177,11 @@ export function useDocumentMenu(props: {
   const show = useCallback(() => setOpen(true), []);
   const colours = useColours();
   const styles = useStyles(makeStyles);
+  const Icon = props.vertical ? EllipsisVertical : Ellipsis;
   const menuButton = (
     <Pressable
       ref={button}
-      testID={`doc-menu-${props.id}`}
+      testID={props.vertical?.testID ?? `doc-menu-${props.id}`}
       accessibilityRole="button"
       accessibilityLabel={t('row.menu', { title: props.title })}
       accessibilityState={{ expanded: open }}
@@ -182,7 +189,12 @@ export function useDocumentMenu(props: {
       onPress={show}
       style={({ pressed }) => [styles.more, pressed ? styles.pressed : null]}
     >
-      <Ellipsis color={colours.inkSoft} size={24} accessibilityElementsHidden importantForAccessibility="no" />
+      <Icon
+        color={props.vertical ? colours.ink : colours.inkSoft}
+        size={props.vertical ? 22 : 24}
+        accessibilityElementsHidden
+        importantForAccessibility="no"
+      />
     </Pressable>
   );
   const sheet = open ? (
@@ -417,6 +429,9 @@ function DocumentMenu(props: {
           const outcome = await setEssential(deps, doc, value, t);
           if (outcome.kind === 'saved') {
             fromVault(outcome.doc);
+            // Its page, the lists and the copies kept on this phone follow now, not
+            // at the next start: from the pages' ⋮, ← lands on that page.
+            emit('documentChanged', outcome.doc.id, outcome.doc.is_essential);
             setSaid({ tone: 'ok', text: t(value ? 'row.essentialMade' : 'row.essentialTaken') });
           } else if (outcome.kind === 'conflict') {
             warn(t('document.conflict'));

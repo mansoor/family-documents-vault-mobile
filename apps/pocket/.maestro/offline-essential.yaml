@@ -74,6 +74,9 @@ env:
     timeout: 15000
 - assertVisible:
     text: "Page 1 of .*"
+# ← before its name, where a ✕ was in the corner (app 0.24.0).
+- assertVisible:
+    id: essential-back
 # A swipe left turns to the next page, as › does (0.7.1: on Gesture Handler;
 # the e2e scanner's passport has two pages). A pinch is not something Maestro does.
 - swipe:

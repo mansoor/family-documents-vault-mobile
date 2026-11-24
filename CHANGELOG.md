@@ -6,6 +6,27 @@ app's own, tagged `vX.Y.Z` in this repository.
 
 ## [Unreleased]
 
+## [0.24.0] — Back and ⋮ on a document's pages, and System health
+
+Re-pinned to the vault's **v0.9.0-dev.97**, whose web renames Security &
+health to System health. Nothing here needs the newer vault. The phone's
+minimum vault stays 0.4.10.
+
+### Changed
+- **A document's pages have ← Back before the name** in place of the ✕
+  in the corner. It goes back where the pages were opened from, as the ✕
+  did: a document's page, or On this phone.
+- **Security & health in Settings is now called System health**, as on
+  the web. What it shows an owner is unchanged.
+
+### Added
+- **A ⋮ in the corner of a document's pages** opens the same choices as
+  the document's ⋯ in a list — Show, Share, Save a copy, Add a new version,
+  Essential and Add to a collection, each for whoever may — with the same
+  questions and "Confirm it's you" as there. A kept Essential note's pages
+  offer Edit first, as its ⋯ in Notes does. It is there for whoever is
+  signed in: a kept Essential read while signed out has none.
+
 ## [0.23.0] — Visibility, a note's Sensitive while it is edited, and printing what is Sensitive
 
 Re-pinned to the vault's **v0.9.0-dev.96**, which makes the same changes

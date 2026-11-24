@@ -1,6 +1,6 @@
 {
   "name": "@fdv/pocket",
-  "version": "0.23.0",
+  "version": "0.24.0",
   "main": "expo-router/entry",
   "dependencies": {
     "@expo-google-fonts/figtree": "^0.4.1",
@@ -9,7 +9,7 @@
     "@fdv/client": "workspace:^",
     "@fdv/shared": "workspace:^",
     "@preeternal/react-native-document-scanner-plugin": "0.4.2",
-    "expo": "~57.0.33",
+    "expo": "~57.0.34",
     "expo-application": "~57.0.3",
     "expo-brightness": "~57.0.2",
     "expo-build-properties": "~57.0.24",

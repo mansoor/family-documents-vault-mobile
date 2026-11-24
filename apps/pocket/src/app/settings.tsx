@@ -27,7 +27,7 @@ import { Chip, ChipRow } from '../ui/chip';
  * Settings (4.15; only settings since P6): Large text, light or dark, the
  * lock, the offline copies, notifications, Reading (an owner's view of the
  * AI reader, AIR4), how long links and requests that no longer work are
- * kept (RQ), an owner's Security & health (0.21.0), About, and the browser for
+ * kept (RQ), an owner's System health (0.21.0), About, and the browser for
  * everything else; and Sign out. Which vault, who is signed in and on which
  * devices are on Account, under More.
  */

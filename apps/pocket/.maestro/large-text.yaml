@@ -54,7 +54,7 @@ env:
       id: settings-large-text
 - tapOn:
     id: settings-large-text
-# An owner's Settings has Security & health (0.21.0) above Sign out, read
+# An owner's Settings has System health (0.21.0) above Sign out, read
 # from the vault: let it arrive, then scroll the longer page, at large text,
 # for as long as it takes.
 - waitForAnimationToEnd
