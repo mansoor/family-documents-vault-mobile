@@ -104,7 +104,10 @@ export function ChangePassword() {
       setDone(true);
     } catch (err) {
       // The new password refused by the household's rules: the vault's own words, by the new password.
-      if (err instanceof ApiRequestError && err.code === PASSWORD_RULES_CODE && err.message) setRefused(err.message);
+      if (err instanceof ApiRequestError && err.code === PASSWORD_RULES_CODE) {
+        // The vault's words; none (the client's "The server answered 400."), the phone's own.
+        setRefused(!err.message || /^The server answered \d+\.$/.test(err.message) ? t('password.rulesRefused') : err.message);
+      }
       else setProblem(wordsFor(err, t));
     } finally {
       setBusy(false);

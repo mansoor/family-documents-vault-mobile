@@ -360,6 +360,8 @@ export function PrintFromMenu(props: {
   onDone: (said: Said | null) => void;
   /** Cancelled: nothing printed. */
   onCancel: () => void;
+  /** Getting it ready (fetching, "Confirm it's you"): the sheet waits for it. */
+  onBusy?: (busy: boolean) => void;
 }) {
   const { t } = useTranslation();
   const { caps } = useVault();
@@ -372,7 +374,12 @@ export function PrintFromMenu(props: {
   >(null);
   const [busy, setBusy] = useState(false);
   const live = useRef(true);
-  const { id, deps, onDone } = props;
+  const { id, deps, onDone, onBusy } = props;
+  // Until it is here, or said why not: the sheet's Back and a tap outside wait.
+  useEffect(() => {
+    onBusy?.(ready === null);
+    return () => onBusy?.(false);
+  }, [ready, onBusy]);
 
   const printTheNote = useCallback(
     async (doc: DocumentView, words: DocumentWords) => {
@@ -386,6 +393,8 @@ export function PrintFromMenu(props: {
   );
 
   useEffect(() => {
+    // This run's own: never a fetch of an earlier run printing.
+    let alive = true;
     live.current = true;
     void (async () => {
       try {
@@ -398,7 +407,7 @@ export function PrintFromMenu(props: {
             a.documentTypes(tk).catch(() => ({ items: [] })),
           ]),
         );
-        if (!live.current) return;
+        if (!alive) return;
         if (got === null) return onDone({ tone: 'warn', text: t('print.notConfirmed') });
         const [doc, versions, members, types] = got;
         const words = documentWords(doc, { doc, members: members.items, types: types.items, caps, t });
@@ -413,11 +422,12 @@ export function PrintFromMenu(props: {
         // A note that isn't Sensitive is printed as it is, as from its page.
         if (!words.sensitive) await printTheNote(doc, words);
       } catch (err) {
-        if (!live.current) return;
+        if (!alive) return;
         onDone({ tone: 'warn', text: err instanceof NetworkError ? t('print.needsConnection') : wordsFor(err, t) });
       }
     })();
     return () => {
+      alive = false;
       live.current = false;
     };
     // Read once, as the sheet asks for it.

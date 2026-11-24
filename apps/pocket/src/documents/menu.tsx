@@ -321,6 +321,8 @@ function DocumentMenu(props: {
   const [confirming, setConfirming] = useState<'remove' | 'essential' | null>(null);
   // Print (app 0.25.0): what its page's Print asks, in this sheet.
   const [printing, setPrinting] = useState(false);
+  // Print getting it ready (fetching, "Confirm it's you"): Back and a tap outside wait for it.
+  const [preparing, setPreparing] = useState(false);
   // A note whose words wait for "Confirm it's you" (0.9.0-dev.87): the vault gave nothing without it.
   const [asks, setAsks] = useState(false);
   const [confirmingDoc, setConfirmingDoc] = useState(false);
@@ -381,7 +383,7 @@ function DocumentMenu(props: {
     away: lock.away,
   };
   const warn = (text: string) => setSaid({ tone: 'warn', text });
-  const working = busy !== null || adding || confirmingDoc;
+  const working = busy !== null || adding || confirmingDoc || (printing && preparing);
   // Back and a tap outside wait, as Done does, for what is on its way.
   const leave = () => {
     if (!working) props.onClose(true);
@@ -582,6 +584,7 @@ function DocumentMenu(props: {
               else props.onClose(true);
             }}
             onCancel={() => setPrinting(false)}
+            onBusy={setPreparing}
           />
         ) : picking ? (
           <CollectionPicker
