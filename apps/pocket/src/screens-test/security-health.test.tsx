@@ -30,7 +30,7 @@ const HEALTH: SecurityHealthView = {
   token_reuse: { state: 'fine', count: 0 },
 };
 
-/** A vault with Security & health, answering the card as an owner's (and 403 to anybody else). */
+/** A vault with System health, answering the card as an owner's (and 403 to anybody else). */
 function vault(over: { feature?: boolean } = {}): TestVault & { asked: number } {
   const t = Object.assign(testVault([ORIGIN]), { asked: 0 });
   t.caps = capabilities({ features: { ...capabilities().features, security_health: over.feature ?? true } });
@@ -43,11 +43,14 @@ function vault(over: { feature?: boolean } = {}): TestVault & { asked: number } 
   return t;
 }
 
-describe('Security & health in Settings', () => {
+describe('System health in Settings', () => {
   it('an owner sees each line in the vault’s words, how many need looking at, and Activity opens', async () => {
     const t = vault();
     await unlocked(t, <Settings />);
     expect(await screen.findByTestId('security-health-summary')).toHaveTextContent('One thing needs looking at.');
+    // Called System health, as the vault's web calls it since v0.9.0-dev.97.
+    expect(screen.getByText('System health')).toBeTruthy();
+    expect(screen.queryByText('Security & health')).toBeNull();
     expect(screen.getByTestId('health-backup')).toHaveTextContent(/^BackupsFine/);
     expect(screen.getByTestId('health-restore_drill')).toHaveTextContent(/When you can/);
     expect(screen.getByTestId('health-failed_sign_ins')).toHaveTextContent(/7 failed sign-ins in the last day\./);

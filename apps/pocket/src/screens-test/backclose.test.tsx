@@ -15,7 +15,8 @@ jest.mock(
 
 /**
  * A ← on a page opened from a list and left again (a document's, a note's,
- * a collection's), and ✕ on the pages (the owner's ask of 12 Nov 2026).
+ * a collection's) (the owner's ask of 12 Nov 2026), and on the pages in
+ * place of their ✕ (24 Nov 2026).
  */
 
 const ORIGIN = 'https://vault.test';
@@ -50,16 +51,17 @@ describe('the bar’s ←', () => {
   });
 });
 
-describe('the pages’ ✕', () => {
-  it('closes them, back where they were opened from', async () => {
+describe('the pages’ ←', () => {
+  it('before their name, in place of the ✕ (0.24.0): back where they were opened from', async () => {
     const t = testVault([ORIGIN]);
     libraryDoc(t, { id: 'passport', title: 'Passport' });
     push('/documents');
     push({ pathname: '/essential/[id]', params: { id: 'passport', online: '1' } });
     await unlocked(t, <EssentialPages id="passport" online />);
-    const close = await screen.findByTestId('essential-close');
-    expect(close.props.accessibilityLabel).toBe('Close the pages');
-    await fireEvent.press(close);
+    const back = await screen.findByTestId('essential-back');
+    expect(back.props.accessibilityLabel).toBe('Back');
+    expect(screen.queryByTestId('essential-close')).toBeNull();
+    await fireEvent.press(back);
     expect(routes().at(-1)).toEqual({ pathname: '/documents', params: {} });
   });
 });

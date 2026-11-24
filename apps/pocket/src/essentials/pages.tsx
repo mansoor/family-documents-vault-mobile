@@ -1,4 +1,4 @@
-import { Minimize2, X } from 'lucide-react-native';
+import { ArrowLeft, Minimize2 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { NOTE_KIND, radii } from '@fdv/shared';
 import { Image } from 'expo-image';
@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { CaregiverMark } from '../caregivers/mark';
 import { isCaregiverPaper } from '../caregivers/rules';
+import { useDocumentMenu } from '../documents/menu';
 import { NoteText } from '../documents/notes';
 import { keptName } from './kept-name';
 import { openOnline } from '../documents/online';
@@ -31,18 +32,25 @@ import { relativeWords, useFamilyZone } from '../state/family-time';
  *
  * A kept Essential note (0.9.0-dev.87) has no pages: its words, from the
  * same store, drawn as its own page draws them.
+ *
+ * At the top (app 0.24.0, the owner's ask of 24 Nov 2026): ← before its
+ * name, going back where it was opened from, and a ⋮ in the corner where
+ * the ✕ was, opening the same sheet as the document's ⋯ in a list — its
+ * permissions, "Confirm it's you" and questions with it. Only for whoever
+ * is signed in, once the document is here: a kept Essential read while
+ * signed out has nothing to offer it.
  */
 export function EssentialPages(props: { id: string; mode?: string; online?: boolean; version?: string }) {
   const router = useRouter();
-  // Closed: back where it was opened from; opened on its own, Home.
-  const close = () => (router.canGoBack() ? router.back() : router.replace('/'));
+  // Back where it was opened from; opened on its own, Home.
+  const back = () => (router.canGoBack() ? router.back() : router.replace('/'));
   const styles = useStyles(makeStyles);
   const colours = useColours();
   const { id, mode, online, version } = props;
   const { t } = useTranslation();
   const zone = useFamilyZone();
   const e = useEssentials();
-  const { offline, withToken } = useVault();
+  const { offline, withToken, who } = useVault();
   const { guarded } = useStepUp();
   useScreenGuard('viewer');
 
@@ -111,19 +119,29 @@ export function EssentialPages(props: { id: string; mode?: string; online?: bool
   };
 
   const title = ready ? (ready.document.title ?? t('essentials.untitled')) : '';
+  // The ⋯'s sheet, from a ⋮ (0.24.0): Edit first for a note, as Notes' ⋯ has it.
+  const menu = useDocumentMenu({
+    id,
+    title,
+    doc: ready?.document ?? null,
+    edit: note !== null,
+    vertical: { testID: 'essential-more' },
+  });
   // Larger or smaller with the fingers or the buttons, one zoom between
   // them; Fit page goes back to the page's own size.
   const ownSize = atOwnSize(zoom);
 
   return (
     <View style={styles.page} testID="essential-viewer">
-      {/* Its name, and ✕ in the corner the screen left empty (the owner's ask of 12 Nov 2026). */}
+      {/* ← before its name, and ⋮ in the corner (the owner's ask of 24 Nov 2026; a ✕ there before). */}
       <View style={styles.top}>
+        <IconButton testID="essential-back" label={t('common.back')} icon={ArrowLeft} onPress={back} />
         <Text variant="title" style={styles.flex} numberOfLines={2}>
           {pages > 0 ? title : ''}
         </Text>
-        <IconButton testID="essential-close" label={t('essentials.close')} icon={X} onPress={close} />
+        {who && ready ? menu.button : null}
       </View>
+      {menu.sheet}
       {/* Somebody else's, seen only as their caregiver (H1b): said over its pages too. */}
       {ready && isCaregiverPaper(ready.document) ? <CaregiverMark testID="essential-caregiver" /> : null}
       {offline && e.checked ? (

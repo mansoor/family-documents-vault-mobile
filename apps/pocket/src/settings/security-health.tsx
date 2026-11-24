@@ -10,7 +10,8 @@ import { sp } from '../ui/space';
 import { LoadFailed, loadFailure } from '../ui/states';
 
 /**
- * Security & health (a vault with `features.security_health`), as the
+ * System health (a vault with `features.security_health`; Security &
+ * health until app 0.24.0, as the vault's web renamed it), as the
  * web's Settings has it, for an owner: the last backup and its copy
  * off-site, the last restore drill, the activity log's nightly check, and
  * the day's failed sign-ins and sign-ins used from two places — each fine,

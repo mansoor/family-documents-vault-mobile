@@ -408,8 +408,7 @@
     "privateChanged": "A fingerprint or face was added or changed on this phone, so your Only me copies were removed. They'll be kept again when you're online.",
     "privateUnavailable": "This phone's fingerprint or face unlock can't open your Only me copies.",
     "dismiss": "Dismiss",
-    "pending": "The vault is still preparing this document's pages. They'll be kept here the next time the phone is online.",
-    "close": "Close the pages"
+    "pending": "The vault is still preparing this document's pages. They'll be kept here the next time the phone is online."
   },
   "show": {
     "hint": "Tap Done, or press back, to finish.",
@@ -1596,7 +1595,7 @@
     "keepTheirsFinal": "This answer can’t be changed later, but {{name}} can still change each paper once they have their own sign-in."
   },
   "health": {
-    "title": "Security & health",
+    "title": "System health",
     "allFine": "All fine.",
     "needLooking_one": "One thing needs looking at.",
     "needLooking_other": "{{count}} things need looking at.",

@@ -276,6 +276,9 @@ describe('Essentials in airplane mode', () => {
     expect(audit()).toEqual([]);
     await fireEvent.press(screen.getByLabelText('Open: Passport'));
     expect(await screen.findByTestId('essential-image')).toBeTruthy();
+    // ← to leave, but no ⋮ (0.24.0): nothing it offers can be done while signed out.
+    expect(screen.getByTestId('essential-back')).toBeTruthy();
+    expect(screen.queryByTestId('essential-more')).toBeNull();
     // Read, not synced: nothing asked of the vault while signed out.
     expect(t.vault.state.offlineEssentials.received.size).toBe(0);
   });
