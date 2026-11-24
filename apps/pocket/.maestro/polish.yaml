@@ -1,7 +1,7 @@
 # The polish (P11, app 0.4.0), against the vault the app is pinned to:
 #  - All documents, sorted;
-#  - on the one document (the passport the capture flow sent): Who can see
-#    it changed and changed back, and its name corrected with Edit details,
+#  - on the one document (the passport the capture flow sent): its
+#    Visibility changed and changed back, and its name corrected with Edit details,
 #    which the workflow then finds in the vault;
 #  - More, with Collections and Notes;
 #  - the dark theme, from Settings.
@@ -134,7 +134,9 @@ env:
       id: documents-chip-statuses
     timeout: 10000
 
-# The passport's page (compact since R6): Who can see it, Adults only and back.
+# The passport's page (compact since R6): Visibility, Adults only and back.
+# The Visibility line never says what it is now (app 0.23.0): the line under
+# the passport's name does.
 - tapOn:
     id: doc-row-.*
 - extendedWaitUntil:
@@ -155,7 +157,9 @@ env:
     visible:
       id: visibility-said
     timeout: 15000
-- assertVisible: Adults only.*
+- assertVisible:
+    id: document-subline
+    text: .*Adults only
 - tapOn:
     id: document-visibility
 - extendedWaitUntil:
@@ -164,12 +168,16 @@ env:
     timeout: 10000
 - tapOn:
     id: visibility-household
-# The sheet closes once the vault has it; the chip says it again.
+# The sheet closes once the vault has it; the line under its name says it again.
 - extendedWaitUntil:
     notVisible:
       id: visibility-sheet
     timeout: 15000
-- assertVisible: Everyone in the family.*
+- extendedWaitUntil:
+    visible:
+      id: document-subline
+      text: .*Everyone in the family
+    timeout: 15000
 
 # Edit details: its name corrected and saved; the page shows it.
 - scrollUntilVisible:
