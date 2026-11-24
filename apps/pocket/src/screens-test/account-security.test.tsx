@@ -7,7 +7,7 @@ import { unlocked } from '../test-support/lookup';
 import SignIn from '../app/sign-in';
 import { installed, knownVault, renderApp } from '../test-support/render';
 import { resetRoutes } from '../test-support/router';
-import { testVault } from '../test-support/vault';
+import { capabilities, testVault } from '../test-support/vault';
 
 jest.mock(
   'expo-router',
@@ -54,6 +54,114 @@ describe('Change your password', () => {
     await fireEvent.press(screen.getByTestId('password-save'));
     expect(await screen.findByTestId('password-problem')).toBeTruthy();
     expect(t.library.account.changes).toEqual([]);
+  });
+});
+
+describe('Change your password: the household’s password rules (the vault’s 0.9.0-dev.98)', () => {
+  /** A vault with password rules: 12 characters, with a number, common passwords refused. */
+  function withRules(): ReturnType<typeof testVault> {
+    const t = testVault([ORIGIN]);
+    t.caps = capabilities({ features: { ...capabilities().features, password_rules: true } });
+    t.vault.state.passwordRules = { ...t.vault.state.passwordRules, min_length: 12, needs_number: true };
+    return t;
+  }
+
+  async function opened(t: ReturnType<typeof testVault>) {
+    await unlocked(t, <ChangePassword />);
+    await fireEvent.press(await screen.findByTestId('password-open'));
+    await fireEvent.changeText(screen.getByTestId('password-current'), t.vault.state.password as string);
+  }
+
+  const save = () => screen.getByTestId('password-save');
+
+  it('the hint says the rules; what is still lacking is said as it is typed; Change it waits for them', async () => {
+    const t = withRules();
+    await opened(t);
+    expect(await screen.findByTestId('password-hint')).toHaveTextContent(
+      'At least 12 characters, with a number. Not a common password, nor your name or email address. A few words you will remember work best.',
+    );
+    // Nothing typed: nothing said yet.
+    expect(screen.queryByTestId('password-lacks')).toBeNull();
+    await fireEvent.changeText(screen.getByTestId('password-new'), 'short');
+    expect(screen.getByTestId('password-lacks')).toHaveTextContent('Use at least 12 characters, with a number.');
+    expect(save().props.accessibilityState).toEqual(expect.objectContaining({ disabled: true }));
+    // Long enough, ten of them more than before, but no number.
+    await fireEvent.changeText(screen.getByTestId('password-new'), 'a much longer one');
+    expect(screen.getByTestId('password-lacks')).toHaveTextContent('Add a number.');
+    expect(save().props.accessibilityState).toEqual(expect.objectContaining({ disabled: true }));
+    await fireEvent.changeText(screen.getByTestId('password-new'), 'a much longer one 7');
+    expect(screen.queryByTestId('password-lacks')).toBeNull();
+    expect(audit()).toEqual([]);
+    await fireEvent.press(save());
+    expect(await screen.findByTestId('password-done')).toBeTruthy();
+    expect(t.library.account.changes).toEqual([
+      { current_password: t.vault.state.password, new_password: 'a much longer one 7' },
+    ]);
+  });
+
+  it('the vault refuses a common password in its own words, by the new password, never as a wrong password now', async () => {
+    const t = withRules();
+    t.library.account.common.add('password12345678');
+    await opened(t);
+    await screen.findByText(/^At least 12 characters/);
+    // The phone never checks common passwords itself: it is the vault's to say.
+    await fireEvent.changeText(screen.getByTestId('password-new'), 'Password12345678');
+    expect(screen.queryByTestId('password-lacks')).toBeNull();
+    await fireEvent.press(save());
+    expect(await screen.findByText('That password is too common: choose another.')).toBeTruthy();
+    expect(screen.queryByTestId('password-problem')).toBeNull();
+    expect(screen.queryByText("That password isn't right.")).toBeNull();
+    expect(t.library.account.changes).toEqual([]);
+    // Changed, the refusal goes; a wrong password now is still said as that.
+    await fireEvent.changeText(screen.getByTestId('password-new'), 'a much longer one 7');
+    expect(screen.queryByText('That password is too common: choose another.')).toBeNull();
+    await fireEvent.changeText(screen.getByTestId('password-current'), 'not it at all');
+    await fireEvent.press(save());
+    expect(await screen.findByTestId('password-problem')).toHaveTextContent("That password isn't right.");
+  });
+
+  it('an older vault keeps ten characters and its hint, and asks for no rules', async () => {
+    const t = testVault([ORIGIN]);
+    const asked: string[] = [];
+    const base = t.fetch;
+    t.fetch = async (url, init) => {
+      if (url.includes('/password-rules')) asked.push(url);
+      return base(url, init);
+    };
+    await opened(t);
+    expect(screen.getByTestId('password-hint')).toHaveTextContent(
+      'At least 10 characters. A few words you will remember work best.',
+    );
+    await fireEvent.changeText(screen.getByTestId('password-new'), 'too short');
+    expect(screen.queryByTestId('password-lacks')).toBeNull();
+    expect(save().props.accessibilityState).toEqual(expect.objectContaining({ disabled: true }));
+    await fireEvent.changeText(screen.getByTestId('password-new'), 'ten chars!');
+    expect(save().props.accessibilityState).toEqual(expect.objectContaining({ disabled: false }));
+    expect(asked).toEqual([]);
+  });
+
+  it('rules that cannot be read keep ten characters, as before', async () => {
+    const t = withRules();
+    const base = t.fetch;
+    t.fetch = async (url, init) =>
+      url.includes('/password-rules')
+        ? ({
+            ok: false,
+            status: 500,
+            headers: { get: () => 'application/json' },
+            json: async () => ({ error: { code: 'internal_error', message: 'Something went wrong.' } }),
+            text: async () => '{"error":{"code":"internal_error","message":"Something went wrong."}}',
+          } as never)
+        : base(url, init);
+    await opened(t);
+    await waitFor(() =>
+      expect(screen.getByTestId('password-hint')).toHaveTextContent(
+        'At least 10 characters. A few words you will remember work best.',
+      ),
+    );
+    await fireEvent.changeText(screen.getByTestId('password-new'), 'ten chars!');
+    expect(screen.queryByTestId('password-lacks')).toBeNull();
+    expect(save().props.accessibilityState).toEqual(expect.objectContaining({ disabled: false }));
   });
 });
 

@@ -19,6 +19,7 @@ import {
   FolderMinus,
   FolderPlus,
   Pencil,
+  Printer,
   Share2,
   Star,
   StarOff,
@@ -40,12 +41,15 @@ import { useStepUp } from '../state/step-up';
 import { useVault } from '../state/vault';
 import { Button, Notice, Text } from '../ui';
 import { saveVersion, setEssential, showDocument, type ActionDeps } from './actions';
+import { isStepUpRequired } from './note-confirm';
 import { latestOf } from './online';
 import { warnedAboutCopies } from './save-copy';
 import { ConfirmBody } from '../ui/confirm';
 import { Sheet } from '../ui/sheet';
 import { sp } from '../ui/space';
 import { useColours, useStyles, type Palette } from '../ui/theme';
+import { PrintFromMenu } from '../print/document-print';
+import { mayPrint } from '../print/document-sheet';
 import { useSensitiveConfirm } from '../sharing/sensitive-confirm';
 import { ShareSheet } from '../sharing/share-sheet';
 
@@ -56,7 +60,16 @@ import { ShareSheet } from '../sharing/share-sheet';
  * decides regardless.
  */
 
-export type RowAction = 'edit' | 'show' | 'share' | 'save' | 'version' | 'essential' | 'collect' | 'remove';
+export type RowAction =
+  | 'edit'
+  | 'show'
+  | 'share'
+  | 'save'
+  | 'version'
+  | 'essential'
+  | 'collect'
+  | 'print'
+  | 'remove';
 
 /**
  * On a collection's page, for its maker (P9, as the web's 0.9.0): Remove
@@ -91,7 +104,11 @@ export interface RemoveFrom {
  *    the phone to keep, so it is not made an Essential here either.
  *  - A paper seen only as somebody's caregiver (H1b, `caregiver: true`)
  *    is read, and a copy saved: nothing else — no edit, share, version,
- *    Essential, collection, or Show from a copy kept on the phone.
+ *    Essential, collection, print, or Show from a copy kept on the phone.
+ *  - Print after the rest (app 0.25.0, the owner's request of 24 Nov
+ *    2026), by its page's own rule (`mayPrint`): for anybody else who sees
+ *    it, a viewer too; a note once its words are here, or are given after
+ *    "Confirm it's you". What was there keeps its place, as on its page.
  */
 export function rowActions(
   who: { role: Role; member_id: string } | null,
@@ -99,6 +116,8 @@ export function rowActions(
     | (Pick<DocumentView, 'owner_member_id' | 'is_essential' | 'latest_version_id' | 'file_removed'> & {
         type_key?: string | null;
         caregiver?: true | undefined;
+        notes?: string | null;
+        confirm_to_read?: unknown;
       })
     | null,
   opts: { collections: boolean; renewing: boolean; edit?: boolean },
@@ -116,10 +135,13 @@ export function rowActions(
   if (hasFile && changes && doc.is_essential) actions.push('show');
   if (can(who.role, 'document.share')) actions.push('share');
   if (hasFile) actions.push('save');
-  if (!changes) return actions;
-  if (mayChange && can(who.role, 'document.add') && !opts.renewing && !note) actions.push('version');
-  if (mayChange && !note) actions.push('essential');
-  if (opts.collections && can(who.role, 'collection.manage')) actions.push('collect');
+  if (changes) {
+    if (mayChange && can(who.role, 'document.add') && !opts.renewing && !note) actions.push('version');
+    if (mayChange && !note) actions.push('essential');
+    if (opts.collections && can(who.role, 'collection.manage')) actions.push('collect');
+  }
+  const printed = { type_key: doc.type_key ?? null, notes: doc.notes ?? null, confirm_to_read: doc.confirm_to_read };
+  if (mayPrint(printed, { asking: true })) actions.push('print');
   return actions;
 }
 
@@ -142,6 +164,10 @@ function newer(a: DocumentView | null, b: DocumentView | null): DocumentView | n
  * `vertical`: the ⋮ at the top of a document's pages (app 0.24.0, the
  * owner's ask of 24 Nov 2026) — the same sheet, drawn as ⋮ in the corner
  * where the pages' ✕ was, with its own test ID.
+ *
+ * Print (app 0.25.0) is asked in the sheet itself (`PrintFromMenu`), as
+ * its page asks it in its ⋯'s; a note that asks "Confirm it's you" before
+ * the vault gives anything of it is said so there, with the button that asks.
  */
 export function useDocumentMenu(props: {
   id: string;
@@ -239,6 +265,7 @@ const ICONS: Record<RowAction, LucideIcon> = {
   version: FilePlus,
   essential: Star,
   collect: FolderPlus,
+  print: Printer,
   remove: FolderMinus,
 };
 
@@ -292,6 +319,13 @@ function DocumentMenu(props: {
   const [picking, setPicking] = useState(false);
   // Asked first (R2): taking it out of a collection, or its copies off phones.
   const [confirming, setConfirming] = useState<'remove' | 'essential' | null>(null);
+  // Print (app 0.25.0): what its page's Print asks, in this sheet.
+  const [printing, setPrinting] = useState(false);
+  // Print getting it ready (fetching, "Confirm it's you"): Back and a tap outside wait for it.
+  const [preparing, setPreparing] = useState(false);
+  // A note whose words wait for "Confirm it's you" (0.9.0-dev.87): the vault gave nothing without it.
+  const [asks, setAsks] = useState(false);
+  const [confirmingDoc, setConfirmingDoc] = useState(false);
   const first = useRef<View>(null);
   const { onDoc } = props;
 
@@ -305,12 +339,29 @@ function DocumentMenu(props: {
   const fetchDoc = useCallback(async () => {
     try {
       fromVault(await withToken((a, token) => a.document(token, id)));
-    } catch {
-      // Not now: what the list knew stands.
+    } catch (err) {
+      // Not now: what the list knew stands. A note that asks first is said so, with the button that asks.
+      if (isStepUpRequired(err)) setAsks(true);
     } finally {
       setFetched(true);
     }
   }, [withToken, id, fromVault]);
+  /** "Confirm it's you" pressed, for a note that asks: read again, as its page reads it. */
+  const confirmDoc = async () => {
+    if (confirmingDoc) return;
+    setSaid(null);
+    setConfirmingDoc(true);
+    try {
+      const d = await guarded((a, token) => a.document(token, id));
+      if (d === null) return warn(t('edit.notConfirmed'));
+      setAsks(false);
+      fromVault(d);
+    } catch (err) {
+      warn(err instanceof NetworkError ? t('document.needsConnection') : wordsFor(err, t));
+    } finally {
+      setConfirmingDoc(false);
+    }
+  };
   useEffect(() => {
     if (offline || caregiver) return;
     // Asked once it opens; the state is set when the vault answers.
@@ -332,7 +383,7 @@ function DocumentMenu(props: {
     away: lock.away,
   };
   const warn = (text: string) => setSaid({ tone: 'warn', text });
-  const working = busy !== null || adding;
+  const working = busy !== null || adding || confirmingDoc || (printing && preparing);
   // Back and a tap outside wait, as Done does, for what is on its way.
   const leave = () => {
     if (!working) props.onClose(true);
@@ -414,6 +465,12 @@ function DocumentMenu(props: {
         setSaid(null);
         setPicking(true);
         return;
+      case 'print':
+        // Online only, as its page's ⋯ is: offline, its page offers no Print, kept on the phone or not.
+        if (offline) return warn(t('print.needsConnection'));
+        setSaid(null);
+        setPrinting(true);
+        return;
       case 'remove':
         if (offline || !props.remove) return warn(t('document.needsConnection'));
         setSaid(null);
@@ -456,6 +513,8 @@ function DocumentMenu(props: {
         return doc?.is_essential ? t('row.essentialOff') : t('row.essentialOn');
       case 'collect':
         return t('row.collect');
+      case 'print':
+        return t('print.menu');
       case 'remove':
         return t('row.removeFrom');
     }
@@ -514,6 +573,19 @@ function DocumentMenu(props: {
             confirmID="row-sheet-essential-yes"
             cancelID="row-sheet-essential-cancel"
           />
+        ) : printing ? (
+          <PrintFromMenu
+            id={id}
+            deps={deps}
+            onDone={(s) => {
+              setPrinting(false);
+              // Printed: done with. Anything to say is said here.
+              if (s) setSaid(s);
+              else props.onClose(true);
+            }}
+            onCancel={() => setPrinting(false)}
+            onBusy={setPreparing}
+          />
         ) : picking ? (
           <CollectionPicker
             id={id}
@@ -524,7 +596,17 @@ function DocumentMenu(props: {
           />
         ) : actions.length === 0 ? (
           // A search hit's document is on its way: what it offers depends on it.
-          fetched ? (
+          fetched && asks && !offline ? (
+            <Notice tone="info" testID="row-sheet-asks">
+              <Text>{t('document.noteAsks')}</Text>
+              <Button
+                label={t('stepUp.title')}
+                busy={confirmingDoc}
+                onPress={() => void confirmDoc()}
+                testID="row-sheet-confirm"
+              />
+            </Notice>
+          ) : fetched ? (
             <Text tone="soft" testID="row-sheet-nothing">
               {caregiver ? t('caregivers.nothingHere') : t('document.needsConnection')}
             </Text>

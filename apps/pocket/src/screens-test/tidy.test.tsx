@@ -224,7 +224,7 @@ describe('Documents: without the notes, and tags among the filters', () => {
 });
 
 describe('Notes: one line each, a ⋯, and a + beside the bell', () => {
-  it('the first line only; the ⋯ offers Edit, Share and Add to a collection; Edit opens the editor', async () => {
+  it('the first line only; the ⋯ offers Edit, Share, Add to a collection and Print; Edit opens the editor', async () => {
     const t = vault();
     doc(t, 'n1', 'Boiler', 'note', [], 'Serviced in March.\nNext due in March 2027.');
     await unlocked(t, <NotesScreen />);
@@ -242,6 +242,7 @@ describe('Notes: one line each, a ⋯, and a + beside the bell', () => {
         'Edit',
         'Share…',
         'Add to a collection',
+        'Print',
       ]),
     );
     await fireEvent.press(screen.getByTestId('row-sheet-edit'));

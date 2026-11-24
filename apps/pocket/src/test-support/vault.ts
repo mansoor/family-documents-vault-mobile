@@ -1,16 +1,19 @@
 import type { FetchLike } from '@fdv/client';
 import { createFakeVault } from '@fdv/client/testing';
-import type {
-  Capabilities,
-  CollectionSharePreview,
-  DetailSuggestions,
-  DocumentView,
-  ReminderView,
-  SearchHit,
-  SessionRow,
-  Share,
-  StopSharing,
-  VersionView,
+import {
+  PASSWORD_RULES_CODE,
+  passwordLacks,
+  passwordRefusalWords,
+  type Capabilities,
+  type CollectionSharePreview,
+  type DetailSuggestions,
+  type DocumentView,
+  type ReminderView,
+  type SearchHit,
+  type SessionRow,
+  type Share,
+  type StopSharing,
+  type VersionView,
 } from '@fdv/shared';
 
 /**
@@ -180,6 +183,8 @@ export interface Library {
     required?: boolean;
     /** Where a step-up's code can be texted (`StepUpState.text_to`, SMS3), masked: GET /auth/step-up says it. */
     stepUpTextTo?: string;
+    /** New passwords the household's rules refuse as common, in lower case (where the vault has the rules). */
+    common: Set<string>;
   };
   /**
    * Links outside the family (sharing from the phone): GET /shares lists
@@ -313,7 +318,7 @@ export function testVault(origins: string[] = ['https://vault.test']): TestVault
       ownLinks: new Map(),
       collections: new Map(),
       trashed: [],
-      account: { totp: false, changes: [], forgot: [] },
+      account: { totp: false, changes: [], forgot: [], common: new Set(['password1234']) },
       shares: [],
       shareBodies: [],
       shareSecrets: new Map(),
@@ -553,6 +558,17 @@ async function library(t: TestVault, path: string, init: Parameters<FetchLike>[1
     }
     if (body.current_password !== undefined && body.current_password !== t.vault.state.password) {
       return failure(401, 'invalid_credentials', "That password isn't right.");
+    }
+    // The household's rules (0.9.0-dev.98), as the client's fake keeps them: its length and mix, and the
+    // few passwords a test says are common (the vault keeps the real list). A vault before them asks neither.
+    if (t.caps.features.password_rules === true) {
+      const rules = t.vault.state.passwordRules;
+      const next = String(body.new_password ?? '');
+      const lacks = passwordLacks(next, rules);
+      const common = rules.refuse_common && lib.account.common.has(next.toLowerCase());
+      if (lacks.length > 0 || common) {
+        return failure(400, PASSWORD_RULES_CODE, passwordRefusalWords(lacks, rules, common ? 'common' : null));
+      }
     }
     lib.account.changes.push(body);
     return done();
