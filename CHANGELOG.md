@@ -6,6 +6,39 @@ app's own, tagged `vX.Y.Z` in this repository.
 
 ## [Unreleased]
 
+## [0.25.0] — Print from the ⋯ menus, and password rules
+
+Re-pinned to the vault's **v0.9.0-dev.98**, which adds password rules an
+owner sets in Settings → Security. Print from the menus needs nothing
+newer; the rules are said where the vault has them, and an older vault
+keeps the ten characters it asked before. The phone's minimum vault stays
+0.4.10.
+
+### Added
+- **Print in the ⋯ of a document or a note** — on Home (Essentials and
+  Recently added), in Documents and in Notes — and in the ⋮ over a
+  document's pages, after the other choices. It does what Print on its
+  page does, without going there first: a document asks whether to print
+  its pages, a sheet of its details or both; a note prints its words. It
+  is offered by the page's own rule — a note once it has words, never a
+  paper seen only as somebody's caregiver — and needs a connection, as on
+  its page.
+- Anything **Sensitive** says first to keep the printout safe, as on its
+  page; Cancel goes back to the choices and prints nothing. An Essential's
+  or an Only me document's pages ask "Confirm it's you" before they are
+  read, and a note that asks (Only me, or an Essential) asks before its
+  words are read — in Notes' ⋯, a Confirm it's you button where the vault
+  gave nothing without it.
+
+### Changed
+- **Change your password follows the household's password rules** where
+  the vault has them: the line under the new password says them ("At
+  least 12 characters, with a number. Not a common password, nor your
+  name or email address."), what the password still lacks is said as you
+  type, and Change it waits until it has the length and mix asked for.
+  Whether it is common is the vault's to say: its refusal is shown in its
+  own words under the new password, never as a wrong password now.
+
 ## [0.24.0] — Back and ⋮ on a document's pages, and System health
 
 Re-pinned to the vault's **v0.9.0-dev.97**, whose web renames Security &

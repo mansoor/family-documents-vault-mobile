@@ -1374,6 +1374,8 @@
     "currentHint": "Leave this empty if you sign in with a passkey and have never set one.",
     "next": "Your new password",
     "nextHint": "At least {{count}} characters. A few words you will remember work best.",
+    "rulesHint": "{{rules}} A few words you will remember work best.",
+    "rulesRefused": "That password doesn't meet your household's password rules. Choose another.",
     "onlyMe": "This also unlocks your own Only me documents, so they come with it. Every other device you are signed in on will be signed out.",
     "save": "Change it",
     "done": "Your password is changed, and your other devices have been signed out."
@@ -2176,6 +2178,9 @@
     "status": "Status",
     "pageOf": "Page {{n}} of {{of}}",
     "notConfirmed": "Nothing was printed: it wasn't confirmed to be you.",
+    "needsConnection": "Printing needs a connection to your vault.",
+    "noteEmpty": "This note has no words to print.",
+    "preparing": "Getting it ready to print…",
     "pagesFailed": "Its pages couldn't be read for printing. Try again.",
     "notOnPhone": "Its pages aren't on this phone. Connect to your vault to print them.",
     "pagesCut": "Pages 1–{{last}} of {{of}}. The rest weren't printed.",

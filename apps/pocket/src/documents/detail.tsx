@@ -5,7 +5,6 @@ import {
   ANOTHER_DOCUMENT,
   NO_LONGER_NEEDED_REASON_MAX,
   can,
-  documentName,
   firstReview,
   formatDate,
   localToday,
@@ -16,10 +15,7 @@ import {
   REVIEW_LABEL,
   SENSITIVE_LABEL,
   TAP_MIN,
-  sensitiveOf,
-  whereKeptWords,
   yearlyReviewOffered,
-  type CoreField,
   type DocumentTypeView,
   type DocumentView,
   type Member,
@@ -73,6 +69,7 @@ import { warnedAboutCopies } from './save-copy';
 import { TrashConfirm } from './trash';
 import { MenuRow } from '../ui/menu-row';
 import { PrintDocument, SensitivePrintNotice, useNotePrint } from '../print/document-print';
+import { documentWords, mayPrint as printableHere, printable } from '../print/document-sheet';
 import { DocumentLinks } from '../sharing/document-links';
 import { TheirLinksOpened } from '../sharing/opens';
 import { ShareSheet } from '../sharing/share-sheet';
@@ -390,35 +387,9 @@ export function DocumentDetail(props: { id: string }) {
     );
   }
 
-  const name = documentName(shown, t('document.untitled'));
-  const owner = members.find((m) => m.id === shown.owner_member_id);
-  // The type's own details, from the vault's answer for this document only:
-  // an Only me document's are sealed everywhere else (a list, the offline
-  // set, so a kept copy) and opened there for its owner (0.5.8).
-  const type = types.find((x) => x.key === shown.type_key);
-  const details = doc ? detailFacts(type?.fields, doc.extra, { yes: t('document.yes'), no: t('document.no') }) : [];
-  // The fixed details under the kind's own names (H3: an advance directive's Issued is "Signed", an insurance
-  // card's Issued by its "Insurer"), and not at all where the kind hides one.
-  const core = (key: CoreField, fallback: string): string | null =>
-    type?.core?.[key]?.shown === false ? null : type?.core?.[key]?.label?.trim() || fallback;
-  const facts = (
-    [
-      [core('issued_by', type?.issued_by_label?.trim() || t('document.issuedBy')), shown.issued_by ?? null],
-      [core('issued', t('document.issued')), shown.issued ? formatDate(shown.issued) : null],
-      [core('expires', t('document.expires')), shown.expires ? formatDate(shown.expires) : null],
-      ...details,
-    ] as [string | null, string | null][]
-  ).filter((f): f is [string, string] => !!f[0] && !!f[1]);
-  // Whose · what kind · who can see it: what the old page said in three places, on one line.
-  // Whose: a person, or the household's (0.9.0-dev.32); Not sure yet says nothing here (its status does).
-  const whose = owner?.display_name ?? (shown.household_owned ? t('capture.household') : null);
-  // Somebody else's Only me, seen as their caregiver, is never said to be "Only me" (H1b): its mark says whose.
-  const subline = [whose, note ? null : type?.label, caregiver ? null : t(`document.visibility_${shown.visibility}`)]
-    .filter(Boolean)
-    .join(' · ');
-  // Sensitive, all said (0.9.0-dev.34, AIR2): the vault's answer, else the one rule; a lock beside its status.
-  const sensitive =
-    caps?.features.sensitive_documents === true && (shown.sensitive_effective ?? sensitiveOf(shown, type));
+  // Its name, whose it is, its line, its facts and Sensitive: as Print from a ⋯ says them too (app 0.25.0).
+  const words = documentWords(shown, { doc, members, types, caps, t });
+  const { name, type, facts, whose, subline, sensitive, place: placeWords } = words;
   const ordered = [...versions].sort((x, y) => y.version_no - x.version_no);
   const first = ordered[ordered.length - 1];
   // A health record kept as it is (0.9.0-dev.51, H5): never drawn, so no picture, no pages and no Show; Save a copy only.
@@ -436,7 +407,7 @@ export function DocumentDetail(props: { id: string }) {
   const mayShare = !!who && can(who.role, 'document.share') && !caregiver;
   // Print (0.21.0): a document for whoever sees it as one of the family (a caregiver saves a copy);
   // a note only once its words are here.
-  const mayPrint = !!doc && !caregiver && (!note || !!doc.notes);
+  const mayPrint = !!doc && printableHere(doc);
   const hasMore = (mayTrash || mayUnneed || mayRemind || mayShare || mayPrint) && !!doc && !offline;
   // A note has no pages to ask about: printed as it is, Sensitive in its heading where it is so.
   const printTheNote = () => {
@@ -448,8 +419,6 @@ export function DocumentDetail(props: { id: string }) {
       if (failed) warn(failed);
     });
   };
-  // Where the original is, said on a vault that keeps places in cabinets (C3): before it, the page said nothing of it.
-  const placeWords = caps?.features.original_place === true && !note && !caregiver ? whereKeptWords(shown) : null;
   // The folder it came from (C4): the household's, as where it is kept; the vault leaves it out for anybody else.
   const sourceFolder = caps?.features.source_folders === true && !caregiver ? (shown.source_folder ?? null) : null;
   const mayForget = mayChange && !!doc && !doc.deleted_at && !offline;
@@ -1073,23 +1042,7 @@ export function DocumentDetail(props: { id: string }) {
         ) : more === 'print' && doc ? (
           <PrintDocument
             id={id}
-            name={name}
-            subline={subline || null}
-            sheet={{
-              kind: note ? null : (type?.label ?? null),
-              whose,
-              status: shown.status,
-              whoCanSee: caregiver
-                ? t('caregivers.whoCanSee', { name: whose ?? t('caregivers.someone') })
-                : t(`document.visibility_${shown.visibility}`),
-              sensitive,
-              place: placeWords,
-              facts,
-              noteLabel: type?.core?.notes?.label?.trim() || t('document.notes'),
-              note: shown.notes_updated_at !== undefined && !caregiver ? (shown.notes ?? null) : null,
-            }}
-            latestId={latest?.id ?? null}
-            drawn={!asIs && !!latest}
+            {...printable(shown, words, versions, t)}
             deps={deps}
             onDone={(said) => {
               setMore(null);

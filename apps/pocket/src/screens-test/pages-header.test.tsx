@@ -107,6 +107,7 @@ describe('a document’s pages: ← and ⋮', () => {
       'row-sheet-version',
       'row-sheet-essential',
       'row-sheet-collect',
+      'row-sheet-print',
     ]);
     // Nothing that is about a list: no Remove from this collection, no Open.
     expect(screen.queryByTestId('row-sheet-remove')).toBeNull();
@@ -157,12 +158,12 @@ describe('a document’s pages: ← and ⋮', () => {
     expect(screen.queryByTestId('essential-more')).toBeNull();
   });
 
-  it('a viewer is offered what a list offers them: Save a copy', async () => {
+  it('a viewer is offered what a list offers them: Save a copy and Print', async () => {
     const t = vault();
     libraryDoc(t, { id: 'bill', title: 'Water bill' });
     await pagesOf(t, 'bill', { role: 'viewer' });
     await fireEvent.press(screen.getByTestId('essential-more'));
-    expect(await choices()).toEqual(['row-sheet-save']);
+    expect(await choices()).toEqual(['row-sheet-save', 'row-sheet-print']);
   });
 
   it('Share closes the sheet and opens the share sheet over the pages', async () => {

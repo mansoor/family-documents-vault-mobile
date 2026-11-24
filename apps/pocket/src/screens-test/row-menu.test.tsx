@@ -108,7 +108,8 @@ const offered = () =>
 
 describe('a menu on every row (5.36)', () => {
   // No Open since the owner's tidy-up of 11 Nov 2026: a tap on the row opens it, and Share takes its place.
-  it("a viewer's sheet has Save a copy only", async () => {
+  // Print after the rest (app 0.25.0), for whoever its page offers it: a viewer too.
+  it("a viewer's sheet has Save a copy and Print", async () => {
     const t = vault();
     t.vault.state.role = 'viewer';
     const bill = libraryDoc(t, { id: 'bill', title: 'Water bill' });
@@ -117,14 +118,14 @@ describe('a menu on every row (5.36)', () => {
     // From the ⋯: what a search hit is, asked of the vault as the sheet opens.
     await fromSearch(t, [bill, passport], 'bill');
     await waitFor(() => expect(offered()).toContain('Save a copy'));
-    expect(offered()).toEqual(['Save a copy']);
+    expect(offered()).toEqual(['Save a copy', 'Print']);
     expect(audit()).toEqual([]);
     await fireEvent.press(screen.getByTestId('row-sheet-cancel'));
     // An Essential too: the menu offers a viewer what they came for.
     await fireEvent.press(screen.getByTestId('doc-menu-passport'));
     await screen.findByTestId('row-sheet');
     await waitFor(() => expect(offered()).toContain('Save a copy'));
-    expect(offered()).toEqual(['Save a copy']);
+    expect(offered()).toEqual(['Save a copy', 'Print']);
   });
 
   it("an owner's sheet has the rest, in order", async () => {
@@ -140,6 +141,7 @@ describe('a menu on every row (5.36)', () => {
       'Add a new version',
       'Stop it being Essential',
       'Add to a collection',
+      'Print',
     ]);
     // Keeping it offline is what an Essential is: said with it.
     expect(screen.getByTestId('row-sheet-essential')).toHaveTextContent(
@@ -169,7 +171,7 @@ describe('a menu on every row (5.36)', () => {
     await fireEvent.press(screen.getByTestId('doc-menu-note'));
     await screen.findByTestId('row-sheet');
     await waitFor(() => expect(offered()).toContain('Add to a collection'));
-    expect(offered()).toEqual(['Share…', 'Add to a collection']);
+    expect(offered()).toEqual(['Share…', 'Add to a collection', 'Print']);
   });
 
   it("a teen's sheet for somebody else's document: nothing that changes it", async () => {
@@ -180,13 +182,19 @@ describe('a menu on every row (5.36)', () => {
     await unlocked(t, <SearchScreen />);
     await fromSearch(t, [deed, mine], 'deed');
     await waitFor(() => expect(offered()).toContain('Save a copy'));
-    expect(offered()).toEqual(['Save a copy', 'Add to a collection']);
+    expect(offered()).toEqual(['Save a copy', 'Add to a collection', 'Print']);
     await fireEvent.press(screen.getByTestId('row-sheet-cancel'));
     // Their own, from a long press on its row.
     await fireEvent(screen.getByTestId('doc-row-mine'), 'longPress');
     await screen.findByTestId('row-sheet');
     await waitFor(() => expect(offered()).toContain('Make it Essential'));
-    expect(offered()).toEqual(['Save a copy', 'Add a new version', 'Make it Essential', 'Add to a collection']);
+    expect(offered()).toEqual([
+      'Save a copy',
+      'Add a new version',
+      'Make it Essential',
+      'Add to a collection',
+      'Print',
+    ]);
   });
 
   it("a guest's sheet has no Keep offline / Essential", async () => {
@@ -198,7 +206,7 @@ describe('a menu on every row (5.36)', () => {
     await fireEvent(await screen.findByTestId(`doc-row-${passport.id}`), 'longPress');
     await screen.findByTestId('row-sheet');
     await waitFor(() => expect(offered()).toContain('Save a copy'));
-    expect(offered()).toEqual(['Save a copy']);
+    expect(offered()).toEqual(['Save a copy', 'Print']);
     expect(screen.queryByTestId('row-sheet-essential')).toBeNull();
     expect(screen.queryByText(/Essential/)).toBeNull();
   });
@@ -269,6 +277,7 @@ describe('a menu on every row (5.36)', () => {
       'Add a new version',
       'Stop it being Essential',
       'Add to a collection',
+      'Print',
     ]);
     // Nothing is changed from it until the vault has answered: no stale ETag, no "someone changed this".
     expect(screen.getByTestId('row-sheet-essential').props.accessibilityState.disabled).toBe(true);
@@ -400,7 +409,7 @@ describe('a menu on every row (5.36)', () => {
     await unlocked(t, <SearchScreen />);
     await fromSearch(t, [bill], 'bill');
     await waitFor(() => expect(offered()).toContain('Make it Essential'));
-    expect(offered()).toEqual(['Share…', 'Save a copy', 'Add a new version', 'Make it Essential']);
+    expect(offered()).toEqual(['Share…', 'Save a copy', 'Add a new version', 'Make it Essential', 'Print']);
     await act(async () => undefined);
   });
 });

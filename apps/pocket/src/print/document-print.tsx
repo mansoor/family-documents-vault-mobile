@@ -1,10 +1,13 @@
 import { NetworkError } from '@fdv/client';
-import { SENSITIVE_LABEL, type DocumentView, type Status } from '@fdv/shared';
-import { useState } from 'react';
+import { NOTE_KIND, SENSITIVE_LABEL, type DocumentView, type Status, type VersionView } from '@fdv/shared';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { StyleSheet, Switch, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Switch, View } from 'react-native';
 import { keptIsCurrent, type ActionDeps } from '../documents/actions';
 import { openOnline } from '../documents/online';
+import { wordsFor } from '../errors/words';
+import { useVault } from '../state/vault';
+import { documentWords, mayPrint, printable, type DocumentWords } from './document-sheet';
 import { exactWords, useFamilyZone } from '../state/family-time';
 import { useEssentials, type OpenCopy } from '../state/essentials';
 import { Button, Notice, Text } from '../ui';
@@ -141,6 +144,8 @@ export function PrintDocument(props: {
   deps: ActionDeps;
   /** Done: what to say on its page, if anything. */
   onDone: (said: { tone: 'ok' | 'warn'; text: string } | null) => void;
+  /** Cancel pressed, where it means something other than done with nothing to say (a ⋯'s sheet goes back to its choices). */
+  onCancel?: () => void;
 }) {
   const { t } = useTranslation();
   const colours = useColours();
@@ -317,7 +322,131 @@ export function PrintDocument(props: {
         disabled={(!pages || !props.drawn) && !details}
         onPress={() => void go()}
       />
-      <Button testID="print-cancel" kind="quiet" label={t('common.cancel')} disabled={busy} onPress={() => props.onDone(null)} />
+      <Button
+        testID="print-cancel"
+        kind="quiet"
+        label={t('common.cancel')}
+        disabled={busy}
+        onPress={props.onCancel ?? (() => props.onDone(null))}
+      />
+    </View>
+  );
+}
+
+/** What came of printing, to be said where it was asked. */
+type Said = { tone: 'ok' | 'warn'; text: string };
+
+/**
+ * Print from a document's ⋯ in a list — Home's Essentials and Recently
+ * added, Documents, Notes — or from the ⋮ over its pages (app 0.25.0, the
+ * owner's request of 24 Nov 2026): exactly what its page's Print does,
+ * without going there first. The document is read as its page reads it
+ * as it opens — a note that asks, after "Confirm it's you" — with its
+ * versions, the household's names and the kinds, so the heading and the
+ * sheet of details are its page's (`documentWords`, `printable`). Then:
+ *
+ *  - a document asks what to print (`PrintDocument`), Sensitive said at
+ *    the top, its pages read as its page reads them;
+ *  - a Sensitive note says first to keep the printout safe
+ *    (`SensitivePrintNotice`); any other note is printed at once.
+ *
+ * Not confirmed, nothing is printed and it says so; Cancel goes back to
+ * the ⋯'s choices, printing nothing. Online only, as its page's ⋯ is.
+ */
+export function PrintFromMenu(props: {
+  id: string;
+  deps: ActionDeps;
+  /** Done: what to say in the ⋯'s sheet, if anything; null once printed. */
+  onDone: (said: Said | null) => void;
+  /** Cancelled: nothing printed. */
+  onCancel: () => void;
+}) {
+  const { t } = useTranslation();
+  const { caps } = useVault();
+  const printNote = useNotePrint();
+  const colours = useColours();
+  const [ready, setReady] = useState<
+    | { kind: 'document'; doc: DocumentView; versions: VersionView[]; words: DocumentWords }
+    | { kind: 'note'; doc: DocumentView; words: DocumentWords }
+    | null
+  >(null);
+  const [busy, setBusy] = useState(false);
+  const live = useRef(true);
+  const { id, deps, onDone } = props;
+
+  const printTheNote = useCallback(
+    async (doc: DocumentView, words: DocumentWords) => {
+      setBusy(true);
+      const failed = await printNote(doc, words.name, words.sensitive);
+      if (!live.current) return;
+      setBusy(false);
+      onDone(failed ? { tone: 'warn', text: failed } : null);
+    },
+    [printNote, onDone],
+  );
+
+  useEffect(() => {
+    live.current = true;
+    void (async () => {
+      try {
+        // As its page reads it as it opens: a note that asks, after "Confirm it's you".
+        const got = await deps.guarded((a, tk) =>
+          Promise.all([
+            a.document(tk, id),
+            a.versions(tk, id),
+            a.members(tk).catch(() => ({ items: [] })),
+            a.documentTypes(tk).catch(() => ({ items: [] })),
+          ]),
+        );
+        if (!live.current) return;
+        if (got === null) return onDone({ tone: 'warn', text: t('print.notConfirmed') });
+        const [doc, versions, members, types] = got;
+        const words = documentWords(doc, { doc, members: members.items, types: types.items, caps, t });
+        if (!mayPrint(doc)) {
+          return onDone({ tone: 'warn', text: doc.type_key === NOTE_KIND ? t('print.noteEmpty') : t('caregivers.nothingHere') });
+        }
+        if (doc.type_key !== NOTE_KIND) {
+          setReady({ kind: 'document', doc, versions: versions.items, words });
+          return;
+        }
+        setReady({ kind: 'note', doc, words });
+        // A note that isn't Sensitive is printed as it is, as from its page.
+        if (!words.sensitive) await printTheNote(doc, words);
+      } catch (err) {
+        if (!live.current) return;
+        onDone({ tone: 'warn', text: err instanceof NetworkError ? t('print.needsConnection') : wordsFor(err, t) });
+      }
+    })();
+    return () => {
+      live.current = false;
+    };
+    // Read once, as the sheet asks for it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  if (ready?.kind === 'document') {
+    return (
+      <PrintDocument
+        id={id}
+        {...printable(ready.doc, ready.words, ready.versions, t)}
+        deps={deps}
+        onDone={onDone}
+        onCancel={props.onCancel}
+      />
+    );
+  }
+  if (ready?.kind === 'note' && ready.words.sensitive) {
+    return (
+      <SensitivePrintNotice
+        busy={busy}
+        onPrint={() => void printTheNote(ready.doc, ready.words)}
+        onCancel={props.onCancel}
+      />
+    );
+  }
+  return (
+    <View style={styles.stack} testID="print-preparing">
+      <ActivityIndicator color={colours.accent} accessibilityLabel={t('print.preparing')} />
     </View>
   );
 }
