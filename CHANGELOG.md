@@ -6,6 +6,43 @@ app's own, tagged `vX.Y.Z` in this repository.
 
 ## [Unreleased]
 
+## [0.23.0] — Visibility, a note's Sensitive while it is edited, and printing what is Sensitive
+
+Re-pinned to the vault's **v0.9.0-dev.96**, which makes the same changes
+on the web. Nothing here needs the newer vault: a note's words and its
+Sensitive were already saved together. The phone's minimum vault stays
+0.4.10.
+
+### Changed
+- **"Who can see it" is now called Visibility**, wherever it names who in
+  the family may open a document or a note: the line on a document's and a
+  note's page and the choice it opens, a new note, the capture card, the
+  filters, and a printed details sheet. Who can see someone's emergency
+  information and a caregiver's medical papers keep their own words: they
+  are about something else.
+- **The Visibility line no longer says Everyone, Adults or Only me beside
+  its name**: the line under the title already says it. A line that can't
+  be changed from here (a viewer's, or with no connection) still says it,
+  as it opens nothing.
+- **A note's Sensitive is switched while you edit it**, beside its tags,
+  and saved with its words when you press Save — one save, so a note that
+  asks "Confirm it's you" asks once for both. Cancel leaves it as it was. A
+  note's page no longer has the switch: it only says **Sensitive** beside
+  the note's status. The rules are as before: a teen can make their own
+  note sensitive but only an adult can make it not sensitive, a switch left
+  alone never undoes somebody else's change, and if links outside the
+  family still give the note, you are asked after saving whether to keep
+  or end them. **Essential** stays a switch on the note's page.
+
+### Added
+- **Printing something Sensitive says so first**: "This is marked
+  Sensitive. Keep the printout somewhere safe and shred it when you no
+  longer need it." For a note it is asked with **Print** and **Cancel**;
+  for a document it is at the top of What to print. Cancel prints nothing,
+  and nothing more is asked of you than before. The printout's heading says
+  Sensitive too ("Adults only · Sensitive"), even when only a document's
+  pages are printed.
+
 ## [0.22.0] — My cabinet arranged by levels, browsed on the phone
 
 Re-pinned to the vault's **v0.9.0-dev.91**. The vault now arranges a

@@ -1,4 +1,3 @@
-import { TEEN_KEEPS_SENSITIVE } from '@fdv/shared';
 import { act, fireEvent, screen, waitFor } from '@testing-library/react-native';
 import { View } from 'react-native';
 import EditScreen from '../app/edit/[id]';
@@ -10,7 +9,6 @@ import { MemoryEssentialsStore } from '../essentials/store';
 import { CHECKED_KEY, isKeptNote, noteVersion } from '../essentials/sync';
 import { OWNER_KEY } from '../essentials/wipe';
 import { writePrefs } from '../platform/prefs';
-import { SecureTokenStore } from '../session/store';
 import { emit } from '../state/events';
 import { phoneParts, unlocked } from '../test-support/lookup';
 import { installed } from '../test-support/render';
@@ -62,13 +60,6 @@ function note(t: TestVault, id: string, words: string, over: Record<string, unkn
 
 const stored = (t: TestVault, id: string) =>
   t.vault.state.documents.find((d) => d.id === id) as unknown as Record<string, unknown>;
-
-/** The phone keeps this role for whoever signed in (the fake signs everybody in as its owner). */
-const asTeen = async () => {
-  const store = new SecureTokenStore();
-  const kept = await store.load();
-  await store.save({ ...(kept as NonNullable<typeof kept>), role: 'teen' as never });
-};
 
 describe("notes that ask \"Confirm it's you\" (a vault of 0.9.0-dev.87)", () => {
   it('an Only me note asks before its words are shown, and once confirmed the editor asks nothing more', async () => {
@@ -144,23 +135,7 @@ describe("notes that ask \"Confirm it's you\" (a vault of 0.9.0-dev.87)", () => 
     expect(t.library.stepUps).toEqual([PASSWORD]);
   });
 
-  it('a note is made sensitive from its page; a teen may make one sensitive, never not', async () => {
-    const t = vault();
-    note(t, 'meds', 'Two tablets at night.');
-    await unlocked(t, <DocumentDetail id="meds" />);
-    const toggle = await screen.findByTestId('note-sensitive-switch');
-    await fireEvent(toggle, 'valueChange', true);
-    await waitFor(() => expect(stored(t, 'meds').sensitive).toBe(true));
-  });
-
-  it('a teen sees a sensitive note’s switch held, and why', async () => {
-    const t = vault();
-    note(t, 'meds', 'Two tablets at night.', { sensitive: true });
-    await unlocked(t, <DocumentDetail id="meds" />, { before: asTeen });
-    expect(await screen.findByTestId('note-sensitive')).toBeTruthy();
-    expect(screen.getByText(TEEN_KEEPS_SENSITIVE)).toBeTruthy();
-    expect(screen.getByTestId('note-sensitive-switch').props.disabled).toBe(true);
-  });
+  // A note's Sensitive is switched in its editor since app 0.23.0, never on its page: visibility-notes-print.test.
 
   it('an Essential note is kept on the phone, words and all, and shown from there when not confirmed', async () => {
     const t = vault();

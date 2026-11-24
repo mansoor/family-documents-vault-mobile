@@ -111,14 +111,19 @@ function vault(upTo: 'dev91' | 'dev51' | 'dev42' | 'none' = 'dev51'): TestVault 
   return t;
 }
 
-/** Study: Drawer 1 with Tax (P60s, by year) and a hidden folder; a hidden drawer; a hidden cabinet. */
+/**
+ * Study: Drawer 1 with Tax (P60s, by year) and a hidden folder; a hidden drawer; a hidden cabinet.
+ * Drawn by levels, as the test vault keeps every cabinet since the vault's dev.94; a vault
+ * before levels (dev.51, dev.42) is read without them, so its tests see the same cabinet.
+ */
 const LAYOUT: CabinetLayout = {
-  levels: null,
+  levels: ['topic', 'person', 'year'],
   cabinets: [
     {
       id: 'c-study',
       name: 'Study',
       hidden: false,
+      drawn: { value: 'study' },
       drawers: [
         {
           id: 'd-one',
@@ -132,9 +137,22 @@ const LAYOUT: CabinetLayout = {
         { id: 'd-hidden', name: 'Hidden drawer', hidden: true, folders: [] },
       ],
     },
-    { id: 'c-hidden', name: 'Loft', hidden: true, drawers: [] },
+    { id: 'c-hidden', name: 'Loft', hidden: true, drawn: { value: 'loft' }, drawers: [] },
   ],
 };
+
+/**
+ * GET /cabinet as a vault of dev.90 to dev.93 answers it: the layout as kept, a cabinet arranged
+ * by hand beside the drawn ones. The test vault reads a layout as the vault has since dev.94
+ * (every cabinet drawn by its levels), so it is asked only for the rest.
+ */
+function answeredAsKept(t: TestVault) {
+  const real = t.fetch;
+  t.fetch = async (url, init) =>
+    url === `${ORIGIN}/api/v1/cabinet` && (init?.method === undefined || init.method === 'GET')
+      ? respond(200, t.vault.state.cabinets?.[ME])
+      : real(url, init);
+}
 
 function filed(t: TestVault) {
   t.vault.state.cabinets = { [ME]: { layout: LAYOUT, version: 1, updated_at: '2026-11-16T00:00:00Z' } };
@@ -664,6 +682,8 @@ describe('browsing a cabinet arranged by levels (dev.90)', () => {
   it('says its levels, a cabinet of one drawer its folders, and marks own and hand-made cabinets', async () => {
     const t = vault('dev91');
     levelled(t);
+    // Loft, arranged by hand, as a vault before dev.94 still answers it.
+    answeredAsKept(t);
     await unlocked(t, <DocumentsScreen />);
     await fireEvent.press(await screen.findByTestId('documents-view-cabinet'));
     await screen.findByTestId('cabinet-c-fin');
@@ -722,7 +742,9 @@ describe('browsing a cabinet arranged by levels (dev.90)', () => {
 
   it('an older vault shows its way as levels, and every drawer and folder as before', async () => {
     const t = vault('dev51');
-    const older = { arranged_by: 'person_kind', cabinets: LEVELLED.cabinets } as unknown as CabinetLayout;
+    // Its way by name; the levels are only for the test vault, which keeps every cabinet drawn by them
+    // since dev.94 — a vault before levels is read without them.
+    const older = { arranged_by: 'person_kind', levels: LEVELLED.levels, cabinets: LEVELLED.cabinets } as unknown as CabinetLayout;
     t.vault.state.cabinets = { [ME]: { layout: older, version: 1, updated_at: '2026-11-22T00:00:00Z' } };
     const first = await unlocked(t, <CabinetBrowse header={null} />);
     await screen.findByTestId('cabinet-c-fin');

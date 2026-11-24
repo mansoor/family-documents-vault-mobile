@@ -15,9 +15,6 @@ import {
   recordFormatWords,
   REVIEW_LABEL,
   SENSITIVE_LABEL,
-  SENSITIVE_MEANS,
-  stopSharingWords,
-  TEEN_KEEPS_SENSITIVE,
   TAP_MIN,
   sensitiveOf,
   whereKeptWords,
@@ -75,11 +72,10 @@ import { latestOf } from './online';
 import { warnedAboutCopies } from './save-copy';
 import { TrashConfirm } from './trash';
 import { MenuRow } from '../ui/menu-row';
-import { PrintDocument, useNotePrint } from '../print/document-print';
+import { PrintDocument, SensitivePrintNotice, useNotePrint } from '../print/document-print';
 import { DocumentLinks } from '../sharing/document-links';
 import { TheirLinksOpened } from '../sharing/opens';
 import { ShareSheet } from '../sharing/share-sheet';
-import { StillSharedSheet } from '../sharing/sensitive-confirm';
 import { Chip, ChipRow } from '../ui/chip';
 import { ConfirmSheet } from '../ui/confirm';
 import { IconButton } from '../ui/icon-button';
@@ -98,10 +94,10 @@ type Problem = 'offline' | 'not_found' | 'failed' | 'confirm' | null;
 
 /**
  * A document (4.12), compact (R6, the mockup's second screen): its
- * picture, its name, a line of whose it is, what kind and who can see it,
+ * picture, its name, a line of whose it is, what kind and its visibility,
  * and its status; one row of round actions — Show for an Essential, its
  * Pages, Save a copy, a New version; its details in two columns; and one
- * card of lines for who can see it, its tags, its collections, its
+ * card of lines for its Visibility (opening the choice), its tags, its collections, its
  * versions (opened in place) and whether it is an Essential. Edit details
  * is the pencil in the header, Move to the Trash is under its ⋯.
  *
@@ -116,7 +112,13 @@ type Problem = 'offline' | 'not_found' | 'failed' | 'confirm' | null;
  * the page says so with a button to ask again, and asks nothing by itself
  * until it is pressed. A copy kept on the phone (an Essential note kept
  * offline) is shown meanwhile, as a kept document's pages are. Such a note
- * offers Essential and Sensitive, by the documents' rules.
+ * offers Essential here, by the documents' rules; its Sensitive is chosen
+ * while it is edited (the owner's request of 24 Nov 2026), and here only
+ * said, beside its status.
+ *
+ * Anything Sensitive still prints, with nothing more asked, but first one
+ * notice says to keep the printout safe and shred it: for a note, in the ⋯
+ * sheet with Print and Cancel; for a document, at the top of what to print.
  */
 export function DocumentDetail(props: { id: string }) {
   const colours = useColours();
@@ -149,7 +151,7 @@ export function DocumentDetail(props: { id: string }) {
   const [refreshing, setRefreshing] = useState(false);
   const [versionsOpen, setVersionsOpen] = useState(false);
   // The header's ⋯: its choices, then the question Move to the Trash asks, in the same sheet.
-  const [more, setMore] = useState<'menu' | 'trash' | 'unneeded' | 'remind' | 'print' | null>(null);
+  const [more, setMore] = useState<'menu' | 'trash' | 'unneeded' | 'remind' | 'print' | 'printNote' | null>(null);
   // Print (0.21.0): a note prints straight from the ⋯; a document asks what to print, in the same sheet.
   const printNote = useNotePrint();
   const [printingNote, setPrintingNote] = useState(false);
@@ -168,8 +170,6 @@ export function DocumentDetail(props: { id: string }) {
   const [unneededOpen, setUnneededOpen] = useState(false);
   // Essential off: its copies leave the phones that keep them, so it asks first (R2).
   const [askOff, setAskOff] = useState(false);
-  // A note made sensitive while links outside the family still give it: how many, asked about (0.9.0-dev.87).
-  const [stillShared, setStillShared] = useState<number | null>(null);
   // Its yearly review (H3, app 0.17.0): undefined until the vault has said; null, none on.
   const [review, setReview] = useState<ReminderView | null | undefined>(undefined);
   const [reviewBusy, setReviewBusy] = useState(false);
@@ -201,10 +201,8 @@ export function DocumentDetail(props: { id: string }) {
     !!who && can(who.role, 'document.add') && (who.role !== 'teen' || mine) && !renewing && !note && !caregiver;
   // A yearly review (H3), for whoever manages reminders, where the vault has health's kinds.
   const reviewsOn = caps?.features.health_kinds === true && !!who && can(who.role, 'reminder.manage') && !caregiver;
-  // A note's Essential and Sensitive (0.9.0-dev.87), where the vault has notes that ask.
+  // A note's Essential (0.9.0-dev.87), where the vault has notes that ask; its Sensitive is chosen in its editor.
   const noteMarks = note && notesConfirm(caps);
-  // A teen may make a note sensitive, never not.
-  const teenKeeps = who?.role === 'teen' && doc?.sensitive_effective === true;
 
   // "Confirm it's you", for a note that asks, only when somebody did something: the page opened, pulled
   // to refresh, or its button pressed (`ask`). A reload nobody asked for (the connection back, a capture
@@ -338,29 +336,6 @@ export function DocumentDetail(props: { id: string }) {
     }
   };
 
-  // A note's Sensitive (0.9.0-dev.87): saved as it is switched. Made sensitive while links outside
-  // the family still give it, it asks whether to end them, as Edit details does.
-  const setNoteSensitive = async (value: boolean) => {
-    if (!doc || toggling) return;
-    setNotice(null);
-    setToggling(true);
-    try {
-      const saved = await guarded((a, tk) => a.updateDocument(tk, doc.id, { sensitive: value }, doc.etag));
-      if (saved === null) return;
-      setDoc((had) => keepWords(had, saved));
-      emit('documentChanged', saved.id, saved.is_essential);
-      const shared = saved.warnings?.find((w) => w.code === 'sensitive_still_shared');
-      if (shared?.links) setStillShared(shared.links);
-    } catch (err) {
-      if (err instanceof ApiRequestError && err.status === 409) {
-        warn(t('document.conflict'));
-        await load();
-      } else warn(wordsFor(err, t, 'document.failed'));
-    } finally {
-      setToggling(false);
-    }
-  };
-
   const doSave = async () => {
     if (!latest) return;
     setWarning(false);
@@ -463,6 +438,16 @@ export function DocumentDetail(props: { id: string }) {
   // a note only once its words are here.
   const mayPrint = !!doc && !caregiver && (!note || !!doc.notes);
   const hasMore = (mayTrash || mayUnneed || mayRemind || mayShare || mayPrint) && !!doc && !offline;
+  // A note has no pages to ask about: printed as it is, Sensitive in its heading where it is so.
+  const printTheNote = () => {
+    if (!doc || printingNote) return;
+    setPrintingNote(true);
+    void printNote(doc, name, sensitive).then((failed) => {
+      setPrintingNote(false);
+      setMore(null);
+      if (failed) warn(failed);
+    });
+  };
   // Where the original is, said on a vault that keeps places in cabinets (C3): before it, the page said nothing of it.
   const placeWords = caps?.features.original_place === true && !note && !caregiver ? whereKeptWords(shown) : null;
   // The folder it came from (C4): the household's, as where it is kept; the vault leaves it out for anybody else.
@@ -777,33 +762,6 @@ export function DocumentDetail(props: { id: string }) {
           },
         ]
       : []),
-    // A note's own Sensitive (0.9.0-dev.87), switched here as the web's is under a note; a
-    // document's is chosen in Edit details. A teen may make one sensitive, never not.
-    ...(noteMarks && mayChange && doc && caps?.features.sensitive_documents === true
-      ? [
-          {
-            key: 'sensitive',
-            node: (
-              <View style={styles.line} testID="note-sensitive">
-                <View style={styles.flex}>
-                  <Text>{SENSITIVE_LABEL}</Text>
-                  <Text tone="soft" variant="small">
-                    {teenKeeps ? TEEN_KEEPS_SENSITIVE : SENSITIVE_MEANS}
-                  </Text>
-                </View>
-                <Switch
-                  testID="note-sensitive-switch"
-                  accessibilityLabel={SENSITIVE_LABEL}
-                  value={doc.sensitive_effective === true}
-                  disabled={offline || toggling || teenKeeps}
-                  onValueChange={(v) => void setNoteSensitive(v)}
-                  trackColor={{ true: colours.accent, false: colours.border }}
-                />
-              </View>
-            ),
-          },
-        ]
-      : []),
     // Its own Activity (0.9.0-dev.54, DA): who added, changed, opened or shared it, as the web's Activity button.
     ...(activityOn
       ? [
@@ -1022,8 +980,8 @@ export function DocumentDetail(props: { id: string }) {
         </View>
       ) : null}
 
-      {/* A note's words come first, as a document's pages do; who can see
-          it below them, and when they were edited at the foot (the owner's
+      {/* A note's words come first, as a document's pages do; its
+          visibility below them, and when they were edited at the foot (the owner's
           tidy-up of 11 Nov 2026). */}
       {note ? notesCard : null}
 
@@ -1074,19 +1032,6 @@ export function DocumentDetail(props: { id: string }) {
         confirmID="essential-off-yes"
         cancelID="essential-off-cancel"
       />
-      {stillShared !== null ? (
-        <StillSharedSheet
-          links={stillShared}
-          testID="note-still-shared"
-          onEnd={async () => {
-            const r = await guarded((a, tk) => a.stopSharing(tk, id));
-            if (!r) return t('sensitive.nothingChanged');
-            emit('sharesChanged');
-            return stopSharingWords(r);
-          }}
-          onDone={() => setStillShared(null)}
-        />
-      ) : null}
       <ConfirmSheet
         visible={askReviewOff}
         testID="review-off-question"
@@ -1123,7 +1068,9 @@ export function DocumentDetail(props: { id: string }) {
         />
       ) : null}
       <Sheet visible={more !== null} onClose={() => setMore(null)} {...(more === 'menu' ? { outside: true as const } : {})} testID="document-more-sheet">
-        {more === 'print' && doc ? (
+        {more === 'printNote' && doc ? (
+          <SensitivePrintNotice busy={printingNote} onPrint={printTheNote} onCancel={() => setMore(null)} />
+        ) : more === 'print' && doc ? (
           <PrintDocument
             id={id}
             name={name}
@@ -1296,13 +1243,9 @@ export function DocumentDetail(props: { id: string }) {
                     setMore('print');
                     return;
                   }
-                  // A note has no pages to ask about: printed as it is.
-                  setPrintingNote(true);
-                  void printNote(doc, name).then((failed) => {
-                    setPrintingNote(false);
-                    setMore(null);
-                    if (failed) warn(failed);
-                  });
+                  // A Sensitive note says first to keep the printout safe; any other is printed as it is.
+                  if (sensitive) setMore('printNote');
+                  else printTheNote();
                 }}
               />
             ) : null}

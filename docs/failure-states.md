@@ -120,7 +120,7 @@ Written by `node apps/pocket/scripts/failure-states.mjs`; CI fails if it is out 
 |  |  | `queue.needsYou` | Needs you |
 |  |  | `queue.storage` | The vault can't reach where it keeps files right now. Your scan is safe here and will try again. |
 |  |  | `queue.noLongerAdd` | You can no longer add documents to this vault. Ask an owner. |
-|  |  | `queue.ownerGone` | The person it was for is no longer in the family. Choose someone else, or save it without a person — it keeps who can see it. |
+|  |  | `queue.ownerGone` | The person it was for is no longer in the family. Choose someone else, or save it without a person — it keeps its visibility. |
 |  |  | `queue.versionRefused` | The vault didn't let you add a new version of this document. Whoever it belongs to can. |
 |  |  | `queue.goesWithout` | It will go without {{names}}: its kind of document no longer asks for it. / It will go without {{names}}: its kind of document no longer asks for them. |
 |  |  | `queue.filedWithout` | {{title}} is in the vault without {{names}}: its kind of document no longer asks for it. / {{title}} is in the vault without {{names}}: its kind of document no longer asks for them. |

@@ -170,7 +170,7 @@ describe('Edit details (P8)', () => {
   });
 });
 
-describe('Who can see it (P8)', () => {
+describe('Visibility (P8)', () => {
   it('chosen from the sheet, sent, and said', async () => {
     const { t } = vault();
     passport(t);
@@ -184,7 +184,9 @@ describe('Who can see it (P8)', () => {
     await fireEvent.press(screen.getByTestId('visibility-adults'));
     expect(await screen.findByTestId('visibility-said')).toHaveTextContent('Now: Adults only.');
     expect(t.library.visibilityChanges).toEqual([{ id: 'passport', visibility: 'adults' }]);
-    await waitFor(() => expect(screen.getByTestId('document-visibility')).toHaveTextContent(/Adults only/));
+    // The line under its title says it now; the Visibility line never does (the owner's request of 24 Nov 2026).
+    await waitFor(() => expect(screen.getByTestId('document-subline')).toHaveTextContent(/Adults only$/));
+    expect(screen.getByTestId('document-visibility')).toHaveTextContent(/^Visibility›$/);
   });
 
   it("into Only me with share links of one's own: asked what becomes of them, and Keep sent", async () => {

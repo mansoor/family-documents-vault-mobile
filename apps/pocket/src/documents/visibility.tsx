@@ -14,18 +14,23 @@ import { sp } from '../ui/space';
 import { useColours, useStyles, type Palette } from '../ui/theme';
 
 /**
- * Who can see it (P8): the document's chip, and — for whoever may change it
+ * Visibility (P8): the document's chip, and — for whoever may change it
  * — a sheet of the choices @fdv/shared's visibilityChoices allows, as the
  * web offers them (an owner or an adult; Only me only for its own person;
  * a teen, Everyone or Only me on what they filed). Into Only me, with share
  * links of the person's own still open, the vault asks what becomes of
  * them (409 links_choice_needed): ended, or kept while the household lets
  * them out. What the vault says back about it is said under the chip.
+ *
+ * Called Visibility since the owner's request of 24 Nov 2026, for documents
+ * and notes alike; the line that opens the choice no longer says what it is
+ * now, as the line under the title already does. A line nobody here may
+ * change still says it: it opens nothing.
  */
 export function VisibilityControl(props: {
   doc: DocumentView;
   onChanged: () => Promise<void> | void;
-  /** A line in the document's card (R6): "Who can see it   Everyone in the family ›". */
+  /** A line in the document's card (R6): "Visibility   ›"; "Visibility   Adults only" where it can't be changed here. */
   line?: boolean;
 }) {
   const styles = useStyles(makeStyles);
@@ -78,21 +83,27 @@ export function VisibilityControl(props: {
   );
 
   const now = t(`document.visibility_${doc.visibility}`);
-  const line = props.line ? (
+  const line = !props.line ? null : choices.length > 0 ? (
     <Pressable
       testID="document-visibility"
       accessibilityRole="button"
-      accessibilityLabel={t('visibility.button', { now })}
-      disabled={choices.length === 0}
+      accessibilityLabel={t('visibility.button')}
       onPress={() => setOpen(true)}
       style={({ pressed }) => [styles.line, pressed ? styles.pressed : null]}
     >
       <Text style={styles.flexLine}>{t('document.whoCanSee')}</Text>
       <Text variant="secondary" tone="soft">
-        {choices.length > 0 ? `${now} ›` : now}
+        ›
       </Text>
     </Pressable>
-  ) : null;
+  ) : (
+    <View style={styles.line} testID="document-visibility">
+      <Text style={styles.flexLine}>{t('document.whoCanSee')}</Text>
+      <Text variant="secondary" tone="soft">
+        {now}
+      </Text>
+    </View>
+  );
 
   return (
     <View style={props.line ? null : styles.wrap}>
@@ -100,13 +111,12 @@ export function VisibilityControl(props: {
         <Pressable
           testID="document-visibility"
           accessibilityRole="button"
-          accessibilityLabel={t('visibility.button', { now: t(`document.visibility_${doc.visibility}`) })}
+          accessibilityLabel={t('visibility.button')}
           onPress={() => setOpen(true)}
           style={({ pressed }) => [styles.pressable, pressed ? styles.pressed : null]}
         >
-          {chip}
           <Text variant="secondary" tone="accent" weight="600">
-            {t('visibility.change')}
+            {t('visibility.button')}
           </Text>
         </Pressable>
       ) : (

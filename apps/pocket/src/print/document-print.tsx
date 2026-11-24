@@ -60,18 +60,25 @@ export function detailRows(
   ];
 }
 
+/** Its heading's line, and Sensitive after it where it is so: "Me · Passport · Adults only · Sensitive". */
+export function withSensitive(line: string | null, sensitive: boolean): string | null {
+  return sensitive ? [line, SENSITIVE_LABEL].filter(Boolean).join(' · ') : line;
+}
+
 /**
- * A note, printed (0.21.0): its title, who sees it, when its words last
+ * A note, printed (0.21.0): its title, its visibility, when its words last
  * changed, and its words. Only a note whose words are here: one waiting for
- * "Confirm it's you" is not offered.
+ * "Confirm it's you" is not offered. A Sensitive one says so under its title
+ * (the owner's request of 24 Nov 2026), after the notice its page shows
+ * first (`SensitivePrintNotice`).
  */
 export function useNotePrint() {
   const { t } = useTranslation();
   const zone = useFamilyZone();
   const { print, foot } = usePrint();
-  return async (doc: DocumentView, name: string): Promise<string | null> => {
+  return async (doc: DocumentView, name: string, sensitive: boolean): Promise<string | null> => {
     const lines = [
-      t(`document.visibility_${doc.visibility}`),
+      withSensitive(t(`document.visibility_${doc.visibility}`), sensitive),
       doc.notes_updated_at
         ? doc.notes_updated_by_name
           ? t('document.notesEditedBy', { when: exactWords(doc.notes_updated_at, zone), name: doc.notes_updated_by_name })
@@ -84,6 +91,33 @@ export function useNotePrint() {
 }
 
 /**
+ * Before anything Sensitive is printed (the owner's request of 24 Nov 2026):
+ * one notice to keep the printout safe and shred it, with Print and Cancel.
+ * Printing stays allowed and asks nothing more; Cancel prints nothing. A
+ * note's, in its page's ⋯ sheet; a document's is said at the top of
+ * `PrintDocument`, whose own Print and Cancel answer it.
+ */
+export function SensitivePrintNotice(props: { busy: boolean; onPrint: () => void; onCancel: () => void }) {
+  const { t } = useTranslation();
+  return (
+    <View style={styles.stack} testID="print-sensitive-question">
+      <Text variant="screen">{t('print.sensitiveTitle')}</Text>
+      <Notice tone="info" testID="print-sensitive">
+        {t('print.sensitiveNotice')}
+      </Notice>
+      <Button testID="print-sensitive-go" label={t('print.print')} busy={props.busy} onPress={props.onPrint} />
+      <Button
+        testID="print-sensitive-cancel"
+        kind="quiet"
+        label={t('common.cancel')}
+        disabled={props.busy}
+        onPress={props.onCancel}
+      />
+    </View>
+  );
+}
+
+/**
  * Print a document (0.21.0), asked in its page's ⋯ sheet: its pages, a
  * sheet of its details, or both. Its pages are those the vault drew, read
  * as its page viewer reads them — from the copy kept on this phone when it
@@ -91,6 +125,9 @@ export function useNotePrint() {
  * or a sensitive one asks "Confirm it's you" first, as looking at it does —
  * at most the first 20. A file the vault draws no pages of prints its
  * details alone, and says so. Not confirmed: nothing is printed.
+ *
+ * A Sensitive one says first to keep the printout safe and shred it, and
+ * its heading says Sensitive, whether its pages or its details are printed.
  */
 export function PrintDocument(props: {
   id: string;
@@ -190,7 +227,8 @@ export function PrintDocument(props: {
         : [];
       const html = documentHtml({
         name: props.name,
-        subline: props.subline,
+        // Sensitive in its heading, whatever is printed under it.
+        subline: withSensitive(props.subline, sheet.sensitive),
         details: details
           ? {
               rows: detailRows(sheet, {
@@ -226,6 +264,11 @@ export function PrintDocument(props: {
   return (
     <View style={styles.stack} testID="print-question">
       <Text variant="screen">{t('print.whatTitle')}</Text>
+      {props.sheet.sensitive ? (
+        <Notice tone="info" testID="print-sensitive">
+          {t('print.sensitiveNotice')}
+        </Notice>
+      ) : null}
       {props.drawn ? (
         <View style={styles.row}>
           <View style={styles.flex}>
