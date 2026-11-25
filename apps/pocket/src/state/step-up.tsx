@@ -208,7 +208,7 @@ function StepUpSheet(props: { asking: Asking | null }) {
   };
 
   return (
-    <Sheet visible={asking !== null} onClose={() => done(false)} testID="step-up-sheet" keyboard>
+    <Sheet visible={asking !== null} onClose={() => done(false)} testID="step-up-sheet">
       <Text variant="screen">{t('stepUp.title')}</Text>
       {asking?.message ? <Text tone="soft">{asking.message}</Text> : null}
       {codeOnly && asking?.codeless ? (

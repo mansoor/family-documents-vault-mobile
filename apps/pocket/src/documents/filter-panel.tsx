@@ -14,12 +14,13 @@ import {
 import { Check, X } from 'lucide-react-native';
 import { useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { matchTypes, rankTypes } from '../capture/types';
 import { Button, Field, Text } from '../ui';
 import { Chip } from '../ui/chip';
 import { ChipLine, PickerSheet } from '../ui/picker';
 import { SideSheet } from '../ui/side-sheet';
+import { SheetScroll } from '../ui/keyboard';
 import { sp } from '../ui/space';
 import { useColours, useStyles, type Palette } from '../ui/theme';
 import { NO_FILTERS, QUICK, quickRange, toggle, type DateWhich, type Filters } from './filter-model';
@@ -54,7 +55,7 @@ const shown = (day: string | null) => (day ? formatDate({ date: day, precision: 
  * "Clear all" at the top. Nothing applies until Show: the list behind is
  * as it was.
  */
-/** How many of the most used tags are offered as chips; the rest are under More. */
+/** How many of the tags are offered as chips (the most recently used, or the most used); the rest are under More. */
 const TAGS_SHOWN = 6;
 
 export function FilterPanel(props: {
@@ -75,7 +76,10 @@ export function FilterPanel(props: {
   today: string;
   /** How many the filters would give; null when the vault cannot say. */
   count: (f: Filters) => Promise<number | null>;
-  /** The tags there are, most used first, where the vault filters by several (`tag_filters`); null otherwise. */
+  /**
+   * The tags there are, where the vault filters by several (`tag_filters`); null otherwise. The one put
+   * on a document most recently first where the vault can say (0.26.0, `recent_tags`), else most used first.
+   */
   tags?: readonly string[] | null;
 }) {
   const styles = useStyles(makeStyles);
@@ -174,7 +178,7 @@ export function FilterPanel(props: {
         </Pressable>
       </View>
 
-      <ScrollView style={styles.flex} contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
+      <SheetScroll style={styles.flex} contentContainerStyle={styles.body}>
         <Section title={t('filters.whose')} chosen={draft.people.length}>
           {(allPeople ? people : people.slice(0, PEOPLE_SHOWN)).map((p) => {
             const on = draft.people.includes(p.id);
@@ -359,7 +363,7 @@ export function FilterPanel(props: {
             {t('filters.older')}
           </Text>
         )}
-      </ScrollView>
+      </SheetScroll>
 
       <View style={styles.foot}>
         <Button

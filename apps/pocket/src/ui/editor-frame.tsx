@@ -1,10 +1,11 @@
 import { useNavigation, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ConfirmSheet } from './confirm';
 import { Button } from './index';
+import { AboveKeyboard, FormScroll } from './keyboard';
 import { sp } from './space';
 import { useStyles, type Palette } from './theme';
 
@@ -16,6 +17,10 @@ import { useStyles, type Palette } from './theme';
  * Cancel, or Back, with something changed asks first: what was typed is
  * lost. Save answers with where to go once it has saved, or nothing to
  * stay: then nothing asks.
+ *
+ * With the keyboard up (0.26.0), Cancel and Save ride on it, and the field
+ * being typed in is scrolled to just above them — on Android too, where
+ * the screen no longer shrinks for the keyboard.
  */
 export function EditorFrame(props: {
   testID: string;
@@ -32,6 +37,8 @@ export function EditorFrame(props: {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const [asking, setAsking] = useState(false);
+  // How tall Cancel and Save are, so a field is kept above them, not only above the keyboard.
+  const [barHeight, setBarHeight] = useState(0);
   const blocked = useRef<unknown>(null);
   const leaving = useRef(false);
   const changed = useRef(props.changed);
@@ -79,29 +86,36 @@ export function EditorFrame(props: {
   };
 
   return (
-    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.screen}>
-      <ScrollView
+    <View style={styles.screen}>
+      <FormScroll
         testID={props.testID}
         style={styles.screen}
         contentContainerStyle={[styles.page, { paddingTop: sp(20) + insets.top }]}
-        keyboardShouldPersistTaps="handled"
+        // What the keyboard covers of the bar is the phone's own buttons' room.
+        gap={Math.max(0, barHeight - insets.bottom)}
       >
         {props.children}
-      </ScrollView>
-      <View style={[styles.bar, { paddingBottom: sp(12) + insets.bottom }]} testID={`${props.testID}-bar`}>
-        <View style={styles.flex}>
-          <Button testID={props.cancelID} kind="quiet" label={t('common.cancel')} disabled={props.busy} onPress={cancel} />
+      </FormScroll>
+      <AboveKeyboard under={insets.bottom}>
+        <View
+          style={[styles.bar, { paddingBottom: sp(12) + insets.bottom }]}
+          testID={`${props.testID}-bar`}
+          onLayout={(e) => setBarHeight(e.nativeEvent.layout.height)}
+        >
+          <View style={styles.flex}>
+            <Button testID={props.cancelID} kind="quiet" label={t('common.cancel')} disabled={props.busy} onPress={cancel} />
+          </View>
+          <View style={styles.flex}>
+            <Button
+              testID={props.save.testID}
+              label={props.save.label}
+              busy={props.busy}
+              disabled={props.save.disabled === true}
+              onPress={() => void save()}
+            />
+          </View>
         </View>
-        <View style={styles.flex}>
-          <Button
-            testID={props.save.testID}
-            label={props.save.label}
-            busy={props.busy}
-            disabled={props.save.disabled === true}
-            onPress={() => void save()}
-          />
-        </View>
-      </View>
+      </AboveKeyboard>
       <ConfirmSheet
         visible={asking}
         testID={`${props.cancelID}-ask`}
@@ -117,7 +131,7 @@ export function EditorFrame(props: {
         confirmID={`${props.cancelID}-yes`}
         cancelID={`${props.cancelID}-no`}
       />
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 

@@ -1,7 +1,7 @@
 import * as Linking from 'expo-linking';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { APP_RELEASES_URL, APP_VERSION, MIN_SERVER_VERSION, plainHttp } from '../config';
 import { CertificateTroubleNotice } from '../connect/certificate-guide';
@@ -11,6 +11,7 @@ import { currentNetwork, internetReachable, whyFailed } from '../net/network';
 import { readVaults } from '../state/vaults';
 import { useVault } from '../state/vault';
 import { Button, Card, Field, Notice, Text } from '../ui';
+import { FormScroll } from '../ui/keyboard';
 import { sp } from '../ui/space';
 
 /**
@@ -55,46 +56,44 @@ export default function Connect(props: { deps?: Partial<ConnectDeps> }) {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.safe}>
-        <ScrollView contentContainerStyle={styles.page} keyboardShouldPersistTaps="handled">
-          <Text variant="hero">{t('connect.title')}</Text>
-          <Text tone="soft">{t('connect.lead')}</Text>
-          <Card>
-            <Field
-              testID="connect-address"
-              label={t('connect.address')}
-              placeholder={t('connect.addressHint')}
-              value={address}
-              onChangeText={(v) => {
-                setOutcome(null);
-                // A pasted invitation, reset or share link: its secret never stays in the field.
-                const pasted = readPasted(v);
-                if (pasted.kind === 'address') {
-                  setAddress(v);
-                  setLink(null);
-                  return;
-                }
-                setLink(pasted);
-                setAddress(pasted.kind === 'shared' ? '' : pasted.origin);
-              }}
-              keyboardType="url"
-              textContentType="URL"
-              autoComplete="url"
-              returnKeyType="go"
-              onSubmitEditing={() => void run()}
-            />
-            <Button
-              testID="connect-go"
-              label={t('connect.connect')}
-              onPress={() => void run()}
-              busy={busy}
-              disabled={!address.trim()}
-            />
-          </Card>
-          {link ? <PastedLink link={link} /> : null}
-          {outcome ? <Outcome outcome={outcome} busy={busy} onApproveHttp={() => void run(true)} /> : null}
-        </ScrollView>
-      </KeyboardAvoidingView>
+      <FormScroll contentContainerStyle={styles.page}>
+        <Text variant="hero">{t('connect.title')}</Text>
+        <Text tone="soft">{t('connect.lead')}</Text>
+        <Card>
+          <Field
+            testID="connect-address"
+            label={t('connect.address')}
+            placeholder={t('connect.addressHint')}
+            value={address}
+            onChangeText={(v) => {
+              setOutcome(null);
+              // A pasted invitation, reset or share link: its secret never stays in the field.
+              const pasted = readPasted(v);
+              if (pasted.kind === 'address') {
+                setAddress(v);
+                setLink(null);
+                return;
+              }
+              setLink(pasted);
+              setAddress(pasted.kind === 'shared' ? '' : pasted.origin);
+            }}
+            keyboardType="url"
+            textContentType="URL"
+            autoComplete="url"
+            returnKeyType="go"
+            onSubmitEditing={() => void run()}
+          />
+          <Button
+            testID="connect-go"
+            label={t('connect.connect')}
+            onPress={() => void run()}
+            busy={busy}
+            disabled={!address.trim()}
+          />
+        </Card>
+        {link ? <PastedLink link={link} /> : null}
+        {outcome ? <Outcome outcome={outcome} busy={busy} onApproveHttp={() => void run(true)} /> : null}
+      </FormScroll>
     </SafeAreaView>
   );
 }

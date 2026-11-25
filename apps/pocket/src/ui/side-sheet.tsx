@@ -1,14 +1,17 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { Animated, Modal, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { Animated, Modal, Pressable, StyleSheet, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useReduceMotion } from './feel';
+import { RisesWithKeyboard, useKeyboardShown } from './keyboard';
 import { useStyles, type Palette } from './theme';
 
 /**
  * A panel from the side (R5): the filters slide out from the right over the
  * list, as the mockup has them, and the list stays in view behind. Back and
  * a tap on the shade close it. With Remove animations on, it is there at
- * once. A screen reader stays inside it.
+ * once. A screen reader stays inside it. It grows shorter from its foot
+ * as the keyboard rises (0.26.0), and what it scrolls is a SheetScroll, so
+ * a field in it is never typed into blind.
  */
 export function SideSheet(props: {
   visible: boolean;
@@ -20,6 +23,7 @@ export function SideSheet(props: {
   const insets = useSafeAreaInsets();
   const still = useReduceMotion();
   const { width } = useWindowDimensions();
+  const keyboard = useKeyboardShown();
   const panel = Math.min(360, Math.round(width * 0.88));
   // Made once, and moved by the effect below: never read while drawing.
   const [x] = useState(() => new Animated.Value(panel));
@@ -31,7 +35,7 @@ export function SideSheet(props: {
 
   return (
     <Modal visible={props.visible} transparent animationType={still ? 'none' : 'fade'} onRequestClose={props.onClose}>
-      <View style={styles.shade}>
+      <RisesWithKeyboard style={styles.shade}>
         <Pressable
           testID={`${props.testID}-shade`}
           accessible={false}
@@ -44,12 +48,12 @@ export function SideSheet(props: {
           accessibilityViewIsModal
           style={[
             styles.panel,
-            { width: panel, paddingTop: insets.top, paddingBottom: insets.bottom, transform: [{ translateX: x }] },
+            { width: panel, paddingTop: insets.top, paddingBottom: keyboard ? 0 : insets.bottom, transform: [{ translateX: x }] },
           ]}
         >
           {props.children}
         </Animated.View>
-      </View>
+      </RisesWithKeyboard>
     </Modal>
   );
 }

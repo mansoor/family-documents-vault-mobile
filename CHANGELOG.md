@@ -6,6 +6,59 @@ app's own, tagged `vX.Y.Z` in this repository.
 
 ## [Unreleased]
 
+## [0.26.0] — Recent's Added and Opened, tags as other apps offer them, and the keyboard out of the way
+
+Re-pinned to the vault's **v0.9.0-dev.103**, which remembers the documents
+each person opens (0.9.0-dev.102) and the tags used most recently
+(0.9.0-dev.103), as its web uses them. Each is used only where the vault
+says it has it (`features.recently_opened`, `features.recent_tags`): an
+older vault's Home, tags and filters are as they were. The phone's minimum
+vault stays 0.4.10.
+
+### Added
+- **Home's Recently added is now Recent, with two tabs, Added and
+  Opened**, in the same place, as on the web. Added is what it always was;
+  Opened is the five documents you opened most recently — yours alone,
+  never anybody else's, and only those you may still open. The tab you
+  chose last is where Home starts, on this phone. Nothing opened yet says
+  so; each row has the same ⋯ as Added's, Print included. On an older
+  vault it stays Recently added, with no tabs.
+- **Opening a document's page tells the vault**, once as it opens: never
+  for a list, a refresh, or coming back to it from a screen it opened, and
+  never a note. If the vault can't be told, nothing is said: the page is
+  open all the same.
+- **Tags as other apps offer them.** In Edit details and in a note, the
+  Tags field offers the five tags used most recently as soon as it has the
+  focus, as pills just above it under **Recently used**; as you type, the
+  tags already used that fit. A screen reader hears that they are there,
+  once as they appear. A tap adds one; a new word is added with Add or Done as before. A
+  tag the document has is never offered. An older vault offers nothing
+  until you type; with no connection, nothing is offered and adding works
+  as before.
+
+### Fixed
+- **The Documents filter offers a tag added since the app started.** Its
+  tags were read once, so a tag put on documents later (on the phone or
+  elsewhere) waited for the app to start again; they are now read again
+  each time the filters open, and when you come back to Documents after
+  changing a document — the most recently used first, where the vault can
+  say. While the filters are open the tags keep their order, so none moves
+  under your finger; one just added is offered at the end until they are
+  opened again.
+- **The keyboard no longer hides what you type.** On Android the app is
+  drawn edge to edge, where the screen no longer shrinks for the keyboard,
+  so a field low on the screen was typed into blind. Now the field being
+  typed in is scrolled to just above the keyboard on every screen with
+  fields — Edit details (its Tags among them), a note, a new note, a
+  collection's checklist, emergency information, the capture card,
+  sign-in and connecting, Account and Settings, asking for documents, the
+  update screen — and every sheet or side panel with a field rises with
+  the keyboard (sharing, a link's changes, a collection, a clinician's
+  link, "Confirm it's you", the filters' and Activity's panels, and the
+  rest), the field given the focus brought to the top of what it scrolls.
+  Cancel and Save ride on the keyboard, the field kept above them, and a
+  sheet leaves no empty band above the keyboard.
+
 ## [0.25.0] — Print from the ⋯ menus, and password rules
 
 Re-pinned to the vault's **v0.9.0-dev.98**, which adds password rules an

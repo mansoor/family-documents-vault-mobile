@@ -20,6 +20,7 @@ import { useVault } from '../state/vault';
 import { Button, Field, Notice, Text } from '../ui';
 import { Chip } from '../ui/chip';
 import { SideSheet } from '../ui/side-sheet';
+import { SheetScroll } from '../ui/keyboard';
 import { sp } from '../ui/space';
 import { LoadFailed, loadFailure, Placeholder } from '../ui/states';
 import { useColours, useStyles, type Palette } from '../ui/theme';
@@ -421,7 +422,7 @@ export function ActivityScreen(props: { document?: string }) {
             <X color={colours.ink} size={20} accessibilityElementsHidden importantForAccessibility="no" />
           </Pressable>
         </View>
-        <ScrollView style={styles.flex} contentContainerStyle={styles.panelBody} keyboardShouldPersistTaps="handled">
+        <SheetScroll style={styles.flex} contentContainerStyle={styles.panelBody}>
           <View style={styles.section} accessibilityRole="radiogroup" accessibilityLabel={t('activity.who')}>
             <Text variant="small" weight="700" tone="soft" role="header">
               {t('activity.who').toUpperCase()}
@@ -504,7 +505,7 @@ export function ActivityScreen(props: { document?: string }) {
               {t('activity.daysWords')}
             </Text>
           </View>
-        </ScrollView>
+        </SheetScroll>
         <View style={styles.foot}>
           <Button
             label={t('activity.showCount', { count: shown.length })}

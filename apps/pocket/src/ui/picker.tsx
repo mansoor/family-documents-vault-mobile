@@ -88,7 +88,6 @@ export function PickerSheet(props: {
       testID={props.testID}
       outside
       tall
-      keyboard={!!props.findID}
     >
       <View style={styles.head}>
         <Text variant="screen" style={styles.flex}>

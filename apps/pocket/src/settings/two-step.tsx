@@ -177,7 +177,7 @@ export function TwoStep(props: { onTurnedOn?: () => void } = {}) {
       ) : (
         <Button testID="two-step-begin" label={t('twoStep.begin')} busy={busy} onPress={() => void begin()} />
       )}
-      <Sheet visible={turningOff} onClose={() => setTurningOff(false)} testID="two-step-off-sheet" keyboard>
+      <Sheet visible={turningOff} onClose={() => setTurningOff(false)} testID="two-step-off-sheet">
         <View style={styles.form}>
           <Text variant="screen">{t('twoStep.offTitle')}</Text>
           <Text>{t('twoStep.offWords')}</Text>

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet } from 'react-native';
+import { StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { EssentialsNotice, KeptWhileSignedOut } from '../essentials/ui';
 import { useCapture } from '../state/capture';
@@ -8,6 +8,7 @@ import { useEssentials } from '../state/essentials';
 import { useVault, type SignInResult } from '../state/vault';
 import { wordsFor } from '../errors/words';
 import { Button, Card, Field, Notice, Text } from '../ui';
+import { FormScroll } from '../ui/keyboard';
 import { Sheet } from '../ui/sheet';
 import { sp } from '../ui/space';
 
@@ -124,187 +125,185 @@ export default function SignIn() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.safe}>
-        <ScrollView contentContainerStyle={styles.page} keyboardShouldPersistTaps="handled">
-          <Text variant="hero">{t('signIn.title')}</Text>
-          {name ? <Text tone="soft">{t('signIn.to', { name })}</Text> : null}
-          {notice === 'signed_out_here' ? <Notice tone="warn">{t('signIn.signedOutHere')}</Notice> : null}
-          {notice === 'paused' && failure?.kind !== 'paused' ? (
-            <Notice tone="warn" testID="sign-in-paused">
-              {t('signIn.paused')}
-            </Notice>
-          ) : null}
-          {notice === 'access_ended' || failure?.kind === 'access_ended' ? (
-            <Notice tone="warn" testID="sign-in-access-ended">
-              {t('signIn.accessEnded')}
-            </Notice>
-          ) : null}
-          {waitingHere > 0 ? (
-            <Notice tone="info" testID="sign-in-waiting">
-              {t('signIn.waiting', { count: waitingHere })}
-            </Notice>
-          ) : null}
-          {notice === 'reinstalled' ? <Notice tone="warn">{t('connect.reinstalled')}</Notice> : null}
-          <Card>
-            {step === 'password' ? (
-              <>
+      <FormScroll contentContainerStyle={styles.page}>
+        <Text variant="hero">{t('signIn.title')}</Text>
+        {name ? <Text tone="soft">{t('signIn.to', { name })}</Text> : null}
+        {notice === 'signed_out_here' ? <Notice tone="warn">{t('signIn.signedOutHere')}</Notice> : null}
+        {notice === 'paused' && failure?.kind !== 'paused' ? (
+          <Notice tone="warn" testID="sign-in-paused">
+            {t('signIn.paused')}
+          </Notice>
+        ) : null}
+        {notice === 'access_ended' || failure?.kind === 'access_ended' ? (
+          <Notice tone="warn" testID="sign-in-access-ended">
+            {t('signIn.accessEnded')}
+          </Notice>
+        ) : null}
+        {waitingHere > 0 ? (
+          <Notice tone="info" testID="sign-in-waiting">
+            {t('signIn.waiting', { count: waitingHere })}
+          </Notice>
+        ) : null}
+        {notice === 'reinstalled' ? <Notice tone="warn">{t('connect.reinstalled')}</Notice> : null}
+        <Card>
+          {step === 'password' ? (
+            <>
+              <Field
+                testID="sign-in-email"
+                label={t('signIn.email')}
+                value={email}
+                onChangeText={setEmail}
+                keyboardType="email-address"
+                textContentType="username"
+                autoComplete="email"
+              />
+              <Field
+                // Its own native field: the code's field below must never
+                // be this one reused, or Android can carry the password's
+                // text into the code (seen in an emulator run).
+                key="sign-in-password"
+                testID="sign-in-password"
+                label={t('signIn.password')}
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry
+                textContentType="password"
+                autoComplete="current-password"
+                returnKeyType="go"
+                onSubmitEditing={() => void submit()}
+              />
+            </>
+          ) : (
+            <>
+              {method === 'totp' ? (
+                <Text testID="sign-in-code-app">{t('signIn.codeStep')}</Text>
+              ) : textedTo ? (
+                <Text testID="sign-in-code-texted">{t('signIn.codeTexted', { to: textedTo })}</Text>
+              ) : (
+                <Text testID="sign-in-code-text-offer">{t('signIn.codeTextOffer', { to: second?.textTo ?? '' })}</Text>
+              )}
+              {method === 'text' && !textedTo ? (
+                <Button testID="sign-in-text-send" label={t('signIn.textMe')} busy={texting} onPress={() => void sendText()} />
+              ) : (
                 <Field
-                  testID="sign-in-email"
-                  label={t('signIn.email')}
-                  value={email}
-                  onChangeText={setEmail}
-                  keyboardType="email-address"
-                  textContentType="username"
-                  autoComplete="email"
-                />
-                <Field
-                  // Its own native field: the code's field below must never
-                  // be this one reused, or Android can carry the password's
-                  // text into the code (seen in an emulator run).
-                  key="sign-in-password"
-                  testID="sign-in-password"
-                  label={t('signIn.password')}
-                  value={password}
-                  onChangeText={setPassword}
-                  secureTextEntry
-                  textContentType="password"
-                  autoComplete="current-password"
+                  key="sign-in-code"
+                  testID="sign-in-code"
+                  label={t('signIn.code')}
+                  value={code}
+                  onChangeText={setCode}
+                  keyboardType="number-pad"
+                  textContentType="oneTimeCode"
+                  // A texted code: Android offers it from the message as it comes.
+                  autoComplete={method === 'text' ? 'sms-otp' : 'one-time-code'}
+                  maxLength={9}
                   returnKeyType="go"
                   onSubmitEditing={() => void submit()}
                 />
-              </>
-            ) : (
-              <>
-                {method === 'totp' ? (
-                  <Text testID="sign-in-code-app">{t('signIn.codeStep')}</Text>
-                ) : textedTo ? (
-                  <Text testID="sign-in-code-texted">{t('signIn.codeTexted', { to: textedTo })}</Text>
-                ) : (
-                  <Text testID="sign-in-code-text-offer">{t('signIn.codeTextOffer', { to: second?.textTo ?? '' })}</Text>
-                )}
-                {method === 'text' && !textedTo ? (
-                  <Button testID="sign-in-text-send" label={t('signIn.textMe')} busy={texting} onPress={() => void sendText()} />
-                ) : (
-                  <Field
-                    key="sign-in-code"
-                    testID="sign-in-code"
-                    label={t('signIn.code')}
-                    value={code}
-                    onChangeText={setCode}
-                    keyboardType="number-pad"
-                    textContentType="oneTimeCode"
-                    // A texted code: Android offers it from the message as it comes.
-                    autoComplete={method === 'text' ? 'sms-otp' : 'one-time-code'}
-                    maxLength={9}
-                    returnKeyType="go"
-                    onSubmitEditing={() => void submit()}
-                  />
-                )}
-                {textProblem ? (
-                  <Notice tone="warn" testID="sign-in-text-problem">
-                    {textProblem}
-                  </Notice>
-                ) : null}
-                {method === 'text' && textedTo ? (
-                  <Button
-                    testID="sign-in-text-again"
-                    kind="quiet"
-                    size="small"
-                    label={t('signIn.textAgain')}
-                    busy={texting}
-                    onPress={() => void sendText()}
-                  />
-                ) : null}
-                {second && second.methods.includes('text') && second.methods.includes('totp') ? (
-                  <Button
-                    testID="sign-in-code-switch"
-                    kind="quiet"
-                    size="small"
-                    label={method === 'totp' ? t('signIn.useText') : t('signIn.useApp')}
-                    onPress={() => {
-                      setCode('');
-                      setTextProblem(null);
-                      setMethod(method === 'totp' ? 'text' : 'totp');
-                    }}
-                  />
-                ) : null}
-              </>
-            )}
-            {step === 'password' ? (
-              <Button
-                testID="sign-in-forgot"
-                kind="quiet"
-                size="small"
-                label={t('signIn.forgot')}
-                onPress={() => {
-                  setForgotEmail(email);
-                  setForgotSaid(null);
-                  setForgotProblem(null);
-                  setForgetting(true);
-                }}
-              />
-            ) : null}
-            <Button
-              testID="sign-in-go"
-              label={step === 'password' ? t('signIn.signIn') : t('signIn.confirm')}
-              onPress={() => void submit()}
-              busy={busy}
-              disabled={
-                left > 0 ||
-                (step === 'password'
-                  ? !email.trim() || !password
-                  : code.replace(/\s/g, '').length < 6 || (method === 'text' && !textedTo))
-              }
-            />
-          </Card>
-          {failure?.kind === 'refused' ? (
-            <Notice tone="danger" testID="sign-in-refused">
-              <Text>{failure.message}</Text>
-              {failure.passkeyHint ? (
-                <Text tone="soft" variant="secondary">
-                  {t('signIn.passkeyOnly')}
-                </Text>
+              )}
+              {textProblem ? (
+                <Notice tone="warn" testID="sign-in-text-problem">
+                  {textProblem}
+                </Notice>
               ) : null}
-            </Notice>
+              {method === 'text' && textedTo ? (
+                <Button
+                  testID="sign-in-text-again"
+                  kind="quiet"
+                  size="small"
+                  label={t('signIn.textAgain')}
+                  busy={texting}
+                  onPress={() => void sendText()}
+                />
+              ) : null}
+              {second && second.methods.includes('text') && second.methods.includes('totp') ? (
+                <Button
+                  testID="sign-in-code-switch"
+                  kind="quiet"
+                  size="small"
+                  label={method === 'totp' ? t('signIn.useText') : t('signIn.useApp')}
+                  onPress={() => {
+                    setCode('');
+                    setTextProblem(null);
+                    setMethod(method === 'totp' ? 'text' : 'totp');
+                  }}
+                />
+              ) : null}
+            </>
+          )}
+          {step === 'password' ? (
+            <Button
+              testID="sign-in-forgot"
+              kind="quiet"
+              size="small"
+              label={t('signIn.forgot')}
+              onPress={() => {
+                setForgotEmail(email);
+                setForgotSaid(null);
+                setForgotProblem(null);
+                setForgetting(true);
+              }}
+            />
           ) : null}
-          {failure?.kind === 'throttled' && left > 0 ? (
-            <Notice tone="warn" testID="sign-in-throttled">
-              {left >= 60
-                ? t('signIn.throttledMinutes', { count: Math.ceil(left / 60) })
-                : t('signIn.throttledSeconds', { count: left })}
-            </Notice>
-          ) : null}
-          {failure?.kind === 'passkey_only' ? (
-            <Notice tone="warn" testID="sign-in-passkey-second">
-              {t('signIn.passkeySecond')}
-            </Notice>
-          ) : null}
-          {failure?.kind === 'paused' ? (
-            <Notice tone="warn" testID="sign-in-paused">
-              {failure.reason === 'restored' ? t('signIn.pausedRestored') : t('signIn.paused')}
-            </Notice>
-          ) : null}
-          {failure?.kind === 'unreachable' ? (
-            <Notice tone="danger">
-              {t('connect.unreachable', { host: vault?.origin.replace(/^https?:\/\//, '') ?? '' })}
-            </Notice>
-          ) : null}
-          {failure?.kind === 'stranger' ? (
-            <Notice tone="danger">
-              {t('connect.stranger', { host: vault?.origin.replace(/^https?:\/\//, '') ?? '' })}
-            </Notice>
-          ) : null}
-          {failure?.kind === 'wifi_only' ? (
-            <Notice tone="warn" testID="sign-in-wifi-only">
-              {t('connect.refuseMobileData')}
-            </Notice>
-          ) : null}
-          <EssentialsNotice />
-          <KeptWhileSignedOut />
-          <Button kind="quiet" label={t('signIn.otherVault')} onPress={() => void chooseAnotherVault()} />
-        </ScrollView>
-      </KeyboardAvoidingView>
-      <Sheet visible={forgetting} onClose={() => setForgetting(false)} testID="forgot-sheet" keyboard>
+          <Button
+            testID="sign-in-go"
+            label={step === 'password' ? t('signIn.signIn') : t('signIn.confirm')}
+            onPress={() => void submit()}
+            busy={busy}
+            disabled={
+              left > 0 ||
+              (step === 'password'
+                ? !email.trim() || !password
+                : code.replace(/\s/g, '').length < 6 || (method === 'text' && !textedTo))
+            }
+          />
+        </Card>
+        {failure?.kind === 'refused' ? (
+          <Notice tone="danger" testID="sign-in-refused">
+            <Text>{failure.message}</Text>
+            {failure.passkeyHint ? (
+              <Text tone="soft" variant="secondary">
+                {t('signIn.passkeyOnly')}
+              </Text>
+            ) : null}
+          </Notice>
+        ) : null}
+        {failure?.kind === 'throttled' && left > 0 ? (
+          <Notice tone="warn" testID="sign-in-throttled">
+            {left >= 60
+              ? t('signIn.throttledMinutes', { count: Math.ceil(left / 60) })
+              : t('signIn.throttledSeconds', { count: left })}
+          </Notice>
+        ) : null}
+        {failure?.kind === 'passkey_only' ? (
+          <Notice tone="warn" testID="sign-in-passkey-second">
+            {t('signIn.passkeySecond')}
+          </Notice>
+        ) : null}
+        {failure?.kind === 'paused' ? (
+          <Notice tone="warn" testID="sign-in-paused">
+            {failure.reason === 'restored' ? t('signIn.pausedRestored') : t('signIn.paused')}
+          </Notice>
+        ) : null}
+        {failure?.kind === 'unreachable' ? (
+          <Notice tone="danger">
+            {t('connect.unreachable', { host: vault?.origin.replace(/^https?:\/\//, '') ?? '' })}
+          </Notice>
+        ) : null}
+        {failure?.kind === 'stranger' ? (
+          <Notice tone="danger">
+            {t('connect.stranger', { host: vault?.origin.replace(/^https?:\/\//, '') ?? '' })}
+          </Notice>
+        ) : null}
+        {failure?.kind === 'wifi_only' ? (
+          <Notice tone="warn" testID="sign-in-wifi-only">
+            {t('connect.refuseMobileData')}
+          </Notice>
+        ) : null}
+        <EssentialsNotice />
+        <KeptWhileSignedOut />
+        <Button kind="quiet" label={t('signIn.otherVault')} onPress={() => void chooseAnotherVault()} />
+      </FormScroll>
+      <Sheet visible={forgetting} onClose={() => setForgetting(false)} testID="forgot-sheet">
         <Text variant="screen">{t('signIn.forgotTitle')}</Text>
         <Text>{t('signIn.forgotWords')}</Text>
         {forgotSaid ? (

@@ -205,6 +205,22 @@ export function DocumentDetail(props: { id: string }) {
   // to refresh, or its button pressed (`ask`). A reload nobody asked for (the connection back, a capture
   // delivered, a change saved) asks nothing: refused, it keeps what is shown.
   const arrived = useRef(false);
+  // Opened (0.26.0): the vault is told once, as the page first has its document — never again for a
+  // reload, a refresh, or coming back to it from a screen it opened. Never a note; and only where the
+  // vault remembers opens. Nothing is said if telling it fails: the page is open all the same.
+  const toldOpened = useRef<string | null>(null);
+  const remembersOpens = caps?.features.recently_opened === true;
+  const tellOpened = useCallback(
+    (d: DocumentView) => {
+      if (!remembersOpens || d.type_key === NOTE_KIND || toldOpened.current === d.id) return;
+      toldOpened.current = d.id;
+      void withToken((a, tk) => a.openedDocument(tk, d.id)).then(
+        () => emit('documentOpened', d.id),
+        () => undefined,
+      );
+    },
+    [remembersOpens, withToken],
+  );
   const load = useCallback(async (opts?: { ask: true }) => {
     try {
       const all = (a: Api, tk: string) => {
@@ -229,6 +245,7 @@ export function DocumentDetail(props: { id: string }) {
       }
       const [d, v, m, ty, c] = got;
       setDoc(d);
+      tellOpened(d);
       setVersions(v.items);
       setMembers(m.items);
       setTypes(ty.items);
@@ -247,7 +264,7 @@ export function DocumentDetail(props: { id: string }) {
         }
       }
     }
-  }, [withToken, guarded, id, t, hasCollections]);
+  }, [withToken, guarded, id, t, hasCollections, tellOpened]);
   /** "Confirm it's you" pressed: asked again. */
   const confirmAgain = () => {
     setProblem(null);

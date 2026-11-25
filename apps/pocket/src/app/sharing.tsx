@@ -31,6 +31,7 @@ import { useVault } from '../state/vault';
 import { Button, Notice, Text } from '../ui';
 import { ConfirmSheet } from '../ui/confirm';
 import { feel } from '../ui/feel';
+import { SheetScroll } from '../ui/keyboard';
 import { sp } from '../ui/space';
 import { LoadFailed, loadFailure, Placeholder } from '../ui/states';
 import { useColours, useStyles, type Palette } from '../ui/theme';
@@ -678,8 +679,8 @@ function ShownLink(props: {
     if (clipboard && copyForAMinute(clipboard, text)) props.onCopied(what);
   };
   return (
-    <Sheet visible onClose={props.onClose} testID="sharing-shown" keyboard tall>
-      <ScrollView contentContainerStyle={styles.shown} keyboardShouldPersistTaps="handled">
+    <Sheet visible onClose={props.onClose} testID="sharing-shown" tall>
+      <SheetScroll contentContainerStyle={styles.shown}>
         <Text variant="screen">{t('sharing.shownTitle', { what: props.what })}</Text>
         {props.share.recipient_label ? (
           <Text variant="secondary" tone="soft">
@@ -722,7 +723,7 @@ function ShownLink(props: {
         ) : null}
         <EmailTheLink share={props.share} testID="sharing-shown-email" />
         <Button kind="quiet" label={t('share.done')} onPress={props.onClose} testID="sharing-shown-done" />
-      </ScrollView>
+      </SheetScroll>
     </Sheet>
   );
 }

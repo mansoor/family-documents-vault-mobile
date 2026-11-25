@@ -11,7 +11,7 @@ import {
   type SearchHit,
   type StatusValue,
 } from '@fdv/shared';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { ArrowUpDown, ListChecks, ScanQrCode, Search, SlidersHorizontal, X } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -327,28 +327,79 @@ function DocumentsList(props: { switcher: ReactNode; searchFirst: boolean }) {
     });
   };
 
-  // The filters' choices: the family, and the kinds there are.
+  // The filters' choices: the family, and the kinds there are, once.
   useEffect(() => {
     if (offline || members.length > 0) return;
     let stopped = false;
-    withToken((a, tk) =>
-      Promise.all([
-        a.members(tk),
-        a.documentTypes(tk),
-        tagsOn ? a.tags(tk, undefined, { limit: 1000 }).catch(() => ({ items: [] })) : Promise.resolve({ items: [] }),
-      ]),
-    )
-      .then(([m, ty, tg]) => {
+    withToken((a, tk) => Promise.all([a.members(tk), a.documentTypes(tk)]))
+      .then(([m, ty]) => {
         if (stopped) return;
         setMembers(m.items);
         setTypes(ty.items);
-        setTags([...new Set(tg.items.map((x) => x.tag))]);
       })
       .catch(() => undefined);
     return () => {
       stopped = true;
     };
-  }, [withToken, offline, members.length, tagsOn]);
+  }, [withToken, offline, members.length]);
+  // And the tags there are (0.26.0). They were read once, at first, so a tag added later waited for
+  // the app to start again. Now: read again each time the filters are opened; and a document changed
+  // here marks them out of date, read again when Documents is in view again (never the household's
+  // every tag at each change). The one put on a document last first, where the vault can say
+  // (features.recent_tags); the most used first otherwise.
+  const recentTags = caps?.features.recent_tags === true;
+  const tagsAsked = useRef(0);
+  const tagsStale = useRef(false);
+  const loadTags = useCallback(() => {
+    if (!tagsOn || offline) return;
+    const n = ++tagsAsked.current;
+    tagsStale.current = false;
+    withToken((a, tk) => a.tags(tk, undefined, { limit: 1000, ...(recentTags ? { sort: 'recent' as const } : {}) }))
+      .then((tg) => {
+        // Only the latest answer: an earlier one never puts back a list without the newest tag.
+        if (n === tagsAsked.current) setTags([...new Set(tg.items.map((x) => x.tag))]);
+      })
+      .catch(() => {
+        tagsStale.current = true;
+      });
+  }, [withToken, tagsOn, offline, recentTags]);
+  useEffect(() => {
+    // Set when the vault answers, not synchronously.
+    loadTags();
+  }, [loadTags]);
+  useEffect(
+    () =>
+      on('documentChanged', () => {
+        tagsStale.current = true;
+      }),
+    [],
+  );
+  const navigation = useNavigation();
+  useEffect(
+    () =>
+      navigation.addListener('focus', () => {
+        if (tagsStale.current) loadTags();
+      }),
+    [navigation, loadTags],
+  );
+  // While the filters are open, the tags keep the order they opened with — none moves under a
+  // finger — and one the vault names that they lack is added at the end; the newest order is theirs
+  // the next time they open.
+  const [heldTags, setHeldTags] = useState<string[] | null>(null);
+  const openFilters = () => {
+    setHeldTags(tags);
+    setPanel(true);
+    loadTags();
+  };
+  const closeFilters = () => {
+    setPanel(false);
+    setHeldTags(null);
+  };
+  const panelTags = useMemo(() => {
+    if (!heldTags) return tags;
+    const had = new Set(heldTags);
+    return [...heldTags, ...tags.filter((x) => !had.has(x))];
+  }, [heldTags, tags]);
 
   const categoryOf = useCallback((kind: string) => types.find((ty) => ty.key === kind)?.category ?? null, [types]);
   const params = useCallback(
@@ -647,7 +698,7 @@ function DocumentsList(props: { switcher: ReactNode; searchFirst: boolean }) {
                 accessibilityRole="button"
                 accessibilityLabel={on_ > 0 ? t('filters.buttonOn', { count: on_ }) : t('filters.button')}
                 accessibilityState={{ expanded: panel }}
-                onPress={() => setPanel(true)}
+                onPress={openFilters}
                 style={({ pressed }) => [styles.filterButton, on_ > 0 ? styles.filterOn : null, pressed ? styles.pressed : null]}
               >
                 <SlidersHorizontal
@@ -871,13 +922,13 @@ function DocumentsList(props: { switcher: ReactNode; searchFirst: boolean }) {
         value={filters}
         onApply={(f) => {
           setFilters(f);
-          setPanel(false);
+          closeFilters();
         }}
-        onClose={() => setPanel(false)}
+        onClose={closeFilters}
         members={members}
         // Notes have their own tab: no Note among Documents' kinds where the vault leaves them out.
         types={notesApart ? types.filter((ty) => ty.key !== NOTE_KIND) : types}
-        tags={tagsOn ? tags : null}
+        tags={tagsOn ? panelTags : null}
         several={several}
         // Nobody's goes with a column sort only, and the list's first sort is not one.
         nobody={false}

@@ -10,7 +10,7 @@ import {
 import { Check } from 'lucide-react-native';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, ScrollView, Share as SystemShare, StyleSheet, Switch, View } from 'react-native';
+import { Pressable, Share as SystemShare, StyleSheet, Switch, View } from 'react-native';
 import { wordsFor } from '../errors/words';
 import { copyForAMinute, nativeClipboard } from '../identity/clipboard';
 import { EmailTheLink } from '../sharing/email-link';
@@ -21,6 +21,7 @@ import { Button, Field, Notice, Text } from '../ui';
 import { Chip, ChipRow } from '../ui/chip';
 import { feel } from '../ui/feel';
 import { Sheet } from '../ui/sheet';
+import { SheetScroll } from '../ui/keyboard';
 import { sp } from '../ui/space';
 import { useColours, useStyles, type Palette } from '../ui/theme';
 import { LINK_HOURS, shareable, tick } from './rules';
@@ -104,7 +105,7 @@ export function ClinicianSheet(props: {
     };
     return (
       <Sheet visible onClose={props.onClose} testID="clinician-sheet" tall>
-        <ScrollView style={styles.scroll} contentContainerStyle={styles.body}>
+        <SheetScroll style={styles.scroll} contentContainerStyle={styles.body}>
           <Text variant="screen">{t('emergency.madeTitle')}</Text>
           <Text variant="secondary" tone="soft" testID="clinician-made-words">
             {props.mine
@@ -144,14 +145,14 @@ export function ClinicianSheet(props: {
           ) : null}
           <Notice tone="warn">{t('share.onlyNow')}</Notice>
           <Button kind="quiet" label={t('share.done')} onPress={props.onClose} testID="clinician-done" />
-        </ScrollView>
+        </SheetScroll>
       </Sheet>
     );
   }
 
   return (
-    <Sheet visible onClose={() => (busy ? undefined : props.onClose())} testID="clinician-sheet" keyboard tall>
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
+    <Sheet visible onClose={() => (busy ? undefined : props.onClose())} testID="clinician-sheet" tall>
+      <SheetScroll style={styles.scroll} contentContainerStyle={styles.body}>
         <Text variant="screen">{t('emergency.share')}</Text>
         <Text variant="secondary" tone="soft">
           {t('emergency.shareWords')}
@@ -261,7 +262,7 @@ export function ClinicianSheet(props: {
           testID="clinician-make"
         />
         <Button kind="quiet" label={t('common.cancel')} disabled={busy} onPress={props.onClose} testID="clinician-cancel" />
-      </ScrollView>
+      </SheetScroll>
     </Sheet>
   );
 }

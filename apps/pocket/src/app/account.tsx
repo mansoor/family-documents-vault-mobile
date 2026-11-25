@@ -1,4 +1,4 @@
-import { ScrollView, StyleSheet } from 'react-native';
+import { StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AccessCard } from '../access/access';
 import { SignedInDevices } from '../settings/devices';
@@ -7,6 +7,7 @@ import { ChangePassword } from '../settings/password';
 import { TextCodes } from '../settings/text-codes';
 import { TwoStep } from '../settings/two-step';
 import { VaultCard } from '../settings/vault-card';
+import { FormScroll } from '../ui/keyboard';
 import { sp } from '../ui/space';
 
 /**
@@ -20,7 +21,7 @@ import { sp } from '../ui/space';
 export default function AccountScreen() {
   const insets = useSafeAreaInsets();
   return (
-    <ScrollView testID="account" contentContainerStyle={[styles.page, { paddingBottom: sp(20) + insets.bottom }]}>
+    <FormScroll testID="account" contentContainerStyle={[styles.page, { paddingBottom: sp(20) + insets.bottom }]}>
       <VaultCard />
       <AccessCard />
       <ChangePassword />
@@ -28,7 +29,7 @@ export default function AccountScreen() {
       <MobileNumber />
       <TextCodes />
       <SignedInDevices />
-    </ScrollView>
+    </FormScroll>
   );
 }
 

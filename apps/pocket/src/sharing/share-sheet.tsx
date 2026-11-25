@@ -20,7 +20,7 @@ import {
 import { Check, Eye, EyeOff } from 'lucide-react-native';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, ScrollView, Share as SystemShare, StyleSheet, Switch, View } from 'react-native';
+import { Pressable, Share as SystemShare, StyleSheet, Switch, View } from 'react-native';
 import { wordsFor } from '../errors/words';
 import { copyForAMinute, nativeClipboard } from '../identity/clipboard';
 import { emit } from '../state/events';
@@ -32,6 +32,7 @@ import { Chip, ChipRow } from '../ui/chip';
 import { IconButton } from '../ui/icon-button';
 import { feel } from '../ui/feel';
 import { Sheet } from '../ui/sheet';
+import { SheetScroll } from '../ui/keyboard';
 import { sp } from '../ui/space';
 import { LoadFailed, loadFailure, Placeholder } from '../ui/states';
 import { useColours, useStyles, type Palette } from '../ui/theme';
@@ -237,8 +238,8 @@ export function ShareSheet(props: { target: ShareTarget; onClose: () => void }) 
       if (clipboard && copyForAMinute(clipboard, text)) setCopied(what);
     };
     return (
-      <Sheet visible onClose={props.onClose} testID="share-sheet" keyboard tall>
-        <ScrollView style={styles.scroll} contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
+      <Sheet visible onClose={props.onClose} testID="share-sheet" tall>
+        <SheetScroll style={styles.scroll} contentContainerStyle={styles.body}>
           <Text variant="screen">{t('share.madeTitle')}</Text>
           <Text variant="secondary" tone="soft">
             {t('share.madeWords', { name, end: shareEndWords(new Date(made.share.expires_at), zone) })}
@@ -315,14 +316,14 @@ export function ShareSheet(props: { target: ShareTarget; onClose: () => void }) 
             <Notice tone="warn">{t('share.onlyNow')}</Notice>
           )}
           <Button kind="quiet" label={t('share.done')} onPress={props.onClose} testID="share-done" />
-        </ScrollView>
+        </SheetScroll>
       </Sheet>
     );
   }
 
   return (
-    <Sheet visible onClose={confirm.asking ? confirm.cancel : props.onClose} testID="share-sheet" keyboard tall>
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
+    <Sheet visible onClose={confirm.asking ? confirm.cancel : props.onClose} testID="share-sheet" tall>
+      <SheetScroll style={styles.scroll} contentContainerStyle={styles.body}>
         <Text variant="screen">{t('share.title')}</Text>
         <Text variant="secondary" tone="soft" testID="share-what">
           {name}
@@ -597,7 +598,7 @@ export function ShareSheet(props: { target: ShareTarget; onClose: () => void }) 
             <Button kind="quiet" label={t('common.cancel')} disabled={busy} onPress={props.onClose} testID="share-cancel" />
           </>
         ) : null}
-      </ScrollView>
+      </SheetScroll>
     </Sheet>
   );
 }

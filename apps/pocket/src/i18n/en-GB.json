@@ -93,6 +93,10 @@
     "calm": "Nothing needs you right now.",
     "allDocuments": "See all",
     "recentTitle": "Recently added",
+    "recent": "Recent",
+    "recentAdded": "Added",
+    "recentOpened": "Opened",
+    "openedNone": "Nothing opened yet.",
     "none": "No documents yet. Add one with the + button below.",
     "noneViewer": "No documents yet.",
     "needsAName": "Needs a name",
@@ -1210,7 +1214,12 @@
     "none": "No tags yet.",
     "add": "Add a tag",
     "addButton": "Add",
-    "remove": "Remove the tag {{tag}}"
+    "remove": "Remove the tag {{tag}}",
+    "recentlyUsed": "Recently used",
+    "alreadyUsed": "Tags already used",
+    "addThis": "Add the tag {{tag}}",
+    "offeredRecent": "Recently used tags are offered above the field.",
+    "offeredUsed": "Tags already used that fit are offered above the field."
   },
   "unneeded": {
     "mark": "No longer needed…",

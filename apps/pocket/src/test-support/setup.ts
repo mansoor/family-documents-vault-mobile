@@ -153,3 +153,7 @@ jest.mock('expo-constants', () => {
 jest.requireActual('react-native-gesture-handler/jestSetup');
 jest.mock('react-native-worklets', () => jest.requireActual('react-native-worklets/src/mock'));
 jest.mock('react-native-reanimated', () => jest.requireActual('react-native-reanimated/mock'));
+
+// The keyboard followed (0.26.0): the library's own stand-ins — its
+// scroll view a ScrollView, its sticky and avoiding views plain Views.
+jest.mock('react-native-keyboard-controller', () => jest.requireActual('react-native-keyboard-controller/jest'));

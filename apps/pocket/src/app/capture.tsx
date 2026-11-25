@@ -18,7 +18,7 @@ import {
 import { useNavigation, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { AccessibilityInfo, ScrollView, StyleSheet, Switch, View } from 'react-native';
+import { AccessibilityInfo, StyleSheet, Switch, View, type ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   addPages,
@@ -57,6 +57,7 @@ import { useScreenGuard } from '../state/lock';
 import { useVault } from '../state/vault';
 import { Button, Field, Notice, requiredLabel, Text } from '../ui';
 import { feel } from '../ui/feel';
+import { FormScroll } from '../ui/keyboard';
 import { sp } from '../ui/space';
 import { useColours, useStyles, type Palette } from '../ui/theme';
 import { familyZoneNow } from '../state/family-time';
@@ -523,12 +524,7 @@ function Card(props: { initial: CaptureSource }) {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
-      <ScrollView
-        ref={scroll}
-        contentContainerStyle={styles.page}
-        keyboardShouldPersistTaps="handled"
-        testID="capture-card"
-      >
+      <FormScroll ref={scroll} contentContainerStyle={styles.page} testID="capture-card">
         <Text variant="title">{t('capture.title')}</Text>
 
         {draft.source.kind === 'pages' ? (
@@ -850,7 +846,7 @@ function Card(props: { initial: CaptureSource }) {
           disabled={busy}
           testID={inboxOn ? 'capture-inbox' : 'capture-skip'}
         />
-      </ScrollView>
+      </FormScroll>
       <LeaveQuestion
         visible={asking}
         inbox={inboxOn}

@@ -22,7 +22,7 @@ import { useRouter } from 'expo-router';
 import type { TFunction } from 'i18next';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { KeyboardAvoidingView, Platform, ScrollView, Share as SystemShare, StyleSheet, Switch, View } from 'react-native';
+import { Share as SystemShare, StyleSheet, Switch, View } from 'react-native';
 import { wordsFor } from '../errors/words';
 import { copyForAMinute, nativeClipboard } from '../identity/clipboard';
 import { emit } from '../state/events';
@@ -30,6 +30,7 @@ import { useFamilyZone } from '../state/family-time';
 import { useStepUp } from '../state/step-up';
 import { useVault } from '../state/vault';
 import { Button, Field, Notice, Text } from '../ui';
+import { FormScroll } from '../ui/keyboard';
 import { Chip, ChipRow } from '../ui/chip';
 import { feel } from '../ui/feel';
 import { sp } from '../ui/space';
@@ -890,11 +891,9 @@ function passwordWords(problem: string, t: TFunction): string {
 function Form(props: { children: ReactNode; testID: string }) {
   const styles = useStyles(makeStyles);
   return (
-    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.screen}>
-      <ScrollView testID={props.testID} style={styles.screen} contentContainerStyle={styles.page} keyboardShouldPersistTaps="handled">
-        {props.children}
-      </ScrollView>
-    </KeyboardAvoidingView>
+    <FormScroll testID={props.testID} style={styles.screen} contentContainerStyle={styles.page}>
+      {props.children}
+    </FormScroll>
   );
 }
 

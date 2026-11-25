@@ -28,6 +28,7 @@ import { useVault, VaultProvider } from '../state/vault';
 import { Blockers } from '../update/gate';
 import { headerFor, type HeaderOptions } from '../ui/app-header';
 import { font } from '../ui/fonts';
+import { KeyboardRoot } from '../ui/keyboard';
 import { TextScaleProvider, useTextScale } from '../ui/text-scale';
 import { WEB_FONTS } from '../ui/web-fonts';
 import { sp } from '../ui/space';
@@ -184,9 +185,12 @@ function ShowRecovery() {
 export default function RootLayout() {
   return (
     <GestureHandlerRootView style={fill.root}>
-      <ThemeProvider>
-        <Root />
-      </ThemeProvider>
+      {/* The keyboard followed on every screen and sheet (0.26.0): a field is never typed into blind. */}
+      <KeyboardRoot>
+        <ThemeProvider>
+          <Root />
+        </ThemeProvider>
+      </KeyboardRoot>
     </GestureHandlerRootView>
   );
 }
