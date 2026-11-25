@@ -9,7 +9,7 @@ import {
   type ResetNotice,
 } from '@fdv/shared';
 import { useNavigation, useRouter } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
 import { AppState, FlatList, RefreshControl, StyleSheet, View } from 'react-native';
@@ -32,6 +32,7 @@ import { DocumentRow, rowPlace } from '../../documents/row';
 import { countAlert, reminderAlert, type HomeAlert } from '../../home/alerts';
 import { AlertCards } from '../../home/alert-cards';
 import { GrownUpCards } from '../../home/grown-up';
+import { readRecentTab, RecentTabs, writeRecentTab, type RecentTab } from '../../home/recent';
 import { useCaregiving } from '../../caregivers/caregiving';
 import { isCaregiverPaper } from '../../caregivers/rules';
 import { Counts, ESSENTIALS_SHOWN, EssentialsLine, EssentialsSection, type HomeCounts } from '../../home/glance';
@@ -75,6 +76,12 @@ const optional = <T,>(p: Promise<T>): Promise<T | null> =>
  * alerts that can be hidden for a while; three numbers at a glance; the
  * Essentials kept on the phone; and the five documents added last. Nothing
  * says "nothing to do": the bell carries what is due.
+ *
+ * Recent (0.26.0, the owner's choice, as the web's): where the vault
+ * remembers what each person opened, the five added last are one tab,
+ * Added, of a section Recent, and the five the person opened last the
+ * other, Opened — the tab chosen kept on the phone. An older vault: Recently
+ * added, as before.
  *
  * Earlier: what needs attention, and what came in lately. It shows what it
  * last had when the vault cannot be reached, under a plain banner. Above
@@ -238,6 +245,70 @@ export default function Home() {
   }, [loadInbox, capture.delivered]);
   const navigation = useNavigation();
   useEffect(() => navigation.addListener('focus', () => void loadInbox()), [navigation, loadInbox]);
+
+  // Recent's tabs (0.26.0), where the vault remembers opens: the one chosen last on this phone, for
+  // this person in this vault, first.
+  const recentTabsOn = caps?.features.recently_opened === true;
+  const tabOwner = vault && who ? `${vault.origin}|${who.member_id}` : null;
+  const keptTab = useMemo(() => (tabOwner ? readRecentTab(tabOwner) : 'added'), [tabOwner]);
+  const [picked, setPicked] = useState<{ owner: string; tab: RecentTab } | null>(null);
+  const recentTab: RecentTab = !recentTabsOn
+    ? 'added'
+    : picked && picked.owner === tabOwner
+      ? picked.tab
+      : keptTab;
+  const chooseRecent = (tab: RecentTab) => {
+    if (!tabOwner) return;
+    setPicked({ owner: tabOwner, tab });
+    writeRecentTab(tabOwner, tab);
+  };
+  // What the person opened, newest first: asked only while Opened shows — as it is chosen, each time
+  // Home is in view again, and when a document's page tells the vault it was opened. Without an
+  // answer, what it last had stays, as the rest of Home's does.
+  const showingOpened = recentTabsOn && recentTab === 'opened';
+  const [opened, setOpened] = useState<DocumentView[] | null>(null);
+  const [openedFailed, setOpenedFailed] = useState<string | null>(null);
+  const openedAsked = useRef(0);
+  const openedAt = useRef(0);
+  const loadOpened = useCallback(async () => {
+    if (!showingOpened) return;
+    const n = ++openedAsked.current;
+    openedAt.current = Date.now();
+    try {
+      const r = await withTokenQuick((a, token) => a.recentlyOpened(token, { limit: RECENT_SHOWN }));
+      if (n !== openedAsked.current) return;
+      setOpened(r.items);
+      setOpenedFailed(null);
+    } catch (err) {
+      if (n !== openedAsked.current) return;
+      setOpenedFailed(loadFailure('home', err, t));
+    }
+  }, [showingOpened, withTokenQuick, t]);
+  useEffect(() => {
+    // Set when the vault answers, not synchronously.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void loadOpened();
+  }, [loadOpened]);
+  // In view or not: a document opened from Home is told while Home is underneath, and Home asks again
+  // as it comes back into view, once — not as well while it is out of sight.
+  const inView = useRef(true);
+  useEffect(() => {
+    const offFocus = navigation.addListener('focus', () => {
+      inView.current = true;
+      // Arriving: the first load has just asked.
+      if (Date.now() - openedAt.current > OPENED_JUST_ASKED_MS) void loadOpened();
+    });
+    const offBlur = navigation.addListener('blur', () => {
+      inView.current = false;
+    });
+    return () => {
+      offFocus();
+      offBlur();
+    };
+  }, [navigation, loadOpened]);
+  useEffect(() => on('documentOpened', () => (inView.current ? void loadOpened() : undefined)), [loadOpened]);
+  useEffect(() => on('documentChanged', () => void loadOpened()), [loadOpened]);
+  useEffect(() => on('carryOn', () => void loadOpened()), [loadOpened]);
   useEffect(() => {
     const sub = AppState.addEventListener('change', (state) => {
       if (state === 'active') void loadInbox();
@@ -275,13 +346,15 @@ export default function Home() {
     setRefreshing(true);
     setAskAgain((n) => n + 1);
     // The Essentials kept on the phone are brought up to date too.
-    await Promise.all([load(), loadInbox(), essentials.sync()]);
+    await Promise.all([load(), loadInbox(), loadOpened(), essentials.sync()]);
     setRefreshing(false);
   };
 
   // What needs doing, as alerts (R4): due reminders, documents with no name, files in the Inbox.
   const due = data?.due ?? [];
-  const recent = (data?.recent ?? []).slice(0, 5);
+  const recent = (data?.recent ?? []).slice(0, RECENT_SHOWN);
+  // The rows Recent shows: the tab chosen's.
+  const rows = showingOpened ? (opened ?? []).slice(0, RECENT_SHOWN) : recent;
   const alerts: HomeAlert[] = [
     ...due.map(reminderAlert),
     ...(data && data.unnamed > 0 ? [countAlert('unnamed', data.unnamed)] : []),
@@ -296,8 +369,8 @@ export default function Home() {
     <SafeAreaView style={styles.safe} edges={[]}>
       <FlatList
         testID="home-list"
-        // The five added last (R4); See all opens Documents.
-        data={recent}
+        // The five added last (R4), or the five opened last (0.26.0); See all opens Documents.
+        data={rows}
         keyExtractor={(d) => d.id}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void refresh()} />}
         contentContainerStyle={styles.page}
@@ -409,8 +482,8 @@ export default function Home() {
             {/* Home has what it asked for: what a test or a flow waits for, now that
                 nothing says "nothing to do" (R4). */}
             <View style={styles.recentHead} {...(data ? { testID: 'home-ready' } : {})}>
-              <Text variant="screen" style={styles.flex}>
-                {t('home.recentTitle')}
+              <Text variant="screen" style={styles.flex} testID="home-recent-title">
+                {recentTabsOn ? t('home.recent') : t('home.recentTitle')}
               </Text>
               <Button
                 kind="quiet"
@@ -419,13 +492,29 @@ export default function Home() {
                 testID="home-all-documents"
               />
             </View>
+            {recentTabsOn ? <RecentTabs current={recentTab} onChoose={chooseRecent} /> : null}
             {failed ? <LoadFailed words={failed} onRetry={() => void load()} /> : null}
-            {!data && !failed && !offline ? <Placeholder /> : null}
-            {data && data.recent.length === 0 ? (
-              <Text tone="soft" testID="home-none">
-                {t(canAdd ? 'home.none' : 'home.noneViewer')}
-              </Text>
-            ) : null}
+            {showingOpened ? (
+              <>
+                {openedFailed ? <LoadFailed words={openedFailed} onRetry={() => void loadOpened()} /> : null}
+                {/* Loading, as Added is; without a connection and nothing yet, nothing, as Added. */}
+                {!opened && !openedFailed && !offline ? <Placeholder /> : null}
+                {opened && opened.length === 0 ? (
+                  <Text tone="soft" testID="home-opened-none">
+                    {t('home.openedNone')}
+                  </Text>
+                ) : null}
+              </>
+            ) : (
+              <>
+                {!data && !failed && !offline ? <Placeholder /> : null}
+                {data && data.recent.length === 0 ? (
+                  <Text tone="soft" testID="home-none">
+                    {t(canAdd ? 'home.none' : 'home.noneViewer')}
+                  </Text>
+                ) : null}
+              </>
+            )}
           </View>
         }
         renderItem={({ item, index }) => (
@@ -436,7 +525,7 @@ export default function Home() {
             note_name={item.note_name}
             status={item.status}
             doc={item}
-            place={rowPlace(index, recent.length)}
+            place={rowPlace(index, rows.length)}
             // A note with no title is named by its first words (0.9.0); a scan with none needs a name.
             untitled={t('home.needsAName')}
             thumb={
@@ -466,6 +555,11 @@ export default function Home() {
     </SafeAreaView>
   );
 }
+
+/** How many Recent shows, either tab: five, as Recently added always did. */
+const RECENT_SHOWN = 5;
+/** Home in view again this soon after Opened was asked (its arrival): not asked twice. */
+const OPENED_JUST_ASKED_MS = 1500;
 
 /**
  * The day a moment fell on, on the family's calendar (P5), in words: "3 Oct

@@ -1,8 +1,9 @@
 import { radii } from '@fdv/shared';
 import type { ReactNode } from 'react';
-import { KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, View } from 'react-native';
+import { Modal, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useReduceMotion } from './feel';
+import { RisesWithKeyboard, useKeyboardShown } from './keyboard';
 import { sp } from './space';
 import { useStyles, type Palette } from './theme';
 
@@ -10,6 +11,9 @@ import { useStyles, type Palette } from './theme';
  * Every question and choice the app puts over a screen (P1): a sheet from
  * the bottom over a shaded page, above the navigation bar, which the
  * window draws under. Back closes it. A screen reader stays inside it.
+ * Every sheet rises with the keyboard (0.26.0), on Android as on iPhone, so
+ * a field in it is never typed into blind; one taller than what is left
+ * above the keyboard gives way, and what it scrolls stays in view.
  */
 export function Sheet(props: {
   visible: boolean;
@@ -23,8 +27,6 @@ export function Sheet(props: {
    */
   outside?: string | true;
   onShow?: () => void;
-  /** It holds a field: it rises with the keyboard. */
-  keyboard?: boolean;
   /** Many choices: at the largest text they scroll within 90% of the screen. */
   tall?: boolean;
   children: ReactNode;
@@ -33,6 +35,8 @@ export function Sheet(props: {
   const insets = useSafeAreaInsets();
   // Remove animations (P10): it is there at once, not faded in.
   const still = useReduceMotion();
+  // With the keyboard up, it covers the phone's own buttons: no room kept for them above it.
+  const keyboard = useKeyboardShown();
   const body = (
     <>
       {props.outside ? (
@@ -45,7 +49,7 @@ export function Sheet(props: {
         />
       ) : null}
       <View
-        style={[styles.sheet, props.tall ? styles.tall : null, { paddingBottom: sp(20) + insets.bottom }]}
+        style={[styles.sheet, props.tall ? styles.tall : null, { paddingBottom: sp(20) + (keyboard ? 0 : insets.bottom) }]}
         accessibilityViewIsModal
         testID={props.testID}
       >
@@ -61,13 +65,7 @@ export function Sheet(props: {
       onRequestClose={props.onClose}
       {...(props.onShow ? { onShow: props.onShow } : {})}
     >
-      {props.keyboard ? (
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.shade}>
-          {body}
-        </KeyboardAvoidingView>
-      ) : (
-        <View style={styles.shade}>{body}</View>
-      )}
+      <RisesWithKeyboard style={styles.shade}>{body}</RisesWithKeyboard>
     </Modal>
   );
 }
@@ -76,6 +74,8 @@ const makeStyles = (colours: Palette) =>
   StyleSheet.create({
     shade: { flex: 1, backgroundColor: colours.scrim, justifyContent: 'flex-end' },
     sheet: {
+      // Never taller than what the keyboard leaves of the screen.
+      flexShrink: 1,
       backgroundColor: colours.bg,
       padding: sp(20),
       gap: sp(12),

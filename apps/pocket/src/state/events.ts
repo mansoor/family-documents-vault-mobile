@@ -18,6 +18,8 @@ interface Events {
    * copies kept on the phone follow only a change that touches them.
    */
   documentChanged: [id: string, essential?: boolean];
+  /** The vault was told the person opened a document's page (0.26.0): Home's Recent, on Opened, looks again. */
+  documentOpened: [id: string];
   /** Documents put in a collection or taken out of it on the phone (P9): its list and its page look again. */
   collectionChanged: [id: string];
   /** A collection's checklist kept, cleared or filled from on the phone (0.8.0): its page looks again. */
@@ -53,6 +55,7 @@ const listeners: { [K in keyof Events]: Set<Listener<K>> } = {
   noticesChanged: new Set(),
   phoneChanged: new Set(),
   documentChanged: new Set(),
+  documentOpened: new Set(),
   collectionChanged: new Set(),
   checklistChanged: new Set(),
   managersChanged: new Set(),

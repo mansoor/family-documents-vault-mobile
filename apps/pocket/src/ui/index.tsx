@@ -14,6 +14,7 @@ import {
   type ViewStyle,
 } from 'react-native';
 import { font, type Weight } from './fonts';
+import { useKeepInView } from './keyboard';
 import { LINE, TYPE } from './scale';
 import { useTextScale } from './text-scale';
 import { sp } from './space';
@@ -236,7 +237,10 @@ export function Field(
 ) {
   const colours = useColours();
   const styles = useStyles(makeStyles);
-  const { label, error, testID, required, goTo, onLayout, clear, ...input } = props;
+  const { label, error, testID, required, goTo, onLayout, onFocus, clear, ...input } = props;
+  // In a sheet, the page brings the field given the focus into view above the keyboard (0.26.0).
+  const keeper = useKeepInView();
+  const wrap = useRef<View>(null);
   const clearing = !!clear && typeof input.value === 'string' && input.value !== '';
   const { scale } = useTextScale();
   const box = useRef<TextInput>(null);
@@ -256,7 +260,7 @@ export function Field(
     else waiting.current = true;
   }, [goTo, focusSoon]);
   return (
-    <View style={styles.field}>
+    <View style={styles.field} ref={wrap}>
       <Text variant="secondary" weight="600" tone="soft">
         {requiredLabel(label, required)}
       </Text>
@@ -276,6 +280,10 @@ export function Field(
           error ? styles.inputError : null,
         ]}
         {...input}
+        onFocus={(e) => {
+          onFocus?.(e);
+          if (wrap.current) keeper?.focused?.(wrap.current);
+        }}
         onLayout={(e) => {
           laidOut.current = true;
           if (waiting.current) {

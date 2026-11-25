@@ -2,7 +2,7 @@ import { ApiRequestError } from '@fdv/client';
 import { radii, shareEndWords, SHOW_TITLE_LABEL, type ChangedShare, type Share } from '@fdv/shared';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ScrollView, StyleSheet, Switch, View } from 'react-native';
+import { StyleSheet, Switch, View } from 'react-native';
 import { wordsFor } from '../errors/words';
 import { copyForAMinute, nativeClipboard } from '../identity/clipboard';
 import { emit } from '../state/events';
@@ -13,6 +13,7 @@ import { Button, Field, Notice, Text } from '../ui';
 import { Chip, ChipRow } from '../ui/chip';
 import { feel } from '../ui/feel';
 import { Sheet } from '../ui/sheet';
+import { SheetScroll } from '../ui/keyboard';
 import { sp } from '../ui/space';
 import { useColours, useStyles, type Palette } from '../ui/theme';
 import { readChange, startChange, type ChangeEnd, type ChangeOptions, type SecretChange } from './change-model';
@@ -85,7 +86,7 @@ export function ChangeLinkSheet(props: { link: Share; what: string; onClose: () 
     const which = made.pin ? 'pin' : 'password';
     const clipboard = nativeClipboard();
     return (
-      <Sheet visible onClose={() => props.onDone(said)} testID="change-link-secret" keyboard>
+      <Sheet visible onClose={() => props.onDone(said)} testID="change-link-secret">
         <Text variant="screen">{t(`changeLink.new_${which}`)}</Text>
         <Text variant="secondary" tone="soft">
           {t(`changeLink.newWords_${which}`)}
@@ -144,8 +145,8 @@ export function ChangeLinkSheet(props: { link: Share; what: string; onClose: () 
   const endChoices: ChangeEnd[] = ['keep', ...read.picks.map((p) => p.key), 'other'];
 
   return (
-    <Sheet visible onClose={props.onClose} testID="change-link" keyboard tall>
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
+    <Sheet visible onClose={props.onClose} testID="change-link" tall>
+      <SheetScroll style={styles.scroll} contentContainerStyle={styles.body}>
         <Text variant="screen">{t('changeLink.title')}</Text>
         <Text variant="secondary" tone="soft" testID="change-link-what">
           {props.what}
@@ -337,7 +338,7 @@ export function ChangeLinkSheet(props: { link: Share; what: string; onClose: () 
           testID="change-link-save"
         />
         <Button kind="quiet" label={t('common.cancel')} disabled={busy} onPress={props.onClose} testID="change-link-cancel" />
-      </ScrollView>
+      </SheetScroll>
     </Sheet>
   );
 }

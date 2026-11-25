@@ -2,7 +2,7 @@ import type { Me } from '@fdv/shared';
 import { usePathname } from 'expo-router';
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { BackHandler, Linking, ScrollView, StyleSheet, View } from 'react-native';
+import { BackHandler, Linking, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { APP_RELEASES_URL, APP_VERSION } from '../config';
 import { KeptRows } from '../essentials/ui';
@@ -12,6 +12,7 @@ import { useEssentials } from '../state/essentials';
 import { useVault, type Blocked, type TwoStepNeeded } from '../state/vault';
 import { Button, Card, Field, Notice, Text } from '../ui';
 import { ConfirmSheet } from '../ui/confirm';
+import { FormScroll } from '../ui/keyboard';
 import { sp } from '../ui/space';
 import { useStyles, type Palette } from '../ui/theme';
 
@@ -71,9 +72,9 @@ function Page(props: { testID: string; children: ReactNode }) {
   }, []);
   return (
     <SafeAreaView style={styles.safe} testID={props.testID}>
-      <ScrollView contentContainerStyle={styles.page} keyboardShouldPersistTaps="handled">
+      <FormScroll contentContainerStyle={styles.page}>
         {props.children}
-      </ScrollView>
+      </FormScroll>
     </SafeAreaView>
   );
 }

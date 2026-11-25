@@ -124,7 +124,6 @@ export function AddDocuments(props: {
       onClose={() => (confirm.asking ? confirm.cancel() : busy ? undefined : props.onClose())}
       testID="add-documents"
       tall
-      keyboard
     >
       {/* Asked in the sheet's place, until answered. */}
       {confirm.body ?? (

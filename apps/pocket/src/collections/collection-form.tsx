@@ -10,13 +10,14 @@ import {
 } from '@fdv/shared';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { wordsFor } from '../errors/words';
 import { useVault } from '../state/vault';
 import { Button, Field, Notice, Text } from '../ui';
 import { Chip, ChipRow } from '../ui/chip';
 import { feel } from '../ui/feel';
 import { Sheet } from '../ui/sheet';
+import { SheetScroll } from '../ui/keyboard';
 import { sp } from '../ui/space';
 import { useStyles } from '../ui/theme';
 import { audienceKey } from './rules';
@@ -81,8 +82,8 @@ export function CollectionForm(props: {
   };
 
   return (
-    <Sheet visible onClose={props.onClose} testID="collection-form" keyboard tall>
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
+    <Sheet visible onClose={props.onClose} testID="collection-form" tall>
+      <SheetScroll style={styles.scroll} contentContainerStyle={styles.body}>
         <Text variant="screen">{e ? t('collectionForm.editTitle') : t('collectionForm.newTitle')}</Text>
         <Field
           label={t('collectionForm.name')}
@@ -136,7 +137,7 @@ export function CollectionForm(props: {
           testID="collection-form-save"
         />
         <Button kind="quiet" label={t('common.cancel')} disabled={busy} onPress={props.onClose} testID="collection-form-cancel" />
-      </ScrollView>
+      </SheetScroll>
     </Sheet>
   );
 }

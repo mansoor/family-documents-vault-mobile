@@ -3,7 +3,7 @@ import * as Linking from 'expo-linking';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
+import { Pressable, StyleSheet, Switch, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { APP_VERSION, SPIKE } from '../config';
 import { NotificationsCard } from '../push/card';
@@ -19,6 +19,7 @@ import { Button, Card, Notice, Text } from '../ui';
 import { useTextScale } from '../ui/text-scale';
 import { ConfirmSheet } from '../ui/confirm';
 import { Sheet } from '../ui/sheet';
+import { FormScroll } from '../ui/keyboard';
 import { sp } from '../ui/space';
 import { useStyles, useTheme, type Palette } from '../ui/theme';
 import { Chip, ChipRow } from '../ui/chip';
@@ -71,7 +72,7 @@ export default function Settings() {
   return (
     // Below the last card, room for the gesture bar: at the largest text
     // "Sign out" sat partly under it, even scrolled to the end (0.2.0).
-    <ScrollView contentContainerStyle={[styles.page, { paddingBottom: 20 + insets.bottom }]}>
+    <FormScroll contentContainerStyle={[styles.page, { paddingBottom: 20 + insets.bottom }]}>
       <Card>
         <View style={styles.row}>
           <View style={styles.flex}>
@@ -207,7 +208,7 @@ export default function Settings() {
         />
         <Button label={t('common.cancel')} kind="quiet" onPress={() => setAsking(false)} testID="sign-out-cancel" />
       </Sheet>
-    </ScrollView>
+    </FormScroll>
   );
 }
 

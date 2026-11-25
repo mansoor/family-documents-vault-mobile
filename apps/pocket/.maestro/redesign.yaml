@@ -150,7 +150,11 @@ env:
     timeout: 15000
 
 # The gaps review (11 Nov 2026): a tag added to the passport in Edit
-# details, and the Trash in More.
+# details, and the Trash in More. The keyboard never hides what is typed
+# (0.26.0): the Tags field, low on the page, is scrolled above the
+# keyboard as it opens, so the word typed is seen, and Add beside it is
+# tapped with the keyboard still up — behind the keyboard, the tap would
+# land on a key and nothing would be added.
 - tapOn:
     id: tab-documents
 - extendedWaitUntil:
@@ -172,13 +176,16 @@ env:
 - tapOn:
     id: edit-tag-new
 - inputText: renew
-- hideKeyboard
+- assertVisible:
+    id: edit-tag-new
+    text: renew
 - tapOn:
     id: edit-tag-add
 - extendedWaitUntil:
     visible:
       id: edit-tag-renew
     timeout: 10000
+- hideKeyboard
 - takeScreenshot: shot-light-edit-tags
 - scrollUntilVisible:
     element:
@@ -190,6 +197,38 @@ env:
       id: document-tags
     timeout: 30000
 - assertVisible: .*renew.*
+# Recently used (0.26.0): in Edit details again, renew taken off (not
+# saved), the Tags field given the focus: renew, put on the passport just
+# now, is offered as a pill above the field, and is tapped with the
+# keyboard still up — a tap, since a pill under the keyboard would still
+# count as visible. Saved as it was.
+- tapOn:
+    id: document-edit
+- scrollUntilVisible:
+    element:
+      id: edit-tag-renew
+    timeout: 30000
+- tapOn:
+    id: edit-tag-renew
+- tapOn:
+    id: edit-tag-new
+- extendedWaitUntil:
+    visible:
+      id: edit-tag-offer-renew
+    timeout: 15000
+- tapOn:
+    id: edit-tag-offer-renew
+- extendedWaitUntil:
+    visible:
+      id: edit-tag-renew
+    timeout: 10000
+- hideKeyboard
+- tapOn:
+    id: edit-save
+- extendedWaitUntil:
+    visible:
+      id: document-more
+    timeout: 15000
 # A reminder set yourself (0.5.3): in a week, with a note, from the ⋯.
 - tapOn:
     id: document-more

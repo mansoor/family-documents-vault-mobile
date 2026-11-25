@@ -3,10 +3,11 @@ import type { TFunction } from 'i18next';
 import { Inbox } from 'lucide-react-native';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ScrollView, Share as SystemShare, StyleSheet, View } from 'react-native';
+import { Share as SystemShare, StyleSheet, View } from 'react-native';
 import { copyForAMinute, nativeClipboard } from '../identity/clipboard';
 import { Button, Text } from '../ui';
 import { Sheet } from '../ui/sheet';
+import { SheetScroll } from '../ui/keyboard';
 import { sp } from '../ui/space';
 import { useColours, useStyles, type Palette } from '../ui/theme';
 import { emit } from '../state/events';
@@ -241,8 +242,8 @@ export function ShownRequest(props: {
     if (clipboard && copyForAMinute(clipboard, text)) setCopied(what);
   };
   return (
-    <Sheet visible onClose={props.onClose} testID="request-shown" keyboard tall>
-      <ScrollView contentContainerStyle={styles.shown} keyboardShouldPersistTaps="handled">
+    <Sheet visible onClose={props.onClose} testID="request-shown" tall>
+      <SheetScroll contentContainerStyle={styles.shown}>
         <Text variant="screen">{t('requests.shownTitle', { title: props.request.title })}</Text>
         {props.request.recipient_label ? (
           <Text variant="secondary" tone="soft">
@@ -289,7 +290,7 @@ export function ShownRequest(props: {
           {t('requests.onlyYou')}
         </Text>
         <Button kind="quiet" label={t('share.done')} onPress={props.onClose} testID="request-shown-done" />
-      </ScrollView>
+      </SheetScroll>
     </Sheet>
   );
 }
