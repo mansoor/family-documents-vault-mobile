@@ -8,7 +8,7 @@ import { StatusBar } from 'expo-status-bar';
 import * as SystemUI from 'expo-system-ui';
 import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Platform, StyleSheet, Text, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { extra, SPIKE } from '../config';
@@ -96,7 +96,13 @@ function Gates() {
           contentStyle: { backgroundColor: colours.bg },
           // The vault's bar at the top of every page, the page's title and buttons below it
           // (the owner's ask of 11 Nov 2026): no back arrow, Android's back goes back.
-          header: ({ options }) => headerFor(options as HeaderOptions),
+          // An iPhone has no back button of its own, so there every page
+          // opened over another has the ← (besides the swipe from the edge).
+          header: ({ options, back }) =>
+            headerFor({
+              ...(options as HeaderOptions),
+              ...(Platform.OS === 'ios' && back !== undefined ? { headerBackVisible: true } : {}),
+            }),
           ...(still ? { animation: 'none' as const } : {}),
         }}
       >
