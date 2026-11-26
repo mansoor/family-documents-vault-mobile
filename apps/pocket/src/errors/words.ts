@@ -106,6 +106,12 @@ export const CATALOGUE: Readonly<Record<string, string>> = {
   app_key_not_accepted: 'errors.general',
   // A new password the household's rules refuse (the vault's 0.9.0-dev.98): its own words name what is missing.
   password_rules: 'password.rulesRefused',
+  // Getting back in without the second step (the vault's 0.9.0-dev.104): a
+  // code by text that can't be sent, a recovery not finished elsewhere, and
+  // codes asked for with no second step. Said in the vault's words when it gives them.
+  text_code_unavailable: 'signIn.textUnavailable',
+  recovery_unfinished: 'signIn.recoveryUnfinished',
+  recovery_codes_need_second_step: 'recovery.secondStepFirst',
 };
 
 /** The vault's "not now" answers: a scan waiting on one of these is sent again later by itself. */
@@ -146,6 +152,15 @@ const VAULT_SAYS: ReadonlySet<string> = new Set([
   'request_ended',
   // What a new password lacks, or that it is too common: only the vault knows its household's rules.
   'password_rules',
+  // Getting back in (0.9.0-dev.104): what to do instead, and for how long, only the vault knows.
+  'text_code_unavailable',
+  'recovery_unfinished',
+  'recovery_codes_need_second_step',
+  'recovery_code_wrong',
+  'security_answers_wrong',
+  'security_questions_refused',
+  'security_questions_not_offered',
+  'security_questions_off',
 ]);
 
 /**
