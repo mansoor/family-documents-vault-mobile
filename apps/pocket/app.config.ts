@@ -86,6 +86,9 @@ export default ({ config }: ConfigContext): ExpoConfig => {
             buildArchs: variant === 'e2e' ? ['x86_64'] : ['arm64-v8a'],
             enableMinifyInReleaseBuilds: variant !== 'dev',
           },
+          // Xcode 27's iOS SDK refuses to launch an app without the UIKit
+          // scene life cycle; SDK 57's template still starts without it.
+          ios: { enableSceneSupport: true },
         },
       ],
       ['expo-sqlite', { useSQLCipher: true }],
