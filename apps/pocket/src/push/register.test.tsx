@@ -16,6 +16,14 @@ import { capabilities, testVault, VAPID } from '../test-support/vault';
 jest.mock('expo-router', () => require('../test-support/router').routerMock);
 
 /** A vault of 0.4.14 with push set up, or not, or a vault from before 0.4.14. */
+/** The vault ends every session of the account, as it does before it pushes session_ended. */
+function endAll(t: ReturnType<typeof testVault>) {
+  for (const s of t.vault.state.sessions) {
+    s.revoked = true;
+    s.endedBecause = 'revoked';
+  }
+}
+
 function pushVault(push: 'on' | 'off' | 'before' = 'on') {
   const t = testVault();
   const caps = capabilities();
@@ -352,6 +360,8 @@ describe('notifications on this phone (4.14)', () => {
       return null;
     }
     await signedIn(t);
+    // The vault ended it while the app was closed: asked as the app starts, it says so (0.27.0).
+    endAll(t);
     await renderApp(<Probe />, {
       fetch: t.fetch,
       lock: parts.lock,
@@ -399,12 +409,12 @@ describe('notifications on this phone (4.14)', () => {
     await waitFor(() => expect(parts.stores.size).toBe(0));
   });
 
-  it('a session_ended read at launch reaches sign-in without waiting for the vault, and says paused once it answers', async () => {
+  it('a session_ended read at launch reaches sign-in after a short wait for the vault, and says paused once it answers', async () => {
     const t = pushVault();
     const fake = new FakePushNative();
     fake.ended = true;
     const parts = phoneParts();
-    // A vault slow to answer why (its link down, say): nothing is waited for.
+    // A vault slow to answer (its link down, say): waited for a moment only.
     let answer: () => void = () => undefined;
     const held = new Promise<void>((resolve) => {
       answer = resolve;
@@ -435,7 +445,8 @@ describe('notifications on this phone (4.14)', () => {
       push: { native: fake },
       deps: { push: fake },
     });
-    await waitFor(() => expect(seen.at(-1)).toBe('sign_in|signed_out_here'));
+    // Asked first whether the session lives (0.27.0): no answer in time, the push is believed.
+    await waitFor(() => expect(seen.at(-1)).toBe('sign_in|signed_out_here'), { timeout: 6000 });
     expect(seen).not.toContain('ready|none');
     // The vault answers: a lock.
     await act(async () => answer());
@@ -453,6 +464,7 @@ describe('notifications on this phone (4.14)', () => {
     });
     await screen.findByTestId('settings-sign-out');
     parts.stores.set('everyday', new MemoryEssentialsStore());
+    endAll(t);
     await act(async () => fake.emit({ kind: 'message', type: 'session_ended' }));
     await waitFor(() => expect(screen.queryByTestId('settings-sign-out')).toBeNull());
     await waitFor(() => expect(parts.stores.size).toBe(0));

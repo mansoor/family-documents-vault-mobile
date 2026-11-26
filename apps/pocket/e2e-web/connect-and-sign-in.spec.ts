@@ -11,7 +11,8 @@ import { apiToken, Authenticator, EMAIL, FAMILY, finishWithCode, PASSWORD, ready
  * FDV_E2E_TOTP_SECRET, if the owner's key is not kept here).
  *
  * And 0.20.0's: an adult the household asks for two-step sign-in, signing
- * in without it, sets it up on the phone before anything else.
+ * in without it, sets it up on the phone before anything else — and, since
+ * 0.27.0, keeps the recovery codes made beside it.
  */
 
 /** What the vault calls itself, which is what the app shows. */
@@ -101,7 +102,19 @@ test('an adult without two-step sign-in sets it up on the phone, then carries on
   await page.getByTestId('two-step-code').fill(await app.code());
   await page.getByTestId('two-step-confirm').click();
 
-  // Set up: the same session goes on, to Home.
+  // Set up: recovery codes made beside it (the vault's 0.9.0-dev.104), shown once — after
+  // confirming it's them again, if the vault asks — and kept before the session goes on.
+  const again = page.getByTestId('step-up-password');
+  await expect(again.or(page.getByTestId('recovery-codes'))).toBeVisible();
+  if (await again.isVisible()) {
+    await again.fill(password);
+    await page.getByTestId('step-up-go').click();
+  }
+  await expect(page.getByTestId('recovery-code-9')).toBeVisible();
+  await expect(page.getByTestId('home-ready')).toHaveCount(0);
+  await page.getByTestId('recovery-codes-kept').click();
+
+  // Kept: the same session goes on, to Home.
   await expect(page.getByTestId('home-ready')).toBeVisible();
   await expect(page.getByTestId('two-step-needed')).toHaveCount(0);
 });
