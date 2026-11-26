@@ -7,9 +7,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { APP_RELEASES_URL, APP_VERSION } from '../config';
 import { KeptRows } from '../essentials/ui';
 import { wordsFor } from '../errors/words';
+import { RecoveryCodesShown } from '../settings/recovery';
+import { TextCodes } from '../settings/text-codes';
 import { TwoStep } from '../settings/two-step';
 import { useEssentials } from '../state/essentials';
-import { useVault, type Blocked, type TwoStepNeeded } from '../state/vault';
+import { useStepUp } from '../state/step-up';
+import { twoStepReason, useVault, type Blocked, type TwoStepNeeded } from '../state/vault';
 import { Button, Card, Field, Notice, Text } from '../ui';
 import { ConfirmSheet } from '../ui/confirm';
 import { FormScroll } from '../ui/keyboard';
@@ -27,7 +30,9 @@ const VAULT_UPGRADE_URL = 'https://github.com/mansoor/family-documents-vault#upg
  *    (`blocked`): this app too old for the vault — its capability document
  *    said so, or any request or renewal was answered `426
  *    app_update_required` — or the vault too old for the app;
- *  - this session must set up two-step sign-in first (`twoStep`).
+ *  - this session must set up two-step sign-in first (`twoStep`) — and,
+ *    where the vault has recovery codes (0.9.0-dev.104), keep the ones made
+ *    beside it, shown once, before the app goes on.
  *
  * Drawn over the screens, never instead of them: what was being written —
  * a scan's card, a note, an edit — stays as it was underneath, hidden from
@@ -41,10 +46,20 @@ export function Blockers(props: { children: ReactNode }) {
   const styles = useStyles(makeStyles);
   const { blocked, twoStep, phase } = useVault();
   const pathname = usePathname();
+  // Recovery codes made as two-step sign-in was set up here (0.9.0-dev.104):
+  // shown until they are kept, even once the vault lets the session go on —
+  // a renewal meanwhile never takes them off the screen unseen.
+  const [codes, setCodes] = useState<string[] | null>(null);
+  const showingCodes = codes !== null && phase === 'ready';
   const update = blocked !== null && (phase === 'ready' || phase === 'sign_in');
-  const held = !update && twoStep !== null && phase === 'ready';
+  const held = !update && (twoStep !== null || showingCodes) && phase === 'ready';
   const reading = update && (pathname.startsWith('/essential/') || pathname.startsWith('/show/'));
   const over = (update && !reading) || held;
+  useEffect(() => {
+    // Signed out meanwhile: nothing of theirs stays to be shown.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (phase !== 'ready') setCodes(null);
+  }, [phase]);
   return (
     <View style={styles.fill}>
       <View
@@ -56,7 +71,13 @@ export function Blockers(props: { children: ReactNode }) {
       </View>
       {over ? (
         <View style={styles.over}>
-          {update && blocked ? <UpdateScreen blocked={blocked} /> : <TwoStepScreen reason={twoStep ?? 'enrol'} />}
+          {update && blocked ? (
+            <UpdateScreen blocked={blocked} />
+          ) : showingCodes ? (
+            <CodesScreen codes={codes} onKept={() => setCodes(null)} />
+          ) : (
+            <TwoStepScreen reason={twoStep ?? 'enrol'} onCodes={setCodes} />
+          )}
         </View>
       ) : null}
     </View>
@@ -202,13 +223,38 @@ function UpdateScreen(props: { blocked: Blocked }) {
   );
 }
 
-function TwoStepScreen(props: { reason: TwoStepNeeded }) {
+/**
+ * The recovery codes made beside a second step just set up, shown once
+ * (0.9.0-dev.104); kept, the vault is asked again and the app goes on.
+ */
+function CodesScreen(props: { codes: string[]; onKept: () => void }) {
+  const { recheckTwoStep } = useVault();
+  return (
+    <Page testID="two-step-codes">
+      <RecoveryCodesShown
+        codes={props.codes}
+        onDone={() => {
+          props.onKept();
+          void recheckTwoStep().catch(() => undefined);
+        }}
+      />
+    </Page>
+  );
+}
+
+function TwoStepScreen(props: { reason: TwoStepNeeded; onCodes: (codes: string[]) => void }) {
   const { t } = useTranslation();
-  const { recheckTwoStep, withToken } = useVault();
+  const { caps, recheckTwoStep, withToken } = useVault();
+  const { guarded } = useStepUp();
   const [me, setMe] = useState<Me | null>(null);
   const [busy, setBusy] = useState(false);
   const [said, setSaid] = useState<string | null>(null);
   const [code, setCode] = useState('');
+  // A second step set up here, and its recovery codes asked for (0.9.0-dev.104).
+  const [asked, setAsked] = useState(false);
+  const [making, setMaking] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+  const { onCodes } = props;
 
   // Why, and what this person has set up: the screen offers what fits.
   useEffect(() => {
@@ -238,6 +284,30 @@ function TwoStepScreen(props: { reason: TwoStepNeeded }) {
     }
   }, [recheckTwoStep, t]);
 
+  /**
+   * A second step set up here: its recovery codes made and shown once
+   * before the app goes on, as the web does (0.9.0-dev.104). After a
+   * recovery the vault waits for them; a vault without them goes straight on.
+   */
+  const setUp = useCallback(async () => {
+    if (caps?.features.recovery_codes !== true) {
+      await carryOn();
+      return;
+    }
+    setAsked(true);
+    setMaking(true);
+    setProblem(null);
+    try {
+      const made = await guarded((a, tk) => a.makeRecoveryCodes(tk));
+      if (made) onCodes(made.codes);
+      else setProblem(t('recovery.notMade'));
+    } catch (err) {
+      setProblem(wordsFor(err, t));
+    } finally {
+      setMaking(false);
+    }
+  }, [caps, carryOn, guarded, onCodes, t]);
+
   const confirm = async () => {
     setBusy(true);
     setSaid(null);
@@ -255,17 +325,56 @@ function TwoStepScreen(props: { reason: TwoStepNeeded }) {
   };
 
   // The vault's own word, once /me has said it; until then, what the refusal said.
-  const reason = me?.two_step_reason === 'confirm' || me?.two_step_reason === 'enrol' ? me.two_step_reason : props.reason;
+  const reason = me?.two_step_reason ? twoStepReason(me.two_step_reason) : props.reason;
   // Confirming takes a code from the authenticator app: a passkey alone is the browser's.
   const passkeyOnly = reason === 'confirm' && me !== null && !me.totp_enabled;
+  // A second step there and no codes yet — making them failed, "Confirm it's
+  // you" was cancelled, or the app started again: made again on request.
+  const secondStepThere = me?.totp_enabled === true || me?.has_passkey === true;
+  const makeAgain =
+    caps?.features.recovery_codes === true &&
+    !making &&
+    (asked || (reason === 'recovered' && secondStepThere)) ? (
+      <Button testID="two-step-needed-make-codes" label={t('recovery.makeMine')} onPress={() => void setUp()} />
+    ) : null;
+  const makingWords = (
+    <>
+      {making ? (
+        <Text tone="soft" variant="secondary" testID="two-step-needed-making">
+          {t('recovery.making')}
+        </Text>
+      ) : null}
+      {problem ? (
+        <Notice tone="warn" testID="two-step-needed-codes-problem">
+          {problem}
+        </Notice>
+      ) : null}
+      {makeAgain}
+    </>
+  );
 
   return (
     <Page testID="two-step-needed">
-      <Text variant="hero">{reason === 'confirm' ? t('twoStepNeeded.confirmTitle') : t('twoStepNeeded.title')}</Text>
-      {reason === 'enrol' ? (
+      <Text variant="hero">
+        {reason === 'confirm'
+          ? t('twoStepNeeded.confirmTitle')
+          : reason === 'recovered'
+            ? t('twoStepNeeded.recoveredTitle')
+            : t('twoStepNeeded.title')}
+      </Text>
+      {reason === 'recovered' ? (
+        <>
+          <Text testID="two-step-needed-words">{t('twoStepNeeded.recovered')}</Text>
+          <TwoStep onTurnedOn={() => void setUp()} />
+          {/* Codes by text too, unless they are an owner, as the web offers them. */}
+          {me && me.role !== 'owner' ? <TextCodes onTurnedOn={() => void setUp()} /> : null}
+          {makingWords}
+        </>
+      ) : reason === 'enrol' ? (
         <>
           <Text testID="two-step-needed-words">{t('twoStepNeeded.enrol')}</Text>
-          <TwoStep onTurnedOn={() => void carryOn()} />
+          <TwoStep onTurnedOn={() => void setUp()} />
+          {makingWords}
           <Text tone="soft" variant="secondary">
             {t('twoStepNeeded.browser')}
           </Text>

@@ -16,7 +16,14 @@ import {
   type StoredSession,
   type TokenStore,
 } from '@fdv/client';
-import { APP_UPDATE_REQUIRED_MESSAGE, type Capabilities, type Me } from '@fdv/shared';
+import {
+  APP_UPDATE_REQUIRED_MESSAGE,
+  PASSWORD_RULES_CODE,
+  TEXT_CODE_UNAVAILABLE_MESSAGE,
+  type Capabilities,
+  type Me,
+  type RecoveryWay,
+} from '@fdv/shared';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { AppState, Platform } from 'react-native';
 import { APP_VERSION, MIN_SERVER_VERSION } from '../config';
@@ -93,9 +100,21 @@ export type Blocked =
 /**
  * This session may do nothing but set up two-step sign-in, or confirm it
  * with a code, until it does (the vault's 0.9.0): `enrol`, none set up yet;
- * `confirm`, one is, and this session never gave it.
+ * `confirm`, one is, and this session never gave it; `recovered`
+ * (0.9.0-dev.104), signed in with a recovery code or security questions,
+ * which took every second step away: one set up again, and new recovery
+ * codes made beside it.
  */
-export type TwoStepNeeded = 'enrol' | 'confirm';
+export type TwoStepNeeded = 'enrol' | 'confirm' | 'recovered';
+
+/** The vault's reason, as this app knows them: anything else is `enrol`. */
+export function twoStepReason(reason: string | null | undefined): TwoStepNeeded {
+  return reason === 'confirm' || reason === 'recovered' ? reason : 'enrol';
+}
+
+/** What stands in for a lost second step, of what the vault said (0.9.0-dev.104). */
+const recoveryWays = (said: readonly string[] | undefined): RecoveryWay[] =>
+  (said ?? []).filter((w): w is RecoveryWay => w === 'recovery_code' || w === 'security_questions');
 
 export type SignInResult =
   | { kind: 'ok' }
@@ -104,8 +123,26 @@ export type SignInResult =
    * — the authenticator app's, a text, or both — the number a text goes to
    * (masked), and whether one already went as the password was accepted.
    */
-  | { kind: 'code'; methods: ('totp' | 'text')[]; textTo: string | null; textSent: boolean }
+  | {
+      kind: 'code';
+      methods: ('totp' | 'text')[];
+      textTo: string | null;
+      textSent: boolean;
+      /** What may stand in for it, if it is lost (0.9.0-dev.104): a recovery code, the security questions. */
+      recovery: RecoveryWay[];
+    }
+  /**
+   * Only a stand-in can finish this sign-in here (0.9.0-dev.104): its code
+   * by text couldn't be sent (`409 text_code_unavailable`, the vault's words
+   * in `refused`), or the second step is a passkey, which the phone hasn't
+   * (`refused` null). `recovery` is what may stand in (empty: nothing
+   * here), `passkey` whether a passkey of theirs would sign them in, in the
+   * browser.
+   */
+  | { kind: 'stand_in'; refused: string | null; recovery: RecoveryWay[]; passkey: boolean }
   | { kind: 'refused'; message: string; passkeyHint: boolean }
+  /** The new password a stand-in chose, refused by the household's rules (`400 password_rules`): the vault's words. */
+  | { kind: 'password_refused'; message: string }
   /**
    * The second step is a passkey and nothing else (the vault's 0.9.0): the
    * phone has no passkeys, so it is done in the browser.
@@ -216,6 +253,15 @@ interface VaultValue {
   signInCode: (code: string, method?: 'totp' | 'text') => Promise<SignInResult>;
   /** A code texted for the second step (SMS3): to the number the vault has, masked. */
   sendSignInText: () => Promise<{ sentTo: string } | { problem: string }>;
+  /** The security questions to answer in place of the second step (0.9.0-dev.104), in order. */
+  signInQuestions: () => Promise<{ questions: string[] } | { problem: string }>;
+  /**
+   * A recovery code, or the answers to the security questions, in place of
+   * the second step, with the new password that replaces the old
+   * (0.9.0-dev.104). Signed in, the session may only set up two-step
+   * sign-in again and make new recovery codes (`recovered`).
+   */
+  signInStandIn: (proof: { code: string } | { answers: string[] }, newPassword: string) => Promise<SignInResult>;
   signOut: () => Promise<void>;
   chooseAnotherVault: () => Promise<void>;
   withToken: <T>(fn: (api: Api, token: string) => Promise<T>) => Promise<T>;
@@ -436,7 +482,7 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
   const heard = useCallback(
     (err: unknown) => {
       if (isAppUpdateRequired(err)) heardUpdate(err.minClientVersion ?? null);
-      else if (twoStepHeld(err)) putTwoStep(err.reason === 'confirm' ? 'confirm' : 'enrol');
+      else if (twoStepHeld(err)) putTwoStep(twoStepReason(err.reason));
     },
     [heardUpdate, putTwoStep],
   );
@@ -1062,10 +1108,11 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
   );
 
   const accepted = useCallback(
-    async (tokens: Parameters<SessionCore['accept']>[0], email: string | null) => {
+    async (tokens: Parameters<SessionCore['accept']>[0], email: string | null, held: TwoStepNeeded = 'enrol') => {
       await session.accept(tokens);
       // Held to setting up two-step sign-in (0.20.0): said by the tokens; why, by GET /me.
-      putTwoStep(tokens.two_step_setup_required ? 'enrol' : null);
+      // A stand-in's sign-in is held as `recovered` (0.9.0-dev.104), as /me will say.
+      putTwoStep(tokens.two_step_setup_required ? held : null);
       if (vault && email)
         setVault(updateVault(vault.origin, { email }).known.find((k) => k.origin === vault.origin) ?? vault);
       mfaToken.current = null;
@@ -1106,6 +1153,18 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
     if (err instanceof ApiRequestError && err.code === 'sign_in_throttled') {
       return { kind: 'throttled', seconds: Math.max(1, Math.ceil(err.retryAfterSeconds ?? 60)) };
     }
+    // The code by text couldn't be sent (0.9.0-dev.104): nobody is let in, and
+    // a recovery code or the security questions may stand in, with the
+    // interim token the password earned.
+    if (err instanceof ApiRequestError && err.code === 'text_code_unavailable' && err.mfaToken) {
+      mfaToken.current = err.mfaToken;
+      return {
+        kind: 'stand_in',
+        refused: err.message || TEXT_CODE_UNAVAILABLE_MESSAGE,
+        recovery: recoveryWays(err.recovery),
+        passkey: err.methods.includes('passkey'),
+      };
+    }
     // The vault's words for a wrong password; the catalogue's for anything else (4.17).
     const words = wordsFor(err, i18n.t.bind(i18n));
     if (err instanceof ApiRequestError) {
@@ -1128,14 +1187,22 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
           const said = r.methods && r.methods.length > 0 ? r.methods : (['totp'] as const);
           // A passkey is the browser's: the phone offers the ways it has.
           const methods = said.filter((m): m is 'totp' | 'text' => m === 'totp' || m === 'text');
-          if (methods.length === 0) return { kind: 'passkey_only' };
+          const recovery = recoveryWays(r.recovery);
+          if (methods.length === 0) {
+            // A passkey alone, with nothing here to stand in for it: the browser's.
+            if (recovery.length === 0) return { kind: 'passkey_only' };
+            mfaToken.current = r.mfa_token;
+            pendingEmail.current = email.trim();
+            return { kind: 'stand_in', refused: null, recovery, passkey: true };
+          }
           mfaToken.current = r.mfa_token;
           pendingEmail.current = email.trim();
-          return { kind: 'code', methods, textTo: r.text_to ?? null, textSent: r.text_sent === true };
+          return { kind: 'code', methods, textTo: r.text_to ?? null, textSent: r.text_sent === true, recovery };
         }
         await accepted(r, email.trim());
         return { kind: 'ok' };
       } catch (err) {
+        if (err instanceof ApiRequestError && err.code === 'text_code_unavailable') pendingEmail.current = email.trim();
         return signInFailed(err);
       }
     },
@@ -1168,6 +1235,40 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
       return { problem: wordsFor(err, i18n.t.bind(i18n)) };
     }
   }, [api, gate]);
+
+  const signInQuestions = useCallback(async (): Promise<{ questions: string[] } | { problem: string }> => {
+    if (!api || !mfaToken.current) return { problem: i18n.t('signIn.startAgain') };
+    try {
+      await gate();
+      const asked = await api.signInQuestions(mfaToken.current);
+      return { questions: asked.questions };
+    } catch (err) {
+      return { problem: wordsFor(err, i18n.t.bind(i18n)) };
+    }
+  }, [api, gate]);
+
+  const signInStandIn = useCallback(
+    async (proof: { code: string } | { answers: string[] }, newPassword: string): Promise<SignInResult> => {
+      if (!api || !mfaToken.current)
+        return { kind: 'refused', message: i18n.t('signIn.startAgain'), passkeyHint: false };
+      try {
+        await gate();
+        const tokens =
+          'code' in proof
+            ? await api.signInRecoveryCode(mfaToken.current, proof.code.trim(), newPassword)
+            : await api.signInAnswers(mfaToken.current, proof.answers, newPassword);
+        await accepted(tokens, pendingEmail.current, 'recovered');
+        return { kind: 'ok' };
+      } catch (err) {
+        // The new password refused by the household's rules: said by it, in the vault's words.
+        if (err instanceof ApiRequestError && err.code === PASSWORD_RULES_CODE) {
+          return { kind: 'password_refused', message: wordsFor(err, i18n.t.bind(i18n)) };
+        }
+        return signInFailed(err);
+      }
+    },
+    [api, gate, accepted],
+  );
 
   const beforeSignOut = useRef(new Set<() => Promise<void>>());
   const onBeforeSignOut = useCallback((fn: () => Promise<void>) => {
@@ -1232,7 +1333,7 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
   const recheckTwoStep = useCallback(async (): Promise<{ done: boolean; me: Me }> => {
     const me = await withToken((a, token) => a.me(token));
     if (me.two_step_setup_required === true) {
-      putTwoStep(me.two_step_reason === 'confirm' ? 'confirm' : 'enrol');
+      putTwoStep(twoStepReason(me.two_step_reason));
       return { done: false, me };
     }
     putTwoStep(null);
@@ -1277,6 +1378,8 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
       signIn,
       signInCode,
       sendSignInText,
+      signInQuestions,
+      signInStandIn,
       signOut,
       chooseAnotherVault,
       withToken,
@@ -1308,6 +1411,8 @@ export function VaultProvider(props: { children: ReactNode; deps?: Partial<Vault
       signIn,
       signInCode,
       sendSignInText,
+      signInQuestions,
+      signInStandIn,
       signOut,
       chooseAnotherVault,
       withToken,

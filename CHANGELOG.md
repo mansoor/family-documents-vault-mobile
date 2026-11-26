@@ -6,6 +6,44 @@ app's own, tagged `vX.Y.Z` in this repository.
 
 ## [Unreleased]
 
+## [0.27.0] — Getting back in without your second step
+
+Re-pinned to the vault's **v0.9.0-dev.104**, which adds recovery codes and
+security questions to stand in for a lost second step, and refuses a
+sign-in whose code by text can't be sent instead of letting the password
+alone in. Everything new is offered only where the vault says it has it
+(`features.recovery_codes`, `features.security_questions`); on an older
+vault the phone is as it was. The phone's minimum vault stays 0.4.10.
+
+### Added
+- **Use a recovery code, or Answer your security questions, when signing
+  in.** Under the code, where the vault says either may stand in. Each
+  asks for a new password too, which replaces the old one there and then;
+  a password the household's rules refuse is said by it, in the vault's
+  words. Signed in so, your authenticator app, passkeys and codes by text
+  are taken away and every other device is signed out, as on the web.
+- **A code by text that can't be sent no longer lets you in on the
+  password alone.** Sign in says so in the vault's words and offers what
+  may stand in; if a passkey of yours would do, it points you to the
+  browser, as the app can't use passkeys yet. Recovered on another device
+  and not finished there, Sign in says that too.
+- **Set up two-step sign-in again** after getting back in that way: an
+  authenticator app, or codes by text (not for owners), then ten new
+  recovery codes, shown once — Copy (cleared from the clipboard in a
+  minute) or Share or save — and the app goes on once you tap I've kept
+  them. If they can't be made, Make my recovery codes tries again. Setting
+  up two-step sign-in when the vault asks for it now makes them too.
+- **Account → Recovery codes**: how many are left, a warning when two or
+  fewer are, and new ones made after confirming it's you (asked first: the
+  old ones stop working). Turning on two-step sign-in or codes by text in
+  Account makes ten, if you have none yet.
+- **Account → Security questions**: three, chosen from a list or in your
+  own words, set or changed after confirming it's you and removed after
+  asking first; your answers are never shown again, and the card says
+  plainly that relatives may know such answers.
+- Recovery codes and security answers are never in a screenshot, a screen
+  recording or the recent apps view while they show.
+
 ## [0.26.0] — Recent's Added and Opened, tags as other apps offer them, and the keyboard out of the way
 
 Re-pinned to the vault's **v0.9.0-dev.103**, which remembers the documents

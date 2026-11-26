@@ -15,9 +15,11 @@ import { sp } from '../ui/space';
  * set a new password. Each turned on or off after confirming it's them.
  * Said plainly beside it: a text is the weakest second step (SIM swap), as
  * well as a passkey or an authenticator app, not instead — and an owner
- * cannot make it their only one (the vault says why, `why_not`).
+ * cannot make it their only one (the vault says why, `why_not`). Either
+ * turned on, `onTurnedOn` (0.9.0-dev.104): recovery codes are made beside
+ * it, where there are none yet.
  */
-export function TextCodes() {
+export function TextCodes(props: { onTurnedOn?: () => void } = {}) {
   const { t } = useTranslation();
   const { caps, withToken } = useVault();
   const { guarded } = useStepUp();
@@ -25,6 +27,8 @@ export function TextCodes() {
   const [busy, setBusy] = useState<'sign_in' | 'reset' | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const offered = caps?.features.sms_codes === true;
+  // Where a code that can't be sent waits for a stand-in (0.9.0-dev.104), the hints say so.
+  const recovery = caps?.features.recovery_codes === true;
 
   const load = useCallback(async () => {
     if (!offered) return;
@@ -51,6 +55,8 @@ export function TextCodes() {
     try {
       const next = await guarded((a, tk) => a.setTextCodeSettings(tk, { [which]: value }));
       if (next) setState(next);
+      // A second step turned on (0.9.0-dev.104): recovery codes are made beside it.
+      if (next && value) props.onTurnedOn?.();
     } catch (err) {
       setProblem(wordsFor(err, t));
     } finally {
@@ -87,8 +93,8 @@ export function TextCodes() {
           {t('textCodes.to', { to: state.phone })}
         </Text>
       ) : null}
-      {row('sign_in', t('textCodes.signIn'), t('textCodes.signInHint'))}
-      {row('reset', t('textCodes.reset'), t('textCodes.resetHint'))}
+      {row('sign_in', t('textCodes.signIn'), recovery ? t('textCodes.signInHintRecovery') : t('textCodes.signInHint'))}
+      {row('reset', t('textCodes.reset'), recovery ? t('textCodes.resetHintRecovery') : t('textCodes.resetHint'))}
       {!state.can_turn_on && state.why_not ? (
         <Text variant="secondary" tone="soft" testID="text-codes-why-not">
           {state.why_not}

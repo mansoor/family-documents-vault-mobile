@@ -1,6 +1,7 @@
+import type { RecoveryWay } from '@fdv/shared';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { StyleSheet } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { EssentialsNotice, KeptWhileSignedOut } from '../essentials/ui';
 import { useCapture } from '../state/capture';
@@ -21,10 +22,31 @@ import { sp } from '../ui/space';
  * says so plainly, whether the vault ended the session or refused the
  * sign-in: nothing went wrong, and the person is told whom to ask. So does
  * a guest's whose access has ended (5.34, 5.36).
+ *
+ * Getting back in without the second step (0.9.0-dev.104), as the web's
+ * sign-in offers it: under the code, Use a recovery code and Answer your
+ * security questions, where the vault says they may stand in
+ * (`MfaChallenge.recovery`). Each asks for a new password too, which
+ * replaces the old one there and then. A code by text that can't be sent
+ * refuses the sign-in (`409 text_code_unavailable`): the vault's words,
+ * and only the stand-ins it has — or, when nothing here can finish it, its
+ * passkey in the browser, or a reset an owner sends. Signed in so, the
+ * session sets up two-step sign-in again (update/gate.tsx).
  */
 export default function SignIn() {
   const { t } = useTranslation();
-  const { vault, caps, notice, signIn, signInCode, sendSignInText, chooseAnotherVault, api } = useVault();
+  const {
+    vault,
+    caps,
+    notice,
+    signIn,
+    signInCode,
+    sendSignInText,
+    signInQuestions,
+    signInStandIn,
+    chooseAnotherVault,
+    api,
+  } = useVault();
   const { waitingHere } = useCapture();
   const essentials = useEssentials();
   // Kept until the sign-in completes (past the code step): it renews the
@@ -74,8 +96,22 @@ export default function SignIn() {
       setForgotBusy(false);
     }
   };
+  // What stands in for a lost second step (0.9.0-dev.104): which is chosen,
+  // which the vault offers, and a sign-in only a stand-in can finish here.
+  const [way, setWay] = useState<'second_step' | RecoveryWay>('second_step');
+  const [ways, setWays] = useState<RecoveryWay[]>([]);
+  const [onlyStandIn, setOnlyStandIn] = useState<Extract<SignInResult, { kind: 'stand_in' }> | null>(null);
+  const [recoveryCode, setRecoveryCode] = useState('');
+  const [questions, setQuestions] = useState<string[] | null>(null);
+  const [answers, setAnswers] = useState<string[]>([]);
+  // Chosen as a code or the answers stand in: the password somebody else may know never gets in again.
+  const [newPassword, setNewPassword] = useState('');
+  const [newPasswordRefused, setNewPasswordRefused] = useState<string | null>(null);
+  const [standInProblem, setStandInProblem] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [failure, setFailure] = useState<Exclude<SignInResult, { kind: 'ok' } | { kind: 'code' }> | null>(null);
+  const [failure, setFailure] = useState<
+    Exclude<SignInResult, { kind: 'ok' } | { kind: 'code' } | { kind: 'stand_in' } | { kind: 'password_refused' }> | null
+  >(null);
   // Too many tries (the vault's 0.9.0): when it takes another, and the button waits until then.
   const [waitUntil, setWaitUntil] = useState<number | null>(null);
   const [now, setNow] = useState(() => Date.now());
@@ -92,6 +128,23 @@ export default function SignIn() {
 
   const name = caps?.branding.display_name ?? vault?.displayName ?? '';
 
+  /** What the vault answered, other than the next step: signed in, or why not. */
+  function answered(r: SignInResult) {
+    if (r.kind === 'ok') {
+      void essentials.signedInWith(typed.current);
+      typed.current = '';
+    } else if (r.kind === 'password_refused') {
+      setNewPasswordRefused(r.message);
+    } else if (r.kind !== 'code' && r.kind !== 'stand_in') {
+      if (r.kind === 'throttled') {
+        const at = Date.now();
+        setNow(at);
+        setWaitUntil(at + r.seconds * 1000);
+      }
+      setFailure(r);
+    }
+  }
+
   async function submit() {
     setBusy(true);
     setFailure(null);
@@ -102,26 +155,123 @@ export default function SignIn() {
         setStep('code');
         setPassword('');
         setSecond(r);
+        setWays(r.recovery);
         // A text already gone, or a text the only way: the code is the text's.
         const byText = r.textSent || !r.methods.includes('totp');
         setMethod(byText ? 'text' : 'totp');
         setTextedTo(r.textSent ? r.textTo : null);
         setTextProblem(null);
-      } else if (r.kind === 'ok') {
-        void essentials.signedInWith(typed.current);
-        typed.current = '';
-      } else {
-        if (r.kind === 'throttled') {
-          const at = Date.now();
-          setNow(at);
-          setWaitUntil(at + r.seconds * 1000);
-        }
-        setFailure(r);
-      }
+      } else if (r.kind === 'stand_in') {
+        setStep('code');
+        setPassword('');
+        setSecond(null);
+        setWays(r.recovery);
+        setOnlyStandIn(r);
+      } else answered(r);
     } finally {
       setBusy(false);
     }
   }
+
+  /** One of what stands in for the second step, chosen: the questions are asked for as they are. */
+  const choose = async (next: RecoveryWay) => {
+    setFailure(null);
+    setStandInProblem(null);
+    setWay(next);
+    if (next !== 'security_questions' || questions) return;
+    setBusy(true);
+    try {
+      const asked = await signInQuestions();
+      if ('questions' in asked) {
+        setQuestions(asked.questions);
+        setAnswers(asked.questions.map(() => ''));
+      } else setStandInProblem(asked.problem);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /** The recovery code, or the answers, in place of the second step, with the new password. */
+  const standIn = async () => {
+    if (busy) return;
+    setBusy(true);
+    setFailure(null);
+    setStandInProblem(null);
+    setNewPasswordRefused(null);
+    try {
+      // The new password is the one that opens Essentials kept here from now on.
+      typed.current = newPassword;
+      answered(
+        await signInStandIn(way === 'recovery_code' ? { code: recoveryCode } : { answers }, newPassword),
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /** Back to the email and password, as if nothing had been typed after them. */
+  const startAgain = () => {
+    setStep('password');
+    setSecond(null);
+    setCode('');
+    setTextedTo(null);
+    setTextProblem(null);
+    setWay('second_step');
+    setWays([]);
+    setOnlyStandIn(null);
+    setRecoveryCode('');
+    setQuestions(null);
+    setAnswers([]);
+    setNewPassword('');
+    setNewPasswordRefused(null);
+    setStandInProblem(null);
+    setFailure(null);
+    typed.current = '';
+  };
+
+  // A stand-in chosen, or the only way on from here.
+  const standingIn = step === 'code' && (way !== 'second_step' || onlyStandIn !== null);
+  const standInReady =
+    newPassword !== '' &&
+    (way === 'recovery_code'
+      ? recoveryCode.trim() !== ''
+      : way === 'security_questions' && questions !== null && answers.every((a) => a.trim() !== ''));
+  // What stands in, as quiet buttons under the second step.
+  const standInLinks = (
+    <>
+      {ways.includes('recovery_code') && way !== 'recovery_code' ? (
+        <Button
+          testID="sign-in-use-recovery-code"
+          kind="quiet"
+          size="small"
+          label={t('signIn.useRecoveryCode')}
+          onPress={() => void choose('recovery_code')}
+        />
+      ) : null}
+      {ways.includes('security_questions') && way !== 'security_questions' ? (
+        <Button
+          testID="sign-in-use-questions"
+          kind="quiet"
+          size="small"
+          label={t('signIn.useQuestions')}
+          onPress={() => void choose('security_questions')}
+        />
+      ) : null}
+      {way !== 'second_step' && !onlyStandIn ? (
+        <Button
+          testID="sign-in-use-second-step"
+          kind="quiet"
+          size="small"
+          label={t('signIn.useSecondStep')}
+          onPress={() => {
+            setWay('second_step');
+            setStandInProblem(null);
+            setFailure(null);
+          }}
+        />
+      ) : null}
+    </>
+  );
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -146,7 +296,107 @@ export default function SignIn() {
         ) : null}
         {notice === 'reinstalled' ? <Notice tone="warn">{t('connect.reinstalled')}</Notice> : null}
         <Card>
-          {step === 'password' ? (
+          {standingIn ? (
+            <View style={styles.form}>
+              <Text variant="title" testID="sign-in-stand-in-title">
+                {way === 'recovery_code'
+                  ? t('signIn.recoveryTitle')
+                  : way === 'security_questions'
+                    ? t('signIn.questionsTitle')
+                    : t('signIn.oneMoreStep')}
+              </Text>
+              <Text testID="sign-in-stand-in-words">
+                {way === 'recovery_code'
+                  ? t('signIn.recoveryWords')
+                  : way === 'security_questions'
+                    ? t('signIn.questionsWords')
+                    : (onlyStandIn?.refused ?? t('signIn.passkeySecond'))}
+              </Text>
+              {way === 'second_step' && onlyStandIn?.refused && onlyStandIn.passkey ? (
+                // The phone has no passkeys: one of theirs signs them in, in the browser.
+                <Text tone="soft" variant="secondary" testID="sign-in-passkey-browser">
+                  {t('signIn.passkeyBrowser')}
+                </Text>
+              ) : null}
+              {way !== 'second_step' ? (
+                <Text tone="soft" variant="secondary" testID="sign-in-stand-in-warning">
+                  {t('signIn.standInWarning')}
+                </Text>
+              ) : null}
+              {way === 'recovery_code' ? (
+                <Field
+                  key="sign-in-recovery-code"
+                  testID="sign-in-recovery-code"
+                  label={t('signIn.recoveryCode')}
+                  value={recoveryCode}
+                  onChangeText={setRecoveryCode}
+                  placeholder="xxxxx-xxxxx"
+                  autoComplete="off"
+                  importantForAutofill="no"
+                />
+              ) : null}
+              {way === 'security_questions'
+                ? (questions ?? []).map((q, i) => (
+                    <Field
+                      key={`sign-in-answer-${i}`}
+                      testID={`sign-in-answer-${i}`}
+                      label={q}
+                      value={answers[i] ?? ''}
+                      autoComplete="off"
+                      importantForAutofill="no"
+                      onChangeText={(v) => setAnswers(answers.map((a, j) => (j === i ? v : a)))}
+                    />
+                  ))
+                : null}
+              {way !== 'second_step' ? (
+                <>
+                  <Field
+                    key="sign-in-new-password"
+                    testID="sign-in-new-password"
+                    label={t('signIn.newPassword')}
+                    value={newPassword}
+                    onChangeText={(v) => {
+                      setNewPassword(v);
+                      setNewPasswordRefused(null);
+                    }}
+                    error={newPasswordRefused}
+                    secureTextEntry
+                    textContentType="newPassword"
+                    autoComplete="new-password"
+                    returnKeyType="go"
+                    onSubmitEditing={() => {
+                      if (standInReady) void standIn();
+                    }}
+                  />
+                  <Text variant="small" tone="soft">
+                    {t('signIn.newPasswordHint')}
+                  </Text>
+                </>
+              ) : null}
+              {standInProblem ? (
+                <Notice tone="warn" testID="sign-in-stand-in-problem">
+                  {standInProblem}
+                </Notice>
+              ) : null}
+              {way !== 'second_step' ? (
+                <Button
+                  testID="sign-in-stand-in-go"
+                  label={t('signIn.continue')}
+                  busy={busy}
+                  disabled={left > 0 || !standInReady}
+                  onPress={() => void standIn()}
+                />
+              ) : null}
+              {standInLinks}
+              <Button
+                testID="sign-in-start-again"
+                kind="quiet"
+                size="small"
+                label={t('signIn.startAgainButton')}
+                onPress={startAgain}
+              />
+            </View>
+          ) : step === 'password' ? (
             <>
               <Field
                 testID="sign-in-email"
@@ -228,6 +478,7 @@ export default function SignIn() {
                   }}
                 />
               ) : null}
+              {standInLinks}
             </>
           )}
           {step === 'password' ? (
@@ -244,18 +495,20 @@ export default function SignIn() {
               }}
             />
           ) : null}
-          <Button
-            testID="sign-in-go"
-            label={step === 'password' ? t('signIn.signIn') : t('signIn.confirm')}
-            onPress={() => void submit()}
-            busy={busy}
-            disabled={
-              left > 0 ||
-              (step === 'password'
-                ? !email.trim() || !password
-                : code.replace(/\s/g, '').length < 6 || (method === 'text' && !textedTo))
-            }
-          />
+          {standingIn ? null : (
+            <Button
+              testID="sign-in-go"
+              label={step === 'password' ? t('signIn.signIn') : t('signIn.confirm')}
+              onPress={() => void submit()}
+              busy={busy}
+              disabled={
+                left > 0 ||
+                (step === 'password'
+                  ? !email.trim() || !password
+                  : code.replace(/\s/g, '').length < 6 || (method === 'text' && !textedTo))
+              }
+            />
+          )}
         </Card>
         {failure?.kind === 'refused' ? (
           <Notice tone="danger" testID="sign-in-refused">
@@ -352,4 +605,5 @@ export default function SignIn() {
 const styles = StyleSheet.create({
   safe: { flex: 1 },
   page: { padding: sp(20), gap: sp(16) },
+  form: { gap: sp(12) },
 });
